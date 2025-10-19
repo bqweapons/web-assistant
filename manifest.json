@@ -1,0 +1,47 @@
+{
+  "manifest_version": 3,
+  "name": "Page Augmentor",
+  "version": "1.0.0",
+  "description": "Add custom buttons and links to any webpage and manage them from a side panel.",
+  "action": {
+    "default_title": "Open Page Augmentor"
+  },
+  "side_panel": {
+    "default_path": "sidepanel/sidepanel.html"
+  },
+  "permissions": [
+    "activeTab",
+    "scripting",
+    "storage",
+    "tabs",
+    "sidePanel"
+  ],
+  "host_permissions": ["<all_urls>"],
+  "background": {
+    "service_worker": "service_worker.js",
+    "type": "module"
+  },
+  "content_scripts": [
+    {
+      "matches": ["<all_urls>"],
+      "js": ["content/content.js"],
+      "run_at": "document_idle"
+    }
+  ],
+  "web_accessible_resources": [
+    {
+      "resources": [
+        "content/selector.js",
+        "content/inject.js",
+        "common/messaging.js",
+        "common/types.js"
+      ],
+      "matches": ["<all_urls>"]
+    }
+  ],
+  "icons": {
+    "16": "assets/icon16.png",
+    "48": "assets/icon48.png",
+    "128": "assets/icon128.png"
+  }
+}

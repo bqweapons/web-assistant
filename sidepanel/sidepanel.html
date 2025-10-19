@@ -1,0 +1,255 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <title>Page Augmentor</title>
+    <link rel="stylesheet" href="sidepanel.css" />
+  </head>
+  <body>
+    <main class="sp-app">
+      <header class="sp-header">
+        <div>
+          <h1>Page Augmentor</h1>
+          <p class="sp-subtitle" data-role="context">Loading active tab…</p>
+        </div>
+        <button type="button" class="sp-overview" data-action="open-overview">一览页面</button>
+      </header>
+      <section class="sp-create">
+        <h2>添加新元素</h2>
+        <form data-role="creator">
+          <div class="sp-field">
+            <label>
+              类型
+              <select name="type">
+                <option value="button">按钮</option>
+                <option value="link">链接</option>
+              </select>
+            </label>
+          </div>
+          <div class="sp-field">
+            <label>
+              目标元素
+              <div class="sp-target">
+                <input type="text" name="selector" placeholder="点击“拾取目标”选择页面元素" readonly required />
+                <button type="button" data-action="pick-target" data-form="creator">拾取目标</button>
+              </div>
+            </label>
+          </div>
+          <div class="sp-field">
+            <label>
+              文本
+              <input type="text" name="text" required maxlength="160" placeholder="按钮或链接文本" />
+            </label>
+          </div>
+          <div class="sp-field" data-role="creator-href">
+            <label>
+              URL（按钮可选）
+              <input type="url" name="href" placeholder="https://example.com" />
+            </label>
+          </div>
+          <div class="sp-field">
+            <label>
+              插入位置
+              <select name="position">
+                <option value="append">Append</option>
+                <option value="prepend">Prepend</option>
+                <option value="before">Before</option>
+                <option value="after">After</option>
+              </select>
+            </label>
+          </div>
+          <fieldset class="sp-fieldset">
+            <legend>样式</legend>
+            <div class="sp-grid">
+              <label>
+                文字颜色
+                <input name="color" type="text" placeholder="#ffffff" />
+              </label>
+              <label>
+                背景
+                <input name="backgroundColor" type="text" placeholder="#1b84ff" />
+              </label>
+              <label>
+                字号
+                <input name="fontSize" type="text" placeholder="16px" />
+              </label>
+              <label>
+                内边距
+                <input name="padding" type="text" placeholder="8px 16px" />
+              </label>
+              <label>
+                圆角
+                <input name="borderRadius" type="text" placeholder="4px" />
+              </label>
+              <label>
+                定位方式
+                <select name="positioning">
+                  <option value="">自动</option>
+                  <option value="static">Static</option>
+                  <option value="relative">Relative</option>
+                  <option value="absolute">Absolute</option>
+                  <option value="fixed">Fixed</option>
+                </select>
+              </label>
+              <label>
+                Top
+                <input name="top" type="text" placeholder="auto" />
+              </label>
+              <label>
+                Right
+                <input name="right" type="text" placeholder="auto" />
+              </label>
+              <label>
+                Bottom
+                <input name="bottom" type="text" placeholder="auto" />
+              </label>
+              <label>
+                Left
+                <input name="left" type="text" placeholder="auto" />
+              </label>
+            </div>
+          </fieldset>
+          <div class="sp-actions">
+            <button type="submit" class="sp-primary">保存元素</button>
+            <button type="button" data-action="reset-creator">重置</button>
+          </div>
+          <p class="sp-message" data-role="creator-message" aria-live="polite"></p>
+        </form>
+      </section>
+      <section class="sp-controls">
+        <label class="sp-search">
+          <span class="sp-search__label">Search</span>
+          <input type="search" data-role="search" placeholder="Filter by text or selector" />
+        </label>
+        <label class="sp-filter">
+          <span>Type</span>
+          <select data-role="type-filter">
+            <option value="all">All</option>
+            <option value="button">Button</option>
+            <option value="link">Link</option>
+          </select>
+        </label>
+      </section>
+      <section class="sp-list" data-role="list" aria-live="polite"></section>
+      <section class="sp-detail" data-role="detail" hidden>
+        <h2>Edit element</h2>
+        <form data-role="editor">
+          <input type="hidden" name="id" />
+          <input type="hidden" name="pageUrl" />
+          <div class="sp-field">
+            <label>
+              Type
+              <span data-role="type-label"></span>
+            </label>
+          </div>
+          <div class="sp-field">
+            <label>
+              Text
+              <input type="text" name="text" required />
+            </label>
+          </div>
+          <div class="sp-field" data-role="href-field">
+            <label>
+              URL（按钮可选）
+              <input type="url" name="href" placeholder="https://example.com" />
+            </label>
+          </div>
+          <div class="sp-field">
+            <label>
+              Selector
+              <div class="sp-target">
+                <input type="text" name="selector" readonly />
+                <button type="button" data-action="pick-target" data-form="editor">拾取目标</button>
+              </div>
+            </label>
+          </div>
+          <div class="sp-field">
+            <label>
+              Position
+              <select name="position">
+                <option value="append">Append</option>
+                <option value="prepend">Prepend</option>
+                <option value="before">Before</option>
+                <option value="after">After</option>
+              </select>
+            </label>
+          </div>
+          <fieldset class="sp-fieldset">
+            <legend>Styles</legend>
+            <div class="sp-grid">
+              <label>
+                Text color
+                <input name="color" type="text" />
+              </label>
+              <label>
+                Background
+                <input name="backgroundColor" type="text" />
+              </label>
+              <label>
+                Font size
+                <input name="fontSize" type="text" />
+              </label>
+              <label>
+                Padding
+                <input name="padding" type="text" />
+              </label>
+              <label>
+                Border radius
+                <input name="borderRadius" type="text" />
+              </label>
+              <label>
+                Positioning
+                <select name="positioning">
+                  <option value="">Auto</option>
+                  <option value="static">Static</option>
+                  <option value="relative">Relative</option>
+                  <option value="absolute">Absolute</option>
+                  <option value="fixed">Fixed</option>
+                </select>
+              </label>
+              <label>
+                Top
+                <input name="top" type="text" />
+              </label>
+              <label>
+                Right
+                <input name="right" type="text" />
+              </label>
+              <label>
+                Bottom
+                <input name="bottom" type="text" />
+              </label>
+              <label>
+                Left
+                <input name="left" type="text" />
+              </label>
+            </div>
+          </fieldset>
+          <div class="sp-actions">
+            <button type="submit" class="sp-primary">Save changes</button>
+            <button type="button" data-action="cancel-edit">Cancel</button>
+          </div>
+          <p class="sp-message" data-role="message" aria-live="polite"></p>
+        </form>
+      </section>
+    </main>
+    <template id="item-template">
+      <article class="sp-card">
+        <header class="sp-card__header">
+          <span class="sp-badge" data-role="item-type"></span>
+          <time data-role="item-date"></time>
+        </header>
+        <p class="sp-card__text" data-role="item-text"></p>
+        <p class="sp-card__subtext">
+          <span data-role="item-selector"></span>
+        </p>
+        <footer class="sp-card__actions">
+          <button type="button" data-action="focus">Focus</button>
+          <button type="button" data-action="edit">Edit</button>
+          <button type="button" data-action="delete" class="sp-danger">Delete</button>
+        </footer>
+      </article>
+    </template>
+    <script type="module" src="sidepanel.js"></script>
+  </body>
+</html>

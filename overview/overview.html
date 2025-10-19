@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <title>Page Augmentor 一览</title>
+    <link rel="stylesheet" href="overview.css" />
+  </head>
+  <body>
+    <header class="ov-header">
+      <div>
+        <h1>Page Augmentor 一览</h1>
+        <p class="ov-subtitle">查看所有网页上已添加的按钮与链接。</p>
+      </div>
+      <button type="button" class="ov-refresh" data-action="refresh">刷新</button>
+    </header>
+    <section class="ov-summary" data-role="summary">
+      <div class="ov-card">
+        <span class="ov-card__label">网页数量</span>
+        <strong class="ov-card__value" data-role="page-count">0</strong>
+      </div>
+      <div class="ov-card">
+        <span class="ov-card__label">元素总数</span>
+        <strong class="ov-card__value" data-role="element-count">0</strong>
+      </div>
+    </section>
+    <section class="ov-content" data-role="content" aria-live="polite"></section>
+
+    <template id="page-template">
+      <article class="ov-section">
+        <header class="ov-section__header">
+          <div class="ov-section__title">
+            <h2 data-role="page-url"></h2>
+            <span class="ov-section__meta" data-role="page-meta"></span>
+          </div>
+          <div class="ov-section__actions">
+            <button type="button" data-action="open-page">打开网页</button>
+            <button type="button" class="ov-danger" data-action="clear-page">清空该页</button>
+          </div>
+        </header>
+        <ul class="ov-list" data-role="item-list"></ul>
+      </article>
+    </template>
+
+    <template id="item-template">
+      <li class="ov-item">
+        <div class="ov-item__main">
+          <span class="ov-item__badge" data-role="item-type"></span>
+          <span class="ov-item__text" data-role="item-text"></span>
+        </div>
+        <div class="ov-item__meta">
+          <span data-role="item-selector"></span>
+          <span data-role="item-created"></span>
+        </div>
+        <div class="ov-item__actions">
+          <button type="button" data-action="focus-item">定位</button>
+          <button type="button" data-action="edit-item">在侧边栏编辑</button>
+          <button type="button" class="ov-danger" data-action="delete-item">删除</button>
+        </div>
+      </li>
+    </template>
+
+    <script type="module" src="overview.js"></script>
+  </body>
+</html>
