@@ -3,13 +3,13 @@ const HIGHLIGHT_FILL_COLOR = 'rgba(27, 132, 255, 0.2)';
 
 const VALID_POSITIONS = new Set(['append', 'prepend', 'before', 'after']);
 const STYLE_FIELD_CONFIGS = [
-  { name: 'color', label: 'Text color', placeholder: '#2563eb', colorPicker: true },
-  { name: 'backgroundColor', label: 'Background', placeholder: '#1b84ff', colorPicker: true },
-  { name: 'fontSize', label: 'Font size', placeholder: '16px' },
-  { name: 'fontWeight', label: 'Font weight', placeholder: '600' },
-  { name: 'padding', label: 'Padding', placeholder: '8px 16px' },
-  { name: 'borderRadius', label: 'Border radius', placeholder: '8px' },
-  { name: 'textDecoration', label: 'Text decoration', placeholder: 'underline' },
+  { name: 'color', label: '文字色', placeholder: '#2563eb', colorPicker: true },
+  { name: 'backgroundColor', label: '背景色', placeholder: '#1b84ff', colorPicker: true },
+  { name: 'fontSize', label: 'フォントサイズ', placeholder: '16px' },
+  { name: 'fontWeight', label: 'フォント太さ', placeholder: '600' },
+  { name: 'padding', label: 'パディング', placeholder: '8px 16px' },
+  { name: 'borderRadius', label: '角丸', placeholder: '8px' },
+  { name: 'textDecoration', label: 'テキスト装飾', placeholder: 'underline' },
 ];
 
 const DEFAULT_BUTTON_STYLE = {
@@ -24,6 +24,13 @@ const DEFAULT_BUTTON_STYLE = {
 const DEFAULT_LINK_STYLE = {
   color: '#2563eb',
   textDecoration: 'underline',
+};
+
+const POSITION_LABELS = {
+  append: '末尾に追加',
+  prepend: '先頭に追加',
+  before: '直前に挿入',
+  after: '直後に挿入',
 };
 
 const cssEscape = typeof CSS !== 'undefined' && typeof CSS.escape === 'function'
@@ -323,7 +330,7 @@ function createElementBubble() {
   bubble.addEventListener('mousedown', (event) => event.stopPropagation());
 
   const title = document.createElement('h3');
-  title.textContent = 'Element settings';
+  title.textContent = '要素設定';
   Object.assign(title.style, {
     margin: '0 0 10px 0',
     fontSize: '14px',
@@ -340,7 +347,7 @@ function createElementBubble() {
   });
 
   const selectorTitle = document.createElement('span');
-  selectorTitle.textContent = 'Target selector';
+  selectorTitle.textContent = '対象セレクター';
   Object.assign(selectorTitle.style, {
     fontSize: '12px',
     fontWeight: '600',
@@ -378,7 +385,7 @@ function createElementBubble() {
   });
 
   const previewLabel = document.createElement('span');
-  previewLabel.textContent = 'Live preview';
+  previewLabel.textContent = 'ライブプレビュー';
   Object.assign(previewLabel.style, {
     fontSize: '11px',
     fontWeight: '600',
@@ -404,14 +411,14 @@ function createElementBubble() {
   ['button', 'link'].forEach((value) => {
     const option = document.createElement('option');
     option.value = value;
-    option.textContent = value === 'button' ? 'Button' : 'Link';
+    option.textContent = value === 'button' ? 'ボタン' : 'リンク';
     typeSelect.appendChild(option);
   });
   styleInput(typeSelect);
 
   const textInput = document.createElement('input');
   textInput.type = 'text';
-  textInput.placeholder = 'Element text';
+  textInput.placeholder = '要素のテキスト';
   textInput.maxLength = 160;
   styleInput(textInput);
 
@@ -424,15 +431,15 @@ function createElementBubble() {
   ['append', 'prepend', 'before', 'after'].forEach((value) => {
     const option = document.createElement('option');
     option.value = value;
-    option.textContent = value.charAt(0).toUpperCase() + value.slice(1);
+    option.textContent = POSITION_LABELS[value] || value;
     positionSelect.appendChild(option);
   });
   styleInput(positionSelect);
 
-  const typeField = createField('Element type', typeSelect);
-  const textField = createField('Text content', textInput);
-  const hrefField = createField('Destination URL', hrefInput);
-  const positionField = createField('Insert position', positionSelect);
+  const typeField = createField('要素タイプ', typeSelect);
+  const textField = createField('テキスト', textInput);
+  const hrefField = createField('リンクURL', hrefInput);
+  const positionField = createField('挿入位置', positionSelect);
 
   const styleFieldset = document.createElement('fieldset');
   Object.assign(styleFieldset.style, {
@@ -445,7 +452,7 @@ function createElementBubble() {
   });
 
   const styleLegend = document.createElement('legend');
-  styleLegend.textContent = 'Style overrides';
+  styleLegend.textContent = 'スタイル設定';
   Object.assign(styleLegend.style, {
     fontSize: '12px',
     fontWeight: '600',
@@ -508,7 +515,7 @@ function createElementBubble() {
   });
 
   const styleHint = document.createElement('p');
-  styleHint.textContent = 'Leave fields blank to keep the default appearance.';
+  styleHint.textContent = '空欄の項目は既定のスタイルが使用されます。';
   Object.assign(styleHint.style, {
     margin: '0',
     fontSize: '11px',
@@ -534,7 +541,7 @@ function createElementBubble() {
 
   const cancelButton = document.createElement('button');
   cancelButton.type = 'button';
-  cancelButton.textContent = 'Cancel';
+  cancelButton.textContent = 'キャンセル';
   Object.assign(cancelButton.style, {
     padding: '7px 12px',
     borderRadius: '10px',
@@ -548,7 +555,7 @@ function createElementBubble() {
 
   const saveButton = document.createElement('button');
   saveButton.type = 'submit';
-  saveButton.textContent = 'Save';
+  saveButton.textContent = '保存';
   Object.assign(saveButton.style, {
     padding: '7px 12px',
     borderRadius: '10px',
@@ -660,7 +667,7 @@ function createElementBubble() {
     const payload = buildPayload();
     ensurePreviewElement(payload.type);
     previewElement.textContent =
-      payload.text || (payload.type === 'link' ? 'Link preview' : 'Button preview');
+      payload.text || (payload.type === 'link' ? 'リンクのプレビュー' : 'ボタンのプレビュー');
     applyPreviewBase(previewElement, payload.type);
     if (payload.style) {
       Object.entries(payload.style).forEach(([key, value]) => {
@@ -675,8 +682,8 @@ function createElementBubble() {
   const handleTypeChange = (applyDefaults = false) => {
     const isLink = state.type === 'link';
     hrefInput.required = isLink;
-    hrefInput.placeholder = isLink ? 'https://example.com' : 'https://example.com (optional)';
-    hrefField.label.textContent = isLink ? 'Destination URL' : 'Optional URL';
+    hrefInput.placeholder = isLink ? 'https://example.com' : 'https://example.com（任意）';
+    hrefField.label.textContent = isLink ? 'リンクURL' : '任意のURL';
     if (applyDefaults) {
       const defaults = state.type === 'link' ? DEFAULT_LINK_STYLE : DEFAULT_BUTTON_STYLE;
       resetStyleState(defaults);
@@ -714,7 +721,9 @@ function createElementBubble() {
     record.text.addEventListener('input', (event) => {
       styleState[name] = event.target.value;
       if (record.color && /^#(?:[0-9a-fA-F]{3}|[0-9a-fA-F]{6})$/i.test(event.target.value.trim())) {
-        record.color.value = event.target.value.trim();
+        const hex = event.target.value.trim();
+        record.color.value = hex;
+        record.color.dataset.defaultValue = hex;
       }
       updatePreview();
     });
@@ -728,6 +737,7 @@ function createElementBubble() {
       record.color.addEventListener('input', (event) => {
         styleState[name] = event.target.value;
         record.text.value = event.target.value;
+        record.color.dataset.defaultValue = event.target.value;
         updatePreview();
       });
     }
@@ -737,12 +747,12 @@ function createElementBubble() {
     event.preventDefault();
     const payload = buildPayload();
     if (!payload.text) {
-      errorLabel.textContent = 'Please provide text content.';
+      errorLabel.textContent = 'テキストを入力してください。';
       textInput.focus({ preventScroll: true });
       return;
     }
     if (payload.type === 'link' && !state.href.trim()) {
-      errorLabel.textContent = 'Links require a destination URL.';
+      errorLabel.textContent = 'リンクにはURLが必要です。';
       hrefInput.focus({ preventScroll: true });
       return;
     }
@@ -835,8 +845,8 @@ function createElementBubble() {
       resetStyleState(initial.style);
       handleTypeChange();
       errorLabel.textContent = '';
-      title.textContent = mode === 'edit' ? 'Edit element' : 'Add element';
-      saveButton.textContent = mode === 'edit' ? 'Save changes' : 'Create element';
+      title.textContent = mode === 'edit' ? '要素を編集' : '要素を追加';
+      saveButton.textContent = mode === 'edit' ? '変更を保存' : '作成';
       updatePreview({ propagate: false });
       submitHandler = (payload) => {
         detach();
@@ -948,7 +958,8 @@ function applyPreviewBase(element, type) {
     element.style.display = 'inline';
     element.style.color = '#2563eb';
     element.style.textDecoration = 'underline';
-    element.style.padding = '10';
+    element.style.padding = '0';
+    element.style.lineHeight = 'inherit';
     element.style.backgroundColor = 'transparent';
   } else {
     element.style.display = 'inline-flex';
@@ -958,7 +969,9 @@ function applyPreviewBase(element, type) {
     element.style.borderRadius = '8px';
     element.style.backgroundColor = '#1b84ff';
     element.style.color = '#fff';
-    element.style.fontSize = '0.95rem';
+    element.style.fontSize = '16px';
+    element.style.fontWeight = '600';
+    element.style.lineHeight = '1.2';
     element.style.border = 'none';
     element.style.textDecoration = 'none';
     element.style.boxShadow = '0 2px 4px rgba(0, 0, 0, 0.12)';

@@ -357,13 +357,39 @@ function applyStyle(node, style) {
  */
 function applyBaseAppearance(node, type) {
   node.className = NODE_CLASS;
+  node.removeAttribute('style');
+  node.style.fontFamily = 'inherit';
   if (type === 'link') {
     node.removeAttribute('type');
+    node.style.display = 'inline';
+    node.style.color = '#2563eb';
+    node.style.textDecoration = 'underline';
+    node.style.backgroundColor = 'transparent';
+    node.style.padding = '0';
+    node.style.lineHeight = 'inherit';
+    node.style.border = 'none';
+    node.style.cursor = 'pointer';
     if (node instanceof HTMLAnchorElement) {
       node.setAttribute('role', 'link');
     }
-  } else if (node instanceof HTMLButtonElement) {
-    node.type = 'button';
+  } else {
+    if (node instanceof HTMLButtonElement) {
+      node.type = 'button';
+    }
+    node.style.display = 'inline-flex';
+    node.style.alignItems = 'center';
+    node.style.justifyContent = 'center';
+    node.style.padding = '8px 16px';
+    node.style.borderRadius = '8px';
+    node.style.backgroundColor = '#1b84ff';
+    node.style.color = '#ffffff';
+    node.style.fontSize = '16px';
+    node.style.fontWeight = '600';
+    node.style.lineHeight = '1.2';
+    node.style.border = 'none';
+    node.style.textDecoration = 'none';
+    node.style.boxShadow = '0 2px 4px rgba(0, 0, 0, 0.12)';
+    node.style.cursor = 'pointer';
   }
 }
 

@@ -22,8 +22,11 @@
  * @property {string | undefined} [color]
  * @property {string | undefined} [backgroundColor]
  * @property {string | undefined} [fontSize]
+ * @property {string | undefined} [fontWeight]
+ * @property {string | undefined} [lineHeight]
  * @property {string | undefined} [padding]
  * @property {string | undefined} [borderRadius]
+ * @property {string | undefined} [textDecoration]
  */
 
 /**
