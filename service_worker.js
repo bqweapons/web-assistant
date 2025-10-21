@@ -59,7 +59,10 @@ addAsyncMessageListener(async (message, sender) => {
       if (!targetTabId) {
         throw new Error('Missing tabId for picker.');
       }
-      await safeSendMessage(targetTabId, { type: MessageType.START_PICKER, pageUrl });
+      const forwarded = { ...(message.data || {}) };
+      delete forwarded.tabId;
+      delete forwarded.pageUrl;
+      await safeSendMessage(targetTabId, { type: MessageType.START_PICKER, pageUrl, data: forwarded });
       return true;
     }
     case MessageType.CANCEL_PICKER: {
@@ -98,6 +101,19 @@ addAsyncMessageListener(async (message, sender) => {
       }
       await safeSendMessage(targetTabId, {
         type: MessageType.FOCUS_ELEMENT,
+        pageUrl,
+        data: { id },
+      });
+      return true;
+    }
+    case MessageType.OPEN_EDITOR: {
+      const { id, tabId, pageUrl } = message.data || {};
+      const targetTabId = tabId ?? sender.tab?.id;
+      if (!targetTabId || !id) {
+        throw new Error('Missing tabId or element id.');
+      }
+      await safeSendMessage(targetTabId, {
+        type: MessageType.OPEN_EDITOR,
         pageUrl,
         data: { id },
       });

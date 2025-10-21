@@ -10,8 +10,11 @@ const ALLOWED_STYLE_KEYS = new Set([
   'color',
   'backgroundColor',
   'fontSize',
+  'fontWeight',
+  'lineHeight',
   'padding',
   'borderRadius',
+  'textDecoration',
 ]);
 
 /** @type {Map<string, import('../common/types.js').InjectedElement>} */
@@ -92,6 +95,41 @@ export function getElement(elementId) {
 }
 
 /**
+ * Retrieves the host element for a stored id.
+ * @param {string} elementId
+ * @returns {HTMLElement | null}
+ */
+export function getHost(elementId) {
+  const host = hosts.get(elementId);
+  return host && document.contains(host) ? host : null;
+}
+
+/**
+ * Applies an unsaved preview to an element without mutating stored data.
+ * @param {string} elementId
+ * @param {Partial<import('../common/types.js').InjectedElement>} overrides
+ */
+export function previewElement(elementId, overrides) {
+  const base = elements.get(elementId);
+  if (!base) {
+    return;
+  }
+  const host = hosts.get(elementId);
+  if (!host || !document.contains(host)) {
+    return;
+  }
+  const merged = {
+    ...base,
+    ...overrides,
+    style: {
+      ...(base.style || {}),
+      ...(overrides?.style || {}),
+    },
+  };
+  applyMetadata(host, merged);
+}
+
+/**
  * Highlights the injected element by id.
  * @param {string} elementId
  * @returns {boolean}
@@ -129,36 +167,40 @@ function createHost(element) {
   style.textContent = `
     :host {
       all: initial;
-      display: inline-flex;
+      display: inline-block;
       max-width: max-content;
-    }
-    button, a {
-      all: unset;
-      font-family: inherit;
-      cursor: pointer;
-      display: inline-flex;
-      align-items: center;
-      justify-content: center;
-      padding: 0.5rem 1rem;
-      border-radius: 0.5rem;
-      background-color: #1b84ff;
-      color: #fff;
-      text-decoration: none;
-      font-size: 0.95rem;
-      border: none;
-      box-shadow: 0 2px 4px rgba(0, 0, 0, 0.12);
-      transition: transform 0.15s ease, box-shadow 0.15s ease;
-    }
-    button:hover, a:hover {
-      transform: translateY(-1px);
-      box-shadow: 0 4px 8px rgba(0, 0, 0, 0.18);
-    }
-    button:focus-visible, a:focus-visible {
-      outline: 2px solid #1b84ff;
-      outline-offset: 2px;
     }
     .${NODE_CLASS} {
       pointer-events: auto;
+      font-family: inherit;
+    }
+    button.${NODE_CLASS} {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      padding: 0.5rem 1rem !important;
+      border-radius: 0.5rem !important;
+      background-color: #1b84ff;
+      color: #fff;
+      border: none;
+      cursor: pointer;
+      font-size: 0.95rem;
+      text-decoration: none;
+      transition: transform 0.15s ease, box-shadow 0.15s ease;
+      box-shadow: 0 2px 4px rgba(0, 0, 0, 0.12);
+    }
+    button.${NODE_CLASS}:hover {
+      transform: translateY(-1px);
+      box-shadow: 0 4px 8px rgba(0, 0, 0, 0.18);
+    }
+    button.${NODE_CLASS}:focus-visible {
+      outline: 2px solid #1b84ff;
+      outline-offset: 2px;
+    }
+    a.${NODE_CLASS} {
+      color: #2563eb;
+      text-decoration: underline;
+      cursor: pointer;
     }
     .flash-outline {
       animation: flash-outline 1.1s ease-out forwards;
@@ -173,9 +215,8 @@ function createHost(element) {
     }
   `;
   shadowRoot.appendChild(style);
-
   const node = element.type === 'link' ? document.createElement('a') : document.createElement('button');
-  node.className = NODE_CLASS;
+  applyBaseAppearance(node, element.type);
   node.textContent = element.text;
   if (element.type === 'link') {
     const sanitized = sanitizeUrl(element.href || '');
@@ -203,10 +244,20 @@ function applyMetadata(host, element) {
   if (!shadow) {
     return;
   }
-  const node = shadow.querySelector(`.${NODE_CLASS}`);
+  let node = shadow.querySelector(`.${NODE_CLASS}`);
   if (!node) {
     return;
   }
+  if (element.type === 'link' && !(node instanceof HTMLAnchorElement)) {
+    const replacement = document.createElement('a');
+    shadow.replaceChild(replacement, node);
+    node = replacement;
+  } else if (element.type === 'button' && !(node instanceof HTMLButtonElement)) {
+    const replacement = document.createElement('button');
+    shadow.replaceChild(replacement, node);
+    node = replacement;
+  }
+  applyBaseAppearance(node, element.type);
   node.textContent = element.text;
   if (element.type === 'link') {
     const sanitized = sanitizeUrl(element.href || '');
@@ -300,6 +351,23 @@ function applyStyle(node, style) {
 }
 
 /**
+ * Applies baseline styling for the element type.
+ * @param {HTMLElement} node
+ * @param {'button' | 'link'} type
+ */
+function applyBaseAppearance(node, type) {
+  node.className = NODE_CLASS;
+  if (type === 'link') {
+    node.removeAttribute('type');
+    if (node instanceof HTMLAnchorElement) {
+      node.setAttribute('role', 'link');
+    }
+  } else if (node instanceof HTMLButtonElement) {
+    node.type = 'button';
+  }
+}
+
+/**
  * Converts camelCase keys to kebab-case CSS property names.
  * @param {string} value
  * @returns {string}
@@ -358,3 +426,5 @@ function flashHighlight(host) {
   void node.offsetWidth; // force reflow
   node.classList.add('flash-outline');
 }
+
+

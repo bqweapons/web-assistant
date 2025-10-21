@@ -14,6 +14,8 @@
 
   const state = {
     pickerSession: /** @type {{ stop: () => void } | null} */ (null),
+    editorSession: /** @type {{ close: () => void } | null} */ (null),
+    activeEditorElementId: /** @type {string | null} */ (null),
   };
 
   await hydrateElements();
@@ -92,13 +94,20 @@
           break;
         }
         case MessageType.START_PICKER: {
-          beginPicker();
+          beginPicker(message.data || {});
           sendResponse?.({ ok: true });
           break;
         }
         case MessageType.CANCEL_PICKER: {
           stopPicker();
           sendResponse?.({ ok: true });
+          break;
+        }
+        case MessageType.OPEN_EDITOR: {
+          if (message.data?.id) {
+            const opened = openEditorBubble(message.data.id);
+            sendResponse?.({ ok: opened });
+          }
           break;
         }
         default:
@@ -129,19 +138,33 @@
   }
 
   /**
-   * Starts the element picker and reports the selection to the extension.
+   * Starts the element picker and opens the bubble workflow on selection.
+   * @param {{ mode?: 'create' }} [options]
    */
-  function beginPicker() {
+  function beginPicker(options = {}) {
     stopPicker();
+    closeEditorBubble();
     document.body.style.cursor = 'crosshair';
     state.pickerSession = selectorModule.startElementPicker({
-      onPick(target, selector) {
-        stopPicker();
+      mode: options.mode || 'create',
+      onTarget(target, selector) {
         sendMessage(MessageType.PICKER_RESULT, {
           pageUrl,
           selector,
           preview: describeElement(target),
         }).catch((error) => console.error('[PageAugmentor] Failed to send picker result', error));
+      },
+      onSubmit(payload) {
+        stopPicker();
+        const elementPayload = {
+          ...payload,
+          pageUrl,
+          createdAt: Date.now(),
+          updatedAt: Date.now(),
+        };
+        sendMessage(MessageType.CREATE, elementPayload).catch((error) =>
+          console.error('[PageAugmentor] Failed to save new element', error),
+        );
       },
       onCancel() {
         stopPicker();
@@ -157,10 +180,93 @@
    */
   function stopPicker() {
     if (state.pickerSession) {
-      state.pickerSession.stop();
+      try {
+        state.pickerSession.stop();
+      } catch (error) {
+        console.warn('[PageAugmentor] Failed to stop picker cleanly', error);
+      }
       state.pickerSession = null;
     }
     document.body.style.cursor = '';
+  }
+
+  /**
+   * Opens the in-page editor bubble for an existing injected element.
+   * @param {string} elementId
+   * @returns {boolean}
+   */
+  function openEditorBubble(elementId) {
+    closeEditorBubble();
+    const element = injectModule.getElement(elementId);
+    if (!element) {
+      console.warn('[PageAugmentor] Requested editor for unknown element', elementId);
+      return false;
+    }
+    let host = injectModule.getHost(elementId);
+    if (!host) {
+      const ensured = injectModule.ensureElement(element);
+      if (!ensured) {
+        console.warn('[PageAugmentor] Unable to ensure element before opening editor', elementId);
+        return false;
+      }
+      host = injectModule.getHost(elementId);
+    }
+    if (!host) {
+      console.warn('[PageAugmentor] Host element not found for editor', elementId);
+      return false;
+    }
+    state.activeEditorElementId = elementId;
+    const session = selectorModule.openElementEditor({
+      target: host,
+      selector: element.selector,
+      values: element,
+      onPreview(updated) {
+        injectModule.previewElement(elementId, updated || {});
+      },
+      onSubmit(updated) {
+        injectModule.previewElement(elementId, updated || {});
+        state.activeEditorElementId = null;
+        closeEditorBubble();
+        const payload = {
+          ...element,
+          ...updated,
+          pageUrl,
+          id: elementId,
+          updatedAt: Date.now(),
+        };
+        sendMessage(MessageType.UPDATE, payload).catch((error) =>
+          console.error('[PageAugmentor] Failed to update element', error),
+        );
+      },
+      onCancel() {
+        closeEditorBubble();
+      },
+    });
+    state.editorSession = session;
+    injectModule.focusElement(elementId);
+    return true;
+  }
+
+  /**
+   * Closes the editor bubble if present.
+   */
+  function closeEditorBubble() {
+    if (state.editorSession) {
+      try {
+        state.editorSession.close();
+      } catch (error) {
+        console.warn('[PageAugmentor] Failed to close editor bubble', error);
+      }
+      state.editorSession = null;
+    }
+    if (state.activeEditorElementId) {
+      try {
+        injectModule.previewElement(state.activeEditorElementId, {});
+      } catch (error) {
+        console.warn('[PageAugmentor] Failed to reset preview element', error);
+      }
+      state.activeEditorElementId = null;
+    }
   }
 
   /**
