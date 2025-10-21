@@ -178,8 +178,8 @@ function createHost(element) {
       display: inline-flex;
       align-items: center;
       justify-content: center;
-      padding: 0.5rem 1rem !important;
-      border-radius: 0.5rem !important;
+      padding: 0.5rem 1rem;
+      border-radius: 0.5rem;
       background-color: #1b84ff;
       color: #fff;
       border: none;
@@ -365,7 +365,7 @@ function applyBaseAppearance(node, type) {
     node.style.color = '#2563eb';
     node.style.textDecoration = 'underline';
     node.style.backgroundColor = 'transparent';
-    node.style.padding = '0';
+    node.style.padding = '0.5rem 1rem';
     node.style.lineHeight = 'inherit';
     node.style.border = 'none';
     node.style.cursor = 'pointer';
@@ -379,7 +379,7 @@ function applyBaseAppearance(node, type) {
     node.style.display = 'inline-flex';
     node.style.alignItems = 'center';
     node.style.justifyContent = 'center';
-    node.style.padding = '8px 16px';
+    node.style.padding = '0.5rem 1rem';
     node.style.borderRadius = '8px';
     node.style.backgroundColor = '#1b84ff';
     node.style.color = '#ffffff';

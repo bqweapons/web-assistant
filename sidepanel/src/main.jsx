@@ -8,7 +8,7 @@ const defaultCreatorMessage = '';
 function App() {
   const [pageUrl, setPageUrl] = useState('');
   const [tabId, setTabId] = useState(undefined);
-  const [contextLabel, setContextLabel] = useState('Loading active page...');
+  const [contextLabel, setContextLabel] = useState('アクティブなページを読み込み中...');
   const [items, setItems] = useState([]);
   const [filterText, setFilterText] = useState('');
   const [filterType, setFilterType] = useState('all');
@@ -29,7 +29,7 @@ function App() {
         setItems(Array.isArray(list) ? list : []);
       } catch (error) {
         console.error('Failed to load elements', error);
-        setCreationMessage(`Failed to load items: ${error.message}`);
+        setCreationMessage(`要素を読み込めませんでした: ${error.message}`);
       }
     },
     [pageUrl],
@@ -45,11 +45,11 @@ function App() {
           setPageUrl(normalized);
           setContextLabel(normalized);
         } else {
-          setContextLabel('No active tab detected');
+          setContextLabel('アクティブなタブが見つかりません');
         }
       } catch (error) {
         console.error('Unable to resolve active tab', error);
-        setContextLabel(`Failed to read active tab: ${error.message}`);
+        setContextLabel(`アクティブなタブを取得できません: ${error.message}`);
       }
     })();
   }, []);
@@ -73,13 +73,13 @@ function App() {
         case MessageType.PICKER_RESULT: {
           if (message.data?.selector) {
             const preview = formatPreview(message.data.preview);
-            setCreationMessage(preview ? `Selected ${preview}` : 'Target selected');
+            setCreationMessage(preview ? `${preview} を選択しました` : 'ターゲットを選択しました');
           }
           setPendingPicker(false);
           break;
         }
         case MessageType.PICKER_CANCELLED:
-          setCreationMessage('Picker cancelled');
+          setCreationMessage('選択をキャンセルしました');
           setPendingPicker(false);
           break;
         case MessageType.REHYDRATE:
@@ -101,7 +101,7 @@ function App() {
           });
           break;
         }
-        case MessageType.DELETE:
+        case MessageType.削除:
           if (message.data?.id) {
             setItems((current) => current.filter((item) => item.id !== message.data.id));
           }
@@ -153,20 +153,20 @@ function App() {
       await cancelActivePicker();
     }
     if (!pageUrl) {
-      setCreationMessage('Active page URL not available yet');
+      setCreationMessage('ページのURLがまだ利用できません');
       return;
     }
     if (!tabId) {
-      setCreationMessage('Unable to locate the active tab');
+      setCreationMessage('アクティブなタブを特定できません');
       return;
     }
     setPendingPicker(true);
-    setCreationMessage('Click on the page to pick a target element');
+    setCreationMessage('ページ上をクリックしてターゲット要素を選択してください');
     try {
       await sendMessage(MessageType.START_PICKER, { tabId, pageUrl, mode: 'create' });
     } catch (error) {
       setPendingPicker(false);
-      setCreationMessage(`Failed to start picker: ${error.message}`);
+      setCreationMessage(`要素選択を開始できません: ${error.message}`);
     }
   };
 
@@ -184,45 +184,45 @@ function App() {
 
   const focusElement = async (id) => {
     if (!tabId || !pageUrl) {
-      setCreationMessage('Activate the tab before focusing an element');
+      setCreationMessage('要素をフォーカスする前にタブをアクティブにしてください');
       return;
     }
     try {
       await chrome.tabs.update(tabId, { active: true });
       await sendMessage(MessageType.FOCUS_ELEMENT, { id, tabId, pageUrl });
     } catch (error) {
-      setCreationMessage(`Unable to focus element: ${error.message}`);
+      setCreationMessage(`要素をフォーカスできません: ${error.message}`);
     }
   };
 
   const deleteElement = async (id) => {
-    if (!window.confirm('Remove this element?')) {
+    if (!window.confirm('この要素を削除しますか？')) {
       return;
     }
     try {
-      const list = await sendMessage(MessageType.DELETE, { id, pageUrl });
+      const list = await sendMessage(MessageType.削除, { id, pageUrl });
       setItems(Array.isArray(list) ? list : []);
-      setCreationMessage('Element removed');
+      setCreationMessage('要素を削除しました');
     } catch (error) {
-      setCreationMessage(`Failed to delete element: ${error.message}`);
+      setCreationMessage(`要素を削除できません: ${error.message}`);
     }
   };
 
   const openEditorBubble = async (id) => {
     if (!pageUrl) {
-      setCreationMessage('Active page URL not available yet');
+      setCreationMessage('ページのURLがまだ利用できません');
       return;
     }
     if (!tabId) {
-      setCreationMessage('Unable to locate the active tab');
+      setCreationMessage('アクティブなタブを特定できません');
       return;
     }
     try {
       await chrome.tabs.update(tabId, { active: true });
       await sendMessage(MessageType.OPEN_EDITOR, { id, pageUrl, tabId });
-      setCreationMessage('Bubble editor opened on the page');
+      setCreationMessage('バブルエディターをページに表示しました');
     } catch (error) {
-      setCreationMessage(`Failed to open bubble: ${error.message}`);
+      setCreationMessage(`バブルを開けませんでした: ${error.message}`);
     }
   };
 
@@ -255,7 +255,7 @@ function App() {
             }`}
             onClick={() => handleSwitchView('manage')}
           >
-            元素管理
+            要素管理
           </button>
           <button
             type="button"
@@ -266,7 +266,7 @@ function App() {
             }`}
             onClick={() => handleSwitchView('overview')}
           >
-            全局一?
+            要素一覧
           </button>
         </div>
       </header>
@@ -276,8 +276,8 @@ function App() {
       <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-brand">
         <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
           <div>
-            <h2 className="text-lg font-semibold text-slate-900">Add element</h2>
-            <p className="text-xs text-slate-500">Pick a target element to open the in-page bubble editor.</p>
+            <h2 className="text-lg font-semibold text-slate-900">要素を追加</h2>
+            <p className="text-xs text-slate-500">ページ内でターゲット要素を選択すると、バブルエディターが開きます。</p>
           </div>
           <div className="flex gap-3">
             <button
@@ -286,7 +286,7 @@ function App() {
               onClick={handleStartCreation}
               disabled={pendingPicker}
             >
-              {pendingPicker ? 'Picking...' : 'Pick target'}
+              {pendingPicker ? '選択中...' : 'ターゲットを選択'}
             </button>
             {pendingPicker && (
               <button
@@ -294,7 +294,7 @@ function App() {
                 className="rounded-xl border border-slate-200 bg-slate-100 px-4 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-200"
                 onClick={cancelActivePicker}
               >
-                Cancel
+                キャンセル
               </button>
             )}
           </div>
@@ -308,25 +308,25 @@ function App() {
 
       <section className="flex flex-col gap-3 rounded-2xl border border-slate-200 bg-white p-5 shadow-brand md:flex-row md:items-end md:justify-between">
         <label className="flex w-full flex-col gap-2 text-sm text-slate-700 md:max-w-md">
-          Search
+          検索
           <input
-            className="rounded-lg border border-slate-200 bg-white p-2 text-sm shadow-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-100"
+            className="rounded-lg border border-slate-200 bg-white p-2 text-sm shadow-sm フォーカス:border-blue-500 フォーカス:outline-none フォーカス:ring-2 フォーカス:ring-blue-100"
             type="search"
-            placeholder="Filter by text, selector or url"
+            placeholder="テキスト・セレクター・URLでフィルター"
             value={filterText}
             onChange={(event) => setFilterText(event.target.value)}
           />
         </label>
         <label className="flex flex-col gap-2 text-sm text-slate-700 md:w-48">
-          Type filter
+          フィルター
           <select
-            className="rounded-lg border border-slate-200 bg-white p-2 text-sm shadow-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-100"
+            className="rounded-lg border border-slate-200 bg-white p-2 text-sm shadow-sm フォーカス:border-blue-500 フォーカス:outline-none フォーカス:ring-2 フォーカス:ring-blue-100"
             value={filterType}
             onChange={(event) => setFilterType(event.target.value)}
           >
-            <option value="all">All</option>
-            <option value="button">Button</option>
-            <option value="link">Link</option>
+            <option value="all">すべて</option>
+            <option value="button">ボタン</option>
+            <option value="link">リンク</option>
           </select>
         </label>
       </section>
@@ -334,7 +334,7 @@ function App() {
       <section className="grid gap-4">
         {filteredItems.length === 0 ? (
           <p className="rounded-xl border border-dashed border-slate-200 bg-white p-6 text-center text-sm text-slate-500 shadow-brand">
-            No elements match your filters.
+            条件に一致する要素がありません。
           </p>
         ) : (
           filteredItems.map((item) => (
@@ -349,7 +349,7 @@ function App() {
                 </span>
                 <time className="text-xs text-slate-500">{formatDate(item.createdAt)}</time>
               </header>
-              <p className="mt-3 text-base font-medium text-slate-900">{item.text || '(empty text)'}</p>
+                      <p className="mt-3 text-base font-medium text-slate-900">{item.text || '（テキストなし）'}</p>
               <p className="mt-2 break-all text-xs text-slate-500">{item.selector}</p>
               {item.href && (
                 <p className="mt-1 break-all text-xs text-blue-600">{item.href}</p>
@@ -363,7 +363,7 @@ function App() {
                     focusElement(item.id);
                   }}
                 >
-                  Focus
+                  フォーカス
                 </button>
                 <button
                   type="button"
@@ -373,7 +373,7 @@ function App() {
                     openEditorBubble(item.id);
                   }}
                 >
-                  Open bubble
+                  バブルを開く
                 </button>
                 <button
                   type="button"
@@ -383,7 +383,7 @@ function App() {
                     deleteElement(item.id);
                   }}
                 >
-                  Delete
+                  削除
                 </button>
               </footer>
             </article>
@@ -419,7 +419,7 @@ function OverviewView({ onOpenManage }) {
       setStore(data || {});
     } catch (error) {
       console.error('Failed to load overview', error);
-      setStatus(`Failed to load data: ${error.message}`);
+      setStatus(`データを読み込めませんでした: ${error.message}`);
     } finally {
       setLoading(false);
     }
@@ -429,7 +429,7 @@ function OverviewView({ onOpenManage }) {
     setStore((prev) => {
       const next = { ...prev };
       if (!list || list.length === 0) {
-        delete next[pageUrl];
+        削除 next[pageUrl];
       } else {
         next[pageUrl] = list;
       }
@@ -448,22 +448,22 @@ function OverviewView({ onOpenManage }) {
     try {
       await sendMessage(MessageType.CLEAR_PAGE, { pageUrl });
       updatePage(pageUrl, []);
-      setStatus('Page cleared');
+      setStatus('ページの要素をすべて削除しました');
     } catch (error) {
-      setStatus(`Failed to clear page: ${error.message}`);
+      setStatus(`ページの要素を削除できませんでした: ${error.message}`);
     }
   };
 
   const handleDeleteItem = async (pageUrl, id) => {
-    if (!window.confirm('Delete this element?')) {
+    if (!window.confirm('削除 this element?')) {
       return;
     }
     try {
-      const list = await sendMessage(MessageType.DELETE, { pageUrl, id });
+      const list = await sendMessage(MessageType.削除, { pageUrl, id });
       updatePage(pageUrl, list);
-      setStatus('Element removed');
+      setStatus('要素を削除しました');
     } catch (error) {
-      setStatus(`Failed to delete element: ${error.message}`);
+      setStatus(`要素を削除できませんでした: ${error.message}`);
     }
   };
 
@@ -471,14 +471,14 @@ function OverviewView({ onOpenManage }) {
     const tab = await findTabByPageUrl(pageUrl);
     if (!tab?.id) {
       const created = await chrome.tabs.create({ url: pageUrl });
-      alert('Opened a new tab. Please open the side panel manually and try again.');
+      alert('新しいタブを開きました。サイドパネルを手動で開いてから再度お試しください。');
       return created;
     }
     await chrome.tabs.update(tab.id, { active: true });
     try {
       await sendMessage(MessageType.FOCUS_ELEMENT, { pageUrl, id, tabId: tab.id });
     } catch (error) {
-      alert(`Failed to focus element: ${error.message}`);
+      alert(`要素をフォーカスできませんでした: ${error.message}`);
     }
   };
 
@@ -497,7 +497,7 @@ function OverviewView({ onOpenManage }) {
         onOpenManage();
       }
     } catch (error) {
-      alert(`Failed to open bubble editor: ${error.message}`);
+      alert(`バブルエディターを開けませんでした: ${error.message}`);
     }
   };
 
@@ -505,11 +505,11 @@ function OverviewView({ onOpenManage }) {
     <section className="flex flex-col gap-6">
       <section className="grid gap-4 md:grid-cols-2">
         <article className="rounded-2xl border border-slate-200 bg-white p-5 shadow-brand">
-          <span className="text-sm font-medium text-slate-500">Pages</span>
+          <span className="text-sm font-medium text-slate-500">ページ数</span>
           <p className="mt-2 text-3xl font-semibold text-slate-900">{entries.length}</p>
         </article>
         <article className="rounded-2xl border border-slate-200 bg-white p-5 shadow-brand">
-          <span className="text-sm font-medium text-slate-500">Elements</span>
+          <span className="text-sm font-medium text-slate-500">要素数</span>
           <p className="mt-2 text-3xl font-semibold text-slate-900">{totalElements}</p>
         </article>
       </section>
@@ -521,7 +521,7 @@ function OverviewView({ onOpenManage }) {
           onClick={refresh}
           disabled={loading}
         >
-          {loading ? 'Refreshing…' : 'Refresh'}
+          {loading ? '更新中…' : '更新'}
         </button>
         {status && (
           <p className="rounded-xl border border-slate-200 bg-amber-50 px-4 py-2 text-sm text-amber-700 shadow-brand">
@@ -533,7 +533,7 @@ function OverviewView({ onOpenManage }) {
       <section className="grid gap-6">
         {entries.length === 0 ? (
           <p className="rounded-xl border border-dashed border-slate-200 bg-white p-8 text-center text-sm text-slate-500 shadow-brand">
-            No pages have stored elements yet.
+            まだ保存された要素はありません。
           </p>
         ) : (
           entries.map(([pageUrl, items]) => (
@@ -541,7 +541,7 @@ function OverviewView({ onOpenManage }) {
               <header className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
                 <div className="space-y-1">
                   <h2 className="break-all text-base font-semibold text-slate-900">{pageUrl}</h2>
-                  <p className="text-xs text-slate-500">{items.length} element(s)</p>
+                  <p className="text-xs text-slate-500">{`${items.length} 件の要素`}</p>
                 </div>
                 <div className="flex flex-wrap gap-3">
                   <button
@@ -549,14 +549,14 @@ function OverviewView({ onOpenManage }) {
                     className="rounded-lg bg-blue-50 px-3 py-2 text-sm font-semibold text-blue-700 transition hover:bg-blue-100"
                     onClick={() => handleOpenPage(pageUrl)}
                   >
-                    Open page
+                    ページを開く
                   </button>
                   <button
                     type="button"
                     className="rounded-lg bg-rose-100 px-3 py-2 text-sm font-semibold text-rose-700 transition hover:bg-rose-200"
                     onClick={() => handleClearPage(pageUrl)}
                   >
-                    Clear page
+                    ページをクリア
                   </button>
                 </div>
               </header>
@@ -568,11 +568,11 @@ function OverviewView({ onOpenManage }) {
                     <li key={item.id} className="rounded-xl border border-slate-200 bg-slate-50 p-4">
                       <div className="flex flex-wrap items-start justify-between gap-3">
                         <span className="inline-flex items-center rounded-full bg-indigo-100 px-3 py-1 text-xs font-semibold uppercase tracking-wide text-indigo-700">
-                          {item.type}
+                          {item.type === 'link' ? 'リンク' : 'ボタン'}
                         </span>
                         <span className="text-xs text-slate-500">{formatDate(item.createdAt)}</span>
                       </div>
-                      <p className="mt-3 text-sm font-semibold text-slate-900">{item.text || '(empty text)'}</p>
+                      <p className="mt-3 text-sm font-semibold text-slate-900">{item.text || '（テキストなし）'}</p>
                       <p className="mt-1 break-all text-xs text-slate-500">{item.selector}</p>
                       {item.href && (
                         <p className="mt-1 break-all text-xs text-blue-600">{item.href}</p>
@@ -583,21 +583,21 @@ function OverviewView({ onOpenManage }) {
                           className="rounded-lg bg-blue-50 px-3 py-2 text-sm font-semibold text-blue-700 transition hover:bg-blue-100"
                           onClick={() => handleFocusItem(pageUrl, item.id)}
                         >
-                          Focus
+                          フォーカス
                         </button>
                         <button
                           type="button"
                           className="rounded-lg bg-slate-100 px-3 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-200"
                           onClick={() => handleEditItem(pageUrl, item.id)}
                         >
-                          Open bubble
+                          バブルを開く
                         </button>
                         <button
                           type="button"
                           className="rounded-lg bg-rose-100 px-3 py-2 text-sm font-semibold text-rose-700 transition hover:bg-rose-200"
                           onClick={() => handleDeleteItem(pageUrl, item.id)}
                         >
-                          Delete
+                          削除
                         </button>
                       </div>
                     </li>
@@ -618,7 +618,7 @@ function formatDate(timestamp) {
 
 function formatPreview(preview) {
   if (!preview) {
-    return 'target element';
+    return '対象要素';
   }
   const parts = [];
   if (preview.tag) {
