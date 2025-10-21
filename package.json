@@ -1,0 +1,18 @@
+{
+  "name": "page-augmentor",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build:sidepanel": "node ./scripts/build.mjs sidepanel",
+    "build:css": "tailwindcss -c tailwind.config.js -i ./sidepanel/src/index.css -o ./sidepanel/dist/index.css --minify",
+    "build": "npm run build:sidepanel && npm run build:css"
+  },
+  "devDependencies": {
+    "@tailwindcss/forms": "^0.5.7",
+    "esbuild": "^0.21.5",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "tailwindcss": "^3.4.14"
+  }
+}
