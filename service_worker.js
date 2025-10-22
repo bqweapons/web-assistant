@@ -2,6 +2,8 @@ import { getElementsByUrl, upsertElement, deleteElement, getFullStore, clearPage
 import { addAsyncMessageListener, MessageType } from './common/messaging.js';
 import { openSidePanelOrTab } from './common/compat.js';
 
+const TOOLTIP_POSITIONS = new Set(['top', 'right', 'bottom', 'left']);
+
 chrome.runtime.onInstalled.addListener(async () => {
   if (chrome.sidePanel?.setPanelBehavior) {
     await chrome.sidePanel.setPanelBehavior({ openPanelOnActionClick: true });
@@ -62,7 +64,7 @@ addAsyncMessageListener(async (message, sender) => {
       const forwarded = { ...(message.data || {}) };
       delete forwarded.tabId;
       delete forwarded.pageUrl;
-      await safeSendMessage(targetTabId, { type: MessageType.START_PICKER, pageUrl, data: forwarded });
+      await sendMessageToFrames(targetTabId, { type: MessageType.START_PICKER, pageUrl, data: forwarded });
       return true;
     }
     case MessageType.CANCEL_PICKER: {
@@ -71,7 +73,7 @@ addAsyncMessageListener(async (message, sender) => {
       if (!targetTabId) {
         throw new Error('Missing tabId for picker cancellation.');
       }
-      await safeSendMessage(targetTabId, { type: MessageType.CANCEL_PICKER, pageUrl });
+      await sendMessageToFrames(targetTabId, { type: MessageType.CANCEL_PICKER, pageUrl });
       return true;
     }
     case MessageType.PICKER_RESULT: {
@@ -99,10 +101,15 @@ addAsyncMessageListener(async (message, sender) => {
       if (!targetTabId || !id) {
         throw new Error('Missing tabId or element id.');
       }
-      await safeSendMessage(targetTabId, {
+      const element = pageUrl && id ? await findElement(pageUrl, id) : null;
+      await sendMessageToFrames(targetTabId, {
         type: MessageType.FOCUS_ELEMENT,
         pageUrl,
-        data: { id },
+        data: {
+          id,
+          frameSelectors: element?.frameSelectors || [],
+          frameUrl: element?.frameUrl,
+        },
       });
       return true;
     }
@@ -112,10 +119,15 @@ addAsyncMessageListener(async (message, sender) => {
       if (!targetTabId || !id) {
         throw new Error('Missing tabId or element id.');
       }
-      await safeSendMessage(targetTabId, {
+      const element = pageUrl && id ? await findElement(pageUrl, id) : null;
+      await sendMessageToFrames(targetTabId, {
         type: MessageType.OPEN_EDITOR,
         pageUrl,
-        data: { id },
+        data: {
+          id,
+          frameSelectors: element?.frameSelectors || [],
+          frameUrl: element?.frameUrl,
+        },
       });
       return true;
     }
@@ -143,11 +155,36 @@ function validateElementPayload(payload) {
     throw new Error('selector is required.');
   }
   const now = Date.now();
-  return {
+  const element = {
     createdAt: payload.createdAt || now,
     ...payload,
     text: payload.text || '',
   };
+  if (element.type === 'tooltip') {
+    element.tooltipPosition = TOOLTIP_POSITIONS.has(element.tooltipPosition)
+      ? element.tooltipPosition
+      : 'top';
+    element.tooltipPersistent = Boolean(element.tooltipPersistent);
+  } else {
+    delete element.tooltipPosition;
+    delete element.tooltipPersistent;
+  }
+  if (Array.isArray(element.frameSelectors)) {
+    element.frameSelectors = element.frameSelectors.map((value) => String(value));
+  } else {
+    delete element.frameSelectors;
+  }
+  if (typeof element.frameLabel === 'string' && element.frameLabel.trim()) {
+    element.frameLabel = element.frameLabel.trim().slice(0, 200);
+  } else {
+    delete element.frameLabel;
+  }
+  if (typeof element.frameUrl === 'string' && element.frameUrl.trim()) {
+    element.frameUrl = element.frameUrl.trim();
+  } else {
+    delete element.frameUrl;
+  }
+  return element;
 }
 
 /**
@@ -161,7 +198,7 @@ async function broadcastState(pageUrl, elements) {
   await Promise.allSettled(
     tabs
       .filter((tab) => tab.id && tab.url && normalizeUrl(tab.url) === pageUrl)
-      .map((tab) => safeSendMessage(tab.id, { type: MessageType.REHYDRATE, pageUrl, data: elements })),
+      .map((tab) => sendMessageToFrames(tab.id, { type: MessageType.REHYDRATE, pageUrl, data: elements })),
   );
   try {
     await chrome.runtime.sendMessage({ type: MessageType.REHYDRATE, pageUrl, data: elements });
@@ -176,12 +213,37 @@ async function broadcastState(pageUrl, elements) {
  * @param {unknown} message
  * @returns {Promise<void>}
  */
-async function safeSendMessage(tabId, message) {
+async function safeSendMessage(tabId, message, frameId) {
   try {
-    await chrome.tabs.sendMessage(tabId, message);
+    if (typeof frameId === 'number') {
+      await chrome.tabs.sendMessage(tabId, message, { frameId });
+    } else {
+      await chrome.tabs.sendMessage(tabId, message);
+    }
   } catch (error) {
     // Content script might not be injected yet; ignore silently.
   }
+}
+
+async function sendMessageToFrames(tabId, message) {
+  try {
+    const frames = await chrome.webNavigation.getAllFrames({ tabId });
+    if (!frames || frames.length === 0) {
+      await safeSendMessage(tabId, message);
+      return;
+    }
+    await Promise.allSettled(frames.map((frame) => safeSendMessage(tabId, message, frame.frameId)));
+  } catch (error) {
+    await safeSendMessage(tabId, message);
+  }
+}
+
+async function findElement(pageUrl, id) {
+  if (!pageUrl || !id) {
+    return null;
+  }
+  const list = await getElementsByUrl(pageUrl);
+  return list.find((item) => item.id === id) || null;
 }
 
 /**

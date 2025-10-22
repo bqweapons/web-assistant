@@ -14,7 +14,8 @@
     "scripting",
     "storage",
     "tabs",
-    "sidePanel"
+    "sidePanel",
+    "webNavigation"
   ],
   "host_permissions": ["<all_urls>"],
   "background": {
@@ -25,7 +26,8 @@
     {
       "matches": ["<all_urls>"],
       "js": ["content/content.js"],
-      "run_at": "document_idle"
+      "run_at": "document_idle",
+      "all_frames": true
     }
   ],
   "web_accessible_resources": [

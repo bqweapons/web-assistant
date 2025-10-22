@@ -15,7 +15,10 @@ const ALLOWED_STYLE_KEYS = new Set([
   'padding',
   'borderRadius',
   'textDecoration',
+  'maxWidth',
 ]);
+
+const TOOLTIP_POSITIONS = new Set(['top', 'right', 'bottom', 'left']);
 
 /** @type {Map<string, import('../common/types.js').InjectedElement>} */
 const elements = new Map();
@@ -202,6 +205,88 @@ function createHost(element) {
       text-decoration: underline;
       cursor: pointer;
     }
+    .${NODE_CLASS}.tooltip {
+      position: relative;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 0.35rem;
+      cursor: help;
+      font-family: inherit;
+    }
+    .${NODE_CLASS}.tooltip[data-persistent='true'] {
+      cursor: default;
+    }
+    .${NODE_CLASS}.tooltip:focus {
+      outline: none;
+    }
+    .tooltip-trigger {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 1.5rem;
+      height: 1.5rem;
+      border-radius: 9999px;
+      background-color: #2563eb;
+      color: #ffffff;
+      font-size: 0.95rem;
+      font-weight: 600;
+      box-shadow: 0 2px 4px rgba(15, 23, 42, 0.18);
+      user-select: none;
+    }
+    .tooltip-bubble {
+      position: absolute;
+      z-index: 10;
+      max-width: 240px;
+      min-width: max-content;
+      padding: 0.45rem 0.75rem;
+      border-radius: 0.75rem;
+      background-color: #111827;
+      color: #f8fafc;
+      font-size: 0.85rem;
+      line-height: 1.4;
+      box-shadow: 0 12px 30px rgba(15, 23, 42, 0.22);
+      opacity: 0;
+      pointer-events: none;
+      transform: var(--tooltip-hidden-transform, translate3d(-50%, 6px, 0));
+      transition: opacity 0.16s ease, transform 0.16s ease;
+      white-space: pre-wrap;
+    }
+    .${NODE_CLASS}.tooltip[data-persistent='true'] .tooltip-bubble {
+      opacity: 1;
+      pointer-events: auto;
+      transform: var(--tooltip-visible-transform, translate3d(-50%, 0, 0));
+    }
+    .${NODE_CLASS}.tooltip[data-persistent='false']:hover .tooltip-bubble,
+    .${NODE_CLASS}.tooltip[data-persistent='false']:focus-within .tooltip-bubble {
+      opacity: 1;
+      pointer-events: auto;
+      transform: var(--tooltip-visible-transform, translate3d(-50%, 0, 0));
+    }
+    .${NODE_CLASS}.tooltip[data-position='top'] .tooltip-bubble {
+      bottom: calc(100% + 8px);
+      left: 50%;
+      --tooltip-hidden-transform: translate3d(-50%, 6px, 0);
+      --tooltip-visible-transform: translate3d(-50%, 0, 0);
+    }
+    .${NODE_CLASS}.tooltip[data-position='bottom'] .tooltip-bubble {
+      top: calc(100% + 8px);
+      left: 50%;
+      --tooltip-hidden-transform: translate3d(-50%, -6px, 0);
+      --tooltip-visible-transform: translate3d(-50%, 0, 0);
+    }
+    .${NODE_CLASS}.tooltip[data-position='left'] .tooltip-bubble {
+      right: calc(100% + 8px);
+      top: 50%;
+      --tooltip-hidden-transform: translate3d(6px, -50%, 0);
+      --tooltip-visible-transform: translate3d(0, -50%, 0);
+    }
+    .${NODE_CLASS}.tooltip[data-position='right'] .tooltip-bubble {
+      left: calc(100% + 8px);
+      top: 50%;
+      --tooltip-hidden-transform: translate3d(-6px, -50%, 0);
+      --tooltip-visible-transform: translate3d(0, -50%, 0);
+    }
     .flash-outline {
       animation: flash-outline 1.1s ease-out forwards;
     }
@@ -215,22 +300,11 @@ function createHost(element) {
     }
   `;
   shadowRoot.appendChild(style);
-  const node = element.type === 'link' ? document.createElement('a') : document.createElement('button');
-  applyBaseAppearance(node, element.type);
-  node.textContent = element.text;
-  if (element.type === 'link') {
-    const sanitized = sanitizeUrl(element.href || '');
-    if (sanitized) {
-      node.setAttribute('href', sanitized);
-      node.setAttribute('rel', 'noopener noreferrer');
-      node.setAttribute('target', '_blank');
-    }
-  } else if (node instanceof HTMLButtonElement) {
-    node.type = 'button';
-    applyButtonBehavior(node, element.href);
-  }
+  const node = createNodeForType(element.type);
   shadowRoot.appendChild(node);
-  applyStyle(node, element.style);
+  hydrateNode(node, element);
+  const styleTarget = getStyleTarget(node);
+  applyStyle(styleTarget, element.style);
   return host;
 }
 
@@ -245,21 +319,49 @@ function applyMetadata(host, element) {
     return;
   }
   let node = shadow.querySelector(`.${NODE_CLASS}`);
-  if (!node) {
+  if (!(node instanceof HTMLElement) || node.dataset.nodeType !== element.type) {
+    const replacement = createNodeForType(element.type);
+    if (node) {
+      shadow.replaceChild(replacement, node);
+    } else {
+      shadow.appendChild(replacement);
+    }
+    node = replacement;
+  }
+  hydrateNode(node, element);
+  const styleTarget = getStyleTarget(node);
+  applyStyle(styleTarget, element.style);
+}
+
+/**
+ * Creates an element that matches the requested type.
+ * @param {'button' | 'link' | 'tooltip'} type
+ * @returns {HTMLElement}
+ */
+function createNodeForType(type) {
+  if (type === 'link') {
+    return document.createElement('a');
+  }
+  if (type === 'tooltip') {
+    return createTooltipNode();
+  }
+  const button = document.createElement('button');
+  button.type = 'button';
+  return button;
+}
+
+/**
+ * Applies text, behaviors, and attributes for the provided element metadata.
+ * @param {HTMLElement} node
+ * @param {import('../common/types.js').InjectedElement} element
+ */
+function hydrateNode(node, element) {
+  if (!(node instanceof HTMLElement)) {
     return;
   }
-  if (element.type === 'link' && !(node instanceof HTMLAnchorElement)) {
-    const replacement = document.createElement('a');
-    shadow.replaceChild(replacement, node);
-    node = replacement;
-  } else if (element.type === 'button' && !(node instanceof HTMLButtonElement)) {
-    const replacement = document.createElement('button');
-    shadow.replaceChild(replacement, node);
-    node = replacement;
-  }
-  applyBaseAppearance(node, element.type);
-  node.textContent = element.text;
-  if (element.type === 'link') {
+  if (element.type === 'link' && node instanceof HTMLAnchorElement) {
+    applyBaseAppearance(node, 'link');
+    node.textContent = element.text;
     const sanitized = sanitizeUrl(element.href || '');
     if (sanitized) {
       node.setAttribute('href', sanitized);
@@ -268,11 +370,137 @@ function applyMetadata(host, element) {
     } else {
       node.removeAttribute('href');
     }
-  } else {
-    node.removeAttribute('href');
-    applyButtonBehavior(/** @type {HTMLButtonElement} */ (node), element.href);
+    delete node.dataset.href;
+    delete node.dataset.actionSelector;
+    node.onclick = null;
+    node.removeAttribute('aria-describedby');
+  } else if (element.type === 'button' && node instanceof HTMLButtonElement) {
+    applyBaseAppearance(node, 'button');
+    node.textContent = element.text;
+    applyButtonBehavior(node, element.href, element.actionSelector);
+  } else if (element.type === 'tooltip') {
+    applyTooltipAppearance(node);
+    const bubble = node.querySelector('.tooltip-bubble');
+    if (bubble instanceof HTMLElement) {
+      bubble.textContent = element.text || '';
+      bubble.setAttribute('role', 'tooltip');
+      const bubbleId = `page-augmentor-tooltip-${element.id}`;
+      bubble.id = bubbleId;
+      node.setAttribute('aria-describedby', bubbleId);
+    }
+    const trigger = node.querySelector('.tooltip-trigger');
+    if (trigger instanceof HTMLElement) {
+      trigger.textContent = 'ⓘ';
+      trigger.setAttribute('aria-hidden', 'true');
+    }
+    const normalizedPosition = normalizeTooltipPosition(element.tooltipPosition);
+    configureTooltipPosition(node, bubble, normalizedPosition);
+    const persistent = element.tooltipPersistent ? 'true' : 'false';
+    node.dataset.persistent = persistent;
+    node.setAttribute('data-persistent', persistent);
+    node.setAttribute('role', 'group');
+    node.tabIndex = 0;
+    node.setAttribute('aria-label', element.text || 'tooltip');
   }
-  applyStyle(node, element.style);
+}
+
+/**
+ * Creates a tooltip container with trigger and bubble nodes.
+ * @returns {HTMLElement}
+ */
+function createTooltipNode() {
+  const container = document.createElement('div');
+  applyTooltipAppearance(container);
+  return container;
+}
+
+/**
+ * Ensures tooltip markup and baseline attributes exist on the provided node.
+ * @param {HTMLElement} node
+ */
+function applyTooltipAppearance(node) {
+  if (!(node instanceof HTMLElement)) {
+    return;
+  }
+  node.className = `${NODE_CLASS} tooltip`;
+  node.dataset.nodeType = 'tooltip';
+  if (!TOOLTIP_POSITIONS.has(node.dataset.position || '')) {
+    node.dataset.position = 'top';
+  }
+  if (node.dataset.persistent !== 'true' && node.dataset.persistent !== 'false') {
+    node.dataset.persistent = 'false';
+  }
+  node.setAttribute('data-position', node.dataset.position);
+  node.setAttribute('data-persistent', node.dataset.persistent);
+  node.setAttribute('role', 'group');
+  node.tabIndex = 0;
+
+  let trigger = node.querySelector('.tooltip-trigger');
+  if (!(trigger instanceof HTMLElement)) {
+    trigger = document.createElement('span');
+    trigger.className = 'tooltip-trigger';
+    node.insertBefore(trigger, node.firstChild);
+  }
+  trigger.textContent = 'ⓘ';
+  trigger.setAttribute('aria-hidden', 'true');
+
+  let bubble = node.querySelector('.tooltip-bubble');
+  if (!(bubble instanceof HTMLElement)) {
+    bubble = document.createElement('div');
+    bubble.className = 'tooltip-bubble';
+    node.appendChild(bubble);
+  }
+  bubble.setAttribute('role', 'tooltip');
+}
+
+/**
+ * Updates data attributes and inline adjustments for tooltip placement.
+ * @param {HTMLElement} container
+ * @param {Element | null} bubble
+ * @param {'top' | 'right' | 'bottom' | 'left'} position
+ */
+function configureTooltipPosition(container, bubble, position) {
+  const normalized = normalizeTooltipPosition(position);
+  container.dataset.position = normalized;
+  container.setAttribute('data-position', normalized);
+  if (bubble instanceof HTMLElement) {
+    bubble.style.top = '';
+    bubble.style.bottom = '';
+    bubble.style.left = '';
+    bubble.style.right = '';
+    bubble.style.removeProperty('--tooltip-hidden-transform');
+    bubble.style.removeProperty('--tooltip-visible-transform');
+  }
+}
+
+/**
+ * Determines which DOM node should receive style overrides.
+ * @param {HTMLElement} node
+ * @returns {HTMLElement | null}
+ */
+function getStyleTarget(node) {
+  if (!(node instanceof HTMLElement)) {
+    return null;
+  }
+  if (node.dataset.nodeType === 'tooltip') {
+    const bubble = node.querySelector('.tooltip-bubble');
+    if (bubble instanceof HTMLElement) {
+      return bubble;
+    }
+  }
+  return node;
+}
+
+/**
+ * Normalizes tooltip placement values.
+ * @param {string | undefined} position
+ * @returns {'top' | 'right' | 'bottom' | 'left'}
+ */
+function normalizeTooltipPosition(position) {
+  if (position && TOOLTIP_POSITIONS.has(position)) {
+    return /** @type {'top' | 'right' | 'bottom' | 'left'} */ (position);
+  }
+  return 'top';
 }
 
 /**
@@ -312,33 +540,116 @@ function insertHost(host, element) {
 }
 
 /**
- * Configures optional click navigation for button elements.
+ * Configures optional click navigation or delegated actions for button elements.
  * @param {HTMLButtonElement} node
  * @param {string | undefined} href
+ * @param {string | undefined} actionSelector
  */
-function applyButtonBehavior(node, href) {
+function applyButtonBehavior(node, href, actionSelector) {
   if (!(node instanceof HTMLButtonElement)) {
     return;
   }
   const sanitized = sanitizeUrl(href || '');
+  const selector = typeof actionSelector === 'string' ? actionSelector.trim() : '';
   if (sanitized) {
     node.dataset.href = sanitized;
+  } else {
+    delete node.dataset.href;
+  }
+  if (selector) {
+    node.dataset.actionSelector = selector;
+  } else {
+    delete node.dataset.actionSelector;
+  }
+  if (selector) {
     node.onclick = (event) => {
       event.preventDefault();
+      event.stopPropagation();
+      const target = resolveSelector(selector);
+      if (target) {
+        const triggered = forwardClick(target);
+        if (!triggered && sanitized) {
+          window.open(sanitized, '_blank', 'noopener');
+        }
+      } else if (sanitized) {
+        window.open(sanitized, '_blank', 'noopener');
+      }
+    };
+  } else if (sanitized) {
+    node.onclick = (event) => {
+      event.preventDefault();
+      event.stopPropagation();
       window.open(sanitized, '_blank', 'noopener');
     };
   } else {
-    delete node.dataset.href;
     node.onclick = null;
   }
 }
 
 /**
+ * Attempts to emulate a pointer click on the provided element.
+ * @param {Element} target
+ * @returns {boolean} whether any event dispatch succeeded
+ */
+function forwardClick(target) {
+  if (!(target instanceof Element)) {
+    return false;
+  }
+  const rect = target.getBoundingClientRect();
+  const clientX = rect.left + rect.width / 2;
+  const clientY = rect.top + rect.height / 2;
+  const baseInit = {
+    bubbles: true,
+    cancelable: true,
+    view: window,
+    button: 0,
+    clientX,
+    clientY,
+  };
+  const pointerInit = {
+    ...baseInit,
+    pointerType: 'mouse',
+    isPrimary: true,
+  };
+  let triggered = false;
+  const dispatch = (factory) => {
+    try {
+      const event = factory();
+      target.dispatchEvent(event);
+      triggered = true;
+    } catch (error) {
+      // ignore failures and continue with other events
+    }
+  };
+  if (typeof PointerEvent === 'function') {
+    dispatch(() => new PointerEvent('pointerdown', pointerInit));
+  }
+  dispatch(() => new MouseEvent('mousedown', baseInit));
+  if (typeof PointerEvent === 'function') {
+    dispatch(() => new PointerEvent('pointerup', pointerInit));
+  }
+  dispatch(() => new MouseEvent('mouseup', baseInit));
+  dispatch(() => new MouseEvent('click', baseInit));
+  if (typeof target.click === 'function') {
+    try {
+      target.click();
+      triggered = true;
+    } catch (error) {
+      // ignore failures when invoking click directly
+    }
+  }
+  return triggered;
+}
+
+/**
  * Applies user-provided styles from the whitelist to the node.
- * @param {HTMLElement} node
+ * @param {HTMLElement | null} node
  * @param {import('../common/types.js').InjectedElementStyle | undefined} style
  */
 function applyStyle(node, style) {
+  if (!(node instanceof HTMLElement)) {
+    return;
+  }
   const whitelist = style || {};
   ALLOWED_STYLE_KEYS.forEach((key) => {
     const value = whitelist[key];
@@ -357,6 +668,7 @@ function applyStyle(node, style) {
  */
 function applyBaseAppearance(node, type) {
   node.className = NODE_CLASS;
+  node.dataset.nodeType = type;
   node.removeAttribute('style');
   node.style.fontFamily = 'inherit';
   if (type === 'link') {
