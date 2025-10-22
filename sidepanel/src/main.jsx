@@ -101,7 +101,7 @@ function App() {
           });
           break;
         }
-        case MessageType.削除:
+        case MessageType.DELETE:
           if (message.data?.id) {
             setItems((current) => current.filter((item) => item.id !== message.data.id));
           }
@@ -200,7 +200,7 @@ function App() {
       return;
     }
     try {
-      const list = await sendMessage(MessageType.削除, { id, pageUrl });
+      const list = await sendMessage(MessageType.DELETE, { id, pageUrl });
       setItems(Array.isArray(list) ? list : []);
       setCreationMessage('要素を削除しました');
     } catch (error) {
@@ -310,7 +310,7 @@ function App() {
         <label className="flex w-full flex-col gap-2 text-sm text-slate-700 md:max-w-md">
           検索
           <input
-            className="rounded-lg border border-slate-200 bg-white p-2 text-sm shadow-sm フォーカス:border-blue-500 フォーカス:outline-none フォーカス:ring-2 フォーカス:ring-blue-100"
+            className="rounded-lg border border-slate-200 bg-white p-2 text-sm shadow-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-100"
             type="search"
             placeholder="テキスト・セレクター・URLでフィルター"
             value={filterText}
@@ -320,7 +320,7 @@ function App() {
         <label className="flex flex-col gap-2 text-sm text-slate-700 md:w-48">
           フィルター
           <select
-            className="rounded-lg border border-slate-200 bg-white p-2 text-sm shadow-sm フォーカス:border-blue-500 フォーカス:outline-none フォーカス:ring-2 フォーカス:ring-blue-100"
+            className="rounded-lg border border-slate-200 bg-white p-2 text-sm shadow-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-100"
             value={filterType}
             onChange={(event) => setFilterType(event.target.value)}
           >
@@ -429,7 +429,7 @@ function OverviewView({ onOpenManage }) {
     setStore((prev) => {
       const next = { ...prev };
       if (!list || list.length === 0) {
-        削除 next[pageUrl];
+        delete next[pageUrl];
       } else {
         next[pageUrl] = list;
       }
@@ -455,11 +455,11 @@ function OverviewView({ onOpenManage }) {
   };
 
   const handleDeleteItem = async (pageUrl, id) => {
-    if (!window.confirm('削除 this element?')) {
+    if (!window.confirm('この要素を削除しますか？')) {
       return;
     }
     try {
-      const list = await sendMessage(MessageType.削除, { pageUrl, id });
+      const list = await sendMessage(MessageType.DELETE, { pageUrl, id });
       updatePage(pageUrl, list);
       setStatus('要素を削除しました');
     } catch (error) {
