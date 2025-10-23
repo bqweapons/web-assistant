@@ -5,12 +5,14 @@
   }
   window.__pageAugmentorInitialized = true;
 
-  const pageUrl = getPageUrl();
   const [{ sendMessage, MessageType }, selectorModule, injectModule] = await Promise.all([
     import(chrome.runtime.getURL('common/messaging.js')),
     import(chrome.runtime.getURL('content/selector.js')),
     import(chrome.runtime.getURL('content/inject.js')),
   ]);
+
+  const frameContext = selectorModule.resolveFrameContext(window);
+  const pageUrl = frameContext.pageUrl || getPageUrl();
 
   const state = {
     pickerSession: /** @type {{ stop: () => void } | null} */ (null),
@@ -21,6 +23,21 @@
   await hydrateElements();
   setupMessageBridge();
   setupMutationWatcher();
+
+  function matchesFrameSelectors(candidate) {
+    const selectors = Array.isArray(candidate) ? candidate : [];
+    if (!frameContext.sameOriginWithTop) {
+      return selectors.length === 0;
+    }
+    if (selectors.length !== frameContext.frameSelectors.length) {
+      return false;
+    }
+    return selectors.every((value, index) => value === frameContext.frameSelectors[index]);
+  }
+
+  function elementMatchesFrame(element) {
+    return element ? matchesFrameSelectors(element.frameSelectors) : false;
+  }
 
   /**
    * Requests stored elements from the background script and renders them.
@@ -45,11 +62,13 @@
     }
     const incomingIds = new Set();
     list.forEach((element) => {
-      incomingIds.add(element.id);
-      injectModule.ensureElement(element);
+      if (elementMatchesFrame(element)) {
+        incomingIds.add(element.id);
+        injectModule.ensureElement(element);
+      }
     });
     injectModule.listElements().forEach((existing) => {
-      if (existing.pageUrl === pageUrl && !incomingIds.has(existing.id)) {
+      if (existing.pageUrl === pageUrl && elementMatchesFrame(existing) && !incomingIds.has(existing.id)) {
         injectModule.removeElement(existing.id);
       }
     });
@@ -73,21 +92,33 @@
           break;
         }
         case MessageType.UPDATE: {
-          if (message.data) {
+          if (message.data && elementMatchesFrame(message.data)) {
             injectModule.updateElement(message.data);
+          } else if (message.data?.id) {
+            const existing = injectModule.getElement(message.data.id);
+            if (existing && elementMatchesFrame(existing)) {
+              injectModule.updateElement({ ...existing, ...message.data });
+            }
           }
           sendResponse?.({ ok: true });
           break;
         }
         case MessageType.DELETE: {
           if (message.data?.id) {
-            injectModule.removeElement(message.data.id);
+            if (elementMatchesFrame(message.data)) {
+              injectModule.removeElement(message.data.id);
+            } else {
+              const existing = injectModule.getElement(message.data.id);
+              if (existing && elementMatchesFrame(existing)) {
+                injectModule.removeElement(message.data.id);
+              }
+            }
           }
           sendResponse?.({ ok: true });
           break;
         }
         case MessageType.FOCUS_ELEMENT: {
-          if (message.data?.id) {
+          if (message.data?.id && matchesFrameSelectors(message.data.frameSelectors)) {
             const success = injectModule.focusElement(message.data.id);
             sendResponse?.({ ok: success });
           }
@@ -104,7 +135,7 @@
           break;
         }
         case MessageType.OPEN_EDITOR: {
-          if (message.data?.id) {
+          if (message.data?.id && matchesFrameSelectors(message.data.frameSelectors)) {
             const opened = openEditorBubble(message.data.id);
             sendResponse?.({ ok: opened });
           }
@@ -148,9 +179,13 @@
     state.pickerSession = selectorModule.startElementPicker({
       mode: options.mode || 'create',
       onTarget(target, selector) {
+        const metadata = selectorModule.resolveFrameContext(target.ownerDocument?.defaultView || window);
         sendMessage(MessageType.PICKER_RESULT, {
           pageUrl,
           selector,
+          frameSelectors: metadata.frameSelectors,
+          frameLabel: metadata.frameLabel,
+          frameUrl: metadata.frameUrl,
           preview: describeElement(target),
         }).catch((error) => console.error('[PageAugmentor] Failed to send picker result', error));
       },

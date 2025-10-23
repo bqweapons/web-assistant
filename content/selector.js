@@ -1,16 +1,22 @@
+import { getLocale, ready as i18nReady, subscribe as subscribeToLocale, t } from '../common/i18n.js';
+
 const HIGHLIGHT_BORDER_COLOR = '#1b84ff';
 const HIGHLIGHT_FILL_COLOR = 'rgba(27, 132, 255, 0.2)';
 
 const VALID_POSITIONS = new Set(['append', 'prepend', 'before', 'after']);
-const STYLE_FIELD_CONFIGS = [
-  { name: 'color', label: '文字色', placeholder: '#2563eb', colorPicker: true },
-  { name: 'backgroundColor', label: '背景色', placeholder: '#1b84ff', colorPicker: true },
-  { name: 'fontSize', label: 'フォントサイズ', placeholder: '16px' },
-  { name: 'fontWeight', label: 'フォント太さ', placeholder: '600' },
-  { name: 'padding', label: 'パディング', placeholder: '8px 16px' },
-  { name: 'borderRadius', label: '角丸', placeholder: '8px' },
-  { name: 'textDecoration', label: 'テキスト装飾', placeholder: 'underline' },
-];
+const VALID_TOOLTIP_POSITIONS = new Set(['top', 'right', 'bottom', 'left']);
+
+function getStyleFieldConfigs() {
+  return [
+    { name: 'color', label: t('editor.styles.color'), placeholder: '#2563eb', colorPicker: true },
+    { name: 'backgroundColor', label: t('editor.styles.backgroundColor'), placeholder: '#1b84ff', colorPicker: true },
+    { name: 'fontSize', label: t('editor.styles.fontSize'), placeholder: '16px' },
+    { name: 'fontWeight', label: t('editor.styles.fontWeight'), placeholder: '600' },
+    { name: 'padding', label: t('editor.styles.padding'), placeholder: '8px 16px' },
+    { name: 'borderRadius', label: t('editor.styles.borderRadius'), placeholder: '8px' },
+    { name: 'textDecoration', label: t('editor.styles.textDecoration'), placeholder: 'underline' },
+  ];
+}
 
 const DEFAULT_BUTTON_STYLE = {
   color: '#ffffff',
@@ -26,12 +32,34 @@ const DEFAULT_LINK_STYLE = {
   textDecoration: 'underline',
 };
 
-const POSITION_LABELS = {
-  append: '末尾に追加',
-  prepend: '先頭に追加',
-  before: '直前に挿入',
-  after: '直後に挿入',
+const DEFAULT_TOOLTIP_STYLE = {
+  color: '#f8fafc',
+  backgroundColor: '#111827',
+  fontSize: '14px',
+  padding: '8px 12px',
+  borderRadius: '12px',
 };
+
+function getTypeOptions() {
+  return [
+    { value: 'button', label: t('type.button') },
+    { value: 'link', label: t('type.link') },
+    { value: 'tooltip', label: t('type.tooltip') },
+  ];
+}
+
+function getPositionLabels() {
+  return {
+    append: t('position.append'),
+    prepend: t('position.prepend'),
+    before: t('position.before'),
+    after: t('position.after'),
+  };
+}
+
+function getTooltipPositionOptions() {
+  return ['top', 'right', 'bottom', 'left'].map((value) => ({ value, label: t(`tooltip.position.${value}`) }));
+}
 
 const cssEscape = typeof CSS !== 'undefined' && typeof CSS.escape === 'function'
   ? CSS.escape.bind(CSS)
@@ -50,18 +78,23 @@ export function generateSelector(element) {
   if (!(element instanceof Element)) {
     throw new Error('Element required for selector generation.');
   }
-  if (element.id && isIdUnique(element.id)) {
+  const contextDocument = element.ownerDocument || document;
+  if (element.id && isIdUnique(element.id, contextDocument)) {
     return `#${cssEscape(element.id)}`;
   }
 
   const segments = [];
   let current = element;
-  while (current && current.nodeType === Node.ELEMENT_NODE && current !== document.documentElement) {
+  while (
+    current &&
+    current.nodeType === Node.ELEMENT_NODE &&
+    current !== contextDocument.documentElement
+  ) {
     let segment = current.localName;
     if (!segment) {
       break;
     }
-    if (current.id && isIdUnique(current.id)) {
+    if (current.id && isIdUnique(current.id, current.ownerDocument || contextDocument)) {
       segment = `${segment}#${cssEscape(current.id)}`;
       segments.unshift(segment);
       break;
@@ -80,7 +113,20 @@ export function generateSelector(element) {
  * Starts the interactive element picker.
  * @param {{
  *   mode?: 'create' | 'edit';
- *   onSubmit?: (payload: { selector: string; type: 'button' | 'link'; text: string; href?: string; position: 'append' | 'prepend' | 'before' | 'after'; style?: import('../common/types.js').InjectedElementStyle }) => void;
+ *   onSubmit?: (payload: {
+ *     selector: string;
+ *     type: 'button' | 'link' | 'tooltip';
+ *     text: string;
+ *     href?: string;
+ *     actionSelector?: string;
+ *     tooltipPosition?: 'top' | 'right' | 'bottom' | 'left';
+ *     tooltipPersistent?: boolean;
+ *     position: 'append' | 'prepend' | 'before' | 'after';
+ *     style?: import('../common/types.js').InjectedElementStyle;
+ *     frameSelectors?: string[];
+ *     frameLabel?: string;
+ *     frameUrl?: string;
+ *   }) => void;
  *   onCancel?: () => void;
  *   onTarget?: (target: Element, selector: string) => void;
  *   defaults?: Partial<import('../common/types.js').InjectedElement>;
@@ -116,16 +162,23 @@ export function startElementPicker(options = {}) {
     overlay.show(target);
     removeListeners();
     const suggestedStyle = getSuggestedStyles(target);
-    bubble.open({
-      mode,
-      selector,
-      target,
-      values: defaults,
-      suggestedStyle,
-      onSubmit(result) {
-        dispose();
-        onSubmit?.({ ...result, selector });
-      },
+ bubble.open({
+    mode,
+    selector,
+    target,
+    values: defaults,
+    suggestedStyle,
+    onSubmit(result) {
+      dispose();
+      const frameMetadata = resolveFrameContext(target.ownerDocument?.defaultView || window);
+      onSubmit?.({
+        ...result,
+        selector,
+        frameSelectors: frameMetadata.frameSelectors,
+        frameLabel: frameMetadata.frameLabel,
+        frameUrl: frameMetadata.frameUrl,
+      });
+    },
       onCancel() {
         dispose('cancel');
       },
@@ -177,9 +230,27 @@ export function startElementPicker(options = {}) {
  *   target: Element;
  *   selector: string;
  *   values: Partial<import('../common/types.js').InjectedElement>;
- *   onSubmit?: (payload: { type: 'button' | 'link'; text: string; href?: string; position: 'append' | 'prepend' | 'before' | 'after'; style?: import('../common/types.js').InjectedElementStyle }) => void;
+ *   onSubmit?: (payload: {
+ *     type: 'button' | 'link' | 'tooltip';
+ *     text: string;
+ *     href?: string;
+ *     actionSelector?: string;
+ *     tooltipPosition?: 'top' | 'right' | 'bottom' | 'left';
+ *     tooltipPersistent?: boolean;
+ *     position: 'append' | 'prepend' | 'before' | 'after';
+ *     style?: import('../common/types.js').InjectedElementStyle;
+ *   }) => void;
  *   onCancel?: () => void;
- *   onPreview?: (payload: { type: 'button' | 'link'; text: string; href?: string; position: 'append' | 'prepend' | 'before' | 'after'; style?: import('../common/types.js').InjectedElementStyle }) => void;
+ *   onPreview?: (payload: {
+ *     type: 'button' | 'link' | 'tooltip';
+ *     text: string;
+ *     href?: string;
+ *     actionSelector?: string;
+ *     tooltipPosition?: 'top' | 'right' | 'bottom' | 'left';
+ *     tooltipPersistent?: boolean;
+ *     position: 'append' | 'prepend' | 'before' | 'after';
+ *     style?: import('../common/types.js').InjectedElementStyle;
+ *   }) => void;
  }} options
  * @returns {{ close: () => void }}
  */
@@ -208,21 +279,48 @@ export function openElementEditor(options) {
 }
 
 let sharedBubble = /** @type {ReturnType<typeof createElementBubble> | null} */ (null);
+let sharedBubbleLocale = getLocale();
+
+subscribeToLocale(() => {
+  sharedBubbleLocale = null;
+  if (sharedBubble) {
+    sharedBubble.destroy();
+    sharedBubble = null;
+  }
+});
+
+i18nReady.then(() => {
+  sharedBubbleLocale = null;
+  if (sharedBubble) {
+    sharedBubble.destroy();
+    sharedBubble = null;
+  }
+});
 
 function getElementBubble() {
-  if (!sharedBubble) {
+  const currentLocale = getLocale();
+  if (!sharedBubble || sharedBubbleLocale !== currentLocale) {
+    if (sharedBubble) {
+      sharedBubble.destroy();
+    }
     sharedBubble = createElementBubble();
+    sharedBubbleLocale = currentLocale;
   }
   return sharedBubble;
 }
 
 /**
- * Determines whether an id is unique within the document.
+ * Determines whether an id is unique within the provided document context.
  * @param {string} id
+ * @param {Document} [contextDocument]
  * @returns {boolean}
  */
-function isIdUnique(id) {
-  return document.querySelectorAll(`#${cssEscape(id)}`).length === 1;
+function isIdUnique(id, contextDocument) {
+  try {
+    return (contextDocument || document).querySelectorAll(`#${cssEscape(id)}`).length === 1;
+  } catch (error) {
+    return false;
+  }
 }
 
 /**
@@ -330,7 +428,7 @@ function createElementBubble() {
   bubble.addEventListener('mousedown', (event) => event.stopPropagation());
 
   const title = document.createElement('h3');
-  title.textContent = '要素設定';
+  title.textContent = t('editor.title');
   Object.assign(title.style, {
     margin: '0 0 10px 0',
     fontSize: '14px',
@@ -347,7 +445,7 @@ function createElementBubble() {
   });
 
   const selectorTitle = document.createElement('span');
-  selectorTitle.textContent = '対象セレクター';
+  selectorTitle.textContent = t('editor.selectorLabel');
   Object.assign(selectorTitle.style, {
     fontSize: '12px',
     fontWeight: '600',
@@ -385,7 +483,7 @@ function createElementBubble() {
   });
 
   const previewLabel = document.createElement('span');
-  previewLabel.textContent = 'ライブプレビュー';
+  previewLabel.textContent = t('editor.previewLabel');
   Object.assign(previewLabel.style, {
     fontSize: '11px',
     fontWeight: '600',
@@ -394,11 +492,94 @@ function createElementBubble() {
     letterSpacing: '0.03em',
   });
 
+  const previewTooltipStyle = document.createElement('style');
+  previewTooltipStyle.textContent = `
+    .page-augmentor-preview-tooltip {
+      position: relative;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 0.35rem;
+      cursor: help;
+      font-family: inherit;
+    }
+    .page-augmentor-preview-tooltip[data-persistent='true'] {
+      cursor: default;
+    }
+    .page-augmentor-preview-tooltip:focus {
+      outline: none;
+    }
+    .page-augmentor-preview-tooltip-trigger {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 1.5rem;
+      height: 1.5rem;
+      border-radius: 9999px;
+      background-color: #2563eb;
+      color: #ffffff;
+      font-size: 0.95rem;
+      font-weight: 600;
+      box-shadow: 0 2px 4px rgba(15, 23, 42, 0.18);
+      user-select: none;
+    }
+    .page-augmentor-preview-tooltip-bubble {
+      position: absolute;
+      z-index: 10;
+      max-width: 240px;
+      min-width: max-content;
+      padding: 0.45rem 0.75rem;
+      border-radius: 0.75rem;
+      background-color: #111827;
+      color: #f8fafc;
+      font-size: 0.85rem;
+      line-height: 1.4;
+      box-shadow: 0 12px 30px rgba(15, 23, 42, 0.22);
+      opacity: 0;
+      pointer-events: none;
+      transform: var(--preview-tooltip-hidden-transform, translate3d(-50%, 6px, 0));
+      transition: opacity 0.16s ease, transform 0.16s ease;
+      white-space: pre-wrap;
+    }
+    .page-augmentor-preview-tooltip[data-preview-visible='true'] .page-augmentor-preview-tooltip-bubble,
+    .page-augmentor-preview-tooltip[data-persistent='true'] .page-augmentor-preview-tooltip-bubble,
+    .page-augmentor-preview-tooltip[data-persistent='false']:hover .page-augmentor-preview-tooltip-bubble,
+    .page-augmentor-preview-tooltip[data-persistent='false']:focus-within .page-augmentor-preview-tooltip-bubble {
+      opacity: 1;
+      pointer-events: auto;
+      transform: var(--preview-tooltip-visible-transform, translate3d(-50%, 0, 0));
+    }
+    .page-augmentor-preview-tooltip[data-position='top'] .page-augmentor-preview-tooltip-bubble {
+      bottom: calc(100% + 8px);
+      left: 50%;
+      --preview-tooltip-hidden-transform: translate3d(-50%, 6px, 0);
+      --preview-tooltip-visible-transform: translate3d(-50%, 0, 0);
+    }
+    .page-augmentor-preview-tooltip[data-position='bottom'] .page-augmentor-preview-tooltip-bubble {
+      top: calc(100% + 8px);
+      left: 50%;
+      --preview-tooltip-hidden-transform: translate3d(-50%, -6px, 0);
+      --preview-tooltip-visible-transform: translate3d(-50%, 0, 0);
+    }
+    .page-augmentor-preview-tooltip[data-position='left'] .page-augmentor-preview-tooltip-bubble {
+      right: calc(100% + 8px);
+      top: 50%;
+      --preview-tooltip-hidden-transform: translate3d(6px, -50%, 0);
+      --preview-tooltip-visible-transform: translate3d(0, -50%, 0);
+    }
+    .page-augmentor-preview-tooltip[data-position='right'] .page-augmentor-preview-tooltip-bubble {
+      left: calc(100% + 8px);
+      top: 50%;
+      --preview-tooltip-hidden-transform: translate3d(-6px, -50%, 0);
+      --preview-tooltip-visible-transform: translate3d(0, -50%, 0);
+    }
+  `;
+
   let previewElement = document.createElement('button');
   previewElement.tabIndex = -1;
   previewElement.style.cursor = 'default';
   previewElement.addEventListener('click', (event) => event.preventDefault());
-  previewWrapper.append(previewLabel, previewElement);
+  previewWrapper.append(previewLabel, previewTooltipStyle, previewElement);
 
   const form = document.createElement('form');
   Object.assign(form.style, {
@@ -408,38 +589,131 @@ function createElementBubble() {
   });
 
   const typeSelect = document.createElement('select');
-  ['button', 'link'].forEach((value) => {
+  getTypeOptions().forEach(({ value, label }) => {
     const option = document.createElement('option');
     option.value = value;
-    option.textContent = value === 'button' ? 'ボタン' : 'リンク';
+    option.textContent = label;
     typeSelect.appendChild(option);
   });
   styleInput(typeSelect);
 
   const textInput = document.createElement('input');
   textInput.type = 'text';
-  textInput.placeholder = '要素のテキスト';
+  textInput.placeholder = t('editor.textPlaceholder');
   textInput.maxLength = 160;
   styleInput(textInput);
 
   const hrefInput = document.createElement('input');
   hrefInput.type = 'url';
-  hrefInput.placeholder = 'https://example.com';
+  hrefInput.placeholder = t('editor.hrefPlaceholder');
   styleInput(hrefInput);
 
+  const actionInput = document.createElement('input');
+  actionInput.type = 'text';
+  actionInput.placeholder = t('editor.actionPlaceholder');
+  actionInput.autocomplete = 'off';
+  styleInput(actionInput);
+  actionInput.style.flex = '1';
+  actionInput.style.width = 'auto';
+
+  const actionPickButton = document.createElement('button');
+  actionPickButton.type = 'button';
+  actionPickButton.textContent = t('editor.actionPick');
+  actionPickButton.dataset.state = 'idle';
+  Object.assign(actionPickButton.style, {
+    padding: '8px 12px',
+    borderRadius: '10px',
+    border: '1px solid rgba(148, 163, 184, 0.6)',
+    backgroundColor: '#f1f5f9',
+    fontSize: '12px',
+    fontWeight: '600',
+    color: '#2563eb',
+    cursor: 'pointer',
+    whiteSpace: 'nowrap',
+  });
+
+  const actionControls = document.createElement('div');
+  Object.assign(actionControls.style, {
+    display: 'flex',
+    gap: '8px',
+    alignItems: 'center',
+  });
+  actionControls.append(actionInput, actionPickButton);
+
   const positionSelect = document.createElement('select');
+  const positionLabels = getPositionLabels();
   ['append', 'prepend', 'before', 'after'].forEach((value) => {
     const option = document.createElement('option');
     option.value = value;
-    option.textContent = POSITION_LABELS[value] || value;
+    option.textContent = positionLabels[value] || value;
     positionSelect.appendChild(option);
   });
   styleInput(positionSelect);
 
-  const typeField = createField('要素タイプ', typeSelect);
-  const textField = createField('テキスト', textInput);
-  const hrefField = createField('リンクURL', hrefInput);
-  const positionField = createField('挿入位置', positionSelect);
+  const tooltipPositionSelect = document.createElement('select');
+  getTooltipPositionOptions().forEach(({ value, label }) => {
+    const option = document.createElement('option');
+    option.value = value;
+    option.textContent = label;
+    tooltipPositionSelect.appendChild(option);
+  });
+  styleInput(tooltipPositionSelect);
+
+  const tooltipPersistentCheckbox = document.createElement('input');
+  tooltipPersistentCheckbox.type = 'checkbox';
+  tooltipPersistentCheckbox.style.width = '16px';
+  tooltipPersistentCheckbox.style.height = '16px';
+  tooltipPersistentCheckbox.style.margin = '0';
+  tooltipPersistentCheckbox.style.cursor = 'pointer';
+  tooltipPersistentCheckbox.style.borderRadius = '4px';
+  tooltipPersistentCheckbox.style.border = '1px solid rgba(148, 163, 184, 0.6)';
+  tooltipPersistentCheckbox.style.accentColor = '#2563eb';
+
+  const tooltipPersistentLabel = document.createElement('span');
+  tooltipPersistentLabel.textContent = t('editor.tooltipPersistenceCheckbox');
+  Object.assign(tooltipPersistentLabel.style, {
+    fontSize: '13px',
+    color: '#0f172a',
+  });
+
+  const tooltipPersistentRow = document.createElement('label');
+  Object.assign(tooltipPersistentRow.style, {
+    display: 'inline-flex',
+    alignItems: 'center',
+    gap: '8px',
+    cursor: 'pointer',
+    fontWeight: '500',
+  });
+  tooltipPersistentRow.append(tooltipPersistentCheckbox, tooltipPersistentLabel);
+
+  const tooltipPersistentHint = document.createElement('p');
+  tooltipPersistentHint.textContent = t('editor.tooltipPersistenceHint');
+  Object.assign(tooltipPersistentHint.style, {
+    margin: '4px 0 0 0',
+    fontSize: '11px',
+    color: '#94a3b8',
+  });
+
+  const typeField = createField(t('editor.typeLabel'), typeSelect);
+  const textField = createField(t('editor.textLabel'), textInput);
+  const hrefField = createField(t('editor.hrefLabel'), hrefInput);
+  const actionField = createField(t('editor.actionLabel'));
+  const actionHint = document.createElement('p');
+  const defaultActionHintText = t('editor.actionHintDefault');
+  actionHint.textContent = defaultActionHintText;
+  Object.assign(actionHint.style, {
+    margin: '4px 0 0 0',
+    fontSize: '11px',
+    color: '#94a3b8',
+  });
+  actionHint.dataset.defaultColor = '#94a3b8';
+  actionField.wrapper.append(actionControls, actionHint);
+  const tooltipPositionField = createField(t('editor.tooltipPositionLabel'), tooltipPositionSelect);
+  tooltipPositionField.wrapper.style.display = 'none';
+  const tooltipPersistentField = createField(t('editor.tooltipPersistenceLabel'));
+  tooltipPersistentField.wrapper.append(tooltipPersistentRow, tooltipPersistentHint);
+  tooltipPersistentField.wrapper.style.display = 'none';
+  const positionField = createField(t('editor.positionLabel'), positionSelect);
 
   const styleFieldset = document.createElement('fieldset');
   Object.assign(styleFieldset.style, {
@@ -452,7 +726,7 @@ function createElementBubble() {
   });
 
   const styleLegend = document.createElement('legend');
-  styleLegend.textContent = 'スタイル設定';
+  styleLegend.textContent = t('editor.stylesLegend');
   Object.assign(styleLegend.style, {
     fontSize: '12px',
     fontWeight: '600',
@@ -463,11 +737,12 @@ function createElementBubble() {
 
   const styleInputs = new Map();
   const styleState = {};
-  STYLE_FIELD_CONFIGS.forEach(({ name }) => {
+  const styleFieldConfigs = getStyleFieldConfigs();
+  styleFieldConfigs.forEach(({ name }) => {
     styleState[name] = '';
   });
 
-  STYLE_FIELD_CONFIGS.forEach((config) => {
+  styleFieldConfigs.forEach((config) => {
     const textInput = document.createElement('input');
     textInput.type = 'text';
     textInput.placeholder = config.placeholder || '';
@@ -515,7 +790,7 @@ function createElementBubble() {
   });
 
   const styleHint = document.createElement('p');
-  styleHint.textContent = '空欄の項目は既定のスタイルが使用されます。';
+  styleHint.textContent = t('editor.stylesHint');
   Object.assign(styleHint.style, {
     margin: '0',
     fontSize: '11px',
@@ -541,7 +816,7 @@ function createElementBubble() {
 
   const cancelButton = document.createElement('button');
   cancelButton.type = 'button';
-  cancelButton.textContent = 'キャンセル';
+  cancelButton.textContent = t('editor.cancel');
   Object.assign(cancelButton.style, {
     padding: '7px 12px',
     borderRadius: '10px',
@@ -555,7 +830,7 @@ function createElementBubble() {
 
   const saveButton = document.createElement('button');
   saveButton.type = 'submit';
-  saveButton.textContent = '保存';
+  saveButton.textContent = t('editor.save');
   Object.assign(saveButton.style, {
     padding: '7px 12px',
     borderRadius: '10px',
@@ -573,6 +848,9 @@ function createElementBubble() {
     typeField.wrapper,
     textField.wrapper,
     hrefField.wrapper,
+    actionField.wrapper,
+    tooltipPositionField.wrapper,
+    tooltipPersistentField.wrapper,
     positionField.wrapper,
     styleFieldset,
     actions,
@@ -584,30 +862,36 @@ function createElementBubble() {
   let currentTarget = null;
   /** @type {() => void} */
   let cancelHandler = () => {};
-  /** @type {(payload: { type: 'button' | 'link'; text: string; href?: string; position: 'append' | 'prepend' | 'before' | 'after'; style?: import('../common/types.js').InjectedElementStyle }) => void} */
+  /** @type {(payload: { type: 'button' | 'link' | 'tooltip'; text: string; href?: string; actionSelector?: string; tooltipPosition?: 'top' | 'right' | 'bottom' | 'left'; tooltipPersistent?: boolean; position: 'append' | 'prepend' | 'before' | 'after'; style?: import('../common/types.js').InjectedElementStyle }) => void} */
   let submitHandler = () => {};
-  /** @type {null | ((payload: { type: 'button' | 'link'; text: string; href?: string; position: 'append' | 'prepend' | 'before' | 'after'; style?: import('../common/types.js').InjectedElementStyle }) => void)} */
+  /** @type {null | ((payload: { type: 'button' | 'link' | 'tooltip'; text: string; href?: string; actionSelector?: string; tooltipPosition?: 'top' | 'right' | 'bottom' | 'left'; tooltipPersistent?: boolean; position: 'append' | 'prepend' | 'before' | 'after'; style?: import('../common/types.js').InjectedElementStyle }) => void)} */
   let previewHandler = null;
+  /** @type {null | ((reason?: 'cancel' | 'select') => void)} */
+  let actionPickerCleanup = null;
+  let originalCursor = '';
   let isAttached = false;
 
   const state = {
     type: 'button',
     text: '',
     href: '',
+    actionSelector: '',
     position: 'append',
+    tooltipPosition: 'top',
+    tooltipPersistent: false,
   };
 
   const clearError = () => {
     errorLabel.textContent = '';
   };
 
-  [textInput, hrefInput, typeSelect, positionSelect].forEach((input) => {
+  [textInput, hrefInput, actionInput, typeSelect, positionSelect, tooltipPositionSelect, tooltipPersistentCheckbox].forEach((input) => {
     input.addEventListener('input', clearError);
     input.addEventListener('change', clearError);
   });
 
   const resetStyleState = (source) => {
-    STYLE_FIELD_CONFIGS.forEach(({ name }) => {
+    styleFieldConfigs.forEach(({ name }) => {
       const value = source && typeof source[name] === 'string' ? source[name] : '';
       styleState[name] = value;
       const record = styleInputs.get(name);
@@ -636,18 +920,63 @@ function createElementBubble() {
     const hrefValue = state.href.trim();
     const position = VALID_POSITIONS.has(state.position) ? state.position : 'append';
     const style = normalizeStyleState(styleState);
-    return {
-      type: state.type === 'link' ? 'link' : 'button',
+    const type = state.type === 'link' ? 'link' : state.type === 'tooltip' ? 'tooltip' : 'button';
+    const payload = {
+      type,
       text: textValue,
-      href: hrefValue ? hrefValue : undefined,
       position,
       style,
     };
+    if (type === 'link') {
+      if (hrefValue) {
+        payload.href = hrefValue;
+      }
+    } else if (type === 'button') {
+      if (hrefValue) {
+        payload.href = hrefValue;
+      }
+      const actionValue = state.actionSelector.trim();
+      if (actionValue) {
+        payload.actionSelector = actionValue;
+      }
+    } else if (type === 'tooltip') {
+      const tooltipPosition = VALID_TOOLTIP_POSITIONS.has(state.tooltipPosition)
+        ? state.tooltipPosition
+        : 'top';
+      payload.tooltipPosition = tooltipPosition;
+      payload.tooltipPersistent = Boolean(state.tooltipPersistent);
+    }
+    return payload;
+  };
+
+  const updateActionHint = () => {
+    const value = state.type === 'button' ? state.actionSelector.trim() : '';
+    if (value) {
+      actionHint.textContent = t('editor.actionHintSelected', { selector: value });
+      actionHint.style.color = '#0f172a';
+    } else {
+      actionHint.textContent = defaultActionHintText;
+      actionHint.style.color = actionHint.dataset.defaultColor || '#94a3b8';
+    }
   };
 
   const ensurePreviewElement = (type) => {
+    if (type === 'tooltip') {
+      if (
+        !(previewElement instanceof HTMLElement) ||
+        previewElement.dataset.previewType !== 'tooltip'
+      ) {
+        const replacement = createPreviewTooltipNode();
+        previewWrapper.replaceChild(replacement, previewElement);
+        previewElement = replacement;
+      }
+      return;
+    }
     const desiredTag = type === 'link' ? 'a' : 'button';
-    if (previewElement.tagName.toLowerCase() !== desiredTag) {
+    if (
+      previewElement.dataset.previewType === 'tooltip' ||
+      previewElement.tagName.toLowerCase() !== desiredTag
+    ) {
       const replacement = document.createElement(desiredTag);
       replacement.tabIndex = -1;
       replacement.style.cursor = 'default';
@@ -655,6 +984,7 @@ function createElementBubble() {
       previewWrapper.replaceChild(replacement, previewElement);
       previewElement = replacement;
     }
+    delete previewElement.dataset.previewType;
     if (type === 'link') {
       previewElement.setAttribute('href', '#');
       previewElement.setAttribute('role', 'link');
@@ -663,36 +993,102 @@ function createElementBubble() {
     }
   };
 
+  const createPreviewTooltipNode = () => {
+    const container = document.createElement('div');
+    container.dataset.previewType = 'tooltip';
+    container.className = 'page-augmentor-preview-tooltip';
+    container.dataset.position = 'top';
+    container.dataset.persistent = 'false';
+    container.dataset.previewVisible = 'true';
+    container.tabIndex = -1;
+    const trigger = document.createElement('span');
+    trigger.className = 'page-augmentor-preview-tooltip-trigger';
+    trigger.textContent = 'ⓘ';
+    trigger.setAttribute('aria-hidden', 'true');
+    const bubble = document.createElement('div');
+    bubble.className = 'page-augmentor-preview-tooltip-bubble';
+    bubble.textContent = t('editor.previewTooltip');
+    container.append(trigger, bubble);
+    return container;
+  };
+
   const updatePreview = (options = { propagate: true }) => {
     const payload = buildPayload();
     ensurePreviewElement(payload.type);
-    previewElement.textContent =
-      payload.text || (payload.type === 'link' ? 'リンクのプレビュー' : 'ボタンのプレビュー');
-    applyPreviewBase(previewElement, payload.type);
-    if (payload.style) {
-      Object.entries(payload.style).forEach(([key, value]) => {
-        previewElement.style[key] = value;
-      });
+    if (payload.type === 'tooltip') {
+      applyTooltipPreview(previewElement, payload);
+    } else {
+      previewElement.textContent =
+        payload.text || (payload.type === 'link' ? t('editor.previewLink') : t('editor.previewButton'));
+      applyPreviewBase(previewElement, payload.type);
+      if (payload.style) {
+        Object.entries(payload.style).forEach(([key, value]) => {
+          previewElement.style[key] = value;
+        });
+      }
     }
     if (options.propagate && typeof previewHandler === 'function') {
       previewHandler(payload);
     }
+    updateActionHint();
   };
 
   const handleTypeChange = (applyDefaults = false) => {
     const isLink = state.type === 'link';
+    const isButton = state.type === 'button';
+    const isTooltip = state.type === 'tooltip';
+
     hrefInput.required = isLink;
-    hrefInput.placeholder = isLink ? 'https://example.com' : 'https://example.com（任意）';
-    hrefField.label.textContent = isLink ? 'リンクURL' : '任意のURL';
+    hrefInput.disabled = isTooltip;
+    hrefInput.placeholder = isLink
+      ? t('editor.hrefPlaceholder')
+      : isTooltip
+        ? t('editor.hrefTooltipPlaceholder')
+        : t('editor.hrefOptionalPlaceholder');
+    hrefField.label.textContent = isLink
+      ? t('editor.hrefLabel')
+      : isTooltip
+        ? t('editor.hrefTooltipLabel')
+        : t('editor.hrefOptionalLabel');
+    hrefField.wrapper.style.display = isTooltip ? 'none' : 'flex';
+
+    actionField.wrapper.style.display = isButton ? 'flex' : 'none';
+    actionInput.disabled = !isButton;
+    actionPickButton.disabled = !isButton;
+    actionPickButton.style.cursor = isButton ? 'pointer' : 'not-allowed';
+    actionPickButton.style.opacity = isButton ? '1' : '0.6';
+    if (!isButton) {
+      stopActionPicker('cancel');
+    }
+
+    tooltipPositionField.wrapper.style.display = isTooltip ? 'flex' : 'none';
+    tooltipPositionSelect.disabled = !isTooltip;
+    tooltipPersistentField.wrapper.style.display = isTooltip ? 'flex' : 'none';
+    tooltipPersistentCheckbox.disabled = !isTooltip;
+
+    textInput.placeholder = isTooltip ? t('editor.tooltipTextPlaceholder') : t('editor.textPlaceholder');
+
+    updateActionHint();
     if (applyDefaults) {
-      const defaults = state.type === 'link' ? DEFAULT_LINK_STYLE : DEFAULT_BUTTON_STYLE;
+      const defaults = isLink
+        ? DEFAULT_LINK_STYLE
+        : isTooltip
+          ? DEFAULT_TOOLTIP_STYLE
+          : DEFAULT_BUTTON_STYLE;
       resetStyleState(defaults);
+      if (isTooltip) {
+        state.tooltipPosition = 'top';
+        tooltipPositionSelect.value = 'top';
+        state.tooltipPersistent = false;
+        tooltipPersistentCheckbox.checked = false;
+      }
     }
     updatePreview();
   };
 
   typeSelect.addEventListener('change', (event) => {
-    state.type = event.target.value === 'link' ? 'link' : 'button';
+    const selected = event.target.value;
+    state.type = selected === 'link' ? 'link' : selected === 'tooltip' ? 'tooltip' : 'button';
     handleTypeChange(true);
   });
 
@@ -706,12 +1102,126 @@ function createElementBubble() {
     updatePreview();
   });
 
+  actionInput.addEventListener('input', (event) => {
+    state.actionSelector = event.target.value;
+    updatePreview();
+  });
+
   positionSelect.addEventListener('change', (event) => {
     state.position = event.target.value;
     updatePreview();
   });
 
-  STYLE_FIELD_CONFIGS.forEach(({ name }) => {
+  tooltipPositionSelect.addEventListener('change', (event) => {
+    clearError();
+    state.tooltipPosition = event.target.value;
+    updatePreview();
+  });
+
+  tooltipPersistentCheckbox.addEventListener('change', (event) => {
+    clearError();
+    state.tooltipPersistent = Boolean(event.target.checked);
+    updatePreview();
+  });
+
+  actionPickButton.addEventListener('click', (event) => {
+    event.preventDefault();
+    event.stopPropagation();
+    if (actionPickButton.disabled) {
+      return;
+    }
+    if (actionPickerCleanup) {
+      stopActionPicker('cancel');
+    } else {
+      startActionPicker();
+    }
+  });
+
+  function setActionPickerState(picking) {
+    if (picking) {
+      actionPickButton.textContent = t('editor.actionCancel');
+      actionPickButton.dataset.state = 'picking';
+      actionPickButton.style.backgroundColor = '#e0e7ff';
+      actionPickButton.style.borderColor = '#6366f1';
+      actionHint.textContent = t('editor.actionHintPicking');
+      actionHint.style.color = '#2563eb';
+    } else {
+      actionPickButton.textContent = t('editor.actionPick');
+      actionPickButton.dataset.state = 'idle';
+      actionPickButton.style.backgroundColor = '#f1f5f9';
+      actionPickButton.style.borderColor = 'rgba(148, 163, 184, 0.6)';
+      updateActionHint();
+    }
+  }
+
+  function startActionPicker() {
+    if (actionPickerCleanup) {
+      return;
+    }
+    const overlay = createOverlay();
+    document.body.appendChild(overlay.container);
+    originalCursor = document.body.style.cursor;
+    document.body.style.cursor = 'copy';
+    setActionPickerState(true);
+
+    const handleMove = (event) => {
+      const candidate = findClickableElement(event.target);
+      if (!candidate) {
+        overlay.hide();
+        return;
+      }
+      overlay.show(candidate);
+    };
+
+    const handleClick = (event) => {
+      const candidate = findClickableElement(event.target);
+      if (!candidate) {
+        return;
+      }
+      event.preventDefault();
+      event.stopPropagation();
+      const selector = generateSelector(candidate);
+      state.actionSelector = selector;
+      actionInput.value = selector;
+      updatePreview();
+      stopActionPicker('select');
+      actionInput.focus({ preventScroll: true });
+    };
+
+    const handleKeydown = (event) => {
+      if (event.key === 'Escape') {
+        event.preventDefault();
+        event.stopPropagation();
+        stopActionPicker('cancel');
+      }
+    };
+
+    actionPickerCleanup = (reason = 'cancel') => {
+      document.removeEventListener('mousemove', handleMove, true);
+      document.removeEventListener('click', handleClick, true);
+      document.removeEventListener('keydown', handleKeydown, true);
+      overlay.dispose();
+      document.body.style.cursor = originalCursor || '';
+      originalCursor = '';
+      setActionPickerState(false);
+      actionPickerCleanup = null;
+      if (reason !== 'select') {
+        updateActionHint();
+      }
+    };
+
+    document.addEventListener('mousemove', handleMove, true);
+    document.addEventListener('click', handleClick, true);
+    document.addEventListener('keydown', handleKeydown, true);
+  }
+
+  function stopActionPicker(reason = 'cancel') {
+    if (actionPickerCleanup) {
+      actionPickerCleanup(reason);
+    }
+  }
+
+  styleFieldConfigs.forEach(({ name }) => {
     const record = styleInputs.get(name);
     if (!record) {
       return;
@@ -747,12 +1257,12 @@ function createElementBubble() {
     event.preventDefault();
     const payload = buildPayload();
     if (!payload.text) {
-      errorLabel.textContent = 'テキストを入力してください。';
+      errorLabel.textContent = t('editor.errorTextRequired');
       textInput.focus({ preventScroll: true });
       return;
     }
     if (payload.type === 'link' && !state.href.trim()) {
-      errorLabel.textContent = 'リンクにはURLが必要です。';
+      errorLabel.textContent = t('editor.errorUrlRequired');
       hrefInput.focus({ preventScroll: true });
       return;
     }
@@ -793,6 +1303,7 @@ function createElementBubble() {
     if (!isAttached) {
       return;
     }
+    stopActionPicker('cancel');
     isAttached = false;
     window.removeEventListener('resize', updatePosition, true);
     document.removeEventListener('scroll', handleScroll, true);
@@ -837,16 +1348,24 @@ function createElementBubble() {
       state.type = initial.type;
       state.text = initial.text;
       state.href = initial.href;
+      state.actionSelector = initial.actionSelector;
       state.position = initial.position;
+      state.tooltipPosition = initial.tooltipPosition;
+      state.tooltipPersistent = initial.tooltipPersistent;
       typeSelect.value = state.type;
       textInput.value = state.text;
       hrefInput.value = state.href;
+      actionInput.value = state.actionSelector;
       positionSelect.value = state.position;
+      tooltipPositionSelect.value = state.tooltipPosition;
+      tooltipPersistentCheckbox.checked = state.tooltipPersistent;
       resetStyleState(initial.style);
+      stopActionPicker('cancel');
+      setActionPickerState(false);
       handleTypeChange();
       errorLabel.textContent = '';
-      title.textContent = mode === 'edit' ? '要素を編集' : '要素を追加';
-      saveButton.textContent = mode === 'edit' ? '変更を保存' : '作成';
+      title.textContent = mode === 'edit' ? t('editor.titleEdit') : t('editor.titleCreate');
+      saveButton.textContent = mode === 'edit' ? t('editor.saveUpdate') : t('editor.saveCreate');
       updatePreview({ propagate: false });
       submitHandler = (payload) => {
         detach();
@@ -864,19 +1383,33 @@ function createElementBubble() {
       detach();
       currentTarget = null;
     },
+    destroy() {
+      detach();
+      if (bubble.isConnected) {
+        bubble.remove();
+      }
+    },
   };
 }
 
 function defaultElementValues(values = {}, suggestedStyle = {}) {
-  const type = values.type === 'link' ? 'link' : 'button';
+  const type = values.type === 'link' ? 'link' : values.type === 'tooltip' ? 'tooltip' : 'button';
   const text = typeof values.text === 'string' ? values.text : '';
   const href = typeof values.href === 'string' ? values.href : '';
+  const actionSelector = typeof values.actionSelector === 'string' ? values.actionSelector : '';
   const position = VALID_POSITIONS.has(values.position)
     ? /** @type {'append' | 'prepend' | 'before' | 'after'} */ (values.position)
     : 'append';
-  const defaults = type === 'link' ? DEFAULT_LINK_STYLE : DEFAULT_BUTTON_STYLE;
+  const tooltipPosition =
+    values.tooltipPosition && VALID_TOOLTIP_POSITIONS.has(values.tooltipPosition)
+      ? /** @type {'top' | 'right' | 'bottom' | 'left'} */ (values.tooltipPosition)
+      : 'top';
+  const tooltipPersistent = Boolean(values.tooltipPersistent);
+  const defaults =
+    type === 'link' ? DEFAULT_LINK_STYLE : type === 'tooltip' ? DEFAULT_TOOLTIP_STYLE : DEFAULT_BUTTON_STYLE;
   const style = {};
-  STYLE_FIELD_CONFIGS.forEach(({ name }) => {
+  const configs = getStyleFieldConfigs();
+  configs.forEach(({ name }) => {
     if (values.style && typeof values.style[name] === 'string') {
       style[name] = values.style[name];
     } else if (suggestedStyle && typeof suggestedStyle[name] === 'string') {
@@ -888,7 +1421,16 @@ function defaultElementValues(values = {}, suggestedStyle = {}) {
       style[name] = defaults[name];
     }
   });
-  return { type, text, href, position, style };
+  return {
+    type,
+    text,
+    href,
+    actionSelector,
+    position,
+    tooltipPosition,
+    tooltipPersistent,
+    style,
+  };
 }
 
 function createField(labelText, control = null) {
@@ -941,7 +1483,7 @@ function styleInput(element) {
 
 function normalizeStyleState(styleState) {
   const entries = {};
-  STYLE_FIELD_CONFIGS.forEach(({ name }) => {
+  getStyleFieldConfigs().forEach(({ name }) => {
     const value = typeof styleState[name] === 'string' ? styleState[name].trim() : '';
     if (value) {
       entries[name] = value;
@@ -975,6 +1517,207 @@ function applyPreviewBase(element, type) {
     element.style.border = 'none';
     element.style.textDecoration = 'none';
     element.style.boxShadow = '0 2px 4px rgba(0, 0, 0, 0.12)';
+  }
+}
+
+/**
+ * Applies tooltip preview styling and content.
+ * @param {HTMLElement} container
+ * @param {{ text: string; tooltipPosition?: string; tooltipPersistent?: boolean; style?: import('../common/types.js').InjectedElementStyle }} payload
+ */
+function applyTooltipPreview(container, payload) {
+  if (!(container instanceof HTMLElement)) {
+    return;
+  }
+  container.dataset.previewType = 'tooltip';
+  container.className = 'page-augmentor-preview-tooltip';
+  const position =
+    payload.tooltipPosition && VALID_TOOLTIP_POSITIONS.has(payload.tooltipPosition)
+      ? payload.tooltipPosition
+      : 'top';
+  container.dataset.position = position;
+  container.dataset.persistent = payload.tooltipPersistent ? 'true' : 'false';
+  container.dataset.previewVisible = 'true';
+  container.setAttribute('role', 'group');
+  container.tabIndex = -1;
+
+  const trigger = container.querySelector('.page-augmentor-preview-tooltip-trigger');
+  if (trigger instanceof HTMLElement) {
+    trigger.textContent = 'ⓘ';
+    trigger.setAttribute('aria-hidden', 'true');
+  }
+
+  const bubble = container.querySelector('.page-augmentor-preview-tooltip-bubble');
+  if (bubble instanceof HTMLElement) {
+    const textValue = payload.text && payload.text.trim() ? payload.text : t('editor.previewTooltip');
+    bubble.textContent = textValue;
+    bubble.removeAttribute('style');
+    if (payload.style) {
+      Object.entries(payload.style).forEach(([key, value]) => {
+        bubble.style[key] = value;
+      });
+    }
+  }
+}
+
+const CLICKABLE_INPUT_TYPES = new Set(['button', 'submit', 'reset', 'image']);
+
+function findClickableElement(target) {
+  let current = resolveTarget(target);
+  while (current) {
+    if (isClickableElement(current)) {
+      return current;
+    }
+    current = current.parentElement;
+  }
+  return null;
+}
+
+function isClickableElement(element) {
+  if (!(element instanceof Element)) {
+    return false;
+  }
+  if (element instanceof HTMLButtonElement) {
+    return true;
+  }
+  if (element instanceof HTMLInputElement && CLICKABLE_INPUT_TYPES.has(element.type)) {
+    return true;
+  }
+  if (element instanceof HTMLAnchorElement && element.href) {
+    return true;
+  }
+  const role = element.getAttribute('role');
+  if (role && ['button', 'link'].includes(role.toLowerCase())) {
+    return true;
+  }
+  if (typeof element.onclick === 'function') {
+    return true;
+  }
+  const tabIndex = element.getAttribute('tabindex');
+  if (tabIndex !== null && Number(tabIndex) >= 0) {
+    return true;
+  }
+  try {
+    const style = window.getComputedStyle(element);
+    if (style.cursor === 'pointer') {
+      return true;
+    }
+  } catch (error) {
+    // ignore style lookup failures
+  }
+  return false;
+}
+
+export function resolveFrameContext(win = window) {
+  const targetWindow = win || window;
+  const { selectors, sameOrigin } = collectFrameSelectors(targetWindow);
+  const frameElement = safeFrameElement(targetWindow);
+  const frameUrl = tryGetWindowUrl(targetWindow);
+  const topUrl = sameOrigin ? tryGetWindowUrl(safeTopWindow(targetWindow)) : '';
+  const pageUrl = topUrl || frameUrl;
+  const frameLabel = selectors.length > 0 ? describeFrameElement(frameElement) : '';
+  return {
+    frameSelectors: sameOrigin ? selectors : [],
+    frameLabel: frameLabel || '',
+    frameUrl: frameUrl || '',
+    pageUrl: pageUrl || '',
+    sameOriginWithTop: sameOrigin && Boolean(pageUrl) && Boolean(frameUrl),
+  };
+}
+
+function collectFrameSelectors(win) {
+  const selectors = [];
+  let current = win;
+  let sameOrigin = true;
+  while (current && current !== current.parent) {
+    if (!canAccessParent(current)) {
+      sameOrigin = false;
+      break;
+    }
+    const frameElement = safeFrameElement(current);
+    if (!(frameElement instanceof Element)) {
+      sameOrigin = false;
+      break;
+    }
+    selectors.unshift(generateSelector(frameElement));
+    try {
+      current = current.parent;
+    } catch (error) {
+      sameOrigin = false;
+      break;
+    }
+  }
+  return { selectors: sameOrigin ? selectors : [], sameOrigin };
+}
+
+function canAccessParent(win) {
+  try {
+    if (win === win.parent) {
+      return false;
+    }
+    void win.parent.document;
+    return true;
+  } catch (error) {
+    return false;
+  }
+}
+
+function safeFrameElement(win) {
+  try {
+    return win.frameElement || null;
+  } catch (error) {
+    return null;
+  }
+}
+
+function safeTopWindow(win) {
+  try {
+    return win.top;
+  } catch (error) {
+    return win;
+  }
+}
+
+function tryGetWindowUrl(win) {
+  try {
+    const { origin, pathname, search } = win.location;
+    return `${origin}${pathname}${search}`;
+  } catch (error) {
+    return '';
+  }
+}
+
+function describeFrameElement(element) {
+  if (!(element instanceof Element)) {
+    return '';
+  }
+  const localName = element.localName || 'frame';
+  if (element.id) {
+    return `${localName}#${element.id}`;
+  }
+  const name = element.getAttribute('name');
+  if (name) {
+    return `${localName}[name="${name}"]`;
+  }
+  const title = element.getAttribute('title');
+  if (title) {
+    return `${localName}[title="${title}"]`;
+  }
+  const src = element.getAttribute('src');
+  if (src) {
+    const normalized = normalizeFrameSource(src, element.ownerDocument);
+    return `${localName}[src*="${normalized}"]`;
+  }
+  return localName;
+}
+
+function normalizeFrameSource(src, doc) {
+  try {
+    const base = doc?.location?.href || window.location.href;
+    const url = new URL(src, base);
+    return `${url.origin}${url.pathname}`.slice(0, 120);
+  } catch (error) {
+    return src.slice(0, 120);
   }
 }
 
