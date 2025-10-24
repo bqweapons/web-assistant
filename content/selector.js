@@ -1,4 +1,5 @@
 import { getLocale, ready as i18nReady, subscribe as subscribeToLocale, t } from '../common/i18n.js';
+import { parseActionFlowDefinition, MAX_FLOW_SOURCE_LENGTH } from '../common/flows.js';
 
 const HIGHLIGHT_BORDER_COLOR = '#1b84ff';
 const HIGHLIGHT_FILL_COLOR = 'rgba(27, 132, 255, 0.2)';
@@ -640,6 +641,17 @@ function createElementBubble() {
   });
   actionControls.append(actionInput, actionPickButton);
 
+  const actionFlowInput = document.createElement('textarea');
+  actionFlowInput.placeholder = t('editor.actionFlowPlaceholder');
+  actionFlowInput.rows = 6;
+  actionFlowInput.spellcheck = false;
+  styleInput(actionFlowInput);
+  actionFlowInput.style.minHeight = '120px';
+  actionFlowInput.style.fontFamily =
+    'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace';
+  actionFlowInput.style.whiteSpace = 'pre';
+  actionFlowInput.style.resize = 'vertical';
+
   const positionSelect = document.createElement('select');
   const positionLabels = getPositionLabels();
   ['append', 'prepend', 'before', 'after'].forEach((value) => {
@@ -708,6 +720,16 @@ function createElementBubble() {
   });
   actionHint.dataset.defaultColor = '#94a3b8';
   actionField.wrapper.append(actionControls, actionHint);
+  const actionFlowField = createField(t('editor.actionFlowLabel'), actionFlowInput);
+  const actionFlowHint = document.createElement('p');
+  actionFlowHint.textContent = t('editor.actionFlowHintDefault', { limit: MAX_FLOW_SOURCE_LENGTH });
+  Object.assign(actionFlowHint.style, {
+    margin: '4px 0 0 0',
+    fontSize: '11px',
+    color: '#94a3b8',
+  });
+  actionFlowHint.dataset.defaultColor = '#94a3b8';
+  actionFlowField.wrapper.append(actionFlowHint);
   const tooltipPositionField = createField(t('editor.tooltipPositionLabel'), tooltipPositionSelect);
   tooltipPositionField.wrapper.style.display = 'none';
   const tooltipPersistentField = createField(t('editor.tooltipPersistenceLabel'));
@@ -849,6 +871,7 @@ function createElementBubble() {
     textField.wrapper,
     hrefField.wrapper,
     actionField.wrapper,
+    actionFlowField.wrapper,
     tooltipPositionField.wrapper,
     tooltipPersistentField.wrapper,
     positionField.wrapper,
@@ -876,6 +899,9 @@ function createElementBubble() {
     text: '',
     href: '',
     actionSelector: '',
+    actionFlow: '',
+    actionFlowError: '',
+    actionFlowSteps: 0,
     position: 'append',
     tooltipPosition: 'top',
     tooltipPersistent: false,
@@ -885,7 +911,16 @@ function createElementBubble() {
     errorLabel.textContent = '';
   };
 
-  [textInput, hrefInput, actionInput, typeSelect, positionSelect, tooltipPositionSelect, tooltipPersistentCheckbox].forEach((input) => {
+  [
+    textInput,
+    hrefInput,
+    actionInput,
+    actionFlowInput,
+    typeSelect,
+    positionSelect,
+    tooltipPositionSelect,
+    tooltipPersistentCheckbox,
+  ].forEach((input) => {
     input.addEventListener('input', clearError);
     input.addEventListener('change', clearError);
   });
@@ -939,6 +974,10 @@ function createElementBubble() {
       if (actionValue) {
         payload.actionSelector = actionValue;
       }
+      const flowValue = state.actionFlow.trim();
+      if (flowValue) {
+        payload.actionFlow = flowValue;
+      }
     } else if (type === 'tooltip') {
       const tooltipPosition = VALID_TOOLTIP_POSITIONS.has(state.tooltipPosition)
         ? state.tooltipPosition
@@ -957,6 +996,49 @@ function createElementBubble() {
     } else {
       actionHint.textContent = defaultActionHintText;
       actionHint.style.color = actionHint.dataset.defaultColor || '#94a3b8';
+    }
+    if (state.type !== 'button') {
+      actionFlowHint.textContent = '';
+      return;
+    }
+    const flowValue = state.actionFlow.trim();
+    if (!flowValue) {
+      actionFlowHint.textContent = t('editor.actionFlowHintDefault', { limit: MAX_FLOW_SOURCE_LENGTH });
+      actionFlowHint.style.color = actionFlowHint.dataset.defaultColor || '#94a3b8';
+    } else if (state.actionFlowError) {
+      actionFlowHint.textContent = t('editor.actionFlowHintError', { error: state.actionFlowError });
+      actionFlowHint.style.color = '#dc2626';
+    } else if (state.actionFlowSteps > 0) {
+      actionFlowHint.textContent = t('editor.actionFlowHintConfigured', { count: state.actionFlowSteps });
+      actionFlowHint.style.color = '#0f172a';
+    } else {
+      actionFlowHint.textContent = t('editor.actionFlowHintDefault', { limit: MAX_FLOW_SOURCE_LENGTH });
+      actionFlowHint.style.color = actionFlowHint.dataset.defaultColor || '#94a3b8';
+    }
+  };
+
+  const validateActionFlowInput = () => {
+    if (state.type !== 'button') {
+      state.actionFlowError = '';
+      state.actionFlowSteps = 0;
+      return;
+    }
+    const trimmed = state.actionFlow.trim();
+    if (!trimmed) {
+      state.actionFlowError = '';
+      state.actionFlowSteps = 0;
+      return;
+    }
+    const { definition, error } = parseActionFlowDefinition(trimmed);
+    if (error) {
+      state.actionFlowError = error;
+      state.actionFlowSteps = 0;
+    } else if (definition) {
+      state.actionFlowError = '';
+      state.actionFlowSteps = definition.stepCount;
+    } else {
+      state.actionFlowError = '';
+      state.actionFlowSteps = 0;
     }
   };
 
@@ -1057,6 +1139,8 @@ function createElementBubble() {
     actionPickButton.disabled = !isButton;
     actionPickButton.style.cursor = isButton ? 'pointer' : 'not-allowed';
     actionPickButton.style.opacity = isButton ? '1' : '0.6';
+    actionFlowField.wrapper.style.display = isButton ? 'flex' : 'none';
+    actionFlowInput.disabled = !isButton;
     if (!isButton) {
       stopActionPicker('cancel');
     }
@@ -1068,6 +1152,7 @@ function createElementBubble() {
 
     textInput.placeholder = isTooltip ? t('editor.tooltipTextPlaceholder') : t('editor.textPlaceholder');
 
+    validateActionFlowInput();
     updateActionHint();
     if (applyDefaults) {
       const defaults = isLink
@@ -1105,6 +1190,18 @@ function createElementBubble() {
   actionInput.addEventListener('input', (event) => {
     state.actionSelector = event.target.value;
     updatePreview();
+  });
+
+  actionFlowInput.addEventListener('input', (event) => {
+    state.actionFlow = event.target.value;
+    validateActionFlowInput();
+    updateActionHint();
+  });
+
+  actionFlowInput.addEventListener('change', (event) => {
+    state.actionFlow = event.target.value;
+    validateActionFlowInput();
+    updateActionHint();
   });
 
   positionSelect.addEventListener('change', (event) => {
@@ -1266,6 +1363,20 @@ function createElementBubble() {
       hrefInput.focus({ preventScroll: true });
       return;
     }
+    if (payload.type === 'button') {
+      const flowValue = state.actionFlow.trim();
+      if (flowValue) {
+        const { definition, error } = parseActionFlowDefinition(flowValue);
+        if (error || !definition) {
+          errorLabel.textContent = t('editor.errorFlowInvalid', { error: error || '' });
+          actionFlowInput.focus({ preventScroll: true });
+          return;
+        }
+        payload.actionFlow = flowValue;
+      } else {
+        delete payload.actionFlow;
+      }
+    }
     submitHandler(payload);
   });
 
@@ -1349,6 +1460,9 @@ function createElementBubble() {
       state.text = initial.text;
       state.href = initial.href;
       state.actionSelector = initial.actionSelector;
+      state.actionFlow = initial.actionFlow;
+      state.actionFlowError = '';
+      state.actionFlowSteps = 0;
       state.position = initial.position;
       state.tooltipPosition = initial.tooltipPosition;
       state.tooltipPersistent = initial.tooltipPersistent;
@@ -1356,6 +1470,7 @@ function createElementBubble() {
       textInput.value = state.text;
       hrefInput.value = state.href;
       actionInput.value = state.actionSelector;
+      actionFlowInput.value = state.actionFlow;
       positionSelect.value = state.position;
       tooltipPositionSelect.value = state.tooltipPosition;
       tooltipPersistentCheckbox.checked = state.tooltipPersistent;
@@ -1366,6 +1481,7 @@ function createElementBubble() {
       errorLabel.textContent = '';
       title.textContent = mode === 'edit' ? t('editor.titleEdit') : t('editor.titleCreate');
       saveButton.textContent = mode === 'edit' ? t('editor.saveUpdate') : t('editor.saveCreate');
+      validateActionFlowInput();
       updatePreview({ propagate: false });
       submitHandler = (payload) => {
         detach();
@@ -1397,6 +1513,7 @@ function defaultElementValues(values = {}, suggestedStyle = {}) {
   const text = typeof values.text === 'string' ? values.text : '';
   const href = typeof values.href === 'string' ? values.href : '';
   const actionSelector = typeof values.actionSelector === 'string' ? values.actionSelector : '';
+  const actionFlow = typeof values.actionFlow === 'string' ? values.actionFlow : '';
   const position = VALID_POSITIONS.has(values.position)
     ? /** @type {'append' | 'prepend' | 'before' | 'after'} */ (values.position)
     : 'append';
@@ -1426,6 +1543,7 @@ function defaultElementValues(values = {}, suggestedStyle = {}) {
     text,
     href,
     actionSelector,
+    actionFlow,
     position,
     tooltipPosition,
     tooltipPersistent,

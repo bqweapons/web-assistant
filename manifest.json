@@ -36,7 +36,8 @@
         "content/selector.js",
         "content/inject.js",
         "common/messaging.js",
-        "common/types.js"
+        "common/types.js",
+        "common/flows.js"
       ],
       "matches": ["<all_urls>"]
     }

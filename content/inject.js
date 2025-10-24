@@ -1,3 +1,9 @@
+import { parseActionFlowDefinition } from '../common/flows.js';
+
+/** @typedef {import('../common/flows.js').FlowDefinition} FlowDefinition */
+/** @typedef {import('../common/flows.js').FlowCondition} FlowCondition */
+/** @typedef {import('../common/flows.js').FlowStep} FlowStep */
+
 const HOST_ATTRIBUTE = 'data-page-augmentor-id';
 const HOST_CLASS = 'page-augmentor-host';
 const NODE_CLASS = 'page-augmentor-node';
@@ -377,7 +383,7 @@ function hydrateNode(node, element) {
   } else if (element.type === 'button' && node instanceof HTMLButtonElement) {
     applyBaseAppearance(node, 'button');
     node.textContent = element.text;
-    applyButtonBehavior(node, element.href, element.actionSelector);
+    applyButtonBehavior(node, element.href, element.actionSelector, element.actionFlow);
   } else if (element.type === 'tooltip') {
     applyTooltipAppearance(node);
     const bubble = node.querySelector('.tooltip-bubble');
@@ -544,13 +550,24 @@ function insertHost(host, element) {
  * @param {HTMLButtonElement} node
  * @param {string | undefined} href
  * @param {string | undefined} actionSelector
+ * @param {string | undefined} actionFlow
  */
-function applyButtonBehavior(node, href, actionSelector) {
+function applyButtonBehavior(node, href, actionSelector, actionFlow) {
   if (!(node instanceof HTMLButtonElement)) {
     return;
   }
   const sanitized = sanitizeUrl(href || '');
   const selector = typeof actionSelector === 'string' ? actionSelector.trim() : '';
+  const flowSource = typeof actionFlow === 'string' ? actionFlow.trim() : '';
+  let parsedFlow = null;
+  if (flowSource) {
+    const { definition, error } = parseActionFlowDefinition(flowSource);
+    if (error) {
+      console.warn('[PageAugmentor] Ignoring invalid action flow:', error);
+    } else if (definition) {
+      parsedFlow = definition;
+    }
+  }
   if (sanitized) {
     node.dataset.href = sanitized;
   } else {
@@ -561,29 +578,296 @@ function applyButtonBehavior(node, href, actionSelector) {
   } else {
     delete node.dataset.actionSelector;
   }
-  if (selector) {
-    node.onclick = (event) => {
-      event.preventDefault();
-      event.stopPropagation();
+  if (parsedFlow) {
+    node.dataset.actionFlow = String(parsedFlow.stepCount);
+  } else {
+    delete node.dataset.actionFlow;
+  }
+  if (!parsedFlow && !selector && !sanitized) {
+    node.onclick = null;
+    return;
+  }
+  node.onclick = async (event) => {
+    event.preventDefault();
+    event.stopPropagation();
+    let handled = false;
+    if (parsedFlow) {
+      try {
+        handled = await executeActionFlow(node, parsedFlow);
+      } catch (error) {
+        console.error('[PageAugmentor] Failed to execute flow', error);
+      }
+    }
+    if (handled) {
+      return;
+    }
+    if (selector) {
       const target = resolveSelector(selector);
       if (target) {
         const triggered = forwardClick(target);
-        if (!triggered && sanitized) {
-          window.open(sanitized, '_blank', 'noopener');
+        if (!triggered) {
+          if (sanitized) {
+            window.open(sanitized, '_blank', 'noopener');
+          } else if (typeof target.click === 'function') {
+            try {
+              target.click();
+            } catch (clickError) {
+              console.warn('[PageAugmentor] Native click fallback failed', clickError);
+            }
+          }
         }
-      } else if (sanitized) {
-        window.open(sanitized, '_blank', 'noopener');
+        return;
       }
-    };
-  } else if (sanitized) {
-    node.onclick = (event) => {
-      event.preventDefault();
-      event.stopPropagation();
+    }
+    if (sanitized) {
       window.open(sanitized, '_blank', 'noopener');
-    };
-  } else {
-    node.onclick = null;
+    }
+  };
+}
+
+const FLOW_SELF_SELECTOR = ':self';
+const FLOW_MAX_RUNTIME_MS = 10000;
+const FLOW_MAX_DEPTH = 8;
+
+/**
+ * @typedef {Object} FlowExecutionContext
+ * @property {HTMLElement} root
+ * @property {Document} document
+ * @property {boolean} performed
+ * @property {number} startTime
+ */
+
+/**
+ * Executes the configured action flow.
+ * @param {HTMLElement} node
+ * @param {FlowDefinition} definition
+ * @returns {Promise<boolean>}
+ */
+async function executeActionFlow(node, definition) {
+  if (!definition || !Array.isArray(definition.steps) || definition.steps.length === 0) {
+    return false;
   }
+  /** @type {FlowExecutionContext} */
+  const context = {
+    root: node,
+    document: node.ownerDocument || document,
+    performed: false,
+    startTime: Date.now(),
+  };
+  await runFlowSteps(definition.steps, context, 0);
+  return context.performed;
+}
+
+/**
+ * Executes a list of flow steps sequentially.
+ * @param {FlowStep[]} steps
+ * @param {FlowExecutionContext} context
+ * @param {number} depth
+ */
+async function runFlowSteps(steps, context, depth) {
+  if (!Array.isArray(steps) || steps.length === 0) {
+    return;
+  }
+  if (depth > FLOW_MAX_DEPTH) {
+    throw new Error('Flow exceeded maximum nesting depth.');
+  }
+  for (const step of steps) {
+    await runFlowStep(step, context, depth);
+    enforceRuntimeLimit(context);
+  }
+}
+
+/**
+ * Executes a single flow step.
+ * @param {FlowStep} step
+ * @param {FlowExecutionContext} context
+ * @param {number} depth
+ */
+async function runFlowStep(step, context, depth) {
+  if (!step) {
+    return;
+  }
+  switch (step.type) {
+    case 'click': {
+      let targets = [];
+      if (step.all) {
+        targets = resolveFlowElements(step.selector, context);
+      } else {
+        const single = resolveFlowElement(step.selector, context);
+        if (single) {
+          targets = [single];
+        }
+      }
+      if (targets.length === 0) {
+        break;
+      }
+      targets.forEach((target) => {
+        const triggered = forwardClick(target);
+        if (!triggered && typeof target.click === 'function') {
+          try {
+            target.click();
+          } catch (error) {
+            console.warn('[PageAugmentor] Flow click fallback failed', error);
+          }
+        }
+      });
+      context.performed = true;
+      break;
+    }
+    case 'wait': {
+      await delay(step.ms);
+      break;
+    }
+    case 'input': {
+      const target = resolveFlowElement(step.selector, context);
+      if (target) {
+        if (applyInputValue(target, step.value)) {
+          context.performed = true;
+        }
+      }
+      break;
+    }
+    case 'navigate': {
+      const sanitized = sanitizeUrl(step.url);
+      if (sanitized) {
+        const target = step.target || '_blank';
+        window.open(sanitized, target, 'noopener');
+        context.performed = true;
+      }
+      break;
+    }
+    case 'log': {
+      console.info('[PageAugmentor][Flow]', step.message);
+      break;
+    }
+    case 'if': {
+      const outcome = evaluateFlowCondition(step.condition, context);
+      await runFlowSteps(outcome ? step.thenSteps : step.elseSteps, context, depth + 1);
+      break;
+    }
+    case 'while': {
+      let iterations = 0;
+      while (iterations < step.maxIterations && evaluateFlowCondition(step.condition, context)) {
+        iterations += 1;
+        await runFlowSteps(step.bodySteps, context, depth + 1);
+        enforceRuntimeLimit(context);
+      }
+      break;
+    }
+    default:
+      break;
+  }
+}
+
+/**
+ * Ensures flow execution stays within the runtime budget.
+ * @param {FlowExecutionContext} context
+ */
+function enforceRuntimeLimit(context) {
+  if (Date.now() - context.startTime > FLOW_MAX_RUNTIME_MS) {
+    throw new Error('Flow execution exceeded the time limit.');
+  }
+}
+
+/**
+ * Resolves the first matching element for a flow selector.
+ * @param {string} selector
+ * @param {FlowExecutionContext} context
+ * @returns {Element | null}
+ */
+function resolveFlowElement(selector, context) {
+  const [element] = resolveFlowElements(selector, context);
+  return element || null;
+}
+
+/**
+ * Resolves all matching elements for a flow selector.
+ * @param {string} selector
+ * @param {FlowExecutionContext} context
+ * @returns {Element[]}
+ */
+function resolveFlowElements(selector, context) {
+  if (!selector) {
+    return [];
+  }
+  if (selector === FLOW_SELF_SELECTOR) {
+    return context.root ? [context.root] : [];
+  }
+  try {
+    return Array.from((context.document || document).querySelectorAll(selector));
+  } catch (error) {
+    console.warn('[PageAugmentor] Invalid flow selector', selector, error);
+    return [];
+  }
+}
+
+/**
+ * Applies a value to an input-like element.
+ * @param {Element} element
+ * @param {string} value
+ * @returns {boolean}
+ */
+function applyInputValue(element, value) {
+  if (element instanceof HTMLInputElement || element instanceof HTMLTextAreaElement) {
+    element.focus({ preventScroll: true });
+    element.value = value;
+    element.dispatchEvent(new InputEvent('input', { bubbles: true, cancelable: true }));
+    element.dispatchEvent(new Event('change', { bubbles: true }));
+    return true;
+  }
+  if (element instanceof HTMLElement && element.isContentEditable) {
+    element.focus({ preventScroll: true });
+    element.textContent = value;
+    element.dispatchEvent(new InputEvent('input', { bubbles: true, cancelable: true }));
+    element.dispatchEvent(new Event('change', { bubbles: true }));
+    return true;
+  }
+  return false;
+}
+
+/**
+ * Evaluates a flow condition.
+ * @param {FlowCondition} condition
+ * @param {FlowExecutionContext} context
+ * @returns {boolean}
+ */
+function evaluateFlowCondition(condition, context) {
+  if (!condition) {
+    return false;
+  }
+  switch (condition.kind) {
+    case 'exists':
+      return Boolean(resolveFlowElement(condition.selector, context));
+    case 'not':
+      return !evaluateFlowCondition(condition.operand, context);
+    case 'textContains': {
+      const target = resolveFlowElement(condition.selector, context);
+      if (!target) {
+        return false;
+      }
+      const text = (target.textContent || '').toLowerCase();
+      return text.includes(condition.value.toLowerCase());
+    }
+    case 'attributeEquals': {
+      const target = resolveFlowElement(condition.selector, context);
+      if (!target) {
+        return false;
+      }
+      return target.getAttribute(condition.name) === condition.value;
+    }
+    default:
+      return false;
+  }
+}
+
+/**
+ * Waits for the requested duration.
+ * @param {number} ms
+ * @returns {Promise<void>}
+ */
+function delay(ms) {
+  const duration = Number.isFinite(ms) && ms > 0 ? ms : 0;
+  return new Promise((resolve) => setTimeout(resolve, duration));
 }
 
 /**

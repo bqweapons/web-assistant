@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { createRoot } from 'react-dom/client';
 import { MessageType, sendMessage } from '../../common/messaging.js';
 import { getActiveTab } from '../../common/compat.js';
+import { parseActionFlowDefinition } from '../../common/flows.js';
 import {
   formatDateTime,
   getLocale,
@@ -421,6 +422,7 @@ function App() {
         ) : (
           filteredItems.map((item) => {
             const frameInfo = formatFrameSummary(item);
+            const flowSummary = summarizeFlow(item.actionFlow);
             return (
               <article
                 key={item.id}
@@ -441,6 +443,11 @@ function App() {
                     {t('manage.item.actionSelector', { selector: item.actionSelector })}
                   </p>
                 )}
+                {flowSummary?.steps ? (
+                  <p className="mt-1 break-all text-xs text-emerald-600">
+                    {t('manage.item.actionFlow', { steps: flowSummary.steps })}
+                  </p>
+                ) : null}
                 {frameInfo && <p className="mt-1 break-all text-xs text-purple-600">{frameInfo}</p>}
                 {item.type === 'tooltip' && (
                   <p className="mt-1 break-all text-xs text-amber-600">
@@ -676,6 +683,7 @@ function OverviewSection({ t, typeLabels, formatTooltipPosition, formatTooltipMo
                   .sort((a, b) => b.createdAt - a.createdAt)
                   .map((item) => {
                     const frameInfo = formatFrameSummary(item);
+                    const flowSummary = summarizeFlow(item.actionFlow);
                     return (
                       <li key={item.id} className="rounded-xl border border-slate-200 bg-slate-50 p-4">
                         <div className="flex flex-wrap items-start justify-between gap-3">
@@ -692,6 +700,11 @@ function OverviewSection({ t, typeLabels, formatTooltipPosition, formatTooltipMo
                             {t('manage.item.actionSelector', { selector: item.actionSelector })}
                           </p>
                         )}
+                        {flowSummary?.steps ? (
+                          <p className="mt-1 break-all text-xs text-emerald-600">
+                            {t('manage.item.actionFlow', { steps: flowSummary.steps })}
+                          </p>
+                        ) : null}
                         {frameInfo && <p className="mt-1 break-all text-xs text-purple-600">{frameInfo}</p>}
                         {item.type === 'tooltip' && (
                           <p className="mt-1 break-all text-xs text-amber-600">
@@ -751,6 +764,21 @@ function formatPreview(preview, t) {
     parts.push(`"${preview.text}"`);
   }
   return parts.length > 0 ? parts.join(' ') : t('picker.previewTarget');
+}
+
+function summarizeFlow(actionFlow) {
+  if (typeof actionFlow !== 'string') {
+    return null;
+  }
+  const trimmed = actionFlow.trim();
+  if (!trimmed) {
+    return null;
+  }
+  const { definition, error } = parseActionFlowDefinition(trimmed);
+  if (error || !definition) {
+    return null;
+  }
+  return { steps: definition.stepCount };
 }
 
 function normalizeUrl(url) {

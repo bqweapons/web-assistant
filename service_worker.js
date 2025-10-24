@@ -1,6 +1,7 @@
 import { getElementsByUrl, upsertElement, deleteElement, getFullStore, clearPage } from './common/storage.js';
 import { addAsyncMessageListener, MessageType } from './common/messaging.js';
 import { openSidePanelOrTab } from './common/compat.js';
+import { parseActionFlowDefinition } from './common/flows.js';
 
 const TOOLTIP_POSITIONS = new Set(['top', 'right', 'bottom', 'left']);
 
@@ -168,6 +169,39 @@ function validateElementPayload(payload) {
   } else {
     delete element.tooltipPosition;
     delete element.tooltipPersistent;
+  }
+  if (element.type === 'button') {
+    if (typeof element.actionSelector === 'string') {
+      const trimmedSelector = element.actionSelector.trim();
+      if (trimmedSelector) {
+        element.actionSelector = trimmedSelector;
+      } else {
+        delete element.actionSelector;
+      }
+    } else {
+      delete element.actionSelector;
+    }
+    if (typeof element.actionFlow === 'string') {
+      const trimmedFlow = element.actionFlow.trim();
+      if (trimmedFlow) {
+        const { definition, error } = parseActionFlowDefinition(trimmedFlow);
+        if (error) {
+          throw new Error(`Invalid action flow: ${error}`);
+        }
+        if (definition) {
+          element.actionFlow = trimmedFlow;
+        } else {
+          delete element.actionFlow;
+        }
+      } else {
+        delete element.actionFlow;
+      }
+    } else {
+      delete element.actionFlow;
+    }
+  } else {
+    delete element.actionSelector;
+    delete element.actionFlow;
   }
   if (Array.isArray(element.frameSelectors)) {
     element.frameSelectors = element.frameSelectors.map((value) => String(value));
