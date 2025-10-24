@@ -604,7 +604,7 @@ function createElementBubble() {
     flex: '1 1 auto',
     minHeight: '0',
     overflowY: 'auto',
-    paddingRight: '6px',
+    paddingTop: '6px',
   });
 
   const typeSelect = document.createElement('select');
@@ -841,7 +841,7 @@ function createElementBubble() {
   const errorLabel = document.createElement('p');
   errorLabel.textContent = '';
   Object.assign(errorLabel.style, {
-    margin: '4px 0 0 0',
+    margin: '0px 0 0 0',
     fontSize: '12px',
     color: '#dc2626',
     minHeight: '16px',
