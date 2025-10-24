@@ -410,6 +410,7 @@ function createElementBubble() {
     zIndex: '2147483647',
     maxWidth: '340px',
     minWidth: '260px',
+    maxHeight: '85vh',
     padding: '18px',
     borderRadius: '16px',
     backgroundColor: '#ffffff',
@@ -423,6 +424,10 @@ function createElementBubble() {
     transition: 'opacity 0.16s ease, transform 0.16s ease',
     pointerEvents: 'auto',
     backdropFilter: 'blur(16px)',
+    overflow: 'hidden',
+    display: 'flex',
+    flexDirection: 'column',
+    gap: '16px',
   });
 
   bubble.addEventListener('click', (event) => event.stopPropagation());
@@ -442,7 +447,7 @@ function createElementBubble() {
     display: 'flex',
     flexDirection: 'column',
     gap: '4px',
-    marginBottom: '12px',
+    margin: '0',
   });
 
   const selectorTitle = document.createElement('span');
@@ -476,11 +481,11 @@ function createElementBubble() {
     display: 'flex',
     flexDirection: 'column',
     gap: '8px',
-    marginBottom: '12px',
     padding: '12px',
     borderRadius: '12px',
     border: '1px solid rgba(148, 163, 184, 0.25)',
     backgroundColor: 'rgba(241, 245, 249, 0.6)',
+    margin: '0',
   });
 
   const previewLabel = document.createElement('span');
@@ -586,7 +591,20 @@ function createElementBubble() {
   Object.assign(form.style, {
     display: 'flex',
     flexDirection: 'column',
-    gap: '12px',
+    gap: '16px',
+    flex: '1 1 auto',
+    minHeight: '0',
+  });
+
+  const formBody = document.createElement('div');
+  Object.assign(formBody.style, {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: '14px',
+    flex: '1 1 auto',
+    minHeight: '0',
+    overflowY: 'auto',
+    paddingRight: '6px',
   });
 
   const typeSelect = document.createElement('select');
@@ -834,6 +852,9 @@ function createElementBubble() {
     display: 'flex',
     justifyContent: 'flex-end',
     gap: '8px',
+    padding: '12px 0 0',
+    borderTop: '1px solid rgba(226, 232, 240, 0.9)',
+    backgroundColor: '#ffffff',
   });
 
   const cancelButton = document.createElement('button');
@@ -866,18 +887,47 @@ function createElementBubble() {
   });
 
   actions.append(cancelButton, saveButton);
-  form.append(
-    typeField.wrapper,
-    textField.wrapper,
-    hrefField.wrapper,
-    actionField.wrapper,
-    actionFlowField.wrapper,
-    tooltipPositionField.wrapper,
-    tooltipPersistentField.wrapper,
-    positionField.wrapper,
-    styleFieldset,
-    actions,
+
+  const basicSection = createSection(
+    t('editor.sections.basics.title'),
+    t('editor.sections.basics.description'),
   );
+  basicSection.content.append(typeField.wrapper, textField.wrapper, hrefField.wrapper);
+
+  const behaviorSection = createSection(
+    t('editor.sections.behavior.title'),
+    t('editor.sections.behavior.description'),
+  );
+  behaviorSection.content.append(actionField.wrapper, actionFlowField.wrapper);
+
+  const tooltipSection = createSection(
+    t('editor.sections.tooltip.title'),
+    t('editor.sections.tooltip.description'),
+  );
+  tooltipSection.content.append(tooltipPositionField.wrapper, tooltipPersistentField.wrapper);
+  tooltipSection.section.style.display = 'none';
+
+  const placementSection = createSection(
+    t('editor.sections.placement.title'),
+    t('editor.sections.placement.description'),
+  );
+  placementSection.content.append(positionField.wrapper);
+
+  const appearanceSection = createSection(
+    t('editor.sections.appearance.title'),
+    t('editor.sections.appearance.description'),
+  );
+  appearanceSection.content.append(styleFieldset);
+
+  formBody.append(
+    basicSection.section,
+    behaviorSection.section,
+    tooltipSection.section,
+    placementSection.section,
+    appearanceSection.section,
+  );
+
+  form.append(formBody, actions);
 
   bubble.append(title, selectorWrapper, previewWrapper, form, errorLabel);
 
@@ -1144,11 +1194,13 @@ function createElementBubble() {
     if (!isButton) {
       stopActionPicker('cancel');
     }
+    behaviorSection.section.style.display = isButton ? 'flex' : 'none';
 
     tooltipPositionField.wrapper.style.display = isTooltip ? 'flex' : 'none';
     tooltipPositionSelect.disabled = !isTooltip;
     tooltipPersistentField.wrapper.style.display = isTooltip ? 'flex' : 'none';
     tooltipPersistentCheckbox.disabled = !isTooltip;
+    tooltipSection.section.style.display = isTooltip ? 'flex' : 'none';
 
     textInput.placeholder = isTooltip ? t('editor.tooltipTextPlaceholder') : t('editor.textPlaceholder');
 
@@ -1549,6 +1601,58 @@ function defaultElementValues(values = {}, suggestedStyle = {}) {
     tooltipPersistent,
     style,
   };
+}
+
+function createSection(titleText, descriptionText = '') {
+  const section = document.createElement('section');
+  Object.assign(section.style, {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: '10px',
+    padding: '14px',
+    borderRadius: '14px',
+    border: '1px solid rgba(148, 163, 184, 0.25)',
+    backgroundColor: 'rgba(248, 250, 252, 0.85)',
+  });
+
+  const header = document.createElement('div');
+  Object.assign(header.style, {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: '4px',
+  });
+
+  const title = document.createElement('h4');
+  title.textContent = titleText;
+  Object.assign(title.style, {
+    margin: '0',
+    fontSize: '13px',
+    fontWeight: '600',
+    color: '#0f172a',
+  });
+  header.appendChild(title);
+
+  if (descriptionText) {
+    const description = document.createElement('p');
+    description.textContent = descriptionText;
+    Object.assign(description.style, {
+      margin: '0',
+      fontSize: '12px',
+      color: '#64748b',
+      lineHeight: '1.5',
+    });
+    header.appendChild(description);
+  }
+
+  const content = document.createElement('div');
+  Object.assign(content.style, {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: '12px',
+  });
+
+  section.append(header, content);
+  return { section, content };
 }
 
 function createField(labelText, control = null) {
