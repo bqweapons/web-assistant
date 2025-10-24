@@ -888,44 +888,40 @@ function createElementBubble() {
 
   actions.append(cancelButton, saveButton);
 
-  const basicSection = createSection(
+  const sectionsTabs = createTabGroup();
+
+  const basicSection = sectionsTabs.addSection(
     t('editor.sections.basics.title'),
     t('editor.sections.basics.description'),
   );
   basicSection.content.append(typeField.wrapper, textField.wrapper, hrefField.wrapper);
 
-  const behaviorSection = createSection(
+  const behaviorSection = sectionsTabs.addSection(
     t('editor.sections.behavior.title'),
     t('editor.sections.behavior.description'),
   );
   behaviorSection.content.append(actionField.wrapper, actionFlowField.wrapper);
 
-  const tooltipSection = createSection(
+  const tooltipSection = sectionsTabs.addSection(
     t('editor.sections.tooltip.title'),
     t('editor.sections.tooltip.description'),
   );
   tooltipSection.content.append(tooltipPositionField.wrapper, tooltipPersistentField.wrapper);
-  tooltipSection.section.style.display = 'none';
+  tooltipSection.setVisible(false);
 
-  const placementSection = createSection(
+  const placementSection = sectionsTabs.addSection(
     t('editor.sections.placement.title'),
     t('editor.sections.placement.description'),
   );
   placementSection.content.append(positionField.wrapper);
 
-  const appearanceSection = createSection(
+  const appearanceSection = sectionsTabs.addSection(
     t('editor.sections.appearance.title'),
     t('editor.sections.appearance.description'),
   );
   appearanceSection.content.append(styleFieldset);
 
-  formBody.append(
-    basicSection.section,
-    behaviorSection.section,
-    tooltipSection.section,
-    placementSection.section,
-    appearanceSection.section,
-  );
+  formBody.append(sectionsTabs.container);
 
   form.append(formBody, actions);
 
@@ -1194,13 +1190,13 @@ function createElementBubble() {
     if (!isButton) {
       stopActionPicker('cancel');
     }
-    behaviorSection.section.style.display = isButton ? 'flex' : 'none';
+    behaviorSection.setVisible(isButton);
 
     tooltipPositionField.wrapper.style.display = isTooltip ? 'flex' : 'none';
     tooltipPositionSelect.disabled = !isTooltip;
     tooltipPersistentField.wrapper.style.display = isTooltip ? 'flex' : 'none';
     tooltipPersistentCheckbox.disabled = !isTooltip;
-    tooltipSection.section.style.display = isTooltip ? 'flex' : 'none';
+    tooltipSection.setVisible(isTooltip);
 
     textInput.placeholder = isTooltip ? t('editor.tooltipTextPlaceholder') : t('editor.textPlaceholder');
 
@@ -1488,13 +1484,14 @@ function createElementBubble() {
     const rect = currentTarget.getBoundingClientRect();
     const bubbleWidth = bubble.offsetWidth || 300;
     const bubbleHeight = bubble.offsetHeight || 320;
-    let top = rect.top + rect.height / 2 - bubbleHeight / 2;
-    top = Math.max(12, Math.min(window.innerHeight - bubbleHeight - 12, top));
+
+    let top = rect.top;
+    if (top + bubbleHeight + 12 > window.innerHeight) {
+      top = window.innerHeight - bubbleHeight - 12;
+    }
+    top = Math.max(12, top);
 
     let left = rect.right + 12;
-    if (left + bubbleWidth + 12 > window.innerWidth) {
-      left = rect.left - bubbleWidth - 12;
-    }
     left = Math.max(12, Math.min(window.innerWidth - bubbleWidth - 12, left));
 
     bubble.style.top = `${top}px`;
@@ -1600,6 +1597,177 @@ function defaultElementValues(values = {}, suggestedStyle = {}) {
     tooltipPosition,
     tooltipPersistent,
     style,
+  };
+}
+
+let tabIdCounter = 0;
+
+function createTabGroup() {
+  const container = document.createElement('div');
+  Object.assign(container.style, {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: '12px',
+    flex: '1 1 auto',
+    minHeight: '0',
+  });
+
+  const tabList = document.createElement('div');
+  tabList.setAttribute('role', 'tablist');
+  Object.assign(tabList.style, {
+    display: 'flex',
+    flexWrap: 'wrap',
+    gap: '8px',
+    paddingBottom: '6px',
+    borderBottom: '1px solid rgba(148, 163, 184, 0.25)',
+  });
+
+  const panels = document.createElement('div');
+  Object.assign(panels.style, {
+    flex: '1 1 auto',
+    display: 'flex',
+    flexDirection: 'column',
+    gap: '12px',
+    minHeight: '0',
+  });
+
+  container.append(tabList, panels);
+
+  /** @type {{
+   *  tabButton: HTMLButtonElement;
+   *  section: HTMLElement;
+   *  content: HTMLElement;
+   *  visible: boolean;
+   *  setVisible: (visible: boolean) => void;
+   * }[]} */
+  const sections = [];
+  /** @type {null | typeof sections[number]} */
+  let activeSection = null;
+
+  function applyTabState(sectionObj, isActive) {
+    sectionObj.tabButton.setAttribute('aria-selected', isActive ? 'true' : 'false');
+    sectionObj.tabButton.style.backgroundColor = isActive
+      ? 'rgba(59, 130, 246, 0.12)'
+      : 'transparent';
+    sectionObj.tabButton.style.borderColor = isActive
+      ? 'rgba(59, 130, 246, 0.35)'
+      : 'rgba(148, 163, 184, 0.45)';
+    sectionObj.tabButton.style.color = isActive ? '#1d4ed8' : '#475569';
+    sectionObj.tabButton.style.boxShadow = isActive ? '0 6px 18px rgba(37, 99, 235, 0.16)' : 'none';
+  }
+
+  function ensureActiveSection() {
+    if (activeSection && activeSection.visible) {
+      return;
+    }
+    const next = sections.find((section) => section.visible);
+    if (next) {
+      activate(next);
+    }
+  }
+
+  function activate(sectionObj) {
+    if (!sectionObj.visible) {
+      return;
+    }
+    if (activeSection === sectionObj) {
+      sectionObj.section.style.display = 'flex';
+      applyTabState(sectionObj, true);
+      return;
+    }
+    if (activeSection) {
+      activeSection.section.style.display = 'none';
+      applyTabState(activeSection, false);
+    }
+    activeSection = sectionObj;
+    sectionObj.section.style.display = 'flex';
+    applyTabState(sectionObj, true);
+  }
+
+  return {
+    container,
+    addSection(titleText, descriptionText = '') {
+      const { section, content } = createSection(titleText, descriptionText);
+      section.style.display = 'none';
+
+      const tabButton = document.createElement('button');
+      tabButton.type = 'button';
+      tabButton.textContent = titleText;
+      tabButton.setAttribute('role', 'tab');
+      const tabId = `page-augmentor-tab-${++tabIdCounter}`;
+      const panelId = `${tabId}-panel`;
+      tabButton.id = tabId;
+      section.id = panelId;
+      section.setAttribute('role', 'tabpanel');
+      section.setAttribute('aria-labelledby', tabId);
+      tabButton.setAttribute('aria-controls', panelId);
+      Object.assign(tabButton.style, {
+        border: '1px solid rgba(148, 163, 184, 0.45)',
+        background: 'transparent',
+        borderRadius: '999px',
+        padding: '6px 14px',
+        fontSize: '12px',
+        fontWeight: '600',
+        textTransform: 'uppercase',
+        letterSpacing: '0.03em',
+        color: '#475569',
+        cursor: 'pointer',
+        transition: 'all 0.16s ease',
+        boxShadow: 'none',
+      });
+
+      const sectionObj = {
+        tabButton,
+        section,
+        content,
+        visible: true,
+        setVisible(visible) {
+          if (sectionObj.visible === visible) {
+            return;
+          }
+          sectionObj.visible = visible;
+          tabButton.style.display = visible ? '' : 'none';
+          if (!visible) {
+            section.style.display = 'none';
+            applyTabState(sectionObj, false);
+            if (activeSection === sectionObj) {
+              activeSection = null;
+              ensureActiveSection();
+            }
+          } else {
+            ensureActiveSection();
+          }
+        },
+      };
+
+      tabButton.addEventListener('mouseenter', () => {
+        if (activeSection === sectionObj || !sectionObj.visible) {
+          return;
+        }
+        tabButton.style.borderColor = 'rgba(148, 163, 184, 0.65)';
+        tabButton.style.backgroundColor = 'rgba(148, 163, 184, 0.12)';
+      });
+      tabButton.addEventListener('mouseleave', () => {
+        if (activeSection === sectionObj || !sectionObj.visible) {
+          return;
+        }
+        tabButton.style.backgroundColor = 'transparent';
+        tabButton.style.borderColor = 'rgba(148, 163, 184, 0.45)';
+      });
+
+      tabButton.addEventListener('click', () => activate(sectionObj));
+
+      sections.push(sectionObj);
+      tabList.appendChild(tabButton);
+      panels.appendChild(section);
+
+      if (!activeSection && sectionObj.visible) {
+        activate(sectionObj);
+      }
+
+      return sectionObj;
+    },
+    activate,
   };
 }
 
