@@ -148,6 +148,28 @@ const messages = {
       tooltipPersistenceCheckbox: 'Keep tooltip visible',
       tooltipPersistenceHint: 'When disabled, the tooltip appears on hover or focus.',
       positionLabel: 'Insertion position',
+      sections: {
+        basics: {
+          title: 'Basics',
+          description: 'Choose the element type and the text visitors will see.',
+        },
+        behavior: {
+          title: 'Behavior & actions',
+          description: 'Control destination links, click forwarding, and optional flows.',
+        },
+        tooltip: {
+          title: 'Tooltip options',
+          description: 'Decide how the tooltip should appear for visitors.',
+        },
+        placement: {
+          title: 'Placement',
+          description: 'Select where to insert the element relative to the target.',
+        },
+        appearance: {
+          title: 'Appearance',
+          description: 'Fine-tune colors, spacing, and other visual styles.',
+        },
+      },
       stylesLegend: 'Style settings',
       stylesHint: 'Leave fields blank to use the defaults.',
       styles: {
@@ -320,6 +342,28 @@ const messages = {
       tooltipPersistenceCheckbox: '常にバブルを表示する',
       tooltipPersistenceHint: 'オフの場合はホバーまたはフォーカス時に表示されます。',
       positionLabel: '挿入位置',
+      sections: {
+        basics: {
+          title: '基本情報',
+          description: '要素タイプと利用者に表示するテキストを選択します。',
+        },
+        behavior: {
+          title: '動作とアクション',
+          description: 'リンク先、クリック転送、任意のアクションフローを設定します。',
+        },
+        tooltip: {
+          title: 'ツールチップ設定',
+          description: 'ツールチップを閲覧者にどのように表示するかを決めます。',
+        },
+        placement: {
+          title: '配置',
+          description: '対象要素に対して挿入する位置を選択します。',
+        },
+        appearance: {
+          title: '外観',
+          description: '色や余白などの見た目を細かく調整します。',
+        },
+      },
       stylesLegend: 'スタイル設定',
       stylesHint: '空欄の項目は既定のスタイルが使用されます。',
       styles: {
@@ -498,6 +542,28 @@ const messages = {
       tooltipPersistenceCheckbox: '保持提示常驻',
       tooltipPersistenceHint: '关闭后仅在悬停或聚焦时显示。',
       positionLabel: '插入位置',
+      sections: {
+        basics: {
+          title: '基础信息',
+          description: '选择元素类型以及用户能看到的文字。',
+        },
+        behavior: {
+          title: '交互与动作',
+          description: '控制跳转链接、点击转发和可选的动作流程。',
+        },
+        tooltip: {
+          title: '提示气泡选项',
+          description: '设置提示气泡的展示位置和方式。',
+        },
+        placement: {
+          title: '插入位置',
+          description: '确定元素相对于目标节点的放置位置。',
+        },
+        appearance: {
+          title: '样式外观',
+          description: '微调颜色、间距等视觉样式。',
+        },
+      },
       stylesLegend: '样式设置',
       stylesHint: '留空时会使用默认样式。',
       styles: {
