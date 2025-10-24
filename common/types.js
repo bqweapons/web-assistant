@@ -6,6 +6,7 @@
  * @property {string} text
  * @property {string | undefined} href
  * @property {string | undefined} actionSelector
+ * @property {string | undefined} actionFlow
  * @property {string} selector
  * @property {string[] | undefined} [frameSelectors]
  * @property {string | undefined} [frameLabel]
