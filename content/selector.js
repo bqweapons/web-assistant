@@ -781,7 +781,7 @@ function createElementBubble() {
         height: '36px',
         padding: '0',
         borderRadius: '10px',
-        border: '1px solid rgba(148, 163, 184, 0.6)',
+        border: 'none',
         background: '#ffffff',
         cursor: 'pointer',
       });

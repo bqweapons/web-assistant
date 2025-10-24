@@ -1,0 +1,242 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>测试静态页面</title>
+  <style>
+    :root {
+      color-scheme: light dark;
+      font-family: "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      background-color: #f4f5f7;
+      color: #1d2330;
+    }
+
+    body {
+      margin: 0;
+      padding: 24px;
+      line-height: 1.6;
+    }
+
+    header {
+      padding-bottom: 16px;
+      border-bottom: 1px solid #d0d4dc;
+      margin-bottom: 24px;
+    }
+
+    h1 {
+      margin: 0 0 12px;
+      font-size: 28px;
+    }
+
+    main {
+      display: grid;
+      gap: 24px;
+    }
+
+    section {
+      background: #fff;
+      border: 1px solid #d0d4dc;
+      border-radius: 12px;
+      padding: 20px;
+      box-shadow: 0 8px 24px rgba(15, 23, 42, 0.08);
+    }
+
+    section h2 {
+      margin-top: 0;
+      font-size: 20px;
+    }
+
+    button {
+      padding: 10px 18px;
+      border-radius: 8px;
+      border: none;
+      background: #2563eb;
+      color: #fff;
+      font-size: 14px;
+      cursor: pointer;
+      transition: transform 0.15s ease, box-shadow 0.15s ease;
+    }
+
+    button:hover {
+      transform: translateY(-1px);
+      box-shadow: 0 10px 20px rgba(37, 99, 235, 0.2);
+    }
+
+    button.secondary {
+      background: #475569;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 16px;
+    }
+
+    th,
+    td {
+      padding: 12px;
+      border: 1px solid #d0d4dc;
+      text-align: left;
+      font-size: 14px;
+    }
+
+    label {
+      display: block;
+      margin-bottom: 6px;
+      font-weight: 600;
+    }
+
+    input,
+    textarea,
+    select {
+      width: 100%;
+      padding: 10px;
+      border-radius: 6px;
+      border: 1px solid #c7ccd5;
+      font-size: 14px;
+      box-sizing: border-box;
+      transition: border-color 0.2s ease;
+    }
+
+    input:focus,
+    textarea:focus,
+    select:focus {
+      outline: none;
+      border-color: #2563eb;
+      box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.15);
+    }
+
+    ul,
+    ol {
+      margin: 0 0 0 20px;
+      padding: 0;
+    }
+
+    code {
+      background: #e2e8f0;
+      color: #1e293b;
+      padding: 2px 6px;
+      border-radius: 4px;
+      font-size: 13px;
+    }
+
+    .card-grid {
+      display: grid;
+      gap: 16px;
+      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+      margin-top: 16px;
+    }
+
+    .card {
+      border: 1px solid #d0d4dc;
+      border-radius: 10px;
+      padding: 16px;
+      background: linear-gradient(120deg, rgba(37, 99, 235, 0.08), rgba(37, 99, 235, 0));
+    }
+
+    footer {
+      margin-top: 32px;
+      font-size: 13px;
+      color: #475569;
+      text-align: center;
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>扩展调试静态页面</h1>
+    <p>该页面包含多种常见 DOM 元素，便于测试内容脚本、选择器解析和交互逻辑。</p>
+  </header>
+  <main>
+    <section id="actions">
+      <h2>常见交互</h2>
+      <p>通过按钮、链接和输入框来测试事件监听。</p>
+      <button id="primary-action">主要操作</button>
+      <button class="secondary" data-test-id="secondary-action">次要操作</button>
+      <a href="#forms" style="margin-left:16px;">滚动到表单示例</a>
+    </section>
+
+    <section id="forms">
+      <h2>表单区域</h2>
+      <form>
+        <div style="margin-bottom:16px;">
+          <label for="name-input">姓名</label>
+          <input id="name-input" name="name" type="text" placeholder="输入姓名">
+        </div>
+        <div style="margin-bottom:16px;">
+          <label for="email-input">邮箱</label>
+          <input id="email-input" name="email" type="email" placeholder="example@test.com">
+        </div>
+        <div style="margin-bottom:16px;">
+          <label for="topic-select">测试范围</label>
+          <select id="topic-select" name="topic">
+            <option value="dom">DOM 结构</option>
+            <option value="style">样式注入</option>
+            <option value="network">网络请求</option>
+            <option value="automation">自动化工作流</option>
+          </select>
+        </div>
+        <div style="margin-bottom:16px;">
+          <label for="feedback">测试备注</label>
+          <textarea id="feedback" name="feedback" rows="3" placeholder="记录测试场景与预期结果"></textarea>
+        </div>
+        <button type="submit">提交表单</button>
+      </form>
+    </section>
+
+    <section id="data-presentation">
+      <h2>数据展示</h2>
+      <p>包含列表元素、表格与卡片布局，方便检测渲染与遍历逻辑。</p>
+      <ul>
+        <li>待办事项：完善自动化脚本</li>
+        <li>提醒：保持内容脚本无状态</li>
+        <li>提示：善用 <code>querySelectorAll</code> 捕获节点</li>
+      </ul>
+      <table>
+        <thead>
+          <tr>
+            <th>模块</th>
+            <th>状态</th>
+            <th>负责人</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>核心解析器</td>
+            <td>开发中</td>
+            <td>Jesse</td>
+          </tr>
+          <tr>
+            <td>侧边面板</td>
+            <td>已完成</td>
+            <td>Alex</td>
+          </tr>
+          <tr>
+            <td>服务脚本</td>
+            <td>待测试</td>
+            <td>Ling</td>
+          </tr>
+        </tbody>
+      </table>
+      <div class="card-grid">
+        <article class="card" data-type="tip">
+          <h3>调试提示</h3>
+          <p>使用浏览器开发者工具检查 content-script 是否注入成功。</p>
+        </article>
+        <article class="card" data-type="note">
+          <h3>兼容性注意</h3>
+          <p>若需要跨域资源，请确认已在 manifest 中声明相应 host 权限。</p>
+        </article>
+        <article class="card" data-type="sample">
+          <h3>测试用例</h3>
+          <p>为常见交互创建自动化案例，确保迭代过程中行为稳定。</p>
+        </article>
+      </div>
+    </section>
+  </main>
+  <footer>
+    页面最后更新于 <time datetime="2025-10-24">2025-10-24</time>。欢迎补充更多测试场景。
+  </footer>
+</body>
+</html>

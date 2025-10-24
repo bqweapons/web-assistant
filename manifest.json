@@ -36,6 +36,7 @@
         "content/selector.js",
         "content/inject.js",
         "common/messaging.js",
+        "common/i18n.js",
         "common/types.js",
         "common/flows.js"
       ],
