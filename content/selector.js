@@ -888,20 +888,7 @@ function createElementBubble() {
 
   actions.append(cancelButton, saveButton);
 
-  const sectionsTabs = createTabGroup({
-    onActivate(sectionObj) {
-      formBody.scrollTop = 0;
-      if (
-        sectionObj &&
-        sectionObj.section &&
-        typeof sectionObj.section.scrollIntoView === 'function' &&
-        bubble.contains(sectionObj.section)
-      ) {
-        sectionObj.section.scrollIntoView({ block: 'nearest' });
-      }
-      requestAnimationFrame(() => updatePosition());
-    },
-  });
+  const sectionsTabs = createTabGroup();
 
   const basicSection = sectionsTabs.addSection(
     t('editor.sections.basics.title'),
@@ -1615,13 +1602,12 @@ function defaultElementValues(values = {}, suggestedStyle = {}) {
 
 let tabIdCounter = 0;
 
-function createTabGroup(options = {}) {
-  const { onActivate } = options;
+function createTabGroup() {
   const container = document.createElement('div');
   Object.assign(container.style, {
     display: 'flex',
     flexDirection: 'column',
-    gap: '0',
+    gap: '12px',
     flex: '1 1 auto',
     minHeight: '0',
   });
@@ -1631,10 +1617,9 @@ function createTabGroup(options = {}) {
   Object.assign(tabList.style, {
     display: 'flex',
     flexWrap: 'wrap',
-    alignItems: 'flex-end',
-    gap: '16px',
-    padding: '0 4px 8px',
-    borderBottom: '1px solid rgba(148, 163, 184, 0.35)',
+    gap: '8px',
+    paddingBottom: '6px',
+    borderBottom: '1px solid rgba(148, 163, 184, 0.25)',
   });
 
   const panels = document.createElement('div');
@@ -1644,7 +1629,6 @@ function createTabGroup(options = {}) {
     flexDirection: 'column',
     gap: '12px',
     minHeight: '0',
-    paddingTop: '12px',
   });
 
   container.append(tabList, panels);
@@ -1662,8 +1646,14 @@ function createTabGroup(options = {}) {
 
   function applyTabState(sectionObj, isActive) {
     sectionObj.tabButton.setAttribute('aria-selected', isActive ? 'true' : 'false');
-    sectionObj.tabButton.style.color = isActive ? '#1d4ed8' : '#64748b';
-    sectionObj.tabButton.style.borderBottomColor = isActive ? '#2563eb' : 'transparent';
+    sectionObj.tabButton.style.backgroundColor = isActive
+      ? 'rgba(59, 130, 246, 0.12)'
+      : 'transparent';
+    sectionObj.tabButton.style.borderColor = isActive
+      ? 'rgba(59, 130, 246, 0.35)'
+      : 'rgba(148, 163, 184, 0.45)';
+    sectionObj.tabButton.style.color = isActive ? '#1d4ed8' : '#475569';
+    // sectionObj.tabButton.style.boxShadow = isActive ? '0 6px 18px rgba(37, 99, 235, 0.16)' : 'none';
   }
 
   function ensureActiveSection() {
@@ -1683,7 +1673,6 @@ function createTabGroup(options = {}) {
     if (activeSection === sectionObj) {
       sectionObj.section.style.display = 'flex';
       applyTabState(sectionObj, true);
-      onActivate?.(sectionObj);
       return;
     }
     if (activeSection) {
@@ -1693,7 +1682,6 @@ function createTabGroup(options = {}) {
     activeSection = sectionObj;
     sectionObj.section.style.display = 'flex';
     applyTabState(sectionObj, true);
-    onActivate?.(sectionObj);
   }
 
   return {
@@ -1714,19 +1702,18 @@ function createTabGroup(options = {}) {
       section.setAttribute('aria-labelledby', tabId);
       tabButton.setAttribute('aria-controls', panelId);
       Object.assign(tabButton.style, {
-        border: 'none',
+        border: '1px solid rgba(148, 163, 184, 0.45)',
         background: 'transparent',
-        padding: '8px 0',
+        borderRadius: '999px',
+        padding: '6px 14px',
         fontSize: '12px',
         fontWeight: '600',
         textTransform: 'uppercase',
         letterSpacing: '0.03em',
-        color: '#64748b',
+        color: '#475569',
         cursor: 'pointer',
-        transition: 'color 0.16s ease, border-bottom-color 0.16s ease',
-        borderBottomWidth: '2px',
-        borderBottomStyle: 'solid',
-        borderBottomColor: 'transparent',
+        transition: 'all 0.16s ease',
+        boxShadow: 'none',
       });
 
       const sectionObj = {
@@ -1741,8 +1728,6 @@ function createTabGroup(options = {}) {
           sectionObj.visible = visible;
           tabButton.style.display = visible ? '' : 'none';
           if (!visible) {
-            tabButton.style.borderBottomColor = 'transparent';
-            tabButton.style.color = '#64748b';
             section.style.display = 'none';
             applyTabState(sectionObj, false);
             if (activeSection === sectionObj) {
@@ -1759,26 +1744,15 @@ function createTabGroup(options = {}) {
         if (activeSection === sectionObj || !sectionObj.visible) {
           return;
         }
-        tabButton.style.color = '#1d4ed8';
+        tabButton.style.borderColor = 'rgba(148, 163, 184, 0.65)';
+        tabButton.style.backgroundColor = 'rgba(148, 163, 184, 0.12)';
       });
       tabButton.addEventListener('mouseleave', () => {
         if (activeSection === sectionObj || !sectionObj.visible) {
           return;
         }
-        tabButton.style.color = '#64748b';
-      });
-
-      tabButton.addEventListener('focus', () => {
-        if (activeSection === sectionObj || !sectionObj.visible) {
-          return;
-        }
-        tabButton.style.color = '#1d4ed8';
-      });
-      tabButton.addEventListener('blur', () => {
-        if (activeSection === sectionObj || !sectionObj.visible) {
-          return;
-        }
-        tabButton.style.color = '#64748b';
+        tabButton.style.backgroundColor = 'transparent';
+        tabButton.style.borderColor = 'rgba(148, 163, 184, 0.45)';
       });
 
       tabButton.addEventListener('click', () => activate(sectionObj));
