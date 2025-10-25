@@ -1,7 +1,7 @@
 import { getLocale, ready as i18nReady, subscribe as subscribeToLocale, t } from '../common/i18n.js';
 import { parseActionFlowDefinition, MAX_FLOW_SOURCE_LENGTH } from '../common/flows.js';
 
-// 要素ピッカーとエディターバブルの UI ロジックをまとめたモジュール。
+// 要素ピッカーとエディターバブルの UI ロジックをまとめたモジュール
 
 const HIGHLIGHT_BORDER_COLOR = '#1b84ff';
 const HIGHLIGHT_FILL_COLOR = 'rgba(27, 132, 255, 0.2)';
@@ -73,7 +73,7 @@ const cssEscape = typeof CSS !== 'undefined' && typeof CSS.escape === 'function'
     (value) => String(value).replace(/[^a-zA-Z0-9_\-]/g, (char) => `\\${char}`);
 
 /**
- * 要素 ID や nth-of-type を用いて一意の CSS セレクターを生成する。
+ * 要素 ID や nth-of-type を用いて一意な CSS セレクターを生成する。
  * Generates a unique CSS selector for the provided element using ids or nth-of-type fallback.
  * @param {Element} element
  * @returns {string}
@@ -316,7 +316,7 @@ function getElementBubble() {
 }
 
 /**
- * 指定ドキュメント内で ID が一意か確認する。
+ * 指定されたドキュメント内で ID が一意かどうかを確認する。
  * Determines whether an id is unique within the provided document context.
  * @param {string} id
  * @param {Document} [contextDocument]
@@ -331,7 +331,7 @@ function isIdUnique(id, contextDocument) {
 }
 
 /**
- * 同種の兄弟要素の中での位置を算出する。
+ * 同じタグを持つ兄弟要素の中での位置を計算する。
  * Calculates the position of the element among siblings of the same type.
  * @param {Element} element
  * @returns {number}
@@ -411,7 +411,7 @@ function createOverlay() {
   };
 }
 
-// エディターバブル本体の DOM 構造を構築するヘルパー。
+// エディターバブル本体の DOM 構造を構築するヘルパー
 function createElementBubble() {
   const bubble = document.createElement('div');
   bubble.dataset.pageAugmentorRoot = 'picker-element-bubble';
@@ -1568,7 +1568,7 @@ function createElementBubble() {
 }
 
 /**
- * エディターバブルの初期値を組み立てる。
+ * エディターバブルの初期値をまとめて整える。
  * @param {Partial<import('../common/types.js').InjectedElement>} values
  * @param {Record<string, string>} suggestedStyle
  * @returns {{ type: 'button' | 'link' | 'tooltip'; text: string; href: string; actionSelector: string; actionFlow: string; position: 'append' | 'prepend' | 'before' | 'after'; tooltipPosition: 'top' | 'right' | 'bottom' | 'left'; tooltipPersistent: boolean; style: Record<string, string> }}
@@ -1618,7 +1618,7 @@ function defaultElementValues(values = {}, suggestedStyle = {}) {
 
 let tabIdCounter = 0;
 
-// セクション別に設定項目を切り替えるタブ UI を生成する。
+// セクション表示のためのタブ UI を生成する。
 function createTabGroup() {
   const container = document.createElement('div');
   Object.assign(container.style, {
@@ -1866,7 +1866,7 @@ function createField(labelText, control = null) {
   return { wrapper, label };
 }
 
-// 入力コントロールの共通スタイルとフォーカス時の振る舞いを設定する。
+// 入力コントロールの基本スタイルとフォーカス時の挙動を設定する。
 function styleInput(element) {
   Object.assign(element.style, {
     width: '100%',
@@ -1908,7 +1908,7 @@ function normalizeStyleState(styleState) {
 }
 
 /**
- * プレビュー要素に基本スタイルを適用する。
+ * プレビュー要素に共通のスタイルを適用する。
  * @param {HTMLElement} element
  * @param {'button' | 'link'} type
  */
@@ -1984,7 +1984,7 @@ function applyTooltipPreview(container, payload) {
 const CLICKABLE_INPUT_TYPES = new Set(['button', 'submit', 'reset', 'image']);
 
 /**
- * クリック可能な要素を上位に辿って探索する。
+ * クリック可能な要素を上位に遡って探索する。
  * @param {EventTarget | null} target
  * @returns {Element | null}
  */
@@ -2178,7 +2178,7 @@ function describeFrameElement(element) {
 }
 
 /**
- * フレーム src を正規化して比較しやすい形にする。
+ * フレーム src を正規化して比較しやすくする。
  * @param {string} src
  * @param {Document} doc
  * @returns {string}
