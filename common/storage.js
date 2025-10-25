@@ -152,4 +152,20 @@ export function observePage(callback) {
   return () => chrome.storage.onChanged.removeListener(listener);
 }
 
+export async function replaceStore(value) {
+  const payload = {};
+  if (value && typeof value === 'object') {
+    for (const [pageUrl, list] of Object.entries(value)) {
+      if (!Array.isArray(list)) {
+        continue;
+      }
+      payload[pageUrl] = list.map((item) => ({ ...item }));
+      if (payload[pageUrl].length === 0) {
+        delete payload[pageUrl];
+      }
+    }
+  }
+  await writeStore(payload);
+}
+
 export { STORAGE_KEY };

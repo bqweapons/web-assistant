@@ -30,6 +30,14 @@ const messages = {
         success: 'Element deleted.',
         error: 'Unable to delete the element: {error}',
       },
+      export: {
+        success: 'Downloaded {filename}.',
+        error: 'Unable to export data: {error}',
+      },
+      import: {
+        success: 'Imported {elements} elements across {pages} pages.',
+        error: 'Unable to import data: {error}',
+      },
       focusError: 'Unable to focus the element: {error}',
       openBubble: {
         success: 'Opened the bubble editor on the page.',
@@ -56,6 +64,10 @@ const messages = {
         pick: 'Pick target',
         picking: 'Picking…',
         cancel: 'Cancel',
+        export: 'Export data',
+        exporting: 'Exporting…',
+        import: 'Import data',
+        importing: 'Importing…',
       },
       empty: 'No elements match the current filters.',
       item: {
@@ -230,6 +242,14 @@ const messages = {
         success: '要素を削除しました。',
         error: '要素を削除できません: {error}',
       },
+      export: {
+        success: '{filename} をダウンロードしました。',
+        error: 'データをエクスポートできません: {error}',
+      },
+      import: {
+        success: '{pages} ページに {elements} 件の要素を取り込みました。',
+        error: 'データをインポートできません: {error}',
+      },
       focusError: '要素をフォーカスできません: {error}',
       openBubble: {
         success: 'バブルエディターをページに表示しました。',
@@ -256,6 +276,10 @@ const messages = {
         pick: 'ターゲットを選択',
         picking: '選択中…',
         cancel: 'キャンセル',
+        export: 'エクスポート',
+        exporting: 'エクスポート中…',
+        import: 'インポート',
+        importing: 'インポート中…',
       },
       empty: '条件に一致する要素がありません。',
       item: {
@@ -424,6 +448,14 @@ const messages = {
         success: '元素已删除。',
         error: '无法删除该元素：{error}',
       },
+      export: {
+        success: '已下载 {filename}。',
+        error: '无法导出数据：{error}',
+      },
+      import: {
+        success: '已导入 {elements} 个元素，覆盖 {pages} 个页面。',
+        error: '无法导入数据：{error}',
+      },
       focusError: '无法定位该元素：{error}',
       openBubble: {
         success: '已在页面中打开气泡编辑器。',
@@ -450,6 +482,10 @@ const messages = {
         pick: '选择目标',
         picking: '选择中…',
         cancel: '取消',
+        export: '导出数据',
+        exporting: '导出中…',
+        import: '导入数据',
+        importing: '导入中…',
       },
       empty: '没有符合条件的元素。',
       item: {

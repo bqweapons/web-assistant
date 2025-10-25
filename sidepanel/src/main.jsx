@@ -65,7 +65,10 @@ function App() {
   const [filterType, setFilterType] = useState('all');
   const [creationMessage, setCreationMessage] = useState(null);
   const [pendingPicker, setPendingPicker] = useState(false);
+  const [exporting, setExporting] = useState(false);
+  const [importing, setImporting] = useState(false);
   const pendingPickerRef = useRef(false);
+  const importInputRef = useRef(null);
 
   const typeLabels = useMemo(
     () => ({
@@ -246,6 +249,71 @@ function App() {
       .sort((a, b) => b.createdAt - a.createdAt);
   }, [filterText, filterType, items]);
 
+  const handleExport = useCallback(async () => {
+    setExporting(true);
+    try {
+      const store = await sendMessage(MessageType.LIST_ALL);
+      const serialized = JSON.stringify(store || {}, null, 2);
+      const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+      const filename = `page-augmentor-export-${timestamp}.json`;
+      const blob = new Blob([serialized], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const anchor = document.createElement('a');
+      anchor.href = url;
+      anchor.download = filename;
+      anchor.rel = 'noopener';
+      document.body.appendChild(anchor);
+      anchor.click();
+      anchor.remove();
+      window.setTimeout(() => URL.revokeObjectURL(url), 1000);
+      setCreationMessage(createMessage('manage.export.success', { filename }));
+    } catch (error) {
+      console.error('Failed to export elements', error);
+      setCreationMessage(createMessage('manage.export.error', { error: error.message }));
+    } finally {
+      setExporting(false);
+    }
+  }, []);
+
+  const handleImportClick = useCallback(() => {
+    importInputRef.current?.click();
+  }, []);
+
+  const handleImportFile = useCallback(
+    async (event) => {
+      const input = event.target;
+      if (!input) {
+        return;
+      }
+      const [file] = input.files || [];
+      if (!file) {
+        return;
+      }
+      setImporting(true);
+      try {
+        const text = await file.text();
+        let parsed;
+        try {
+          parsed = JSON.parse(text);
+        } catch (error) {
+          throw new Error('Invalid JSON file');
+        }
+        const result = await sendMessage(MessageType.IMPORT_STORE, { store: parsed });
+        const pages = result?.pageCount ?? 0;
+        const elements = result?.elementCount ?? 0;
+        setCreationMessage(createMessage('manage.import.success', { pages, elements }));
+        await refreshItems(pageUrl);
+      } catch (error) {
+        console.error('Failed to import elements', error);
+        setCreationMessage(createMessage('manage.import.error', { error: error.message }));
+      } finally {
+        setImporting(false);
+        input.value = '';
+      }
+    },
+    [pageUrl, refreshItems],
+  );
+
   const handleStartCreation = useCallback(async () => {
     if (pendingPicker) {
       await cancelActivePicker();
@@ -345,6 +413,29 @@ function App() {
           <p className="text-xs text-slate-400">{contextLabelText}</p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
+          <input
+            ref={importInputRef}
+            type="file"
+            accept="application/json,.json"
+            className="hidden"
+            onChange={handleImportFile}
+          />
+          <button
+            type="button"
+            className="rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700 shadow-sm transition hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-60"
+            onClick={handleImportClick}
+            disabled={importing}
+          >
+            {importing ? t('manage.actions.importing') : t('manage.actions.import')}
+          </button>
+          <button
+            type="button"
+            className="rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700 shadow-sm transition hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-60"
+            onClick={handleExport}
+            disabled={exporting}
+          >
+            {exporting ? t('manage.actions.exporting') : t('manage.actions.export')}
+          </button>
           <label className="sr-only" htmlFor="page-augmentor-language">
             {t('app.language.label')}
           </label>
