@@ -38,7 +38,8 @@
         "common/messaging.js",
         "common/i18n.js",
         "common/types.js",
-        "common/flows.js"
+        "common/flows.js",
+        "common/url.js"
       ],
       "matches": ["<all_urls>"]
     }

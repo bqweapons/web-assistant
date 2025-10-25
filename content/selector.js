@@ -1,5 +1,6 @@
 import { getLocale, ready as i18nReady, subscribe as subscribeToLocale, t } from '../common/i18n.js';
 import { parseActionFlowDefinition, MAX_FLOW_SOURCE_LENGTH } from '../common/flows.js';
+import { normalizePageUrl } from '../common/url.js';
 
 // 要素ピッカーとエディターバブルの UI ロジックをまとめたモジュール
 
@@ -2050,7 +2051,7 @@ export function resolveFrameContext(win = window) {
   const frameElement = safeFrameElement(targetWindow);
   const frameUrl = tryGetWindowUrl(targetWindow);
   const topUrl = sameOrigin ? tryGetWindowUrl(safeTopWindow(targetWindow)) : '';
-  const pageUrl = topUrl || frameUrl;
+  const pageUrl = normalizePageUrl(topUrl || frameUrl);
   const frameLabel = selectors.length > 0 ? describeFrameElement(frameElement) : '';
   return {
     frameSelectors: sameOrigin ? selectors : [],

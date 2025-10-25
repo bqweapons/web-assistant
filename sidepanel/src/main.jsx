@@ -3,6 +3,7 @@ import { createRoot } from 'react-dom/client';
 import { MessageType, sendMessage } from '../../common/messaging.js';
 import { getActiveTab } from '../../common/compat.js';
 import { parseActionFlowDefinition } from '../../common/flows.js';
+import { normalizePageUrl } from '../../common/url.js';
 import {
   formatDateTime,
   getLocale,
@@ -111,11 +112,11 @@ function App() {
     [t],
   );
 
-  const refreshItems = useCallback(
-    async (targetUrl) => {
-      const url = targetUrl || pageUrl;
-      if (!url) {
-        setItems([]);
+const refreshItems = useCallback(
+  async (targetUrl) => {
+    const url = targetUrl || pageUrl;
+    if (!url) {
+      setItems([]);
         return;
       }
       try {
@@ -125,28 +126,72 @@ function App() {
         console.error('Failed to load elements', error);
         setCreationMessage(createMessage('manage.loadError', { error: error.message }));
       }
-    },
-    [pageUrl],
-  );
+  },
+  [pageUrl],
+);
+
+  const applyTabContext = useCallback((tab) => {
+    if (tab?.url) {
+      const normalized = normalizePageUrl(tab.url);
+      setTabId(tab.id);
+      setPageUrl((current) => (current === normalized ? current : normalized));
+      setContextInfo({ kind: 'url', value: normalized });
+    } else {
+      setTabId(undefined);
+      setPageUrl((current) => (current ? '' : current));
+      setContextInfo({ kind: 'message', key: 'context.noActiveTab' });
+      setItems([]);
+    }
+  }, []);
+
+  const resolveActiveTabContext = useCallback(async () => {
+    try {
+      const tab = await getActiveTab();
+      applyTabContext(tab);
+    } catch (error) {
+      console.error('Unable to resolve active tab', error);
+      setContextInfo({ kind: 'message', key: 'context.resolveError', values: { error: error.message } });
+    }
+  }, [applyTabContext]);
 
   useEffect(() => {
-    (async () => {
-      try {
-        const tab = await getActiveTab();
-        if (tab?.url) {
-          const normalized = normalizeUrl(tab.url);
-          setTabId(tab.id);
-          setPageUrl(normalized);
-          setContextInfo({ kind: 'url', value: normalized });
-        } else {
-          setContextInfo({ kind: 'message', key: 'context.noActiveTab' });
-        }
-      } catch (error) {
-        console.error('Unable to resolve active tab', error);
-        setContextInfo({ kind: 'message', key: 'context.resolveError', values: { error: error.message } });
+    resolveActiveTabContext();
+  }, [resolveActiveTabContext]);
+
+  useEffect(() => {
+    if (!chrome?.tabs?.onActivated || !chrome?.tabs?.onUpdated) {
+      return undefined;
+    }
+
+    const handleActivated = async (activeInfo) => {
+      if (!activeInfo?.tabId) {
+        return;
       }
-    })();
-  }, []);
+      try {
+        const tab = await chrome.tabs.get(activeInfo.tabId);
+        applyTabContext(tab);
+      } catch (error) {
+        console.warn('Failed to handle tab activation', error);
+      }
+    };
+
+    const handleUpdated = (tabId, changeInfo, tab) => {
+      if (!tab?.active || !tab.url) {
+        return;
+      }
+      if (typeof changeInfo.url === 'string' || changeInfo.status === 'complete') {
+        applyTabContext(tab);
+      }
+    };
+
+    chrome.tabs.onActivated.addListener(handleActivated);
+    chrome.tabs.onUpdated.addListener(handleUpdated);
+
+    return () => {
+      chrome.tabs.onActivated.removeListener(handleActivated);
+      chrome.tabs.onUpdated.removeListener(handleUpdated);
+    };
+  }, [applyTabContext]);
 
   useEffect(() => {
     if (!pageUrl) {
@@ -897,15 +942,6 @@ function summarizeFlow(actionFlow) {
  * @param {string} url
  * @returns {string}
  */
-function normalizeUrl(url) {
-  try {
-    const target = new URL(url);
-    return `${target.origin}${target.pathname}${target.search}`;
-  } catch (error) {
-    return url;
-  }
-}
-
 /**
  * 指定ページ URL と一致するタブを検索する。
  * @param {string} pageUrl
@@ -913,7 +949,7 @@ function normalizeUrl(url) {
  */
 async function findTabByPageUrl(pageUrl) {
   const tabs = await chrome.tabs.query({});
-  return tabs.find((tab) => tab.url && normalizeUrl(tab.url) === pageUrl);
+  return tabs.find((tab) => tab.url && normalizePageUrl(tab.url) === pageUrl);
 }
 
 /**

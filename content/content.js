@@ -6,11 +6,13 @@
   }
   window.__pageAugmentorInitialized = true;
 
-  const [{ sendMessage, MessageType }, selectorModule, injectModule] = await Promise.all([
+  const [{ sendMessage, MessageType }, selectorModule, injectModule, urlModule] = await Promise.all([
     import(chrome.runtime.getURL('common/messaging.js')),
     import(chrome.runtime.getURL('content/selector.js')),
     import(chrome.runtime.getURL('content/inject.js')),
+    import(chrome.runtime.getURL('common/url.js')),
   ]);
+  const { normalizePageUrl } = urlModule;
 
   const frameContext = selectorModule.resolveFrameContext(window);
   const pageUrl = frameContext.pageUrl || getPageUrl();
@@ -341,6 +343,5 @@
  * @returns {string}
  */
 function getPageUrl() {
-  const { origin, pathname, search } = window.location;
-  return `${origin}${pathname}${search}`;
+  return normalizePageUrl(window.location.href);
 }
