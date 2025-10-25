@@ -587,6 +587,12 @@ function applyButtonBehavior(node, href, actionSelector, actionFlow) {
       console.warn('[PageAugmentor] Ignoring invalid action flow:', error);
     } else if (definition) {
       parsedFlow = definition;
+      if (selector) {
+        parsedFlow = {
+          steps: [...definition.steps, { type: 'click', selector, all: false }],
+          stepCount: definition.stepCount + 1,
+        };
+      }
     }
   }
   if (sanitized) {
