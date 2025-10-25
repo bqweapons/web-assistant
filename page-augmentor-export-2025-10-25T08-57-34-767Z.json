@@ -1,0 +1,65 @@
+{
+  "file:///D:/GitHub/web-assistant/test-page.html": [
+    {
+      "createdAt": 1761311674503,
+      "frameSelectors": [],
+      "frameUrl": "file:///D:/GitHub/web-assistant/test-page.html",
+      "id": "da2fa84d-9a93-4d95-838e-2dbcb86d9dce",
+      "pageUrl": "file:///D:/GitHub/web-assistant/test-page.html",
+      "position": "append",
+      "selector": "section#actions > p",
+      "style": {
+        "backgroundColor": "#eff4fe",
+        "borderRadius": "1rem",
+        "color": "rgb(29, 35, 48)",
+        "fontSize": "16px",
+        "fontWeight": "400",
+        "padding": "8px 16px"
+      },
+      "text": "Google",
+      "type": "button",
+      "updatedAt": 1761348268176
+    },
+    {
+      "createdAt": 1761382617486,
+      "frameSelectors": [],
+      "frameUrl": "file:///D:/GitHub/web-assistant/test-page.html",
+      "href": "http://google.co.jp",
+      "id": "09808dff-9d18-4105-8716-b86ff3cf3903",
+      "pageUrl": "file:///D:/GitHub/web-assistant/test-page.html",
+      "position": "append",
+      "selector": "section#actions > p",
+      "style": {
+        "color": "#2563eb",
+        "textDecoration": "underline"
+      },
+      "text": "google",
+      "type": "link",
+      "updatedAt": 1761382617486
+    }
+  ],
+  
+  "file:///D:/GitHub/web-assistant/test-page2.html": [
+    {
+      "actionSelector": "section#forms > form > button",
+      "createdAt": 1761384701729,
+      "frameSelectors": [],
+      "frameUrl": "file:///D:/GitHub/web-assistant/test-page2.html",
+      "id": "9629835b-6ff9-45d3-9081-e33af9ac78c6",
+      "pageUrl": "file:///D:/GitHub/web-assistant/test-page2.html",
+      "position": "append",
+      "selector": "section#actions > h2",
+      "style": {
+        "backgroundColor": "#1b84ff",
+        "borderRadius": "8px",
+        "color": "#ffffff",
+        "fontSize": "16px",
+        "fontWeight": "600",
+        "padding": "8px 16px"
+      },
+      "text": "submit",
+      "type": "button",
+      "updatedAt": 1761384701729
+    }
+  ]
+}

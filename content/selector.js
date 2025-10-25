@@ -1,8 +1,25 @@
 import { getLocale, ready as i18nReady, subscribe as subscribeToLocale, t } from '../common/i18n.js';
 import { parseActionFlowDefinition, MAX_FLOW_SOURCE_LENGTH } from '../common/flows.js';
+
+/**
+ * @typedef {Object} ActionClickStep
+ * @property {'click'} type
+ * @property {string} selector
+ *
+ * @typedef {Object} ActionInputStep
+ * @property {'input'} type
+ * @property {string} selector
+ * @property {string} value
+ *
+ * @typedef {Object} ActionWaitStep
+ * @property {'wait'} type
+ * @property {number} ms
+ *
+ * @typedef {ActionClickStep | ActionInputStep | ActionWaitStep} ActionBuilderStep
+ */
 import { normalizePageUrl } from '../common/url.js';
 
-// 要素ピッカーとエディターバブルの UI ロジックをまとめたモジュール
+// Element picker and editor bubble UI logic.
 
 const HIGHLIGHT_BORDER_COLOR = '#1b84ff';
 const HIGHLIGHT_FILL_COLOR = 'rgba(27, 132, 255, 0.2)';
@@ -74,7 +91,6 @@ const cssEscape = typeof CSS !== 'undefined' && typeof CSS.escape === 'function'
     (value) => String(value).replace(/[^a-zA-Z0-9_\-]/g, (char) => `\\${char}`);
 
 /**
- * 要素 ID や nth-of-type を用いて一意な CSS セレクターを生成する。
  * Generates a unique CSS selector for the provided element using ids or nth-of-type fallback.
  * @param {Element} element
  * @returns {string}
@@ -115,28 +131,9 @@ export function generateSelector(element) {
 }
 
 /**
- * インタラクティブな要素ピッカーを開始する。
+ * 
  * Starts the interactive element picker.
  * @param {{
- *   mode?: 'create' | 'edit';
- *   onSubmit?: (payload: {
- *     selector: string;
- *     type: 'button' | 'link' | 'tooltip';
- *     text: string;
- *     href?: string;
- *     actionSelector?: string;
- *     tooltipPosition?: 'top' | 'right' | 'bottom' | 'left';
- *     tooltipPersistent?: boolean;
- *     position: 'append' | 'prepend' | 'before' | 'after';
- *     style?: import('../common/types.js').InjectedElementStyle;
- *     frameSelectors?: string[];
- *     frameLabel?: string;
- *     frameUrl?: string;
- *   }) => void;
- *   onCancel?: () => void;
- *   onTarget?: (target: Element, selector: string) => void;
- *   defaults?: Partial<import('../common/types.js').InjectedElement>;
- *   filter?: (element: Element) => boolean;
  * }} options
  * @returns {{ stop: () => void }}
  */
@@ -231,33 +228,9 @@ export function startElementPicker(options = {}) {
 }
 
 /**
- * 既存要素向けにエディターバブルを開く。
+ * 
  * Opens the editor bubble for an existing element.
  * @param {{
- *   target: Element;
- *   selector: string;
- *   values: Partial<import('../common/types.js').InjectedElement>;
- *   onSubmit?: (payload: {
- *     type: 'button' | 'link' | 'tooltip';
- *     text: string;
- *     href?: string;
- *     actionSelector?: string;
- *     tooltipPosition?: 'top' | 'right' | 'bottom' | 'left';
- *     tooltipPersistent?: boolean;
- *     position: 'append' | 'prepend' | 'before' | 'after';
- *     style?: import('../common/types.js').InjectedElementStyle;
- *   }) => void;
- *   onCancel?: () => void;
- *   onPreview?: (payload: {
- *     type: 'button' | 'link' | 'tooltip';
- *     text: string;
- *     href?: string;
- *     actionSelector?: string;
- *     tooltipPosition?: 'top' | 'right' | 'bottom' | 'left';
- *     tooltipPersistent?: boolean;
- *     position: 'append' | 'prepend' | 'before' | 'after';
- *     style?: import('../common/types.js').InjectedElementStyle;
- *   }) => void;
  }} options
  * @returns {{ close: () => void }}
  */
@@ -317,7 +290,6 @@ function getElementBubble() {
 }
 
 /**
- * 指定されたドキュメント内で ID が一意かどうかを確認する。
  * Determines whether an id is unique within the provided document context.
  * @param {string} id
  * @param {Document} [contextDocument]
@@ -332,7 +304,7 @@ function isIdUnique(id, contextDocument) {
 }
 
 /**
- * 同じタグを持つ兄弟要素の中での位置を計算する。
+ * 
  * Calculates the position of the element among siblings of the same type.
  * @param {Element} element
  * @returns {number}
@@ -347,7 +319,7 @@ function nthOfType(element) {
 }
 
 /**
- * イベントターゲットから適切な要素候補を取得する。
+ * 
  * Resolves the best candidate element from an event target.
  * @param {EventTarget | null} target
  * @returns {Element | null}
@@ -363,7 +335,7 @@ function resolveTarget(target) {
 }
 
 /**
- * ホバー中の要素をハイライトするオーバーレイを生成する。
+ * 
  * Creates the overlay used to highlight hovered elements.
  * @returns {{ container: HTMLDivElement; show: (element: Element) => void; hide: () => void; dispose: () => void }}
  */
@@ -412,7 +384,7 @@ function createOverlay() {
   };
 }
 
-// エディターバブル本体の DOM 構造を構築するヘルパー
+// Builds the editor bubble DOM structure.
 function createElementBubble() {
   const bubble = document.createElement('div');
   bubble.dataset.pageAugmentorRoot = 'picker-element-bubble';
@@ -750,6 +722,597 @@ function createElementBubble() {
   actionHint.dataset.defaultColor = '#94a3b8';
   actionField.wrapper.append(actionControls, actionHint);
   const actionFlowField = createField(t('editor.actionFlowLabel'), actionFlowInput);
+  const ACTION_TYPE_OPTIONS = [
+    { value: 'click', label: t('editor.actionBuilder.type.click') },
+    { value: 'input', label: t('editor.actionBuilder.type.input') },
+    { value: 'wait', label: t('editor.actionBuilder.type.wait') },
+  ];
+  const actionFlowBuilder = document.createElement('div');
+  Object.assign(actionFlowBuilder.style, {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: '12px',
+    padding: '12px',
+    border: '1px dashed rgba(148, 163, 184, 0.6)',
+    borderRadius: '10px',
+    backgroundColor: '#f8fafc',
+  });
+  const actionStepsContainer = document.createElement('div');
+  Object.assign(actionStepsContainer.style, {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: '12px',
+  });
+  const actionBuilderEmpty = document.createElement('div');
+  actionBuilderEmpty.textContent = t('editor.actionBuilder.empty');
+  Object.assign(actionBuilderEmpty.style, {
+    fontSize: '12px',
+    color: '#94a3b8',
+    textAlign: 'center',
+    padding: '16px',
+    borderRadius: '8px',
+    border: '1px dashed rgba(148, 163, 184, 0.6)',
+    backgroundColor: '#fff',
+  });
+  const addActionContainer = document.createElement('div');
+  Object.assign(addActionContainer.style, {
+    alignSelf: 'flex-start',
+    position: 'relative',
+    display: 'inline-flex',
+    flexDirection: 'column',
+    gap: '6px',
+  });
+  const addActionButton = document.createElement('button');
+  addActionButton.type = 'button';
+  addActionButton.textContent = t('editor.actionBuilder.add');
+  addActionButton.setAttribute('aria-haspopup', 'true');
+  addActionButton.setAttribute('aria-expanded', 'false');
+  Object.assign(addActionButton.style, {
+    padding: '8px 14px',
+    borderRadius: '8px',
+    border: '1px solid rgba(99, 102, 241, 0.5)',
+    background: 'linear-gradient(135deg, #6366f1, #8b5cf6)',
+    color: '#ffffff',
+    fontSize: '13px',
+    fontWeight: '600',
+    cursor: 'pointer',
+    boxShadow: '0 2px 8px rgba(99, 102, 241, 0.35)',
+  });
+  const addActionMenu = document.createElement('div');
+  addActionMenu.setAttribute('role', 'menu');
+  Object.assign(addActionMenu.style, {
+    position: 'absolute',
+    top: 'calc(100% + 6px)',
+    left: '0',
+    display: 'none',
+    flexDirection: 'column',
+    gap: '4px',
+    padding: '8px',
+    borderRadius: '10px',
+    border: '1px solid rgba(99, 102, 241, 0.25)',
+    backgroundColor: '#ffffff',
+    boxShadow: '0 12px 30px rgba(15, 23, 42, 0.18)',
+    zIndex: '5',
+    minWidth: '200px',
+  });
+  ACTION_TYPE_OPTIONS.forEach(({ value, label }) => {
+    const optionButton = document.createElement('button');
+    optionButton.type = 'button';
+    optionButton.textContent = label;
+    optionButton.dataset.actionType = value;
+    optionButton.setAttribute('role', 'menuitem');
+    Object.assign(optionButton.style, {
+      border: 'none',
+      background: 'transparent',
+      color: '#312e81',
+      fontSize: '13px',
+      fontWeight: '600',
+      textAlign: 'left',
+      padding: '8px 10px',
+      borderRadius: '8px',
+      cursor: 'pointer',
+      transition: 'background-color 0.12s ease',
+    });
+    const resetOptionBackground = () => {
+      optionButton.style.backgroundColor = 'transparent';
+    };
+    const highlightOptionBackground = () => {
+      optionButton.style.backgroundColor = '#eef2ff';
+    };
+    optionButton.addEventListener('mouseenter', highlightOptionBackground);
+    optionButton.addEventListener('mouseleave', resetOptionBackground);
+    optionButton.addEventListener('focus', highlightOptionBackground);
+    optionButton.addEventListener('blur', resetOptionBackground);
+    optionButton.addEventListener('click', (event) => {
+      event.preventDefault();
+      event.stopPropagation();
+      addActionStep(value);
+      hideActionMenu();
+    });
+    addActionMenu.appendChild(optionButton);
+  });
+  addActionButton.addEventListener('click', (event) => {
+    event.preventDefault();
+    event.stopPropagation();
+    if (addActionButton.disabled) {
+      return;
+    }
+    toggleActionMenu();
+  });
+  addActionContainer.append(addActionButton, addActionMenu);
+  const actionBuilderAdvancedNote = document.createElement('div');
+  actionBuilderAdvancedNote.textContent = t('editor.actionBuilder.advancedNotice');
+  Object.assign(actionBuilderAdvancedNote.style, {
+    fontSize: '12px',
+    color: '#dc2626',
+    backgroundColor: '#fef2f2',
+    borderRadius: '8px',
+    padding: '10px 12px',
+    display: 'none',
+  });
+  actionFlowBuilder.append(actionStepsContainer, actionBuilderEmpty, addActionContainer, actionBuilderAdvancedNote);
+  actionFlowField.wrapper.appendChild(actionFlowBuilder);
+
+  let actionBuilderInvalidIndex = -1;
+  let actionMenuVisible = false;
+  function hideActionMenu() {
+    if (!actionMenuVisible) {
+      return;
+    }
+    actionMenuVisible = false;
+    addActionMenu.style.display = 'none';
+    addActionButton.setAttribute('aria-expanded', 'false');
+    document.removeEventListener('mousedown', handleMenuOutsideClick, true);
+    document.removeEventListener('keydown', handleMenuKeydown, true);
+  }
+  function showActionMenu() {
+    if (actionMenuVisible) {
+      return;
+    }
+    actionMenuVisible = true;
+    addActionMenu.style.display = 'flex';
+    addActionButton.setAttribute('aria-expanded', 'true');
+    document.addEventListener('mousedown', handleMenuOutsideClick, true);
+    document.addEventListener('keydown', handleMenuKeydown, true);
+    requestAnimationFrame(() => {
+      const firstOption = addActionMenu.querySelector('button');
+      if (firstOption instanceof HTMLButtonElement) {
+        firstOption.focus({ preventScroll: true });
+      }
+    });
+  }
+  function toggleActionMenu() {
+    if (actionMenuVisible) {
+      hideActionMenu();
+    } else {
+      showActionMenu();
+    }
+  }
+  const handleMenuOutsideClick = (event) => {
+    if (!addActionContainer.contains(event.target)) {
+      hideActionMenu();
+    }
+  };
+  const handleMenuKeydown = (event) => {
+    if (event.key === 'Escape') {
+      hideActionMenu();
+      addActionButton.focus({ preventScroll: true });
+    }
+  };
+
+  const createStepTemplate = (type, previous = {}) => {
+    if (type === 'input') {
+      return { type: 'input', selector: previous.selector || '', value: previous.value || '' };
+    }
+    if (type === 'wait') {
+      const ms =
+        typeof previous.ms === 'number' && Number.isFinite(previous.ms) && previous.ms >= 0
+          ? Math.round(previous.ms)
+          : 1000;
+      return { type: 'wait', ms };
+    }
+    return { type: 'click', selector: previous.selector || '' };
+  };
+
+  const parseFlowForBuilder = (source) => {
+    const trimmed = typeof source === 'string' ? source.trim() : '';
+    if (!trimmed) {
+      return { mode: 'builder', steps: [], error: '' };
+    }
+    const { definition, error } = parseActionFlowDefinition(trimmed);
+    if (error) {
+      return { mode: 'advanced', steps: [], error };
+    }
+    if (!definition) {
+      return { mode: 'builder', steps: [], error: '' };
+    }
+    const steps = [];
+    for (const step of definition.steps) {
+      switch (step.type) {
+        case 'click':
+          steps.push({ type: 'click', selector: step.selector || '' });
+          break;
+        case 'input':
+          steps.push({ type: 'input', selector: step.selector || '', value: step.value || '' });
+          break;
+        case 'wait':
+          steps.push({ type: 'wait', ms: typeof step.ms === 'number' ? Math.max(0, Math.round(step.ms)) : 1000 });
+          break;
+        default:
+          return { mode: 'advanced', steps: [], error: '' };
+      }
+    }
+    return { mode: 'builder', steps, error: '' };
+  };
+
+  const serializeActionSteps = (steps) => {
+    const payload = steps.map((step) => {
+      if (step.type === 'input') {
+        return { type: 'input', selector: step.selector.trim(), value: step.value };
+      }
+      if (step.type === 'wait') {
+        return { type: 'wait', ms: Math.max(0, Math.round(step.ms)) };
+      }
+      return { type: 'click', selector: step.selector.trim(), all: false };
+    });
+    return JSON.stringify({ steps: payload }, null, 2);
+  };
+
+  const updateActionFlowFromSteps = ({ updateHint = true } = {}) => {
+    if (state.actionFlowMode !== 'builder' || state.type !== 'button') {
+      return state.actionFlow;
+    }
+    actionBuilderInvalidIndex = -1;
+    if (state.actionSteps.length === 0) {
+      state.actionFlow = '';
+      state.actionFlowError = '';
+      state.actionFlowSteps = 0;
+      actionFlowInput.value = '';
+      if (updateHint) {
+        updateActionHint();
+      }
+      return '';
+    }
+    for (let index = 0; index < state.actionSteps.length; index += 1) {
+      const step = state.actionSteps[index];
+      if (step.type === 'wait') {
+        const ms = Number(step.ms);
+        if (!Number.isFinite(ms) || ms < 0) {
+          state.actionFlowError = t('editor.actionBuilder.error.delay', { index: index + 1 });
+          state.actionFlowSteps = 0;
+          state.actionFlow = '';
+          actionBuilderInvalidIndex = index;
+          if (updateHint) {
+            updateActionHint();
+          }
+          return null;
+        }
+      } else {
+        const selector = (step.selector || '').trim();
+        if (!selector) {
+          state.actionFlowError = t('editor.actionBuilder.error.selector', { index: index + 1 });
+          state.actionFlowSteps = 0;
+          state.actionFlow = '';
+          actionBuilderInvalidIndex = index;
+          if (updateHint) {
+            updateActionHint();
+          }
+          return null;
+        }
+        if (step.type === 'input') {
+          if (!((step.value || '').trim())) {
+            state.actionFlowError = t('editor.actionBuilder.error.value', { index: index + 1 });
+            state.actionFlowSteps = 0;
+            state.actionFlow = '';
+            actionBuilderInvalidIndex = index;
+            if (updateHint) {
+              updateActionHint();
+            }
+            return null;
+          }
+        }
+      }
+    }
+    const serialized = serializeActionSteps(state.actionSteps);
+    state.actionFlow = serialized;
+    state.actionFlowError = '';
+    state.actionFlowSteps = state.actionSteps.length;
+    actionFlowInput.value = serialized;
+    if (updateHint) {
+      updateActionHint();
+    }
+    return serialized;
+  };
+
+  const refreshActionBuilderState = () => {
+    hideActionMenu();
+    if (state.actionFlowMode !== 'builder') {
+      actionStepsContainer.innerHTML = '';
+      actionBuilderEmpty.style.display = 'none';
+      return;
+    }
+    actionStepsContainer.innerHTML = '';
+    if (state.actionSteps.length === 0) {
+      actionBuilderEmpty.style.display = 'block';
+    } else {
+      actionBuilderEmpty.style.display = 'none';
+      state.actionSteps.forEach((step, index) => {
+        actionStepsContainer.appendChild(createActionStepRow(step, index));
+      });
+    }
+  };
+
+  const addActionStep = (type = 'click') => {
+    if (state.actionFlowMode !== 'builder') {
+      return;
+    }
+    hideActionMenu();
+    state.actionSteps = [...state.actionSteps, createStepTemplate(type)];
+    refreshActionBuilderState();
+    updateActionFlowFromSteps();
+  };
+
+  const removeActionStep = (index) => {
+    if (state.actionFlowMode !== 'builder') {
+      return;
+    }
+    state.actionSteps = state.actionSteps.filter((_, idx) => idx !== index);
+    refreshActionBuilderState();
+    updateActionFlowFromSteps();
+  };
+
+  const updateActionStep = (index, patch) => {
+    if (state.actionFlowMode !== 'builder') {
+      return;
+    }
+    state.actionSteps = state.actionSteps.map((step, idx) => (idx === index ? { ...step, ...patch } : step));
+    updateActionFlowFromSteps();
+    refreshActionBuilderState();
+  };
+
+  const convertActionStepType = (index, type) => {
+    if (state.actionFlowMode !== 'builder') {
+      return;
+    }
+    const current = state.actionSteps[index] || {};
+    state.actionSteps = state.actionSteps.map((step, idx) =>
+      idx === index ? createStepTemplate(type, step) : step,
+    );
+    if (current.type !== type) {
+      updateActionFlowFromSteps();
+    }
+    refreshActionBuilderState();
+  };
+
+  const createActionStepRow = (step, index) => {
+    const row = document.createElement('div');
+    Object.assign(row.style, {
+      display: 'flex',
+      flexDirection: 'column',
+      gap: '10px',
+      padding: '12px',
+      borderRadius: '10px',
+      border: '1px solid rgba(148, 163, 184, 0.6)',
+      backgroundColor: '#ffffff',
+      boxShadow: '0 1px 2px rgba(15, 23, 42, 0.04)',
+    });
+    if (index === actionBuilderInvalidIndex) {
+      row.style.border = '1px solid #dc2626';
+      row.style.boxShadow = '0 0 0 2px rgba(220, 38, 38, 0.1)';
+    }
+
+    const header = document.createElement('div');
+    Object.assign(header.style, {
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      gap: '12px',
+    });
+    const badge = document.createElement('span');
+    badge.textContent = `#${index + 1}`;
+    Object.assign(badge.style, {
+      display: 'inline-flex',
+      alignItems: 'center',
+      justifyContent: 'center',
+      minWidth: '28px',
+      height: '28px',
+      borderRadius: '999px',
+      background: 'rgba(99, 102, 241, 0.1)',
+      color: '#4f46e5',
+      fontSize: '12px',
+      fontWeight: '600',
+    });
+    const removeButton = document.createElement('button');
+    removeButton.type = 'button';
+    removeButton.textContent = t('editor.actionBuilder.remove');
+    Object.assign(removeButton.style, {
+      border: 'none',
+      background: 'transparent',
+      color: '#dc2626',
+      fontSize: '12px',
+      cursor: 'pointer',
+      fontWeight: '600',
+    });
+    removeButton.addEventListener('click', (event) => {
+      event.preventDefault();
+      removeActionStep(index);
+    });
+    header.append(badge, removeButton);
+    row.appendChild(header);
+
+    const typeLabel = document.createElement('label');
+    typeLabel.textContent = t('editor.actionBuilder.typeLabel');
+    Object.assign(typeLabel.style, {
+      display: 'flex',
+      flexDirection: 'column',
+      gap: '6px',
+      fontSize: '12px',
+      fontWeight: '600',
+      color: '#0f172a',
+    });
+    const typeSelect = document.createElement('select');
+    ACTION_TYPE_OPTIONS.forEach((option) => {
+      const opt = document.createElement('option');
+      opt.value = option.value;
+      opt.textContent = option.label;
+      typeSelect.appendChild(opt);
+    });
+    typeSelect.value = step.type;
+    styleInput(typeSelect);
+    typeSelect.addEventListener('change', (event) => {
+      convertActionStepType(index, event.target.value);
+    });
+    typeLabel.appendChild(typeSelect);
+    row.appendChild(typeLabel);
+
+    const body = document.createElement('div');
+    Object.assign(body.style, {
+      display: 'flex',
+      flexDirection: 'column',
+      gap: '10px',
+    });
+
+    if (step.type === 'wait') {
+      const delayLabel = document.createElement('label');
+      delayLabel.textContent = t('editor.actionBuilder.delayLabel');
+      Object.assign(delayLabel.style, {
+        display: 'flex',
+        flexDirection: 'column',
+        gap: '6px',
+        fontSize: '12px',
+        fontWeight: '600',
+        color: '#0f172a',
+      });
+      const delayInput = document.createElement('input');
+      delayInput.type = 'number';
+      delayInput.min = '0';
+      delayInput.step = '100';
+      delayInput.value = typeof step.ms === 'number' ? String(step.ms) : '1000';
+      styleInput(delayInput);
+      delayInput.addEventListener('input', (event) => {
+        const nextValue = Number.parseInt(event.target.value, 10);
+        state.actionSteps[index] = { ...state.actionSteps[index], ms: Number.isFinite(nextValue) ? nextValue : 0 };
+        updateActionFlowFromSteps();
+      });
+      delayLabel.appendChild(delayInput);
+      body.appendChild(delayLabel);
+    } else {
+      const selectorLabel = document.createElement('label');
+      selectorLabel.textContent = t('editor.actionBuilder.selectorLabel');
+      Object.assign(selectorLabel.style, {
+        display: 'flex',
+        flexDirection: 'column',
+        gap: '6px',
+        fontSize: '12px',
+        fontWeight: '600',
+        color: '#0f172a',
+      });
+      const selectorRow = document.createElement('div');
+      Object.assign(selectorRow.style, {
+        display: 'flex',
+        gap: '8px',
+        alignItems: 'center',
+      });
+      const selectorInput = document.createElement('input');
+      selectorInput.type = 'text';
+      selectorInput.placeholder = t('editor.actionBuilder.selectorPlaceholder');
+      selectorInput.value = step.selector || '';
+      styleInput(selectorInput);
+      selectorInput.addEventListener('input', (event) => {
+        state.actionSteps[index] = { ...state.actionSteps[index], selector: event.target.value };
+        updateActionFlowFromSteps({ updateHint: false });
+      });
+      const pickButton = document.createElement('button');
+      pickButton.type = 'button';
+      debugger
+      pickButton.textContent = t('editor.actionBuilder.pick');
+      Object.assign(pickButton.style, {
+        padding: '8px 12px',
+        borderRadius: '8px',
+        border: '1px solid rgba(99, 102, 241, 0.6)',
+        backgroundColor: '#eef2ff',
+        color: '#4f46e5',
+        fontSize: '12px',
+        fontWeight: '600',
+        cursor: 'pointer',
+      });
+      pickButton.addEventListener('click', (event) => {
+        event.preventDefault();
+        row.dataset.picking = 'true';
+        startActionPicker({
+          source: 'builder',
+          onSelect: (selector) => {
+            row.dataset.picking = 'false';
+            state.actionSteps[index] = { ...state.actionSteps[index], selector };
+            updateActionFlowFromSteps();
+            refreshActionBuilderState();
+          },
+          onCancel: () => {
+            row.dataset.picking = 'false';
+            refreshActionBuilderState();
+          },
+        });
+      });
+      selectorRow.append(selectorInput, pickButton);
+      selectorLabel.appendChild(selectorRow);
+      body.appendChild(selectorLabel);
+
+      if (step.type === 'input') {
+        const valueLabel = document.createElement('label');
+        valueLabel.textContent = t('editor.actionBuilder.valueLabel');
+        Object.assign(valueLabel.style, {
+          display: 'flex',
+          flexDirection: 'column',
+          gap: '6px',
+          fontSize: '12px',
+          fontWeight: '600',
+          color: '#0f172a',
+        });
+        const valueInput = document.createElement('input');
+        valueInput.type = 'text';
+        valueInput.placeholder = t('editor.actionBuilder.valuePlaceholder');
+        valueInput.value = step.value || '';
+        styleInput(valueInput);
+        valueInput.addEventListener('input', (event) => {
+          state.actionSteps[index] = { ...state.actionSteps[index], value: event.target.value };
+          updateActionFlowFromSteps({ updateHint: false });
+        });
+        valueLabel.appendChild(valueInput);
+        body.appendChild(valueLabel);
+      }
+    }
+
+    row.appendChild(body);
+    return row;
+  };
+
+  const syncActionFlowUI = () => {
+    const isButton = state.type === 'button';
+    actionFlowField.wrapper.style.display = isButton ? 'flex' : 'none';
+    addActionButton.disabled = !isButton || state.actionFlowMode !== 'builder';
+    if (addActionButton.disabled) {
+      hideActionMenu();
+    }
+    if (!isButton) {
+      hideActionMenu();
+      actionFlowBuilder.style.display = 'none';
+      actionBuilderAdvancedNote.style.display = 'none';
+      actionFlowInput.style.display = 'none';
+      return;
+    }
+    if (state.actionFlowMode === 'builder') {
+      actionFlowBuilder.style.display = 'flex';
+      actionBuilderAdvancedNote.style.display = 'none';
+      actionFlowInput.style.display = 'none';
+      refreshActionBuilderState();
+      updateActionFlowFromSteps({ updateHint: false });
+    } else {
+      hideActionMenu();
+      actionFlowBuilder.style.display = 'none';
+      actionBuilderAdvancedNote.style.display = 'block';
+      actionFlowInput.style.display = 'block';
+    }
+  };
   const actionFlowHint = document.createElement('p');
   actionFlowHint.textContent = t('editor.actionFlowHintDefault', { limit: MAX_FLOW_SOURCE_LENGTH });
   Object.assign(actionFlowHint.style, {
@@ -797,6 +1360,7 @@ function createElementBubble() {
     const textInput = document.createElement('input');
     textInput.type = 'text';
     textInput.placeholder = config.placeholder || '';
+    textInput.dataset.defaultPlaceholder = config.placeholder || '';
     styleInput(textInput);
 
     let colorInput = null;
@@ -959,6 +1523,8 @@ function createElementBubble() {
     actionFlow: '',
     actionFlowError: '',
     actionFlowSteps: 0,
+    actionFlowMode: 'builder',
+    actionSteps: /** @type {Array<ActionBuilderStep>} */ ([]),
     position: 'append',
     tooltipPosition: 'top',
     tooltipPersistent: false,
@@ -982,7 +1548,7 @@ function createElementBubble() {
     input.addEventListener('change', clearError);
   });
 
-  const resetStyleState = (source) => {
+  const resetStyleState = (source, suggestions) => {
     styleFieldConfigs.forEach(({ name }) => {
       const value = source && typeof source[name] === 'string' ? source[name] : '';
       styleState[name] = value;
@@ -991,15 +1557,24 @@ function createElementBubble() {
         return;
       }
       record.text.value = value || '';
+      const basePlaceholder = record.text.dataset.defaultPlaceholder || record.text.placeholder || '';
+      if (suggestions && typeof suggestions[name] === 'string') {
+        const hint = suggestions[name].trim();
+        record.text.placeholder = hint || basePlaceholder;
+      } else {
+        record.text.placeholder = basePlaceholder;
+      }
       if (record.color) {
-        if (value && /^#(?:[0-9a-fA-F]{3}|[0-9a-fA-F]{6})$/i.test(value)) {
-          record.color.value = value;
-          record.color.dataset.defaultValue = value;
+        const trimmed = typeof value === 'string' ? value.trim() : '';
+        const hexPattern = /^#(?:[0-9a-fA-F]{3}|[0-9a-fA-F]{6})$/i;
+        if (trimmed && hexPattern.test(trimmed)) {
+          record.color.value = trimmed;
+          record.color.dataset.defaultValue = trimmed;
         } else {
-          const fallback =
-            (source && typeof source[name] === 'string' && /^#(?:[0-9a-fA-F]{3}|[0-9a-fA-F]{6})$/i.test(source[name])
-              ? source[name]
-              : record.color.dataset.defaultValue) || '#ffffff';
+          let fallback = record.color.dataset.defaultValue;
+          if (!fallback || !hexPattern.test(fallback)) {
+            fallback = '#ffffff';
+          }
           record.color.value = fallback;
           record.color.dataset.defaultValue = fallback;
         }
@@ -1031,9 +1606,20 @@ function createElementBubble() {
       if (actionValue) {
         payload.actionSelector = actionValue;
       }
-      const flowValue = state.actionFlow.trim();
-      if (flowValue) {
-        payload.actionFlow = flowValue;
+      if (state.actionFlowMode === 'builder') {
+        const serialized = updateActionFlowFromSteps({ updateHint: true });
+        if (serialized && !state.actionFlowError) {
+          payload.actionFlow = serialized;
+        } else if (!state.actionFlowError) {
+          delete payload.actionFlow;
+        }
+      } else {
+        const flowValue = state.actionFlow.trim();
+        if (flowValue) {
+          payload.actionFlow = flowValue;
+        } else {
+          delete payload.actionFlow;
+        }
       }
     } else if (type === 'tooltip') {
       const tooltipPosition = VALID_TOOLTIP_POSITIONS.has(state.tooltipPosition)
@@ -1058,6 +1644,19 @@ function createElementBubble() {
       actionFlowHint.textContent = '';
       return;
     }
+    if (state.actionFlowMode === 'builder') {
+      if (state.actionFlowError) {
+        actionFlowHint.textContent = t('editor.actionFlowHintError', { error: state.actionFlowError });
+        actionFlowHint.style.color = '#dc2626';
+      } else if (state.actionFlowSteps > 0) {
+        actionFlowHint.textContent = t('editor.actionFlowHintConfigured', { count: state.actionFlowSteps });
+        actionFlowHint.style.color = '#0f172a';
+      } else {
+        actionFlowHint.textContent = t('editor.actionFlowHintDefault', { limit: MAX_FLOW_SOURCE_LENGTH });
+        actionFlowHint.style.color = actionFlowHint.dataset.defaultColor || '#94a3b8';
+      }
+      return;
+    }
     const flowValue = state.actionFlow.trim();
     if (!flowValue) {
       actionFlowHint.textContent = t('editor.actionFlowHintDefault', { limit: MAX_FLOW_SOURCE_LENGTH });
@@ -1078,6 +1677,10 @@ function createElementBubble() {
     if (state.type !== 'button') {
       state.actionFlowError = '';
       state.actionFlowSteps = 0;
+      return;
+    }
+    if (state.actionFlowMode === 'builder') {
+      updateActionFlowFromSteps({ updateHint: false });
       return;
     }
     const trimmed = state.actionFlow.trim();
@@ -1142,7 +1745,7 @@ function createElementBubble() {
     container.tabIndex = -1;
     const trigger = document.createElement('span');
     trigger.className = 'page-augmentor-preview-tooltip-trigger';
-    trigger.textContent = 'ⓘ';
+    trigger.textContent = 'i';
     trigger.setAttribute('aria-hidden', 'true');
     const bubble = document.createElement('div');
     bubble.className = 'page-augmentor-preview-tooltip-bubble';
@@ -1173,6 +1776,7 @@ function createElementBubble() {
   };
 
   const handleTypeChange = (applyDefaults = false) => {
+    hideActionMenu();
     const isLink = state.type === 'link';
     const isButton = state.type === 'button';
     const isTooltip = state.type === 'tooltip';
@@ -1227,6 +1831,7 @@ function createElementBubble() {
         tooltipPersistentCheckbox.checked = false;
       }
     }
+    syncActionFlowUI();
     updatePreview();
   };
 
@@ -1252,12 +1857,20 @@ function createElementBubble() {
   });
 
   actionFlowInput.addEventListener('input', (event) => {
+    if (state.actionFlowMode === 'builder') {
+      event.target.value = state.actionFlow;
+      return;
+    }
     state.actionFlow = event.target.value;
     validateActionFlowInput();
     updateActionHint();
   });
 
   actionFlowInput.addEventListener('change', (event) => {
+    if (state.actionFlowMode === 'builder') {
+      event.target.value = state.actionFlow;
+      return;
+    }
     state.actionFlow = event.target.value;
     validateActionFlowInput();
     updateActionHint();
@@ -1310,15 +1923,19 @@ function createElementBubble() {
     }
   }
 
-  function startActionPicker() {
+  function startActionPicker(options = {}) {
     if (actionPickerCleanup) {
       return;
     }
+    const { onSelect, onCancel, source = 'button' } = options;
+    const updatePrimaryButton = source === 'button';
     const overlay = createOverlay();
     document.body.appendChild(overlay.container);
     originalCursor = document.body.style.cursor;
-    document.body.style.cursor = 'copy';
-    setActionPickerState(true);
+    document.body.style.cursor = source === 'builder' ? 'crosshair' : 'copy';
+    if (updatePrimaryButton) {
+      setActionPickerState(true);
+    }
 
     const handleMove = (event) => {
       const candidate = findClickableElement(event.target);
@@ -1337,11 +1954,17 @@ function createElementBubble() {
       event.preventDefault();
       event.stopPropagation();
       const selector = generateSelector(candidate);
-      state.actionSelector = selector;
-      actionInput.value = selector;
-      updatePreview();
+      if (typeof onSelect === 'function') {
+        onSelect(selector);
+      } else {
+        state.actionSelector = selector;
+        actionInput.value = selector;
+        updatePreview();
+      }
       stopActionPicker('select');
-      actionInput.focus({ preventScroll: true });
+      if (!onSelect) {
+        actionInput.focus({ preventScroll: true });
+      }
     };
 
     const handleKeydown = (event) => {
@@ -1359,11 +1982,15 @@ function createElementBubble() {
       overlay.dispose();
       document.body.style.cursor = originalCursor || '';
       originalCursor = '';
-      setActionPickerState(false);
-      actionPickerCleanup = null;
-      if (reason !== 'select') {
-        updateActionHint();
+      if (updatePrimaryButton) {
+        setActionPickerState(false);
+        if (reason !== 'select') {
+          updateActionHint();
+        }
+      } else if (typeof onCancel === 'function' && reason !== 'select') {
+        onCancel();
       }
+      actionPickerCleanup = null;
     };
 
     document.addEventListener('mousemove', handleMove, true);
@@ -1423,17 +2050,35 @@ function createElementBubble() {
       return;
     }
     if (payload.type === 'button') {
-      const flowValue = state.actionFlow.trim();
-      if (flowValue) {
-        const { definition, error } = parseActionFlowDefinition(flowValue);
-        if (error || !definition) {
-          errorLabel.textContent = t('editor.errorFlowInvalid', { error: error || '' });
-          actionFlowInput.focus({ preventScroll: true });
+      if (state.actionFlowMode === 'builder') {
+        const serialized = updateActionFlowFromSteps({ updateHint: true });
+        if (state.actionFlowError) {
+          errorLabel.textContent = state.actionFlowError;
           return;
         }
-        payload.actionFlow = flowValue;
+        if (serialized) {
+          const { error } = parseActionFlowDefinition(serialized);
+          if (error) {
+            errorLabel.textContent = t('editor.errorFlowInvalid', { error });
+            return;
+          }
+          payload.actionFlow = serialized;
+        } else {
+          delete payload.actionFlow;
+        }
       } else {
-        delete payload.actionFlow;
+        const flowValue = state.actionFlow.trim();
+        if (flowValue) {
+          const { definition, error } = parseActionFlowDefinition(flowValue);
+          if (error || !definition) {
+            errorLabel.textContent = t('editor.errorFlowInvalid', { error: error || '' });
+            actionFlowInput.focus({ preventScroll: true });
+            return;
+          }
+          payload.actionFlow = flowValue;
+        } else {
+          delete payload.actionFlow;
+        }
       }
     }
     submitHandler(payload);
@@ -1474,6 +2119,7 @@ function createElementBubble() {
       return;
     }
     stopActionPicker('cancel');
+    hideActionMenu();
     isAttached = false;
     window.removeEventListener('resize', updatePosition, true);
     document.removeEventListener('scroll', handleScroll, true);
@@ -1520,9 +2166,11 @@ function createElementBubble() {
       state.text = initial.text;
       state.href = initial.href;
       state.actionSelector = initial.actionSelector;
-      state.actionFlow = initial.actionFlow;
+      state.actionFlow = initial.actionFlow || '';
       state.actionFlowError = '';
       state.actionFlowSteps = 0;
+      state.actionFlowMode = 'builder';
+      state.actionSteps = [];
       state.position = initial.position;
       state.tooltipPosition = initial.tooltipPosition;
       state.tooltipPersistent = initial.tooltipPersistent;
@@ -1530,14 +2178,31 @@ function createElementBubble() {
       textInput.value = state.text;
       hrefInput.value = state.href;
       actionInput.value = state.actionSelector;
-      actionFlowInput.value = state.actionFlow;
+      const parsedFlow =
+        state.type === 'button' ? parseFlowForBuilder(initial.actionFlow) : { mode: 'builder', steps: [], error: '' };
+      if (state.type === 'button' && parsedFlow.mode === 'builder') {
+        state.actionFlowMode = 'builder';
+        state.actionSteps = parsedFlow.steps;
+        state.actionFlow = state.actionSteps.length ? serializeActionSteps(state.actionSteps) : '';
+        actionFlowInput.value = state.actionFlow;
+        actionBuilderAdvancedNote.style.display = 'none';
+      } else if (state.type === 'button' && parsedFlow.mode === 'advanced') {
+        state.actionFlowMode = 'advanced';
+        state.actionFlow = initial.actionFlow || '';
+        state.actionFlowError = parsedFlow.error || '';
+        actionFlowInput.value = state.actionFlow;
+      } else {
+        actionFlowInput.value = state.actionFlow;
+      }
       positionSelect.value = state.position;
       tooltipPositionSelect.value = state.tooltipPosition;
       tooltipPersistentCheckbox.checked = state.tooltipPersistent;
-      resetStyleState(initial.style);
+      resetStyleState(initial.style, initial.styleSuggestions);
       stopActionPicker('cancel');
       setActionPickerState(false);
+      refreshActionBuilderState();
       handleTypeChange();
+      syncActionFlowUI();
       errorLabel.textContent = '';
       title.textContent = mode === 'edit' ? t('editor.titleEdit') : t('editor.titleCreate');
       saveButton.textContent = mode === 'edit' ? t('editor.saveUpdate') : t('editor.saveCreate');
@@ -1569,10 +2234,11 @@ function createElementBubble() {
 }
 
 /**
- * エディターバブルの初期値をまとめて整える。
+ * 
  * @param {Partial<import('../common/types.js').InjectedElement>} values
  * @param {Record<string, string>} suggestedStyle
- * @returns {{ type: 'button' | 'link' | 'tooltip'; text: string; href: string; actionSelector: string; actionFlow: string; position: 'append' | 'prepend' | 'before' | 'after'; tooltipPosition: 'top' | 'right' | 'bottom' | 'left'; tooltipPersistent: boolean; style: Record<string, string> }}
+ * @returns {{
+ * }}
  */
 function defaultElementValues(values = {}, suggestedStyle = {}) {
   const type = values.type === 'link' ? 'link' : values.type === 'tooltip' ? 'tooltip' : 'button';
@@ -1591,17 +2257,23 @@ function defaultElementValues(values = {}, suggestedStyle = {}) {
   const defaults =
     type === 'link' ? DEFAULT_LINK_STYLE : type === 'tooltip' ? DEFAULT_TOOLTIP_STYLE : DEFAULT_BUTTON_STYLE;
   const style = {};
+  const styleSuggestions = {};
   const configs = getStyleFieldConfigs();
   configs.forEach(({ name }) => {
-    if (values.style && typeof values.style[name] === 'string') {
-      style[name] = values.style[name];
-    } else if (suggestedStyle && typeof suggestedStyle[name] === 'string') {
-      style[name] = suggestedStyle[name];
+    const providedRaw = values.style && typeof values.style[name] === 'string' ? values.style[name] : '';
+    const provided = typeof providedRaw === 'string' ? providedRaw.trim() : '';
+    if (provided) {
+      style[name] = provided;
+    } else if (defaults && typeof defaults[name] === 'string') {
+      style[name] = defaults[name];
     } else {
       style[name] = '';
     }
-    if (!style[name] && defaults && defaults[name]) {
-      style[name] = defaults[name];
+    if (suggestedStyle && typeof suggestedStyle[name] === 'string') {
+      const hint = suggestedStyle[name].trim();
+      if (hint) {
+        styleSuggestions[name] = hint;
+      }
     }
   });
   return {
@@ -1614,12 +2286,13 @@ function defaultElementValues(values = {}, suggestedStyle = {}) {
     tooltipPosition,
     tooltipPersistent,
     style,
+    styleSuggestions,
   };
 }
 
 let tabIdCounter = 0;
 
-// セクション表示のためのタブ UI を生成する。
+// Creates the tabbed layout for editor sections.
 function createTabGroup() {
   const container = document.createElement('div');
   Object.assign(container.style, {
@@ -1652,11 +2325,6 @@ function createTabGroup() {
   container.append(tabList, panels);
 
   /** @type {{
-   *  tabButton: HTMLButtonElement;
-   *  section: HTMLElement;
-   *  content: HTMLElement;
-   *  visible: boolean;
-   *  setVisible: (visible: boolean) => void;
    * }[]} */
   const sections = [];
   /** @type {null | typeof sections[number]} */
@@ -1789,7 +2457,7 @@ function createTabGroup() {
   };
 }
 
-// タブ内に表示するセクション要素を生成する。
+// Creates section metadata and helpers.
 function createSection(titleText, descriptionText = '') {
   const section = document.createElement('section');
   Object.assign(section.style, {
@@ -1842,7 +2510,7 @@ function createSection(titleText, descriptionText = '') {
   return { section, content };
 }
 
-// ラベルと入力コントロールをまとめたフォームフィールドを生成する。
+// Adds a heading and description wrapper to a section node.
 function createField(labelText, control = null) {
   const wrapper = document.createElement('label');
   Object.assign(wrapper.style, {
@@ -1867,7 +2535,7 @@ function createField(labelText, control = null) {
   return { wrapper, label };
 }
 
-// 入力コントロールの基本スタイルとフォーカス時の挙動を設定する。
+// Creates a form field wrapper with label and control.
 function styleInput(element) {
   Object.assign(element.style, {
     width: '100%',
@@ -1893,7 +2561,7 @@ function styleInput(element) {
 }
 
 /**
- * スタイル入力の状態を整形し、空値を除外する。
+ * 
  * @param {Record<string, string>} styleState
  * @returns {Record<string, string> | undefined}
  */
@@ -1909,7 +2577,7 @@ function normalizeStyleState(styleState) {
 }
 
 /**
- * プレビュー要素に共通のスタイルを適用する。
+ * 
  * @param {HTMLElement} element
  * @param {'button' | 'link'} type
  */
@@ -1942,7 +2610,7 @@ function applyPreviewBase(element, type) {
 }
 
 /**
- * ツールチップのプレビュー表示とスタイルを適用する。
+ * 
  * Applies tooltip preview styling and content.
  * @param {HTMLElement} container
  * @param {{ text: string; tooltipPosition?: string; tooltipPersistent?: boolean; style?: import('../common/types.js').InjectedElementStyle }} payload
@@ -1965,7 +2633,7 @@ function applyTooltipPreview(container, payload) {
 
   const trigger = container.querySelector('.page-augmentor-preview-tooltip-trigger');
   if (trigger instanceof HTMLElement) {
-    trigger.textContent = 'ⓘ';
+    trigger.textContent = 'i';
     trigger.setAttribute('aria-hidden', 'true');
   }
 
@@ -1985,7 +2653,7 @@ function applyTooltipPreview(container, payload) {
 const CLICKABLE_INPUT_TYPES = new Set(['button', 'submit', 'reset', 'image']);
 
 /**
- * クリック可能な要素を上位に遡って探索する。
+ * 
  * @param {EventTarget | null} target
  * @returns {Element | null}
  */
@@ -2001,7 +2669,7 @@ function findClickableElement(target) {
 }
 
 /**
- * 要素がクリック可能かどうかを判定する。
+ * 
  * @param {Element} element
  * @returns {boolean}
  */
@@ -2041,7 +2709,7 @@ function isClickableElement(element) {
 }
 
 /**
- * フレーム階層のメタデータを収集し、同一オリジンかどうかを判定する。
+ * 
  * @param {Window} [win]
  * @returns {{ frameSelectors: string[]; frameLabel: string; frameUrl: string; pageUrl: string; sameOriginWithTop: boolean }}
  */
@@ -2063,7 +2731,7 @@ export function resolveFrameContext(win = window) {
 }
 
 /**
- * フレーム階層を遡ってセレクター配列を生成する。
+ * 
  * @param {Window} win
  * @returns {{ selectors: string[]; sameOrigin: boolean }}
  */
@@ -2093,7 +2761,7 @@ function collectFrameSelectors(win) {
 }
 
 /**
- * 親ウィンドウへアクセス可能かどうかを確認する。
+ * 
  * @param {Window} win
  * @returns {boolean}
  */
@@ -2110,7 +2778,7 @@ function canAccessParent(win) {
 }
 
 /**
- * フレーム要素を安全に取得する。
+ * 
  * @param {Window} win
  * @returns {Element | null}
  */
@@ -2123,7 +2791,7 @@ function safeFrameElement(win) {
 }
 
 /**
- * top ウィンドウ取得時のクロスオリジン例外を吸収する。
+ * top 
  * @param {Window} win
  * @returns {Window}
  */
@@ -2136,7 +2804,6 @@ function safeTopWindow(win) {
 }
 
 /**
- * ウィンドウのロケーションから URL を構築する。
  * @param {Window} win
  * @returns {string}
  */
@@ -2150,7 +2817,7 @@ function tryGetWindowUrl(win) {
 }
 
 /**
- * フレーム要素の概要文字列を生成する。
+ * 
  * @param {Element | null} element
  * @returns {string}
  */
@@ -2179,7 +2846,6 @@ function describeFrameElement(element) {
 }
 
 /**
- * フレーム src を正規化して比較しやすくする。
  * @param {string} src
  * @param {Document} doc
  * @returns {string}
@@ -2195,7 +2861,7 @@ function normalizeFrameSource(src, doc) {
 }
 
 /**
- * 対象要素の計算スタイルから推奨スタイルを抽出する。
+ * 
  * @param {Element} target
  * @returns {Record<string, string>}
  */
@@ -2216,9 +2882,3 @@ function getSuggestedStyles(target) {
     borderRadius: maybe(computed.borderRadius),
   };
 }
-
-
-
-
-
-

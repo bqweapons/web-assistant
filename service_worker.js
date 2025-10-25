@@ -6,6 +6,7 @@ import { getElementsByUrl, upsertElement, deleteElement, getFullStore, clearPage
 import { addAsyncMessageListener, MessageType } from './common/messaging.js';
 import { openSidePanelOrTab } from './common/compat.js';
 import { parseActionFlowDefinition } from './common/flows.js';
+import { normalizePageUrl } from './common/url.js';
 
 const TOOLTIP_POSITIONS = new Set(['top', 'right', 'bottom', 'left']);
 
@@ -252,7 +253,7 @@ async function broadcastState(pageUrl, elements) {
   const tabs = await chrome.tabs.query({});
   await Promise.allSettled(
     tabs
-      .filter((tab) => tab.id && tab.url && normalizeUrl(tab.url) === pageUrl)
+      .filter((tab) => tab.id && tab.url && normalizePageUrl(tab.url) === pageUrl)
       .map((tab) => sendMessageToFrames(tab.id, { type: MessageType.REHYDRATE, pageUrl, data: elements })),
   );
   try {
@@ -323,14 +324,7 @@ async function notifyPickerResult(type, payload) {
  * @param {string} url
  * @returns {string}
  */
-function normalizeUrl(url) {
-  try {
-    const target = new URL(url);
-    return `${target.origin}${target.pathname}${target.search}`;
-  } catch (error) {
-    return url;
-  }
-}
+
 
 async function importStorePayload(rawStore) {
   if (!rawStore || typeof rawStore !== 'object' || Array.isArray(rawStore)) {
@@ -345,7 +339,7 @@ async function importStorePayload(rawStore) {
     if (!Array.isArray(list)) {
       throw new Error(`Invalid element list for ${key}.`);
     }
-    const pageUrl = normalizeUrl(key).trim();
+    const pageUrl = normalizePageUrl(key).trim();
     if (!pageUrl) {
       throw new Error(`Import payload contains an invalid pageUrl: ${key}`);
     }
@@ -354,9 +348,10 @@ async function importStorePayload(rawStore) {
       if (!entry || typeof entry !== 'object') {
         throw new Error(`Invalid element entry for ${key}.`);
       }
+      const normalizedEntryUrl = normalizePageUrl(entry.pageUrl || pageUrl, key).trim();
       const payload = {
         ...entry,
-        pageUrl: normalizeUrl(entry.pageUrl || pageUrl).trim() || pageUrl,
+        pageUrl: normalizedEntryUrl || pageUrl,
       };
       try {
         const validated = validateElementPayload(payload);
