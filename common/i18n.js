@@ -1,3 +1,4 @@
+// ローカライズ済みのテキスト定義と i18n ユーティリティを集約したモジュール。
 const messages = {
   en: {
     app: {
@@ -612,6 +613,7 @@ let currentLocale = systemLocale;
 const subscribers = new Set();
 
 /**
+ * ロケール文字列を解析して、最も近いサポート済みロケールへ変換する。
  * Resolves a locale string to the closest supported locale.
  * @param {string} input
  * @returns {keyof typeof messages}
@@ -638,6 +640,7 @@ export function resolveLocale(input) {
 }
 
 /**
+ * 現在選択されているロケールを返す。
  * Returns the currently active locale.
  * @returns {keyof typeof messages}
  */
@@ -646,6 +649,7 @@ export function getLocale() {
 }
 
 /**
+ * アクティブなロケールを更新し、購読者へ通知する。
  * Updates the active locale and notifies subscribers.
  * @param {string} locale
  * @returns {keyof typeof messages}
@@ -662,6 +666,7 @@ export function setLocale(locale) {
 }
 
 /**
+ * 利用可能な場合は現在のロケールをストレージへ保存する。
  * Persists the current locale to storage when available.
  * @param {string} locale
  */
@@ -676,6 +681,7 @@ function persistLocale(locale) {
 }
 
 /**
+ * ロケール変更を購読者へ通知する。
  * Notifies all subscribed listeners of the locale change.
  */
 function notifySubscribers() {
@@ -689,6 +695,7 @@ function notifySubscribers() {
 }
 
 /**
+ * ロケール変更の通知を購読する。
  * Subscribes to locale changes.
  * @param {(locale: keyof typeof messages) => void} listener
  * @returns {() => void}
@@ -699,6 +706,7 @@ export function subscribe(listener) {
 }
 
 /**
+ * 指定したキーに対応するローカライズ文字列を取得する。
  * Retrieves a localized string for the provided key.
  * @param {string} key
  * @param {Record<string, string | number>} [values]
@@ -723,6 +731,7 @@ export function t(key, values) {
 }
 
 /**
+ * メッセージオブジェクトからネストした値を取り出す。
  * Resolves a nested value from the messages object.
  * @param {any} source
  * @param {string} key
@@ -741,6 +750,7 @@ function resolveMessage(source, key) {
 }
 
 /**
+ * 選択可能なロケール一覧をラベル付きで返す。
  * Returns the available locale options with labels.
  * @returns {{ value: string; label: string }[]}
  */
@@ -762,6 +772,7 @@ export function getLocaleOptions() {
 }
 
 /**
+ * アクティブなロケールに従ってタイムスタンプを整形する。
  * Formats a timestamp using the active locale.
  * @param {number} timestamp
  * @returns {string}
@@ -780,6 +791,7 @@ export function formatDateTime(timestamp) {
 }
 
 /**
+ * 保存済みのロケール設定を読み込む。
  * Loads any persisted locale preference.
  * @returns {Promise<keyof typeof messages>}
  */

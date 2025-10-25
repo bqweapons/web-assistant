@@ -94,6 +94,7 @@ const MAX_FLOW_SOURCE_LENGTH = 8000;
  */
 
 /**
+ * JSON 文字列からフロー定義を解析し、正規化された構造に変換する。
  * Attempts to parse and normalize a flow definition from JSON.
  * @param {string} source
  * @returns {{ definition: FlowDefinition | null; error: string | null }}
@@ -124,6 +125,7 @@ export function parseActionFlowDefinition(source) {
 }
 
 /**
+ * 生のフローデータを検証し、正規化された定義へ整形する。
  * Normalizes the raw flow into a validated definition.
  * @param {unknown} raw
  * @returns {FlowDefinition}
@@ -141,6 +143,7 @@ function normalizeFlow(raw) {
 }
 
 /**
+ * ステップ配列を正規化し、統計情報を更新する。
  * Normalizes a list of steps.
  * @param {unknown} raw
  * @param {string} path
@@ -171,6 +174,7 @@ function normalizeSteps(raw, path, stats) {
 }
 
 /**
+ * 単一ステップを判別して正しい形式へ変換する。
  * Normalizes an individual step.
  * @param {unknown} entry
  * @param {string} path
@@ -245,6 +249,7 @@ function normalizeStep(entry, path, stats) {
 }
 
 /**
+ * 条件定義を解釈して正規化する。
  * Normalizes a condition entry.
  * @param {unknown} raw
  * @param {string} path
@@ -283,6 +288,7 @@ function normalizeCondition(raw, path) {
 }
 
 /**
+ * 値が空でない文字列であることを確認する。
  * Ensures the provided value is a non-empty string.
  * @param {unknown} value
  * @param {string} message
@@ -297,6 +303,7 @@ function requireString(value, message) {
 }
 
 /**
+ * トリム済み文字列を返し、空の場合は undefined を返す。
  * Returns a trimmed string or undefined.
  * @param {unknown} value
  * @returns {string | undefined}
@@ -310,6 +317,7 @@ function optionalString(value) {
 }
 
 /**
+ * 数値を指定範囲に収める。
  * Clamps a numeric value.
  * @param {number} value
  * @param {number} min
@@ -324,6 +332,7 @@ function clampNumber(value, min, max) {
 }
 
 /**
+ * 整数値を指定範囲で丸め込む。
  * Clamps an integer between bounds.
  * @param {number} value
  * @param {number} min

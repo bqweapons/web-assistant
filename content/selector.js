@@ -1,6 +1,8 @@
 import { getLocale, ready as i18nReady, subscribe as subscribeToLocale, t } from '../common/i18n.js';
 import { parseActionFlowDefinition, MAX_FLOW_SOURCE_LENGTH } from '../common/flows.js';
 
+// 要素ピッカーとエディターバブルの UI ロジックをまとめたモジュール。
+
 const HIGHLIGHT_BORDER_COLOR = '#1b84ff';
 const HIGHLIGHT_FILL_COLOR = 'rgba(27, 132, 255, 0.2)';
 
@@ -71,6 +73,7 @@ const cssEscape = typeof CSS !== 'undefined' && typeof CSS.escape === 'function'
     (value) => String(value).replace(/[^a-zA-Z0-9_\-]/g, (char) => `\\${char}`);
 
 /**
+ * 要素 ID や nth-of-type を用いて一意の CSS セレクターを生成する。
  * Generates a unique CSS selector for the provided element using ids or nth-of-type fallback.
  * @param {Element} element
  * @returns {string}
@@ -111,6 +114,7 @@ export function generateSelector(element) {
 }
 
 /**
+ * インタラクティブな要素ピッカーを開始する。
  * Starts the interactive element picker.
  * @param {{
  *   mode?: 'create' | 'edit';
@@ -226,6 +230,7 @@ export function startElementPicker(options = {}) {
 }
 
 /**
+ * 既存要素向けにエディターバブルを開く。
  * Opens the editor bubble for an existing element.
  * @param {{
  *   target: Element;
@@ -311,6 +316,7 @@ function getElementBubble() {
 }
 
 /**
+ * 指定ドキュメント内で ID が一意か確認する。
  * Determines whether an id is unique within the provided document context.
  * @param {string} id
  * @param {Document} [contextDocument]
@@ -325,6 +331,7 @@ function isIdUnique(id, contextDocument) {
 }
 
 /**
+ * 同種の兄弟要素の中での位置を算出する。
  * Calculates the position of the element among siblings of the same type.
  * @param {Element} element
  * @returns {number}
@@ -339,6 +346,7 @@ function nthOfType(element) {
 }
 
 /**
+ * イベントターゲットから適切な要素候補を取得する。
  * Resolves the best candidate element from an event target.
  * @param {EventTarget | null} target
  * @returns {Element | null}
@@ -354,6 +362,7 @@ function resolveTarget(target) {
 }
 
 /**
+ * ホバー中の要素をハイライトするオーバーレイを生成する。
  * Creates the overlay used to highlight hovered elements.
  * @returns {{ container: HTMLDivElement; show: (element: Element) => void; hide: () => void; dispose: () => void }}
  */
@@ -402,6 +411,7 @@ function createOverlay() {
   };
 }
 
+// エディターバブル本体の DOM 構造を構築するヘルパー。
 function createElementBubble() {
   const bubble = document.createElement('div');
   bubble.dataset.pageAugmentorRoot = 'picker-element-bubble';
@@ -1557,6 +1567,12 @@ function createElementBubble() {
   };
 }
 
+/**
+ * エディターバブルの初期値を組み立てる。
+ * @param {Partial<import('../common/types.js').InjectedElement>} values
+ * @param {Record<string, string>} suggestedStyle
+ * @returns {{ type: 'button' | 'link' | 'tooltip'; text: string; href: string; actionSelector: string; actionFlow: string; position: 'append' | 'prepend' | 'before' | 'after'; tooltipPosition: 'top' | 'right' | 'bottom' | 'left'; tooltipPersistent: boolean; style: Record<string, string> }}
+ */
 function defaultElementValues(values = {}, suggestedStyle = {}) {
   const type = values.type === 'link' ? 'link' : values.type === 'tooltip' ? 'tooltip' : 'button';
   const text = typeof values.text === 'string' ? values.text : '';
@@ -1602,6 +1618,7 @@ function defaultElementValues(values = {}, suggestedStyle = {}) {
 
 let tabIdCounter = 0;
 
+// セクション別に設定項目を切り替えるタブ UI を生成する。
 function createTabGroup() {
   const container = document.createElement('div');
   Object.assign(container.style, {
@@ -1771,6 +1788,7 @@ function createTabGroup() {
   };
 }
 
+// タブ内に表示するセクション要素を生成する。
 function createSection(titleText, descriptionText = '') {
   const section = document.createElement('section');
   Object.assign(section.style, {
@@ -1823,6 +1841,7 @@ function createSection(titleText, descriptionText = '') {
   return { section, content };
 }
 
+// ラベルと入力コントロールをまとめたフォームフィールドを生成する。
 function createField(labelText, control = null) {
   const wrapper = document.createElement('label');
   Object.assign(wrapper.style, {
@@ -1847,6 +1866,7 @@ function createField(labelText, control = null) {
   return { wrapper, label };
 }
 
+// 入力コントロールの共通スタイルとフォーカス時の振る舞いを設定する。
 function styleInput(element) {
   Object.assign(element.style, {
     width: '100%',
@@ -1871,6 +1891,11 @@ function styleInput(element) {
   });
 }
 
+/**
+ * スタイル入力の状態を整形し、空値を除外する。
+ * @param {Record<string, string>} styleState
+ * @returns {Record<string, string> | undefined}
+ */
 function normalizeStyleState(styleState) {
   const entries = {};
   getStyleFieldConfigs().forEach(({ name }) => {
@@ -1882,6 +1907,11 @@ function normalizeStyleState(styleState) {
   return Object.keys(entries).length ? entries : undefined;
 }
 
+/**
+ * プレビュー要素に基本スタイルを適用する。
+ * @param {HTMLElement} element
+ * @param {'button' | 'link'} type
+ */
 function applyPreviewBase(element, type) {
   element.removeAttribute('style');
   element.style.cursor = 'default';
@@ -1911,6 +1941,7 @@ function applyPreviewBase(element, type) {
 }
 
 /**
+ * ツールチップのプレビュー表示とスタイルを適用する。
  * Applies tooltip preview styling and content.
  * @param {HTMLElement} container
  * @param {{ text: string; tooltipPosition?: string; tooltipPersistent?: boolean; style?: import('../common/types.js').InjectedElementStyle }} payload
@@ -1952,6 +1983,11 @@ function applyTooltipPreview(container, payload) {
 
 const CLICKABLE_INPUT_TYPES = new Set(['button', 'submit', 'reset', 'image']);
 
+/**
+ * クリック可能な要素を上位に辿って探索する。
+ * @param {EventTarget | null} target
+ * @returns {Element | null}
+ */
 function findClickableElement(target) {
   let current = resolveTarget(target);
   while (current) {
@@ -1963,6 +1999,11 @@ function findClickableElement(target) {
   return null;
 }
 
+/**
+ * 要素がクリック可能かどうかを判定する。
+ * @param {Element} element
+ * @returns {boolean}
+ */
 function isClickableElement(element) {
   if (!(element instanceof Element)) {
     return false;
@@ -1998,6 +2039,11 @@ function isClickableElement(element) {
   return false;
 }
 
+/**
+ * フレーム階層のメタデータを収集し、同一オリジンかどうかを判定する。
+ * @param {Window} [win]
+ * @returns {{ frameSelectors: string[]; frameLabel: string; frameUrl: string; pageUrl: string; sameOriginWithTop: boolean }}
+ */
 export function resolveFrameContext(win = window) {
   const targetWindow = win || window;
   const { selectors, sameOrigin } = collectFrameSelectors(targetWindow);
@@ -2015,6 +2061,11 @@ export function resolveFrameContext(win = window) {
   };
 }
 
+/**
+ * フレーム階層を遡ってセレクター配列を生成する。
+ * @param {Window} win
+ * @returns {{ selectors: string[]; sameOrigin: boolean }}
+ */
 function collectFrameSelectors(win) {
   const selectors = [];
   let current = win;
@@ -2040,6 +2091,11 @@ function collectFrameSelectors(win) {
   return { selectors: sameOrigin ? selectors : [], sameOrigin };
 }
 
+/**
+ * 親ウィンドウへアクセス可能かどうかを確認する。
+ * @param {Window} win
+ * @returns {boolean}
+ */
 function canAccessParent(win) {
   try {
     if (win === win.parent) {
@@ -2052,6 +2108,11 @@ function canAccessParent(win) {
   }
 }
 
+/**
+ * フレーム要素を安全に取得する。
+ * @param {Window} win
+ * @returns {Element | null}
+ */
 function safeFrameElement(win) {
   try {
     return win.frameElement || null;
@@ -2060,6 +2121,11 @@ function safeFrameElement(win) {
   }
 }
 
+/**
+ * top ウィンドウ取得時のクロスオリジン例外を吸収する。
+ * @param {Window} win
+ * @returns {Window}
+ */
 function safeTopWindow(win) {
   try {
     return win.top;
@@ -2068,6 +2134,11 @@ function safeTopWindow(win) {
   }
 }
 
+/**
+ * ウィンドウのロケーションから URL を構築する。
+ * @param {Window} win
+ * @returns {string}
+ */
 function tryGetWindowUrl(win) {
   try {
     const { origin, pathname, search } = win.location;
@@ -2077,6 +2148,11 @@ function tryGetWindowUrl(win) {
   }
 }
 
+/**
+ * フレーム要素の概要文字列を生成する。
+ * @param {Element | null} element
+ * @returns {string}
+ */
 function describeFrameElement(element) {
   if (!(element instanceof Element)) {
     return '';
@@ -2101,6 +2177,12 @@ function describeFrameElement(element) {
   return localName;
 }
 
+/**
+ * フレーム src を正規化して比較しやすい形にする。
+ * @param {string} src
+ * @param {Document} doc
+ * @returns {string}
+ */
 function normalizeFrameSource(src, doc) {
   try {
     const base = doc?.location?.href || window.location.href;
@@ -2111,6 +2193,11 @@ function normalizeFrameSource(src, doc) {
   }
 }
 
+/**
+ * 対象要素の計算スタイルから推奨スタイルを抽出する。
+ * @param {Element} target
+ * @returns {Record<string, string>}
+ */
 function getSuggestedStyles(target) {
   if (!(target instanceof Element)) {
     return {};
