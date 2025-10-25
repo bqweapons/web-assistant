@@ -1,3 +1,7 @@
+/**
+ * サービスワーカー全体のエントリーポイント。
+ * 注入要素の保存・更新・同期を担い、サイドパネルやコンテンツスクリプトへ通知する。
+ */
 import { getElementsByUrl, upsertElement, deleteElement, getFullStore, clearPage } from './common/storage.js';
 import { addAsyncMessageListener, MessageType } from './common/messaging.js';
 import { openSidePanelOrTab } from './common/compat.js';
@@ -138,6 +142,7 @@ addAsyncMessageListener(async (message, sender) => {
 });
 
 /**
+ * 要素ペイロードの必須項目を検証し、不足していれば補完する。
  * Ensures the element payload contains the required fields.
  * @param {Partial<import('./common/types.js').InjectedElement>} payload
  * @returns {import('./common/types.js').InjectedElement}
@@ -222,6 +227,7 @@ function validateElementPayload(payload) {
 }
 
 /**
+ * 状態更新をサイドパネルおよび同一ページのタブへ配信する。
  * Broadcasts state updates to side panels and matching tabs.
  * @param {string} pageUrl
  * @param {import('./common/types.js').InjectedElement[]} elements
@@ -242,6 +248,7 @@ async function broadcastState(pageUrl, elements) {
 }
 
 /**
+ * タブへメッセージを送信し、失敗時は静かに握りつぶす。
  * Dispatches a message to a tab, ignoring failures quietly.
  * @param {number} tabId
  * @param {unknown} message
@@ -281,6 +288,7 @@ async function findElement(pageUrl, id) {
 }
 
 /**
+ * ピッカーイベントをリスナーへ転送し、存在しない場合は無視する。
  * Forwards picker events to any listening extension pages.
  * @param {string} type
  * @param {any} payload
@@ -295,6 +303,7 @@ async function notifyPickerResult(type, payload) {
 }
 
 /**
+ * URL を正規化してストレージキーを安定させる。
  * Normalizes URL for consistent storage keys.
  * @param {string} url
  * @returns {string}

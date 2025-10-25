@@ -13,12 +13,19 @@ import {
   t as translate,
 } from '../../common/i18n.js';
 
+// サイドパネル UI 全体をレンダリングし、コンテンツスクリプトと同期する React エントリーポイント。
+
 const initialContextState = { kind: 'message', key: 'context.loading' };
 
+// i18n キーと置換値をまとめるためのヘルパー。
 function createMessage(key, values) {
   return { key, values };
 }
 
+/**
+ * i18n 状態と翻訳関数を提供するカスタムフック。
+ * @returns {{ locale: string; t: (key: string, values?: Record<string, any>) => string; options: { value: string; label: string }[]; setLocale: (locale: string) => void }}
+ */
 function useI18n() {
   const [locale, setLocaleState] = useState(getLocale());
 
@@ -47,6 +54,7 @@ function useI18n() {
   return { locale, t, options, setLocale };
 }
 
+// サイドパネルのメイン画面を構築するコンテナコンポーネント。
 function App() {
   const { locale, t, options: localeOptions, setLocale } = useI18n();
   const [pageUrl, setPageUrl] = useState('');
@@ -507,6 +515,7 @@ function App() {
   );
 }
 
+// 保存済み全ページの一覧を表示する概要セクション。
 function OverviewSection({ t, typeLabels, formatTooltipPosition, formatTooltipMode, formatDateTime, formatFrameSummary }) {
   const [store, setStore] = useState({});
   const [loading, setLoading] = useState(false);
@@ -749,6 +758,12 @@ function OverviewSection({ t, typeLabels, formatTooltipPosition, formatTooltipMo
   );
 }
 
+/**
+ * ピッカーで選択した要素の概要テキストを整形する。
+ * @param {{ tag?: string; classes?: string; text?: string } | null} preview
+ * @param {(key: string, values?: Record<string, any>) => string} t
+ * @returns {string}
+ */
 function formatPreview(preview, t) {
   if (!preview) {
     return t('picker.previewTarget');
@@ -766,6 +781,11 @@ function formatPreview(preview, t) {
   return parts.length > 0 ? parts.join(' ') : t('picker.previewTarget');
 }
 
+/**
+ * アクションフロー文字列からステップ数を取得する。
+ * @param {string | undefined} actionFlow
+ * @returns {{ steps: number } | null}
+ */
 function summarizeFlow(actionFlow) {
   if (typeof actionFlow !== 'string') {
     return null;
@@ -781,6 +801,11 @@ function summarizeFlow(actionFlow) {
   return { steps: definition.stepCount };
 }
 
+/**
+ * URL を正規化して比較可能な形へ変換する。
+ * @param {string} url
+ * @returns {string}
+ */
 function normalizeUrl(url) {
   try {
     const target = new URL(url);
@@ -790,11 +815,21 @@ function normalizeUrl(url) {
   }
 }
 
+/**
+ * 指定ページ URL と一致するタブを検索する。
+ * @param {string} pageUrl
+ * @returns {Promise<chrome.tabs.Tab | undefined>}
+ */
 async function findTabByPageUrl(pageUrl) {
   const tabs = await chrome.tabs.query({});
   return tabs.find((tab) => tab.url && normalizeUrl(tab.url) === pageUrl);
 }
 
+/**
+ * ページ URL に対応するタブをアクティブ化し、存在しない場合は新規作成する。
+ * @param {string} pageUrl
+ * @returns {Promise<chrome.tabs.Tab>}
+ */
 async function ensureTab(pageUrl) {
   const existing = await findTabByPageUrl(pageUrl);
   if (existing) {

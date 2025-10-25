@@ -1,3 +1,4 @@
+// DOM へ注入する要素の生成・更新・動作制御をまとめたモジュール。
 import { parseActionFlowDefinition } from '../common/flows.js';
 
 /** @typedef {import('../common/flows.js').FlowDefinition} FlowDefinition */
@@ -32,6 +33,7 @@ const elements = new Map();
 const hosts = new Map();
 
 /**
+ * 要素を DOM 上に生成・更新して確実に表示する。
  * Ensures an element is rendered in the DOM, creating or updating it as needed.
  * @param {import('../common/types.js').InjectedElement} element
  * @returns {boolean}
@@ -54,6 +56,7 @@ export function ensureElement(element) {
 }
 
 /**
+ * 既存要素の DOM インスタンスを更新する。
  * Updates an existing element's DOM instance.
  * @param {import('../common/types.js').InjectedElement} element
  * @returns {boolean}
@@ -69,6 +72,7 @@ export function updateElement(element) {
 }
 
 /**
+ * 注入済み要素を DOM から削除する。
  * Removes an injected element from the DOM.
  * @param {string} elementId
  * @returns {boolean}
@@ -85,6 +89,7 @@ export function removeElement(elementId) {
 }
 
 /**
+ * DOM 変化後などに既知の要素を再挿入する。
  * Re-inserts all known elements, typically after DOM mutations.
  * @returns {void}
  */
@@ -95,6 +100,7 @@ export function reconcileElements() {
 }
 
 /**
+ * ID に対応する要素データを取得する。
  * Retrieves a stored element by identifier.
  * @param {string} elementId
  * @returns {import('../common/types.js').InjectedElement | undefined}
@@ -104,6 +110,7 @@ export function getElement(elementId) {
 }
 
 /**
+ * 指定 ID のホスト要素を返す。
  * Retrieves the host element for a stored id.
  * @param {string} elementId
  * @returns {HTMLElement | null}
@@ -114,6 +121,7 @@ export function getHost(elementId) {
 }
 
 /**
+ * ストレージを書き換えずにプレビュー内容を適用する。
  * Applies an unsaved preview to an element without mutating stored data.
  * @param {string} elementId
  * @param {Partial<import('../common/types.js').InjectedElement>} overrides
@@ -139,6 +147,7 @@ export function previewElement(elementId, overrides) {
 }
 
 /**
+ * 指定 ID の要素を強調表示し、画面内へスクロールする。
  * Highlights the injected element by id.
  * @param {string} elementId
  * @returns {boolean}
@@ -154,6 +163,7 @@ export function focusElement(elementId) {
 }
 
 /**
+ * すべての保持要素を配列で返す。
  * Returns all known elements.
  * @returns {import('../common/types.js').InjectedElement[]}
  */
@@ -162,6 +172,7 @@ export function listElements() {
 }
 
 /**
+ * Shadow DOM を備えたホストノードを生成する。
  * Creates a host node with shadow DOM.
  * @param {import('../common/types.js').InjectedElement} element
  * @returns {HTMLElement}
@@ -315,6 +326,7 @@ function createHost(element) {
 }
 
 /**
+ * テキストやスタイルなどのメタデータをホストへ適用する。
  * Applies metadata (text, href, style) to an existing host.
  * @param {HTMLElement} host
  * @param {import('../common/types.js').InjectedElement} element
@@ -340,6 +352,7 @@ function applyMetadata(host, element) {
 }
 
 /**
+ * 要素タイプに応じた DOM ノードを生成する。
  * Creates an element that matches the requested type.
  * @param {'button' | 'link' | 'tooltip'} type
  * @returns {HTMLElement}
@@ -357,6 +370,7 @@ function createNodeForType(type) {
 }
 
 /**
+ * メタデータに基づきテキスト・振る舞い・属性を適用する。
  * Applies text, behaviors, and attributes for the provided element metadata.
  * @param {HTMLElement} node
  * @param {import('../common/types.js').InjectedElement} element
@@ -411,6 +425,7 @@ function hydrateNode(node, element) {
 }
 
 /**
+ * トリガーとバブルを含むツールチップ要素を生成する。
  * Creates a tooltip container with trigger and bubble nodes.
  * @returns {HTMLElement}
  */
@@ -421,6 +436,7 @@ function createTooltipNode() {
 }
 
 /**
+ * ツールチップに必要なマークアップと属性を整える。
  * Ensures tooltip markup and baseline attributes exist on the provided node.
  * @param {HTMLElement} node
  */
@@ -460,6 +476,7 @@ function applyTooltipAppearance(node) {
 }
 
 /**
+ * ツールチップ位置に応じて属性とスタイルを更新する。
  * Updates data attributes and inline adjustments for tooltip placement.
  * @param {HTMLElement} container
  * @param {Element | null} bubble
@@ -480,6 +497,7 @@ function configureTooltipPosition(container, bubble, position) {
 }
 
 /**
+ * スタイル上書きの適用先となる DOM ノードを決定する。
  * Determines which DOM node should receive style overrides.
  * @param {HTMLElement} node
  * @returns {HTMLElement | null}
@@ -498,6 +516,7 @@ function getStyleTarget(node) {
 }
 
 /**
+ * ツールチップの位置指定を正規化する。
  * Normalizes tooltip placement values.
  * @param {string | undefined} position
  * @returns {'top' | 'right' | 'bottom' | 'left'}
@@ -510,6 +529,7 @@ function normalizeTooltipPosition(position) {
 }
 
 /**
+ * 保存されたセレクターと挿入位置に従ってホストを挿入する。
  * Attempts to insert a host using the stored selector and position.
  * @param {HTMLElement} host
  * @param {import('../common/types.js').InjectedElement} element
@@ -546,6 +566,7 @@ function insertHost(host, element) {
 }
 
 /**
+ * ボタン要素にナビゲーションや委譲クリックなどの挙動を設定する。
  * Configures optional click navigation or delegated actions for button elements.
  * @param {HTMLButtonElement} node
  * @param {string | undefined} href
@@ -638,6 +659,7 @@ const FLOW_MAX_DEPTH = 8;
  */
 
 /**
+ * 設定されたアクションフローを順次実行する。
  * Executes the configured action flow.
  * @param {HTMLElement} node
  * @param {FlowDefinition} definition
@@ -659,6 +681,7 @@ async function executeActionFlow(node, definition) {
 }
 
 /**
+ * フローステップを順番に実行する。
  * Executes a list of flow steps sequentially.
  * @param {FlowStep[]} steps
  * @param {FlowExecutionContext} context
@@ -678,6 +701,7 @@ async function runFlowSteps(steps, context, depth) {
 }
 
 /**
+ * 単一のフローステップを実行する。
  * Executes a single flow step.
  * @param {FlowStep} step
  * @param {FlowExecutionContext} context
@@ -760,6 +784,7 @@ async function runFlowStep(step, context, depth) {
 }
 
 /**
+ * フロー実行が制限時間を超えないようにチェックする。
  * Ensures flow execution stays within the runtime budget.
  * @param {FlowExecutionContext} context
  */
@@ -770,6 +795,7 @@ function enforceRuntimeLimit(context) {
 }
 
 /**
+ * フロー用セレクターで最初に一致した要素を返す。
  * Resolves the first matching element for a flow selector.
  * @param {string} selector
  * @param {FlowExecutionContext} context
@@ -781,6 +807,7 @@ function resolveFlowElement(selector, context) {
 }
 
 /**
+ * フロー用セレクターで一致した要素をすべて返す。
  * Resolves all matching elements for a flow selector.
  * @param {string} selector
  * @param {FlowExecutionContext} context
@@ -802,6 +829,7 @@ function resolveFlowElements(selector, context) {
 }
 
 /**
+ * 入力要素または編集可能要素に値を入力する。
  * Applies a value to an input-like element.
  * @param {Element} element
  * @param {string} value
@@ -826,6 +854,7 @@ function applyInputValue(element, value) {
 }
 
 /**
+ * フロー条件を評価して真偽を返す。
  * Evaluates a flow condition.
  * @param {FlowCondition} condition
  * @param {FlowExecutionContext} context
@@ -861,6 +890,7 @@ function evaluateFlowCondition(condition, context) {
 }
 
 /**
+ * 指定ミリ秒分の待機を行う。
  * Waits for the requested duration.
  * @param {number} ms
  * @returns {Promise<void>}
@@ -871,6 +901,7 @@ function delay(ms) {
 }
 
 /**
+ * 指定要素に対してポインタークリックを擬似的に発火させる。
  * Attempts to emulate a pointer click on the provided element.
  * @param {Element} target
  * @returns {boolean} whether any event dispatch succeeded
@@ -926,6 +957,7 @@ function forwardClick(target) {
 }
 
 /**
+ * 許可されたスタイルキーのみをノードへ適用する。
  * Applies user-provided styles from the whitelist to the node.
  * @param {HTMLElement | null} node
  * @param {import('../common/types.js').InjectedElementStyle | undefined} style
@@ -946,6 +978,7 @@ function applyStyle(node, style) {
 }
 
 /**
+ * 要素タイプごとの基本スタイルを適用する。
  * Applies baseline styling for the element type.
  * @param {HTMLElement} node
  * @param {'button' | 'link'} type
@@ -990,6 +1023,7 @@ function applyBaseAppearance(node, type) {
 }
 
 /**
+ * camelCase のキーを kebab-case の CSS プロパティ名へ変換する。
  * Converts camelCase keys to kebab-case CSS property names.
  * @param {string} value
  * @returns {string}

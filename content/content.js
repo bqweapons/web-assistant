@@ -1,4 +1,5 @@
 /* eslint-disable no-undef */
+// コンテンツスクリプトのエントリーポイント。注入要素の同期とピッカー連携を担当する。
 (async () => {
   if (window.__pageAugmentorInitialized) {
     return;
@@ -40,6 +41,7 @@
   }
 
   /**
+   * バックグラウンドから保存済み要素を取得し、ページへ反映する。
    * Requests stored elements from the background script and renders them.
    * @returns {Promise<void>}
    */
@@ -53,6 +55,7 @@
   }
 
   /**
+   * 渡された要素リストと DOM を同期させる。
    * Synchronizes the injected DOM with the provided list.
    * @param {import('../common/types.js').InjectedElement[]} list
    */
@@ -75,6 +78,7 @@
   }
 
   /**
+   * バックグラウンドからのメッセージを受け取るリスナーを設定する。
    * Configures messaging listeners for background-originated events.
    */
   function setupMessageBridge() {
@@ -149,6 +153,7 @@
   }
 
   /**
+   * DOM 変化を監視し、必要に応じて要素を再描画する。
    * Observes DOM mutations and re-applies injected elements when necessary.
    */
   function setupMutationWatcher() {
@@ -169,6 +174,7 @@
   }
 
   /**
+   * 要素ピッカーを開始し、選択完了時にバブルフローを起動する。
    * Starts the element picker and opens the bubble workflow on selection.
    * @param {{ mode?: 'create' }} [options]
    */
@@ -211,6 +217,7 @@
   }
 
   /**
+   * アクティブなピッカーを停止する。
    * Stops the active picker session.
    */
   function stopPicker() {
@@ -226,6 +233,7 @@
   }
 
   /**
+   * 既存の注入要素に対してページ内エディターを表示する。
    * Opens the in-page editor bubble for an existing injected element.
    * @param {string} elementId
    * @returns {boolean}
@@ -283,6 +291,7 @@
   }
 
   /**
+   * エディターバブルがあれば閉じる。
    * Closes the editor bubble if present.
    */
   function closeEditorBubble() {
@@ -305,6 +314,7 @@
   }
 
   /**
+   * 選択した要素の概要テキストを生成する。
    * Produces a human-friendly description of the selected element.
    * @param {Element} element
    * @returns {{ tag: string; text: string; classes: string }}
@@ -326,6 +336,7 @@
 })();
 
 /**
+ * ストレージ識別用に正規化した URL を返す。
  * Returns a normalized URL for storage grouping.
  * @returns {string}
  */

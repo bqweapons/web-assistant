@@ -1,4 +1,6 @@
 /**
+ * 注入要素に関連する型定義をまとめたモジュール。
+ *
  * @typedef {Object} InjectedElement
  * @property {string} id
  * @property {string} pageUrl
@@ -43,5 +45,6 @@
  * @property {any} [data]
  */
 
+// 何もしないダミー関数。コールバック初期値として利用する。
 export const noop = () => {};
 
