@@ -19,6 +19,7 @@ export default function App() {
   const [filterText, setFilterText] = useState('');
   const [filterType, setFilterType] = useState('all');
   const [creationMessage, setCreationMessage] = useState(null);
+  const [activeTab, setActiveTab] = useState('home');
   const [pendingPicker, setPendingPicker] = useState(false);
   const [exporting, setExporting] = useState(false);
   const [importing, setImporting] = useState(false);
@@ -31,6 +32,15 @@ export default function App() {
       link: t('type.link'),
       tooltip: t('type.tooltip'),
     }),
+    [t],
+  );
+
+  const tabs = useMemo(
+    () => [
+      { id: 'home', label: t('navigation.home') },
+      { id: 'overview', label: t('navigation.overview') },
+      { id: 'settings', label: t('navigation.settings') },
+    ],
     [t],
   );
 
@@ -401,140 +411,187 @@ export default function App() {
   );
 
   const contextLabelText = contextInfo?.kind === 'url' ? contextInfo.value : t(contextInfo.key, contextInfo.values);
-  const creationMessageText = creationMessage ? t(creationMessage.key, creationMessage.values) : '';
+  const statusMessageText = creationMessage ? t(creationMessage.key, creationMessage.values) : '';
 
   return (
     <main className="flex min-h-screen flex-col gap-6 bg-slate-50 p-6">
-      <header className="flex flex-col gap-4 rounded-2xl border border-slate-200 bg-white p-5 shadow-brand sm:flex-row sm:items-center sm:justify-between">
+      <header className="rounded-2xl border border-slate-200 bg-white p-5 shadow-brand">
         <div className="space-y-1">
           <h1 className="text-2xl font-semibold text-slate-900">{t('app.title')}</h1>
           <p className="text-sm text-slate-500">{t('app.subtitle')}</p>
           <p className="text-xs text-slate-400">{contextLabelText}</p>
         </div>
-        <div className="flex flex-wrap items-center gap-2">
-          <input
-            ref={importInputRef}
-            type="file"
-            accept="application/json,.json"
-            className="hidden"
-            onChange={handleImportFile}
-          />
-          <button
-            type="button"
-            className="rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700 shadow-sm transition hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-60"
-            onClick={handleImportClick}
-            disabled={importing}
-          >
-            {importing ? t('manage.actions.importing') : t('manage.actions.import')}
-          </button>
-          <button
-            type="button"
-            className="rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700 shadow-sm transition hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-60"
-            onClick={handleExport}
-            disabled={exporting}
-          >
-            {exporting ? t('manage.actions.exporting') : t('manage.actions.export')}
-          </button>
-          <label className="sr-only" htmlFor="page-augmentor-language">
-            {t('app.language.label')}
-          </label>
-          <select
-            id="page-augmentor-language"
-            className="rounded-xl border border-slate-200 bg-slate-100 px-3 py-2 text-sm font-medium text-slate-700 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-100"
-            value={locale}
-            onChange={(event) => setLocale(event.target.value)}
-          >
-            {localeOptions.map((option) => (
-              <option key={option.value} value={option.value}>
-                {option.label}
-              </option>
-            ))}
-          </select>
-        </div>
       </header>
 
-      <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-brand">
-        <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-          <div>
-            <h2 className="text-lg font-semibold text-slate-900">{t('manage.sections.add.title')}</h2>
-            <p className="text-xs text-slate-500">{t('manage.sections.add.description')}</p>
-          </div>
-          <div className="flex gap-3">
+      <nav className="flex gap-2 rounded-2xl border border-slate-200 bg-white p-1 shadow-brand">
+        {tabs.map((tab) => {
+          const isActive = tab.id === activeTab;
+          return (
             <button
+              key={tab.id}
               type="button"
-              className="rounded-xl bg-gradient-to-r from-blue-600 to-violet-500 px-4 py-2 text-sm font-semibold text-white shadow-lg transition hover:shadow-xl disabled:cursor-not-allowed disabled:opacity-60"
-              onClick={handleStartCreation}
-              disabled={pendingPicker}
+              className={`flex-1 rounded-xl px-4 py-2 text-sm font-semibold transition ${
+                isActive ? 'bg-slate-900 text-white shadow-sm' : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900'
+              }`}
+              onClick={() => setActiveTab(tab.id)}
             >
-              {pendingPicker ? t('manage.actions.picking') : t('manage.actions.pick')}
+              {tab.label}
             </button>
-            {pendingPicker && (
-              <button
-                type="button"
-                className="rounded-xl border border-slate-200 bg-slate-100 px-4 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-200"
-                onClick={cancelActivePicker}
+          );
+        })}
+      </nav>
+
+      {statusMessageText && (
+        <section className="rounded-2xl border border-slate-200 bg-blue-50 px-4 py-3 text-sm text-blue-700 shadow-brand">
+          {statusMessageText}
+        </section>
+      )}
+
+      {activeTab === 'home' && (
+        <>
+          <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-brand">
+            <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+              <div>
+                <h2 className="text-lg font-semibold text-slate-900">{t('manage.sections.add.title')}</h2>
+                <p className="text-xs text-slate-500">{t('manage.sections.add.description')}</p>
+              </div>
+              <div className="flex gap-3">
+                <button
+                  type="button"
+                  className="rounded-xl bg-gradient-to-r from-blue-600 to-violet-500 px-4 py-2 text-sm font-semibold text-white shadow-lg transition hover:shadow-xl disabled:cursor-not-allowed disabled:opacity-60"
+                  onClick={handleStartCreation}
+                  disabled={pendingPicker}
+                >
+                  {pendingPicker ? t('manage.actions.picking') : t('manage.actions.pick')}
+                </button>
+                {pendingPicker && (
+                  <button
+                    type="button"
+                    className="rounded-xl border border-slate-200 bg-slate-100 px-4 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-200"
+                    onClick={cancelActivePicker}
+                  >
+                    {t('manage.actions.cancel')}
+                  </button>
+                )}
+              </div>
+            </div>
+          </section>
+
+          <section className="flex flex-col gap-3 rounded-2xl border border-slate-200 bg-white p-5 shadow-brand md:flex-row md:items-end md:justify-between">
+            <label className="flex w-full flex-col gap-2 text-sm text-slate-700 md:max-w-md">
+              {t('manage.sections.filters.searchLabel')}
+              <input
+                className="rounded-lg border border-slate-200 bg-white p-2 text-sm shadow-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-100"
+                type="search"
+                placeholder={t('manage.sections.filters.searchPlaceholder')}
+                value={filterText}
+                onChange={(event) => setFilterText(event.target.value)}
+              />
+            </label>
+            <label className="flex flex-col gap-2 text-sm text-slate-700 md:w-48">
+              {t('manage.sections.filters.filterLabel')}
+              <select
+                className="rounded-lg border border-slate-200 bg-white p-2 text-sm shadow-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-100"
+                value={filterType}
+                onChange={(event) => setFilterType(event.target.value)}
               >
-                {t('manage.actions.cancel')}
-              </button>
-            )}
-          </div>
-        </div>
-        {creationMessageText && (
-          <p className="mt-4 rounded-lg border border-slate-200 bg-slate-100 px-4 py-2 text-xs text-slate-600">
-            {creationMessageText}
-          </p>
-        )}
-      </section>
+                <option value="all">{t('manage.sections.filters.options.all')}</option>
+                <option value="button">{t('manage.sections.filters.options.button')}</option>
+                <option value="link">{t('manage.sections.filters.options.link')}</option>
+                <option value="tooltip">{t('manage.sections.filters.options.tooltip')}</option>
+              </select>
+            </label>
+          </section>
 
-      <section className="flex flex-col gap-3 rounded-2xl border border-slate-200 bg-white p-5 shadow-brand md:flex-row md:items-end md:justify-between">
-        <label className="flex w-full flex-col gap-2 text-sm text-slate-700 md:max-w-md">
-          {t('manage.sections.filters.searchLabel')}
-          <input
-            className="rounded-lg border border-slate-200 bg-white p-2 text-sm shadow-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-100"
-            type="search"
-            placeholder={t('manage.sections.filters.searchPlaceholder')}
-            value={filterText}
-            onChange={(event) => setFilterText(event.target.value)}
-          />
-        </label>
-        <label className="flex flex-col gap-2 text-sm text-slate-700 md:w-48">
-          {t('manage.sections.filters.filterLabel')}
-          <select
-            className="rounded-lg border border-slate-200 bg-white p-2 text-sm shadow-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-100"
-            value={filterType}
-            onChange={(event) => setFilterType(event.target.value)}
-          >
-            <option value="all">{t('manage.sections.filters.options.all')}</option>
-            <option value="button">{t('manage.sections.filters.options.button')}</option>
-            <option value="link">{t('manage.sections.filters.options.link')}</option>
-            <option value="tooltip">{t('manage.sections.filters.options.tooltip')}</option>
-          </select>
-        </label>
-      </section>
+          <section className="grid gap-4">
+            <ItemList
+              items={filteredItems}
+              t={t}
+              typeLabels={typeLabels}
+              formatTimestamp={formatTimestamp}
+              formatFrameSummary={formatFrameSummary}
+              formatTooltipPosition={formatTooltipPosition}
+              formatTooltipMode={formatTooltipMode}
+              onFocus={focusElement}
+              onOpenEditor={openEditorBubble}
+              onDelete={deleteElement}
+            />
+          </section>
+        </>
+      )}
 
-      <section className="grid gap-4">
-        <ItemList
-          items={filteredItems}
+      {activeTab === 'overview' && (
+        <OverviewSection
           t={t}
           typeLabels={typeLabels}
-          formatTimestamp={formatTimestamp}
-          formatFrameSummary={formatFrameSummary}
           formatTooltipPosition={formatTooltipPosition}
           formatTooltipMode={formatTooltipMode}
-          onFocus={focusElement}
-          onOpenEditor={openEditorBubble}
-          onDelete={deleteElement}
+          formatDateTime={formatTimestamp}
+          formatFrameSummary={formatFrameSummary}
         />
-      </section>
+      )}
 
-      <OverviewSection
-        t={t}
-        typeLabels={typeLabels}
-        formatTooltipPosition={formatTooltipPosition}
-        formatTooltipMode={formatTooltipMode}
-        formatDateTime={formatTimestamp}
-        formatFrameSummary={formatFrameSummary}
-      />
+      {activeTab === 'settings' && (
+        <section className="flex flex-col gap-4">
+          <article className="rounded-2xl border border-slate-200 bg-white p-5 shadow-brand">
+            <h2 className="text-lg font-semibold text-slate-900">{t('settings.heading')}</h2>
+            <p className="mt-2 text-sm text-slate-500">{t('settings.description')}</p>
+          </article>
+
+          <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-brand">
+            <header className="space-y-2">
+              <h3 className="text-base font-semibold text-slate-900">{t('settings.sections.data.title')}</h3>
+              <p className="text-sm text-slate-500">{t('settings.sections.data.description')}</p>
+            </header>
+            <div className="mt-4 flex flex-wrap items-center gap-3">
+              <input
+                ref={importInputRef}
+                type="file"
+                accept="application/json,.json"
+                className="hidden"
+                onChange={handleImportFile}
+              />
+              <button
+                type="button"
+                className="rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700 shadow-sm transition hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-60"
+                onClick={handleImportClick}
+                disabled={importing}
+              >
+                {importing ? t('manage.actions.importing') : t('manage.actions.import')}
+              </button>
+              <button
+                type="button"
+                className="rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700 shadow-sm transition hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-60"
+                onClick={handleExport}
+                disabled={exporting}
+              >
+                {exporting ? t('manage.actions.exporting') : t('manage.actions.export')}
+              </button>
+            </div>
+          </section>
+
+          <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-brand">
+            <header className="space-y-2">
+              <h3 className="text-base font-semibold text-slate-900">{t('settings.sections.preferences.title')}</h3>
+              <p className="text-sm text-slate-500">{t('settings.sections.preferences.description')}</p>
+            </header>
+            <label className="mt-4 flex max-w-xs flex-col gap-2 text-sm text-slate-700">
+              <span>{t('app.language.label')}</span>
+              <select
+                className="rounded-xl border border-slate-200 bg-slate-100 px-3 py-2 text-sm font-medium text-slate-700 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-100"
+                value={locale}
+                onChange={(event) => setLocale(event.target.value)}
+              >
+                {localeOptions.map((option) => (
+                  <option key={option.value} value={option.value}>
+                    {option.label}
+                  </option>
+                ))}
+              </select>
+            </label>
+          </section>
+        </section>
+      )}
     </main>
   );
 }
