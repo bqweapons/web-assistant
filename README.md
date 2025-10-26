@@ -50,10 +50,27 @@ npm run build
 ├─ content/
 │  ├─ content.js           # Bootstraps picker, bubble editor, and DOM sync
 │  ├─ inject.js            # Renders, updates, and removes injected nodes
-│  └─ selector.js          # Visual picker & in-page editor implementation
+│  ├─ selector.js          # Entry point that re-exports the selector modules
+│  └─ selector/
+│     ├─ bubble.js         # In-page editor bubble UI and actions
+│     ├─ frame.js          # Frame discovery and cross-frame coordination
+│     ├─ overlay.js        # Target highlighting overlay renderer
+│     ├─ picker.js         # Visual picker state machine and messaging
+│     └─ utils.js          # Shared selector helpers and constants
 ├─ sidepanel/
 │  ├─ sidepanel.html       # Entry point for the side panel
-│  └─ src/                 # React + Tailwind source for the side panel UI
+│  └─ src/
+│     ├─ App.jsx           # Root application shell for the side panel
+│     ├─ components/
+│     │  ├─ ItemList.jsx   # Manage view list with filters and actions
+│     │  └─ OverviewSection.jsx  # Overview page aggregating all entries
+│     ├─ hooks/
+│     │  └─ useI18n.js     # Shared hook for i18n messaging lookup
+│     ├─ utils/
+│     │  ├─ messages.js    # Chrome runtime message helpers
+│     │  └─ tabs.js        # Tab utilities consumed by the UI
+│     ├─ index.css
+│     └─ main.jsx          # Mounts the React application
 ├─ common/
 │  ├─ compat.js            # Cross-context helpers (tabs, side panel)
 │  ├─ messaging.js         # Message bus & enums shared by all scripts
@@ -121,10 +138,27 @@ npm run build
 ├─ content/
 │  ├─ content.js           # ピッカーとバブル、DOM 同期のエントリ
 │  ├─ inject.js            # 注入ノードの描画・更新・削除を担当
-│  └─ selector.js          # ビジュアルピッカーとページ内エディター
+│  ├─ selector.js          # セレクター用モジュール群のエントリポイント
+│  └─ selector/
+│     ├─ bubble.js         # ページ内バブルエディターとアクション
+│     ├─ frame.js          # フレーム検出とクロスフレーム連携
+│     ├─ overlay.js        # 選択対象をハイライトするオーバーレイ
+│     ├─ picker.js         # ビジュアルピッカーの状態管理と通信
+│     └─ utils.js          # セレクター共通のヘルパーと定数
 ├─ sidepanel/
 │  ├─ sidepanel.html       # サイドパネルのエントリーポイント
-│  └─ src/                 # React + Tailwind 製のサイドパネル UI
+│  └─ src/
+│     ├─ App.jsx           # サイドパネル全体のアプリケーションシェル
+│     ├─ components/
+│     │  ├─ ItemList.jsx   # 管理ビューのリスト、フィルターと操作
+│     │  └─ OverviewSection.jsx  # 全ページの概要を集約表示
+│     ├─ hooks/
+│     │  └─ useI18n.js     # 共通の i18n メッセージ参照フック
+│     ├─ utils/
+│     │  ├─ messages.js    # Chrome ランタイムのメッセージヘルパー
+│     │  └─ tabs.js        # UI から利用するタブ操作ユーティリティ
+│     ├─ index.css
+│     └─ main.jsx          # React アプリをマウントするエントリ
 ├─ common/
 │  ├─ compat.js            # タブやサイドパネル操作のヘルパー
 │  ├─ messaging.js         # 各スクリプト共通のメッセージ機構
@@ -192,10 +226,27 @@ npm run build
 ├─ content/
 │  ├─ content.js           # 负责启动拾取器、气泡编辑器与 DOM 同步
 │  ├─ inject.js            # 渲染、更新、移除已注入的节点
-│  └─ selector.js          # 可视化拾取器与页面内编辑器
+│  ├─ selector.js          # 导出拆分后的选择器模块入口
+│  └─ selector/
+│     ├─ bubble.js         # 页面内气泡编辑器与相关操作
+│     ├─ frame.js          # 框架检测与跨框架协调
+│     ├─ overlay.js        # 负责高亮目标节点的覆盖层
+│     ├─ picker.js         # 可视化拾取器的状态机与通信逻辑
+│     └─ utils.js          # 选择器共享的工具与常量
 ├─ sidepanel/
 │  ├─ sidepanel.html       # 侧边栏入口
-│  └─ src/                 # React + Tailwind 侧边栏源码
+│  └─ src/
+│     ├─ App.jsx           # 侧边栏的应用壳组件
+│     ├─ components/
+│     │  ├─ ItemList.jsx   # 元素管理列表、筛选与操作
+│     │  └─ OverviewSection.jsx  # 汇总全部页面数据的总览
+│     ├─ hooks/
+│     │  └─ useI18n.js     # 通用的 i18n 消息查询钩子
+│     ├─ utils/
+│     │  ├─ messages.js    # Chrome 运行时消息工具
+│     │  └─ tabs.js        # UI 使用的标签页工具函数
+│     ├─ index.css
+│     └─ main.jsx          # 挂载 React 应用的入口
 ├─ common/
 │  ├─ compat.js            # 标签页与侧边栏的兼容性工具
 │  ├─ messaging.js         # 各脚本共享的消息通道与枚举
