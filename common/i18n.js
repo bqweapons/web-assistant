@@ -6,6 +6,11 @@
       label: 'Language',
     },
   },
+  navigation: {
+    home: 'Home',
+    overview: 'Element overview',
+    settings: 'Settings',
+  },
   context: {
     loading: 'Loading active page...',
     noActiveTab: 'No active tab found.',
@@ -125,6 +130,21 @@
     openedNewTab: 'Opened a new tab. Open the side panel manually, then try again.',
     statusLoadError: 'Unable to load data: {error}',
   },
+  settings: {
+    heading: 'Settings',
+    description: 'Manage preferences and organize your saved elements.',
+    sections: {
+      data: {
+        title: 'Data management',
+        description: 'Import or export saved elements as a JSON file.',
+      },
+      preferences: {
+        title: 'Preferences',
+        description: 'Choose your preferred language for the side panel.',
+      },
+    },
+  },
+
   editor: {
     title: 'Configure element',
     titleCreate: 'Add element',
@@ -265,6 +285,11 @@ mergeMessages(jaMessages, {
     subtitle: 'このページ向けのカスタムUIを作成し、保存した要素をいつでも確認できます。',
     language: { label: '言語' },
   },
+  navigation: {
+    home: 'ホーム',
+    overview: '要素一覧',
+    settings: '設定',
+  },
   context: {
     loading: 'アクティブなページを読み込み中...',
     noActiveTab: 'アクティブなタブが見つかりません。',
@@ -383,6 +408,20 @@ mergeMessages(jaMessages, {
     openBubbleError: 'バブルを開けませんでした: {error}',
     openedNewTab: '新しいタブを開きました。サイドパネルを開いてからもう一度お試しください。',
     statusLoadError: 'データを読み込めませんでした: {error}',
+  },
+  settings: {
+    heading: '設定',
+    description: '表示と言語、保存データを管理します。',
+    sections: {
+      data: {
+        title: 'データ管理',
+        description: '保存した要素をJSONファイルとしてインポート/エクスポートします。',
+      },
+      preferences: {
+        title: '表示設定',
+        description: 'サイドパネルの表示言語を選択します。',
+      },
+    },
   },
   editor: {
     title: '要素を設定',
