@@ -1,4 +1,4 @@
-import { normalizePageUrl } from '../common/url.js';
+import { normalizePageUrl } from '../../common/url.js';
 import { generateSelector } from './utils.js';
 
 /**
