@@ -1,5 +1,5 @@
-import { getLocale, ready as i18nReady, subscribe as subscribeToLocale, t } from '../common/i18n.js';
-import { parseActionFlowDefinition, MAX_FLOW_SOURCE_LENGTH } from '../common/flows.js';
+import { getLocale, ready as i18nReady, subscribe as subscribeToLocale, t } from '../../common/i18n.js';
+import { parseActionFlowDefinition, MAX_FLOW_SOURCE_LENGTH } from '../../common/flows.js';
 import { createOverlay } from './overlay.js';
 import { generateSelector, resolveTarget } from './utils.js';
 
