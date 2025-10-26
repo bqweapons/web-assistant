@@ -493,7 +493,7 @@ mergeMessages(jaMessages, {
         description: '要素タイプと表示するテキストを選択します。',
       },
       behavior: {
-        title: '挙動とアクション',
+        title: 'アクション',
         description: 'リンク先、クリック転送、任意フローを設定します。',
       },
       tooltip: {
@@ -505,7 +505,7 @@ mergeMessages(jaMessages, {
         description: '対象との位置関係を選択します。',
       },
       appearance: {
-        title: '見た目',
+        title: 'スタイル',
         description: '色・余白などのスタイルを調整します。',
       },
     },
@@ -689,8 +689,7 @@ mergeMessages(zhCNMessages, {
     actionHintPicking: '点击要复制的按钮（按 Esc 取消）。',
     actionFlowLabel: '动作流程（可选）',
     actionFlowPlaceholder: '[\n  {"type":"click","selector":"#target"}\n]',
-    actionFlowHintDefault:
-      '使用 JSON 数组描述连续步骤（最多 {limit} 个字符）。支持 click、wait、input、if、while、navigate。',
+    actionFlowHintDefault: '使用 JSON 数组描述连续步骤（最多 {limit} 个字符）。支持 click、wait、input、if、while、navigate。',
     actionFlowHintConfigured: '已配置 {count} 个步骤的流程。',
     actionFlowHintError: '流程错误：{error}',
     actionFlowConfigure: '配置流程',

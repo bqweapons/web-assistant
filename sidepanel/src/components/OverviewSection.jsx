@@ -139,12 +139,12 @@ export function OverviewSection({
       {statusMessage && (
         <p className="rounded-xl border border-slate-200 bg-amber-50 px-4 py-2 text-sm text-amber-700 shadow-brand">{statusMessage}</p>
       )}
-      <section className="grid gap-4 md:grid-cols-2">
-        <article className="rounded-2xl border border-slate-200 bg-slate-50 p-5 shadow-brand">
+      <section className="flex gap-4">
+        <article className="flex-1 rounded-2xl border border-slate-200 bg-slate-50 p-5 shadow-brand">
           <span className="text-sm font-medium text-slate-500">{t('overview.pageCount.label')}</span>
           <p className="mt-2 text-3xl font-semibold text-slate-900">{entries.length}</p>
         </article>
-        <article className="rounded-2xl border border-slate-200 bg-slate-50 p-5 shadow-brand">
+        <article className="flex-1 rounded-2xl border border-slate-200 bg-slate-50 p-5 shadow-brand">
           <span className="text-sm font-medium text-slate-500">{t('overview.elementCount.label')}</span>
           <p className="mt-2 text-3xl font-semibold text-slate-900">{totalElements}</p>
         </article>

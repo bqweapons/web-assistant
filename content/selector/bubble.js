@@ -81,8 +81,7 @@ function getTooltipPositionOptions() {
 /**
  *
  * Opens the editor bubble for an existing element.
- * @param {{
- }} options
+ * @param {{}} options
  * @returns {{ close: () => void }}
  */
 export function openElementEditor(options) {
@@ -1845,6 +1844,199 @@ function createElementBubble() {
     cancelHandler();
   });
 
+  const updateActionFlowSummary = () => {
+    if (state.type !== 'button') {
+      actionFlowSummaryText.textContent = t('editor.actionFlowSummaryUnavailable');
+      actionFlowSummaryText.style.color = '#64748b';
+      actionFlowSummaryHint.textContent = '';
+      openActionFlowButton.disabled = true;
+      openActionFlowButton.style.opacity = '0.6';
+      openActionFlowButton.style.cursor = 'not-allowed';
+      actionFlowHint.textContent = '';
+      actionFlowHint.style.color = actionFlowHint.dataset.defaultColor || '#94a3b8';
+      return;
+    }
+    openActionFlowButton.disabled = false;
+    openActionFlowButton.style.opacity = '1';
+    openActionFlowButton.style.cursor = 'pointer';
+    if (state.actionFlowError) {
+      actionFlowSummaryText.textContent = t('editor.actionFlowSummaryError', { error: state.actionFlowError });
+      actionFlowSummaryText.style.color = '#dc2626';
+      actionFlowSummaryHint.textContent = t('editor.actionFlowHintError', { error: state.actionFlowError });
+      actionFlowSummaryHint.style.color = '#dc2626';
+      actionFlowHint.textContent = t('editor.actionFlowHintError', { error: state.actionFlowError });
+      actionFlowHint.style.color = '#dc2626';
+      return;
+    }
+    if (state.actionFlowSteps > 0) {
+      actionFlowSummaryText.textContent = t('editor.actionFlowSummaryConfigured', { count: state.actionFlowSteps });
+      actionFlowSummaryText.style.color = '#0f172a';
+      actionFlowSummaryHint.textContent = t('editor.actionFlowHintConfigured', { count: state.actionFlowSteps });
+      actionFlowSummaryHint.style.color = '#0f172a';
+      actionFlowHint.textContent = t('editor.actionFlowHintConfigured', { count: state.actionFlowSteps });
+      actionFlowHint.style.color = '#0f172a';
+    } else {
+      actionFlowSummaryText.textContent = t('editor.actionFlowSummaryEmpty');
+      actionFlowSummaryText.style.color = '#64748b';
+      actionFlowSummaryHint.textContent = t('editor.actionFlowHintDefault', { limit: MAX_FLOW_SOURCE_LENGTH });
+      actionFlowSummaryHint.style.color = actionFlowSummaryHint.dataset.defaultColor || '#94a3b8';
+      actionFlowHint.textContent = t('editor.actionFlowHintDefault', { limit: MAX_FLOW_SOURCE_LENGTH });
+      actionFlowHint.style.color = actionFlowHint.dataset.defaultColor || '#94a3b8';
+    }
+    if (state.actionFlowMode !== 'builder') {
+      const flowValue = state.actionFlow.trim();
+      if (!flowValue) {
+        actionFlowHint.textContent = t('editor.actionFlowHintDefault', { limit: MAX_FLOW_SOURCE_LENGTH });
+        actionFlowHint.style.color = actionFlowHint.dataset.defaultColor || '#94a3b8';
+      } else if (state.actionFlowError) {
+        actionFlowHint.textContent = t('editor.actionFlowHintError', { error: state.actionFlowError });
+        actionFlowHint.style.color = '#dc2626';
+      } else if (state.actionFlowSteps > 0) {
+        actionFlowHint.textContent = t('editor.actionFlowHintConfigured', { count: state.actionFlowSteps });
+        actionFlowHint.style.color = '#0f172a';
+      } else {
+        actionFlowHint.textContent = t('editor.actionFlowHintDefault', { limit: MAX_FLOW_SOURCE_LENGTH });
+        actionFlowHint.style.color = actionFlowHint.dataset.defaultColor || '#94a3b8';
+      }
+    }
+  };
+
+  const restoreFlowState = (snapshot) => {
+    if (!snapshot) {
+      return;
+    }
+    state.actionFlow = snapshot.actionFlow || '';
+    state.actionFlowError = snapshot.actionFlowError || '';
+    state.actionFlowSteps = snapshot.actionFlowSteps || 0;
+    state.actionFlowMode = snapshot.actionFlowMode || 'builder';
+    state.actionSteps = Array.isArray(snapshot.actionSteps)
+      ? snapshot.actionSteps.map((step) => ({ ...step }))
+      : [];
+    actionFlowInput.value = state.actionFlow;
+    refreshActionBuilderState();
+    validateActionFlowInput();
+    syncActionFlowUI();
+    updateActionFlowSummary();
+  };
+
+  const handleFlowKeydown = (event) => {
+    if (event.key === 'Escape') {
+      event.preventDefault();
+      event.stopPropagation();
+      flowCancelButton.click();
+    }
+  };
+
+  const closeFlowEditor = (options = { reopen: true }) => {
+    const { reopen = true } = options;
+    if (flowBubbleAttached) {
+      flowBubbleAttached = false;
+      flowBubble.style.opacity = '0';
+      flowBubble.style.transform = 'translateY(12px)';
+      setTimeout(() => {
+        if (!flowBubbleAttached && flowBubble.isConnected) {
+          flowBubble.remove();
+        }
+      }, 200);
+    }
+    document.removeEventListener('keydown', handleFlowKeydown, true);
+    flowSnapshot = null;
+    actionFlowEditorHost.appendChild(actionFlowField.wrapper);
+    if (reopen) {
+      attach();
+      updateActionFlowSummary();
+      updatePreview({ propagate: false });
+    }
+  };
+
+  const openFlowEditor = () => {
+    if (flowBubbleAttached || state.type !== 'button') {
+      return;
+    }
+    flowSnapshot = {
+      actionFlow: state.actionFlow,
+      actionFlowError: state.actionFlowError,
+      actionFlowSteps: state.actionFlowSteps,
+      actionFlowMode: state.actionFlowMode,
+      actionSteps: state.actionSteps.map((step) => ({ ...step })),
+    };
+    detach();
+    flowBubbleBody.appendChild(actionFlowField.wrapper);
+    flowBubble.style.opacity = '0';
+    flowBubble.style.transform = 'translateY(12px)';
+    document.body.appendChild(flowBubble);
+    flowBubbleAttached = true;
+    document.addEventListener('keydown', handleFlowKeydown, true);
+    requestAnimationFrame(() => {
+      flowBubble.style.opacity = '1';
+      flowBubble.style.transform = 'translateY(0)';
+    });
+    refreshActionBuilderState();
+    syncActionFlowUI();
+    validateActionFlowInput();
+    updateActionFlowSummary();
+  };
+
+  openActionFlowButton.addEventListener('click', (event) => {
+    event.preventDefault();
+    event.stopPropagation();
+    if (state.type !== 'button') {
+      return;
+    }
+    openFlowEditor();
+  });
+
+  flowCancelButton.addEventListener('click', (event) => {
+    event.preventDefault();
+    restoreFlowState(flowSnapshot);
+    flowSnapshot = null;
+    closeFlowEditor({ reopen: true });
+  });
+
+  flowSaveButton.addEventListener('click', (event) => {
+    event.preventDefault();
+    if (state.type !== 'button') {
+      flowSnapshot = null;
+      closeFlowEditor({ reopen: true });
+      return;
+    }
+    if (state.actionFlowMode === 'builder') {
+      const serialized = updateActionFlowFromSteps({ updateHint: true });
+      if (serialized === null || state.actionFlowError) {
+        return;
+      }
+      const { error } = parseActionFlowDefinition(serialized);
+      if (error) {
+        state.actionFlowError = error;
+        state.actionFlowSteps = 0;
+        updateActionFlowSummary();
+        refreshActionBuilderState();
+        return;
+      }
+      state.actionFlow = serialized;
+    } else {
+      const flowValue = state.actionFlow.trim();
+      if (flowValue) {
+        const { definition, error } = parseActionFlowDefinition(flowValue);
+        if (error || !definition) {
+          state.actionFlowError = error || t('editor.errorFlowInvalid', { error: '' });
+          updateActionFlowSummary();
+          return;
+        }
+        state.actionFlowSteps = definition.stepCount;
+        state.actionFlowError = '';
+        state.actionFlow = flowValue;
+      } else {
+        state.actionFlow = '';
+        state.actionFlowSteps = 0;
+        state.actionFlowError = '';
+      }
+    }
+    flowSnapshot = null;
+    updateActionFlowSummary();
+    closeFlowEditor({ reopen: true });
+  });
+
   const handleScroll = () => updatePosition();
   const handleKeydown = (event) => {
     if (event.key === 'Escape') {
@@ -1961,7 +2153,6 @@ function createElementBubble() {
       tooltipPersistentCheckbox.checked = state.tooltipPersistent;
       resetStyleState(initial.style, initial.styleSuggestions);
       stopActionPicker('cancel');
-      setActionPickerState(false);
       refreshActionBuilderState();
       handleTypeChange();
       syncActionFlowUI();
@@ -2497,196 +2688,3 @@ export function getSuggestedStyles(target) {
     borderRadius: maybe(computed.borderRadius),
   };
 }
-  const updateActionFlowSummary = () => {
-    if (state.type !== 'button') {
-      actionFlowSummaryText.textContent = t('editor.actionFlowSummaryUnavailable');
-      actionFlowSummaryText.style.color = '#64748b';
-      actionFlowSummaryHint.textContent = '';
-      openActionFlowButton.disabled = true;
-      openActionFlowButton.style.opacity = '0.6';
-      openActionFlowButton.style.cursor = 'not-allowed';
-      actionFlowHint.textContent = '';
-      actionFlowHint.style.color = actionFlowHint.dataset.defaultColor || '#94a3b8';
-      return;
-    }
-    openActionFlowButton.disabled = false;
-    openActionFlowButton.style.opacity = '1';
-    openActionFlowButton.style.cursor = 'pointer';
-    if (state.actionFlowError) {
-      actionFlowSummaryText.textContent = t('editor.actionFlowSummaryError', { error: state.actionFlowError });
-      actionFlowSummaryText.style.color = '#dc2626';
-      actionFlowSummaryHint.textContent = t('editor.actionFlowHintError', { error: state.actionFlowError });
-      actionFlowSummaryHint.style.color = '#dc2626';
-      actionFlowHint.textContent = t('editor.actionFlowHintError', { error: state.actionFlowError });
-      actionFlowHint.style.color = '#dc2626';
-      return;
-    }
-    if (state.actionFlowSteps > 0) {
-      actionFlowSummaryText.textContent = t('editor.actionFlowSummaryConfigured', { count: state.actionFlowSteps });
-      actionFlowSummaryText.style.color = '#0f172a';
-      actionFlowSummaryHint.textContent = t('editor.actionFlowHintConfigured', { count: state.actionFlowSteps });
-      actionFlowSummaryHint.style.color = '#0f172a';
-      actionFlowHint.textContent = t('editor.actionFlowHintConfigured', { count: state.actionFlowSteps });
-      actionFlowHint.style.color = '#0f172a';
-    } else {
-      actionFlowSummaryText.textContent = t('editor.actionFlowSummaryEmpty');
-      actionFlowSummaryText.style.color = '#64748b';
-      actionFlowSummaryHint.textContent = t('editor.actionFlowHintDefault', { limit: MAX_FLOW_SOURCE_LENGTH });
-      actionFlowSummaryHint.style.color = actionFlowSummaryHint.dataset.defaultColor || '#94a3b8';
-      actionFlowHint.textContent = t('editor.actionFlowHintDefault', { limit: MAX_FLOW_SOURCE_LENGTH });
-      actionFlowHint.style.color = actionFlowHint.dataset.defaultColor || '#94a3b8';
-    }
-    if (state.actionFlowMode !== 'builder') {
-      const flowValue = state.actionFlow.trim();
-      if (!flowValue) {
-        actionFlowHint.textContent = t('editor.actionFlowHintDefault', { limit: MAX_FLOW_SOURCE_LENGTH });
-        actionFlowHint.style.color = actionFlowHint.dataset.defaultColor || '#94a3b8';
-      } else if (state.actionFlowError) {
-        actionFlowHint.textContent = t('editor.actionFlowHintError', { error: state.actionFlowError });
-        actionFlowHint.style.color = '#dc2626';
-      } else if (state.actionFlowSteps > 0) {
-        actionFlowHint.textContent = t('editor.actionFlowHintConfigured', { count: state.actionFlowSteps });
-        actionFlowHint.style.color = '#0f172a';
-      } else {
-        actionFlowHint.textContent = t('editor.actionFlowHintDefault', { limit: MAX_FLOW_SOURCE_LENGTH });
-        actionFlowHint.style.color = actionFlowHint.dataset.defaultColor || '#94a3b8';
-      }
-    }
-  };
-
-  const restoreFlowState = (snapshot) => {
-    if (!snapshot) {
-      return;
-    }
-    state.actionFlow = snapshot.actionFlow || '';
-    state.actionFlowError = snapshot.actionFlowError || '';
-    state.actionFlowSteps = snapshot.actionFlowSteps || 0;
-    state.actionFlowMode = snapshot.actionFlowMode || 'builder';
-    state.actionSteps = Array.isArray(snapshot.actionSteps)
-      ? snapshot.actionSteps.map((step) => ({ ...step }))
-      : [];
-    actionFlowInput.value = state.actionFlow;
-    refreshActionBuilderState();
-    validateActionFlowInput();
-    syncActionFlowUI();
-    updateActionFlowSummary();
-  };
-
-  const handleFlowKeydown = (event) => {
-    if (event.key === 'Escape') {
-      event.preventDefault();
-      event.stopPropagation();
-      flowCancelButton.click();
-    }
-  };
-
-  const closeFlowEditor = (options = { reopen: true }) => {
-    const { reopen = true } = options;
-    if (flowBubbleAttached) {
-      flowBubbleAttached = false;
-      flowBubble.style.opacity = '0';
-      flowBubble.style.transform = 'translateY(12px)';
-      setTimeout(() => {
-        if (!flowBubbleAttached && flowBubble.isConnected) {
-          flowBubble.remove();
-        }
-      }, 200);
-    }
-    document.removeEventListener('keydown', handleFlowKeydown, true);
-    flowSnapshot = null;
-    actionFlowEditorHost.appendChild(actionFlowField.wrapper);
-    if (reopen) {
-      attach();
-      updateActionFlowSummary();
-      updatePreview({ propagate: false });
-    }
-  };
-
-  const openFlowEditor = () => {
-    if (flowBubbleAttached || state.type !== 'button') {
-      return;
-    }
-    flowSnapshot = {
-      actionFlow: state.actionFlow,
-      actionFlowError: state.actionFlowError,
-      actionFlowSteps: state.actionFlowSteps,
-      actionFlowMode: state.actionFlowMode,
-      actionSteps: state.actionSteps.map((step) => ({ ...step })),
-    };
-    detach();
-    flowBubbleBody.appendChild(actionFlowField.wrapper);
-    flowBubble.style.opacity = '0';
-    flowBubble.style.transform = 'translateY(12px)';
-    document.body.appendChild(flowBubble);
-    flowBubbleAttached = true;
-    document.addEventListener('keydown', handleFlowKeydown, true);
-    requestAnimationFrame(() => {
-      flowBubble.style.opacity = '1';
-      flowBubble.style.transform = 'translateY(0)';
-    });
-    refreshActionBuilderState();
-    syncActionFlowUI();
-    validateActionFlowInput();
-    updateActionFlowSummary();
-  };
-
-  openActionFlowButton.addEventListener('click', (event) => {
-    event.preventDefault();
-    event.stopPropagation();
-    if (state.type !== 'button') {
-      return;
-    }
-    openFlowEditor();
-  });
-
-  flowCancelButton.addEventListener('click', (event) => {
-    event.preventDefault();
-    restoreFlowState(flowSnapshot);
-    flowSnapshot = null;
-    closeFlowEditor({ reopen: true });
-  });
-
-  flowSaveButton.addEventListener('click', (event) => {
-    event.preventDefault();
-    if (state.type !== 'button') {
-      flowSnapshot = null;
-      closeFlowEditor({ reopen: true });
-      return;
-    }
-    if (state.actionFlowMode === 'builder') {
-      const serialized = updateActionFlowFromSteps({ updateHint: true });
-      if (serialized === null || state.actionFlowError) {
-        return;
-      }
-      const { error } = parseActionFlowDefinition(serialized);
-      if (error) {
-        state.actionFlowError = error;
-        state.actionFlowSteps = 0;
-        updateActionFlowSummary();
-        refreshActionBuilderState();
-        return;
-      }
-      state.actionFlow = serialized;
-    } else {
-      const flowValue = state.actionFlow.trim();
-      if (flowValue) {
-        const { definition, error } = parseActionFlowDefinition(flowValue);
-        if (error || !definition) {
-          state.actionFlowError = error || t('editor.errorFlowInvalid', { error: '' });
-          updateActionFlowSummary();
-          return;
-        }
-        state.actionFlowSteps = definition.stepCount;
-        state.actionFlowError = '';
-        state.actionFlow = flowValue;
-      } else {
-        state.actionFlow = '';
-        state.actionFlowSteps = 0;
-        state.actionFlowError = '';
-      }
-    }
-    flowSnapshot = null;
-    updateActionFlowSummary();
-    closeFlowEditor({ reopen: true });
-  });
-
