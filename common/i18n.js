@@ -4,9 +4,7 @@ import zhCNMessages from './i18n/locales/zh-CN.js';
 
 const messages = {
   en: enMessages,
-  'en-US': enMessages,
   ja: jaMessages,
-  'ja-JP': jaMessages,
   'zh-CN': zhCNMessages,
 };
 
@@ -15,9 +13,7 @@ const FALLBACK_LOCALE = 'en';
 
 const LOCALE_LABELS = {
   en: 'English',
-  'en-US': 'English (US)',
   ja: '日本語',
-  'ja-JP': '日本語',
   'zh-CN': '简体中文',
 };
 

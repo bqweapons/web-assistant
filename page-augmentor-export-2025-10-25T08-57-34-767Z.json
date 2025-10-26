@@ -1,6 +1,7 @@
 {
   "file:///D:/GitHub/web-assistant/test-page.html": [
     {
+      "actionFlow": "{\n  \"steps\": [\n    {\n      \"type\": \"input\",\n      \"selector\": \"#name-input\",\n      \"value\": \"テスト 太郎\"\n    },\n    {\n      \"type\": \"input\",\n      \"selector\": \"#email-input\",\n      \"value\": \"test@gmail.com\"\n    },\n    {\n      \"type\": \"input\",\n      \"selector\": \"#topic-select\",\n      \"value\": \"自動化ワークフロー\"\n    },\n    {\n      \"type\": \"input\",\n      \"selector\": \"#topic-select\",\n      \"value\": \"automation\"\n    }\n  ]\n}",
       "createdAt": 1761311674503,
       "frameSelectors": [],
       "frameUrl": "file:///D:/GitHub/web-assistant/test-page.html",
@@ -16,9 +17,9 @@
         "fontWeight": "400",
         "padding": "8px 16px"
       },
-      "text": "Google",
+      "text": "フォーム入力",
       "type": "button",
-      "updatedAt": 1761348268176
+      "updatedAt": 1761487147185
     },
     {
       "createdAt": 1761382617486,
@@ -36,9 +37,29 @@
       "text": "google",
       "type": "link",
       "updatedAt": 1761382617486
+    },
+    {
+      "actionFlow": "{\n  \"steps\": [\n    {\n      \"type\": \"click\",\n      \"selector\": \"#primary-action\",\n      \"all\": false\n    },\n    {\n      \"type\": \"wait\",\n      \"ms\": 1000\n    },\n    {\n      \"type\": \"click\",\n      \"selector\": \"#popup-ok\",\n      \"all\": false\n    }\n  ]\n}",
+      "createdAt": 1761487202803,
+      "frameSelectors": [],
+      "frameUrl": "file:///D:/GitHub/web-assistant/test-page.html",
+      "id": "d6ae6a17-f3db-48c4-a691-8e10a58ac0e4",
+      "pageUrl": "file:///D:/GitHub/web-assistant/test-page.html",
+      "position": "append",
+      "selector": "section#actions > p",
+      "style": {
+        "backgroundColor": "#1b84ff",
+        "borderRadius": "8px",
+        "color": "#ffffff",
+        "fontSize": "16px",
+        "fontWeight": "600",
+        "padding": "8px 16px"
+      },
+      "text": "Click Main",
+      "type": "button",
+      "updatedAt": 1761487241225
     }
   ],
-  
   "file:///D:/GitHub/web-assistant/test-page2.html": [
     {
       "actionSelector": "section#forms > form > button",
