@@ -2,6 +2,14 @@ import { getLocale, ready as i18nReady, subscribe as subscribeToLocale, t } from
 import { parseActionFlowDefinition, MAX_FLOW_SOURCE_LENGTH } from '../../common/flows.js';
 import { createOverlay } from './overlay.js';
 import { generateSelector, resolveTarget } from './utils.js';
+import { DEFAULT_BUTTON_STYLE, applyButtonPreview } from './types/button.js';
+import { DEFAULT_LINK_STYLE, applyLinkPreview } from './types/link.js';
+import {
+  DEFAULT_TOOLTIP_STYLE,
+  VALID_TOOLTIP_POSITIONS,
+  getTooltipPositionOptions as buildTooltipPositionOptions,
+  applyTooltipPreview,
+} from './types/tooltip.js';
 
 /**
  * @typedef {Object} ActionClickStep
@@ -21,7 +29,6 @@ import { generateSelector, resolveTarget } from './utils.js';
  */
 
 const VALID_POSITIONS = new Set(['append', 'prepend', 'before', 'after']);
-const VALID_TOOLTIP_POSITIONS = new Set(['top', 'right', 'bottom', 'left']);
 
 function getStyleFieldConfigs() {
   return [
@@ -34,28 +41,6 @@ function getStyleFieldConfigs() {
     { name: 'textDecoration', label: t('editor.styles.textDecoration'), placeholder: 'underline' },
   ];
 }
-
-const DEFAULT_BUTTON_STYLE = {
-  color: '#ffffff',
-  backgroundColor: '#1b84ff',
-  fontSize: '16px',
-  fontWeight: '600',
-  padding: '8px 16px',
-  borderRadius: '8px',
-};
-
-const DEFAULT_LINK_STYLE = {
-  color: '#2563eb',
-  textDecoration: 'underline',
-};
-
-const DEFAULT_TOOLTIP_STYLE = {
-  color: '#f8fafc',
-  backgroundColor: '#111827',
-  fontSize: '14px',
-  padding: '8px 12px',
-  borderRadius: '12px',
-};
 
 function getTypeOptions() {
   return [
@@ -75,7 +60,7 @@ function getPositionLabels() {
 }
 
 function getTooltipPositionOptions() {
-  return ['top', 'right', 'bottom', 'left'].map((value) => ({ value, label: t(`tooltip.position.${value}`) }));
+  return buildTooltipPositionOptions(t);
 }
 
 /**
@@ -554,8 +539,8 @@ function createElementBubble() {
     borderRadius: '10px',
     border: '1px solid rgba(99, 102, 241, 0.25)',
     backgroundColor: '#ffffff',
-    boxShadow: '0 12px 30px rgba(15, 23, 42, 0.18)',
-    zIndex: '5',
+    boxShadow: '0 12px 30px rgba(15, 23, 42, 0.25)',
+    zIndex: '50',
     minWidth: '200px',
   });
   ACTION_TYPE_OPTIONS.forEach(({ value, label }) => {
@@ -625,6 +610,7 @@ function createElementBubble() {
     actionMenuVisible = false;
     addActionMenu.style.display = 'none';
     addActionButton.setAttribute('aria-expanded', 'false');
+    flowBubbleBody.style.overflowY = 'auto';
     document.removeEventListener('mousedown', handleMenuOutsideClick, true);
     document.removeEventListener('keydown', handleMenuKeydown, true);
   }
@@ -635,6 +621,7 @@ function createElementBubble() {
     actionMenuVisible = true;
     addActionMenu.style.display = 'flex';
     addActionButton.setAttribute('aria-expanded', 'true');
+    flowBubbleBody.style.overflowY = 'visible';
     document.addEventListener('mousedown', handleMenuOutsideClick, true);
     document.addEventListener('keydown', handleMenuKeydown, true);
     requestAnimationFrame(() => {
@@ -1001,8 +988,11 @@ function createElementBubble() {
       pickButton.addEventListener('click', (event) => {
         event.preventDefault();
         row.dataset.picking = 'true';
+        const currentStep = state.actionSteps[index];
+        const accept = currentStep && currentStep.type === 'input' ? 'input' : step.type === 'input' ? 'input' : 'clickable';
         startActionPicker({
           source: 'builder',
+          accept,
           onSelect: (selector) => {
             row.dataset.picking = 'false';
             state.actionSteps[index] = { ...state.actionSteps[index], selector };
@@ -1231,16 +1221,17 @@ function createElementBubble() {
     position: 'fixed',
     top: '24px',
     right: '24px',
-    width: '360px',
-    maxHeight: '85vh',
-    padding: '20px',
+    width: '420px',
+    maxHeight: '92vh',
+    minHeight: '420px',
+    padding: '22px',
     borderRadius: '18px',
     backgroundColor: '#ffffff',
     boxShadow: '0 24px 60px rgba(15, 23, 42, 0.22)',
     border: '1px solid rgba(148, 163, 184, 0.35)',
     display: 'flex',
     flexDirection: 'column',
-    gap: '16px',
+    gap: '14px',
     opacity: '0',
     transform: 'translateY(12px)',
     transition: 'opacity 0.18s ease, transform 0.18s ease',
@@ -1274,7 +1265,9 @@ function createElementBubble() {
     flexDirection: 'column',
     gap: '12px',
     overflowY: 'auto',
-    paddingRight: '4px',
+    paddingRight: '8px',
+    flex: '1 1 auto',
+    minHeight: '0',
   });
   flowBubbleBody.appendChild(actionFlowField.wrapper);
 
@@ -1568,11 +1561,15 @@ function createElementBubble() {
     const payload = buildPayload();
     ensurePreviewElement(payload.type);
     if (payload.type === 'tooltip') {
-      applyTooltipPreview(previewElement, payload);
+      applyTooltipPreview(previewElement, payload, t);
     } else {
       previewElement.textContent =
         payload.text || (payload.type === 'link' ? t('editor.previewLink') : t('editor.previewButton'));
-      applyPreviewBase(previewElement, payload.type);
+      if (payload.type === 'link') {
+        applyLinkPreview(previewElement);
+      } else {
+        applyButtonPreview(previewElement);
+      }
       if (payload.style) {
         Object.entries(payload.style).forEach(([key, value]) => {
           previewElement.style[key] = value;
@@ -1698,14 +1695,15 @@ function createElementBubble() {
     if (actionPickerCleanup) {
       return;
     }
-    const { onSelect, onCancel } = options;
+    const { onSelect, onCancel, accept = 'clickable' } = options;
+    const finder = accept === 'input' ? findInputElement : findClickableElement;
     const overlay = createOverlay();
     document.body.appendChild(overlay.container);
     originalCursor = document.body.style.cursor;
     document.body.style.cursor = 'crosshair';
 
     const handleMove = (event) => {
-      const candidate = findClickableElement(event.target);
+      const candidate = finder(event.target);
       if (!candidate) {
         overlay.hide();
         return;
@@ -1714,7 +1712,7 @@ function createElementBubble() {
     };
 
     const handleClick = (event) => {
-      const candidate = findClickableElement(event.target);
+      const candidate = finder(event.target);
       if (!candidate) {
         return;
       }
@@ -2534,76 +2532,8 @@ function normalizeStyleState(styleState) {
  * @param {HTMLElement} element
  * @param {'button' | 'link'} type
  */
-function applyPreviewBase(element, type) {
-  element.removeAttribute('style');
-  element.style.cursor = 'default';
-  element.style.fontFamily = 'inherit';
-  if (type === 'link') {
-    element.style.display = 'inline';
-    element.style.color = '#2563eb';
-    element.style.textDecoration = 'underline';
-    element.style.padding = '0';
-    element.style.lineHeight = 'inherit';
-    element.style.backgroundColor = 'transparent';
-  } else {
-    element.style.display = 'inline-flex';
-    element.style.alignItems = 'center';
-    element.style.justifyContent = 'center';
-    element.style.padding = '8px 16px';
-    element.style.borderRadius = '8px';
-    element.style.backgroundColor = '#1b84ff';
-    element.style.color = '#fff';
-    element.style.fontSize = '16px';
-    element.style.fontWeight = '600';
-    element.style.lineHeight = '1.2';
-    element.style.border = 'none';
-    element.style.textDecoration = 'none';
-    element.style.boxShadow = '0 2px 4px rgba(0, 0, 0, 0.12)';
-  }
-}
-
-/**
- * 
- * Applies tooltip preview styling and content.
- * @param {HTMLElement} container
- * @param {{ text: string; tooltipPosition?: string; tooltipPersistent?: boolean; style?: import('../common/types.js').InjectedElementStyle }} payload
- */
-function applyTooltipPreview(container, payload) {
-  if (!(container instanceof HTMLElement)) {
-    return;
-  }
-  container.dataset.previewType = 'tooltip';
-  container.className = 'page-augmentor-preview-tooltip';
-  const position =
-    payload.tooltipPosition && VALID_TOOLTIP_POSITIONS.has(payload.tooltipPosition)
-      ? payload.tooltipPosition
-      : 'top';
-  container.dataset.position = position;
-  container.dataset.persistent = payload.tooltipPersistent ? 'true' : 'false';
-  container.dataset.previewVisible = 'true';
-  container.setAttribute('role', 'group');
-  container.tabIndex = -1;
-
-  const trigger = container.querySelector('.page-augmentor-preview-tooltip-trigger');
-  if (trigger instanceof HTMLElement) {
-    trigger.textContent = 'i';
-    trigger.setAttribute('aria-hidden', 'true');
-  }
-
-  const bubble = container.querySelector('.page-augmentor-preview-tooltip-bubble');
-  if (bubble instanceof HTMLElement) {
-    const textValue = payload.text && payload.text.trim() ? payload.text : t('editor.previewTooltip');
-    bubble.textContent = textValue;
-    bubble.removeAttribute('style');
-    if (payload.style) {
-      Object.entries(payload.style).forEach(([key, value]) => {
-        bubble.style[key] = value;
-      });
-    }
-  }
-}
-
 const CLICKABLE_INPUT_TYPES = new Set(['button', 'submit', 'reset', 'image']);
+const INPUT_EXCLUDED_TYPES = new Set(['button', 'submit', 'reset', 'image', 'checkbox', 'radio', 'file', 'color', 'range', 'hidden']);
 
 /**
  * 
@@ -2614,6 +2544,22 @@ function findClickableElement(target) {
   let current = resolveTarget(target);
   while (current) {
     if (isClickableElement(current)) {
+      return current;
+    }
+    current = current.parentElement;
+  }
+  return null;
+}
+
+function findInputElement(target) {
+  let current = resolveTarget(target);
+  while (current) {
+    if (current instanceof HTMLLabelElement && current.control) {
+      if (isTypeableInputElement(current.control)) {
+        return current.control;
+      }
+    }
+    if (isTypeableInputElement(current)) {
       return current;
     }
     current = current.parentElement;
@@ -2657,6 +2603,26 @@ function isClickableElement(element) {
     }
   } catch (error) {
     // ignore style lookup failures
+  }
+  return false;
+}
+
+function isTypeableInputElement(element) {
+  if (!(element instanceof Element)) {
+    return false;
+  }
+  if (element instanceof HTMLTextAreaElement) {
+    return true;
+  }
+  if (element instanceof HTMLInputElement) {
+    const type = element.type ? element.type.toLowerCase() : '';
+    return !INPUT_EXCLUDED_TYPES.has(type);
+  }
+  if (element instanceof HTMLSelectElement) {
+    return true;
+  }
+  if (element instanceof HTMLElement && element.isContentEditable) {
+    return true;
   }
   return false;
 }
