@@ -1,17 +1,30 @@
 import { applyButtonPreview } from '../selector/types/button.js';
 import { applyLinkPreview } from '../selector/types/link.js';
 import { applyTooltipPreview } from '../selector/types/tooltip.js';
+import { applyAreaPreview } from '../selector/types/area.js';
 
 /**
  * Ensures the preview element matches the desired type, replacing the node if needed.
  * @param {HTMLElement | null} currentElement
- * @param {'button' | 'link' | 'tooltip'} type
+ * @param {'button' | 'link' | 'tooltip' | 'area'} type
  * @returns {HTMLElement}
  */
 export function ensurePreviewElement(currentElement, type) {
   if (type === 'tooltip') {
     if (!currentElement || currentElement.dataset.previewType !== 'tooltip') {
       const replacement = createTooltipContainer();
+      if (currentElement && currentElement.parentElement) {
+        currentElement.parentElement.replaceChild(replacement, currentElement);
+      }
+      return replacement;
+    }
+    return currentElement;
+  }
+
+  if (type === 'area') {
+    if (!currentElement || currentElement.dataset.previewType !== 'area') {
+      const replacement = document.createElement('div');
+      replacement.dataset.previewType = 'area';
       if (currentElement && currentElement.parentElement) {
         currentElement.parentElement.replaceChild(replacement, currentElement);
       }
@@ -53,7 +66,7 @@ export function ensurePreviewElement(currentElement, type) {
  * Applies preview styling/content based on payload.
  * @param {HTMLElement} previewElement
  * @param {{
- *   type: 'button' | 'link' | 'tooltip';
+ *   type: 'button' | 'link' | 'tooltip' | 'area';
  *   text: string;
  *   href?: string;
  *   position: 'append' | 'prepend' | 'before' | 'after';
@@ -70,6 +83,18 @@ export function applyPreview(previewElement, payload, t) {
 
   if (payload.type === 'tooltip') {
     applyTooltipPreview(previewElement, payload, t);
+    return;
+  }
+
+  if (payload.type === 'area') {
+    applyAreaPreview(previewElement);
+    const textValue = payload.text && payload.text.trim() ? payload.text : t('editor.previewArea');
+    previewElement.textContent = textValue;
+    if (payload.style) {
+      Object.entries(payload.style).forEach(([key, value]) => {
+        previewElement.style[key] = value;
+      });
+    }
     return;
   }
 

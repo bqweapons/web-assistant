@@ -1,6 +1,9 @@
 import { createField, styleInput } from '../ui/field.js';
 import { getStyleFieldConfigs as buildStyleFieldConfigs } from '../styles/style-config.js';
 import { normalizeStyleState } from '../styles/style-normalize.js';
+import { DEFAULT_BUTTON_STYLE } from '../../selector/types/button.js';
+import { DEFAULT_LINK_STYLE } from '../../selector/types/link.js';
+import { DEFAULT_AREA_STYLE } from '../../selector/types/area.js';
 
 const HEX_COLOR_PATTERN = /^#(?:[0-9a-fA-F]{3}|[0-9a-fA-F]{6})$/i;
 
@@ -42,10 +45,52 @@ export function createStyleControls({ t }) {
   const styleInputs = new Map();
   const styleState = {};
   const styleFieldConfigs = buildStyleFieldConfigs(t);
+  const stylePresets = [
+    { value: '', label: t('editor.styles.presets.custom'), styles: null },
+    { value: 'button-default', label: t('editor.styles.presets.primary'), styles: DEFAULT_BUTTON_STYLE },
+    {
+      value: 'button-outline',
+      label: t('editor.styles.presets.outline'),
+      styles: {
+        backgroundColor: 'transparent',
+        color: '#2563eb',
+        border: '2px solid #2563eb',
+        padding: '8px 16px',
+        borderRadius: '10px',
+      },
+    },
+    {
+      value: 'floating-card',
+      label: t('editor.styles.presets.floating'),
+      styles: {
+        backgroundColor: '#ffffff',
+        color: '#0f172a',
+        border: '1px solid rgba(15, 23, 42, 0.12)',
+        borderRadius: '12px',
+        padding: '16px',
+        boxShadow: '0 12px 32px rgba(15, 23, 42, 0.18)',
+        position: 'relative',
+      },
+    },
+    { value: 'link-default', label: t('editor.styles.presets.link'), styles: DEFAULT_LINK_STYLE },
+    { value: 'area-default', label: t('editor.styles.presets.area'), styles: DEFAULT_AREA_STYLE },
+  ];
 
   styleFieldConfigs.forEach(({ name }) => {
     styleState[name] = '';
   });
+
+  const presetSelect = document.createElement('select');
+  stylePresets.forEach((preset) => {
+    const option = document.createElement('option');
+    option.value = preset.value;
+    option.textContent = preset.label;
+    presetSelect.appendChild(option);
+  });
+  styleInput(presetSelect);
+
+  const presetField = createField(t('editor.styles.presetsLabel'), presetSelect);
+  styleFieldset.appendChild(presetField.wrapper);
 
   styleFieldConfigs.forEach((config) => {
     const textInput = document.createElement('input');
@@ -104,6 +149,31 @@ export function createStyleControls({ t }) {
   });
   styleFieldset.appendChild(styleHint);
 
+  function applyStylesToInputs(styles = {}) {
+    Object.entries(styles).forEach(([name, rawValue]) => {
+      if (typeof rawValue !== 'string') {
+        return;
+      }
+      const record = styleInputs.get(name);
+      if (!record) {
+        return;
+      }
+      const value = rawValue;
+      styleState[name] = value;
+      record.text.value = value;
+      if (record.color) {
+        const trimmed = value.trim();
+        const fallback = record.color.dataset.defaultValue || '#ffffff';
+        if (trimmed && HEX_COLOR_PATTERN.test(trimmed)) {
+          record.color.value = trimmed;
+          record.color.dataset.defaultValue = trimmed;
+        } else {
+          record.color.value = fallback;
+        }
+      }
+    });
+  }
+
   function resetStyleState(source = {}, suggestions = {}) {
     styleFieldConfigs.forEach(({ name }) => {
       const value = source && typeof source[name] === 'string' ? source[name] : '';
@@ -136,6 +206,7 @@ export function createStyleControls({ t }) {
         }
       }
     });
+    presetSelect.value = '';
   }
 
   function attachInteractions({ clearError, updatePreview }) {
@@ -176,6 +247,28 @@ export function createStyleControls({ t }) {
           updatePreview();
         });
       }
+    });
+
+    presetSelect.addEventListener('change', () => {
+      clearError();
+      const preset = stylePresets.find((option) => option.value === presetSelect.value);
+      if (!preset || !preset.styles) {
+        return;
+      }
+      styleFieldConfigs.forEach(({ name }) => {
+        const record = styleInputs.get(name);
+        styleState[name] = '';
+        if (!record) {
+          return;
+        }
+        record.text.value = '';
+        if (record.color) {
+          const fallback = record.color.dataset.defaultValue || '#ffffff';
+          record.color.value = fallback;
+        }
+      });
+      applyStylesToInputs(preset.styles);
+      updatePreview();
     });
   }
 

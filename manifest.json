@@ -55,6 +55,7 @@
         "content/selector/picker.js",
         "content/selector/utils.js",
         "content/selector/types/button.js",
+        "content/selector/types/area.js",
         "content/selector/types/link.js",
         "content/selector/types/tooltip.js",
         "content/inject.js",

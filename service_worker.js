@@ -9,6 +9,7 @@ import { parseActionFlowDefinition } from './common/flows.js';
 import { normalizePageUrl } from './common/url.js';
 
 const TOOLTIP_POSITIONS = new Set(['top', 'right', 'bottom', 'left']);
+const ELEMENT_TYPES = new Set(['button', 'link', 'tooltip', 'area']);
 
 chrome.runtime.onInstalled.addListener(async () => {
   if (chrome.sidePanel?.setPanelBehavior) {
@@ -182,6 +183,9 @@ function validateElementPayload(payload) {
     ...payload,
     text: payload.text || '',
   };
+  if (!ELEMENT_TYPES.has(element.type)) {
+    element.type = 'button';
+  }
   if (element.type === 'tooltip') {
     element.tooltipPosition = TOOLTIP_POSITIONS.has(element.tooltipPosition)
       ? element.tooltipPosition
@@ -220,6 +224,21 @@ function validateElementPayload(payload) {
     } else {
       delete element.actionFlow;
     }
+    if (typeof element.href === 'string') {
+      const trimmedHref = element.href.trim();
+      if (trimmedHref) {
+        element.href = trimmedHref;
+      } else {
+        delete element.href;
+      }
+    }
+    if (element.href && !element.actionFlow && !element.actionSelector) {
+      throw new Error('Buttons with a URL need an action flow.');
+    }
+  } else if (element.type === 'area') {
+    delete element.actionSelector;
+    delete element.actionFlow;
+    delete element.href;
   } else {
     delete element.actionSelector;
     delete element.actionFlow;

@@ -20,9 +20,14 @@ const ALLOWED_STYLE_KEYS = new Set([
   'fontWeight',
   'lineHeight',
   'padding',
+  'border',
   'borderRadius',
   'textDecoration',
   'maxWidth',
+  'boxShadow',
+  'width',
+  'height',
+  'zIndex',
 ]);
 
 const TOOLTIP_POSITIONS = new Set(['top', 'right', 'bottom', 'left']);
@@ -354,7 +359,7 @@ function applyMetadata(host, element) {
 /**
  * 要素タイプに応じた DOM ノードを生成する。
  * Creates an element that matches the requested type.
- * @param {'button' | 'link' | 'tooltip'} type
+ * @param {'button' | 'link' | 'tooltip' | 'area'} type
  * @returns {HTMLElement}
  */
 function createNodeForType(type) {
@@ -363,6 +368,9 @@ function createNodeForType(type) {
   }
   if (type === 'tooltip') {
     return createTooltipNode();
+  }
+  if (type === 'area') {
+    return document.createElement('div');
   }
   const button = document.createElement('button');
   button.type = 'button';
@@ -421,6 +429,12 @@ function hydrateNode(node, element) {
     node.setAttribute('role', 'group');
     node.tabIndex = 0;
     node.setAttribute('aria-label', element.text || 'tooltip');
+  } else if (element.type === 'area') {
+    applyBaseAppearance(node, 'area');
+    node.textContent = element.text || '';
+    delete node.dataset.href;
+    delete node.dataset.actionSelector;
+    node.onclick = null;
   }
 }
 
@@ -987,13 +1001,27 @@ function applyStyle(node, style) {
  * 要素タイプごとの基本スタイルを適用する。
  * Applies baseline styling for the element type.
  * @param {HTMLElement} node
- * @param {'button' | 'link'} type
+ * @param {'button' | 'link' | 'area'} type
  */
 function applyBaseAppearance(node, type) {
   node.className = NODE_CLASS;
   node.dataset.nodeType = type;
   node.removeAttribute('style');
   node.style.fontFamily = 'inherit';
+  if (type === 'area') {
+    node.style.display = 'block';
+    node.style.boxSizing = 'border-box';
+    node.style.minHeight = '80px';
+    node.style.padding = '16px';
+    node.style.borderRadius = '14px';
+    node.style.backgroundColor = 'rgba(37, 99, 235, 0.12)';
+    node.style.border = '1px dashed rgba(37, 99, 235, 0.4)';
+    node.style.position = 'relative';
+    node.style.color = '#0f172a';
+    node.style.lineHeight = '1.5';
+    node.style.cursor = 'default';
+    return;
+  }
   if (type === 'link') {
     node.removeAttribute('type');
     node.style.display = 'inline';

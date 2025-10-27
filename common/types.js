@@ -4,7 +4,7 @@
  * @typedef {Object} InjectedElement
  * @property {string} id
  * @property {string} pageUrl
- * @property {'button' | 'link' | 'tooltip'} type
+ * @property {'button' | 'link' | 'tooltip' | 'area'} type
  * @property {string} text
  * @property {string | undefined} href
  * @property {string | undefined} actionSelector
@@ -34,10 +34,15 @@
  * @property {string | undefined} [fontWeight]
  * @property {string | undefined} [lineHeight]
  * @property {string | undefined} [padding]
+ * @property {string | undefined} [border]
  * @property {string | undefined} [borderRadius]
  * @property {string | undefined} [textDecoration]
  * @property {string | undefined} [maxWidth]
- */
+ * @property {string | undefined} [boxShadow]
+ * @property {string | undefined} [width]
+ * @property {string | undefined} [height]
+ * @property {string | undefined} [zIndex]
+*/
 
 /**
  * @typedef {Object} MessagePayload

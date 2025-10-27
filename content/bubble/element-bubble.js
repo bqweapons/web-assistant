@@ -6,6 +6,7 @@ import {
   DEFAULT_TOOLTIP_STYLE,
   getTooltipPositionOptions as buildTooltipPositionOptions,
 } from '../selector/types/tooltip.js';
+import { DEFAULT_AREA_STYLE } from '../selector/types/area.js';
 import { createField, styleInput, createSection } from './ui/field.js';
 import { createTabGroup } from './ui/tab-group.js';
 import { ensureTooltipPreviewStyle } from './ui/tooltip-preview-style.js';
@@ -46,6 +47,7 @@ function getTypeOptions() {
     { value: 'button', label: t('type.button') },
     { value: 'link', label: t('type.link') },
     { value: 'tooltip', label: t('type.tooltip') },
+    { value: 'area', label: t('type.area') },
   ];
 }
 
@@ -458,9 +460,9 @@ function createElementBubble() {
   let currentTarget = null;
   /** @type {() => void} */
   let cancelHandler = () => {};
-  /** @type {(payload: { type: 'button' | 'link' | 'tooltip'; text: string; href?: string; actionSelector?: string; tooltipPosition?: 'top' | 'right' | 'bottom' | 'left'; tooltipPersistent?: boolean; position: 'append' | 'prepend' | 'before' | 'after'; style?: import('../../common/types.js').InjectedElementStyle }) => void} */
+  /** @type {(payload: { type: 'button' | 'link' | 'tooltip' | 'area'; text: string; href?: string; actionSelector?: string; tooltipPosition?: 'top' | 'right' | 'bottom' | 'left'; tooltipPersistent?: boolean; position: 'append' | 'prepend' | 'before' | 'after'; style?: import('../../common/types.js').InjectedElementStyle }) => void} */
   let submitHandler = () => {};
-  /** @type {null | ((payload: { type: 'button' | 'link' | 'tooltip'; text: string; href?: string; actionSelector?: string; tooltipPosition?: 'top' | 'right' | 'bottom' | 'left'; tooltipPersistent?: boolean; position: 'append' | 'prepend' | 'before' | 'after'; style?: import('../../common/types.js').InjectedElementStyle }) => void)} */
+  /** @type {null | ((payload: { type: 'button' | 'link' | 'tooltip' | 'area'; text: string; href?: string; actionSelector?: string; tooltipPosition?: 'top' | 'right' | 'bottom' | 'left'; tooltipPersistent?: boolean; position: 'append' | 'prepend' | 'before' | 'after'; style?: import('../../common/types.js').InjectedElementStyle }) => void)} */
   let previewHandler = null;
   /** @type {null | ((reason?: 'cancel' | 'select') => void)} */
   let actionPickerCleanup = null;
@@ -493,7 +495,8 @@ function createElementBubble() {
     const hrefValue = state.href.trim();
     const position = resolvePosition(state.position);
     const style = styleControls.getNormalizedStyle();
-    const type = state.type === 'link' ? 'link' : state.type === 'tooltip' ? 'tooltip' : 'button';
+    const type =
+      state.type === 'link' || state.type === 'tooltip' || state.type === 'area' ? state.type : 'button';
     const payload = {
       type,
       text: textValue,
@@ -537,6 +540,9 @@ function createElementBubble() {
       const tooltipPosition = resolveTooltipPosition(state.tooltipPosition);
       payload.tooltipPosition = tooltipPosition;
       payload.tooltipPersistent = Boolean(state.tooltipPersistent);
+    } else if (type === 'area') {
+      delete payload.href;
+      delete payload.actionFlow;
     }
     return payload;
   };
@@ -568,12 +574,13 @@ function createElementBubble() {
     const isLink = state.type === 'link';
     const isButton = state.type === 'button';
     const isTooltip = state.type === 'tooltip';
+    const isArea = state.type === 'area';
 
     hrefInput.required = isLink;
-    hrefInput.disabled = isTooltip;
+    hrefInput.disabled = isTooltip || isArea;
     hrefInput.placeholder = isLink
       ? t('editor.hrefPlaceholder')
-      : isTooltip
+      : isTooltip || isArea
         ? t('editor.hrefTooltipPlaceholder')
         : t('editor.hrefOptionalPlaceholder');
     hrefField.label.textContent = isLink
@@ -581,7 +588,7 @@ function createElementBubble() {
       : isTooltip
         ? t('editor.hrefTooltipLabel')
         : t('editor.hrefOptionalLabel');
-    hrefField.wrapper.style.display = isTooltip ? 'none' : 'flex';
+    hrefField.wrapper.style.display = isTooltip || isArea ? 'none' : 'flex';
 
     actionFlowSummaryField.wrapper.style.display = isButton ? 'flex' : 'none';
     actionFlowField.wrapper.style.display = isButton ? 'flex' : 'none';
@@ -597,7 +604,11 @@ function createElementBubble() {
     tooltipPersistentCheckbox.disabled = !isTooltip;
     tooltipSection.setVisible(isTooltip);
 
-    textInput.placeholder = isTooltip ? t('editor.tooltipTextPlaceholder') : t('editor.textPlaceholder');
+    textInput.placeholder = isTooltip
+      ? t('editor.tooltipTextPlaceholder')
+      : isArea
+        ? t('editor.areaTextPlaceholder')
+        : t('editor.textPlaceholder');
 
     actionFlowController.validateInput();
     actionFlowController.updateSummary();
@@ -606,12 +617,22 @@ function createElementBubble() {
         ? DEFAULT_LINK_STYLE
         : isTooltip
           ? DEFAULT_TOOLTIP_STYLE
-          : DEFAULT_BUTTON_STYLE;
+          : isArea
+            ? DEFAULT_AREA_STYLE
+            : DEFAULT_BUTTON_STYLE;
       resetStyleState(defaults);
       if (isTooltip) {
         state.tooltipPosition = 'top';
         tooltipPositionSelect.value = 'top';
         state.tooltipPersistent = false;
+        tooltipPersistentCheckbox.checked = false;
+      } else if (isArea) {
+        state.href = '';
+        hrefInput.value = '';
+        state.actionFlow = '';
+        state.actionSteps = [];
+        state.actionFlowMode = 'builder';
+        tooltipPositionSelect.value = 'top';
         tooltipPersistentCheckbox.checked = false;
       }
     }
@@ -621,7 +642,7 @@ function createElementBubble() {
 
   typeSelect.addEventListener('change', (event) => {
     const selected = event.target.value;
-    state.type = selected === 'link' ? 'link' : selected === 'tooltip' ? 'tooltip' : 'button';
+    state.type = selected === 'link' ? 'link' : selected === 'tooltip' ? 'tooltip' : selected === 'area' ? 'area' : 'button';
     handleTypeChange(true);
   });
 
@@ -717,7 +738,7 @@ function createElementBubble() {
     if (!payload) {
       return;
     }
-    if (!payload.text) {
+    if (payload.type !== 'area' && !payload.text) {
       errorLabel.textContent = t('editor.errorTextRequired');
       textInput.focus({ preventScroll: true });
       return;
@@ -725,6 +746,11 @@ function createElementBubble() {
     if (payload.type === 'link' && !state.href.trim()) {
       errorLabel.textContent = t('editor.errorUrlRequired');
       hrefInput.focus({ preventScroll: true });
+      return;
+    }
+    if (payload.type === 'button' && payload.href && !payload.actionFlow) {
+      errorLabel.textContent = t('editor.errorActionRequiredForUrl');
+      openActionFlowButton.focus({ preventScroll: true });
       return;
     }
     if (payload.type === 'button') {
@@ -736,7 +762,11 @@ function createElementBubble() {
           errorLabel.textContent = t('editor.errorFlowInvalid', { error: error || '' });
           return;
         }
-        payload.actionFlow = serialized;
+        if (definition.stepCount > 0) {
+          payload.actionFlow = serialized;
+        } else {
+          delete payload.actionFlow;
+        }
       } else {
         const flowValue = state.actionFlow.trim();
         if (flowValue) {

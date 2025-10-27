@@ -31,6 +31,7 @@ export default function App() {
       button: t('type.button'),
       link: t('type.link'),
       tooltip: t('type.tooltip'),
+      area: t('type.area'),
     }),
     [t],
   );
@@ -499,6 +500,7 @@ export default function App() {
                 <option value="button">{t('manage.sections.filters.options.button')}</option>
                 <option value="link">{t('manage.sections.filters.options.link')}</option>
                 <option value="tooltip">{t('manage.sections.filters.options.tooltip')}</option>
+                <option value="area">{t('manage.sections.filters.options.area')}</option>
               </select>
             </label>
           </section>

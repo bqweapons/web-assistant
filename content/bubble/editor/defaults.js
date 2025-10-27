@@ -4,11 +4,13 @@ import {
   DEFAULT_TOOLTIP_STYLE,
   VALID_TOOLTIP_POSITIONS,
 } from '../../selector/types/tooltip.js';
+import { DEFAULT_AREA_STYLE } from '../../selector/types/area.js';
 import { getStyleFieldConfigs as buildStyleFieldConfigs } from '../styles/style-config.js';
 
 export function getDefaultElementValues(values = {}, suggestedStyle = {}, t) {
   const configs = buildStyleFieldConfigs(t);
-  const type = values.type === 'link' ? 'link' : values.type === 'tooltip' ? 'tooltip' : 'button';
+  const type =
+    values.type === 'link' ? 'link' : values.type === 'tooltip' ? 'tooltip' : values.type === 'area' ? 'area' : 'button';
   const text = typeof values.text === 'string' ? values.text : '';
   const href = typeof values.href === 'string' ? values.href : '';
   const actionFlow = typeof values.actionFlow === 'string' ? values.actionFlow : '';
@@ -16,7 +18,13 @@ export function getDefaultElementValues(values = {}, suggestedStyle = {}, t) {
   const tooltipPosition = resolveTooltipPosition(values.tooltipPosition);
   const tooltipPersistent = Boolean(values.tooltipPersistent);
   const defaults =
-    type === 'link' ? DEFAULT_LINK_STYLE : type === 'tooltip' ? DEFAULT_TOOLTIP_STYLE : DEFAULT_BUTTON_STYLE;
+    type === 'link'
+      ? DEFAULT_LINK_STYLE
+      : type === 'tooltip'
+        ? DEFAULT_TOOLTIP_STYLE
+        : type === 'area'
+          ? DEFAULT_AREA_STYLE
+          : DEFAULT_BUTTON_STYLE;
   const style = {};
   const styleSuggestions = {};
 
