@@ -1243,7 +1243,10 @@ function createElementBubble() {
   let flowBubbleAttached = false;
   let flowSnapshot = null;
 
-  const editorState = createEditorState();\n  let state = editorState.get();\n  const setState = (patch) => { editorState.patch(patch); state = editorState.get(); };
+  const editorState = createEditorState();
+    let state = editorState.get();
+    const setState = (patch) => { editorState.patch(patch); state = editorState.get(); 
+  };
 
   const clearError = () => {
     errorLabel.textContent = '';
@@ -1317,12 +1320,14 @@ function createElementBubble() {
         payload.href = hrefValue;
       }
       if (state.actionFlowMode === 'builder') {
-        const serialized = updateActionFlowFromSteps({ updateHint: true });
-        if (serialized && !state.actionFlowError) {
-          payload.actionFlow = serialized;
-        } else if (!state.actionFlowError) {
-          delete payload.actionFlow;
+        const serialized = stepsToJSON(Array.isArray(state.actionSteps) ? state.actionSteps : []);
+        setState({ actionFlow: serialized });
+        const { definition, error } = parseActionFlowDefinition(serialized.trim());
+        if (error || !definition) {
+          errorLabel.textContent = t('editor.errorFlowInvalid', { error: error || '' });
+          return;
         }
+        payload.actionFlow = serialized;
       } else {
         const flowValue = state.actionFlow.trim();
         if (flowValue) {
@@ -1578,21 +1583,14 @@ function createElementBubble() {
     }
     if (payload.type === 'button') {
       if (state.actionFlowMode === 'builder') {
-        const serialized = updateActionFlowFromSteps({ updateHint: true });
-        if (state.actionFlowError) {
-          errorLabel.textContent = state.actionFlowError;
+        const serialized = stepsToJSON(Array.isArray(state.actionSteps) ? state.actionSteps : []);
+        setState({ actionFlow: serialized });
+        const { definition, error } = parseActionFlowDefinition(serialized.trim());
+        if (error || !definition) {
+          errorLabel.textContent = t('editor.errorFlowInvalid', { error: error || '' });
           return;
         }
-        if (serialized) {
-          const { error } = parseActionFlowDefinition(serialized);
-          if (error) {
-            errorLabel.textContent = t('editor.errorFlowInvalid', { error });
-            return;
-          }
-          payload.actionFlow = serialized;
-        } else {
-          delete payload.actionFlow;
-        }
+        payload.actionFlow = serialized;
       } else {
         const flowValue = state.actionFlow.trim();
         if (flowValue) {
@@ -1773,20 +1771,15 @@ function createElementBubble() {
       return;
     }
     if (state.actionFlowMode === 'builder') {
-      const serialized = updateActionFlowFromSteps({ updateHint: true });
-      if (serialized === null || state.actionFlowError) {
-        return;
-      }
-      const { error } = parseActionFlowDefinition(serialized);
-      if (error) {
-        state.actionFlowError = error;
-        state.actionFlowSteps = 0;
-        updateActionFlowSummary();
-        refreshActionBuilderState();
-        return;
-      }
-      state.actionFlow = serialized;
-    } else {
+      const serialized = stepsToJSON(Array.isArray(state.actionSteps) ? state.actionSteps : []);
+        setState({ actionFlow: serialized });
+        const { definition, error } = parseActionFlowDefinition(serialized.trim());
+        if (error || !definition) {
+          errorLabel.textContent = t('editor.errorFlowInvalid', { error: error || '' });
+          return;
+        }
+        payload.actionFlow = serialized;
+      } else {
       const flowValue = state.actionFlow.trim();
       if (flowValue) {
         const { definition, error } = parseActionFlowDefinition(flowValue);
@@ -1986,7 +1979,7 @@ function defaultElementValues(values = {}, suggestedStyle = {}) {
 }
 
 
-// Extracts inline style suggestions from a target element.
+/* Extracts inline style suggestions from a target element.
  * @param {Element} target
  * @returns {Record<string, string>}
  */
@@ -2007,6 +2000,10 @@ export function getSuggestedStyles(target) {
     borderRadius: maybe(computed.borderRadius),
   };
 }
+
+
+
+
 
 
 

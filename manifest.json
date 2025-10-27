@@ -63,7 +63,12 @@
         "common/i18n/locales/zh-CN.js",
         "common/types.js",
         "common/flows.js",
-        "common/url.js"
+        "common/url.js",
+        "common/compat.js",
+        "common/storage.js",
+        "content/bubble/actionflow/builder.js",
+        "content/bubble/state.js",
+        "content/content.js"
       ],
       "matches": ["<all_urls>"]
     }
