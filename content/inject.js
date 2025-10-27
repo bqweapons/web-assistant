@@ -832,6 +832,187 @@ function resolveFlowElements(selector, context) {
     console.warn('[PageAugmentor] Invalid flow selector', selector, error);
     return [];
   }
+  switch (step.type) {
+    case 'click': {
+      let targets = [];
+      if (step.all) {
+        targets = resolveFlowElements(step.selector, context);
+      } else {
+        const single = resolveFlowElement(step.selector, context);
+        if (single) {
+          targets = [single];
+        }
+      }
+      if (targets.length === 0) {
+        break;
+      }
+      targets.forEach((target) => {
+        const triggered = forwardClick(target);
+        if (!triggered && typeof target.click === 'function') {
+          try {
+            target.click();
+          } catch (error) {
+            console.warn('[PageAugmentor] Flow click fallback failed', error);
+          }
+        }
+      });
+      context.performed = true;
+      break;
+    }
+    case 'wait': {
+      await delay(step.ms);
+      break;
+    }
+    case 'input': {
+      const target = resolveFlowElement(step.selector, context);
+      if (target) {
+        if (applyInputValue(target, step.value)) {
+          context.performed = true;
+        }
+      }
+      break;
+    }
+    case 'navigate': {
+      const sanitized = sanitizeUrl(step.url);
+      if (sanitized) {
+        const target = step.target || '_blank';
+        window.open(sanitized, target, 'noopener');
+        context.performed = true;
+      }
+      break;
+    }
+    case 'log': {
+      console.info('[PageAugmentor][Flow]', step.message);
+      break;
+    }
+    case 'if': {
+      const outcome = evaluateFlowCondition(step.condition, context);
+      await runFlowSteps(outcome ? step.thenSteps : step.elseSteps, context, depth + 1);
+      break;
+    }
+    case 'while': {
+      let iterations = 0;
+      while (iterations < step.maxIterations && evaluateFlowCondition(step.condition, context)) {
+        iterations += 1;
+        await runFlowSteps(step.bodySteps, context, depth + 1);
+        enforceRuntimeLimit(context);
+      }
+      break;
+    }
+    default:
+      break;
+  }
+}
+
+/**
+ * Ensures flow execution stays within the runtime budget.
+ * @param {FlowExecutionContext} context
+ */
+function enforceRuntimeLimit(context) {
+  if (Date.now() - context.startTime > FLOW_MAX_RUNTIME_MS) {
+    throw new Error('Flow execution exceeded the time limit.');
+  }
+}
+
+/**
+ * Resolves the first matching element for a flow selector.
+ * @param {string} selector
+ * @param {FlowExecutionContext} context
+ * @returns {Element | null}
+ */
+function resolveFlowElement(selector, context) {
+  const [element] = resolveFlowElements(selector, context);
+  return element || null;
+}
+
+/**
+ * Resolves all matching elements for a flow selector.
+ * @param {string} selector
+ * @param {FlowExecutionContext} context
+ * @returns {Element[]}
+ */
+function resolveFlowElements(selector, context) {
+  if (!selector) {
+    return [];
+  }
+  if (selector === FLOW_SELF_SELECTOR) {
+    return context.root ? [context.root] : [];
+  }
+  try {
+    return Array.from((context.document || document).querySelectorAll(selector));
+  } catch (error) {
+    console.warn('[PageAugmentor] Invalid flow selector', selector, error);
+    return [];
+  }
+}
+
+/**
+ * Applies a value to an input-like element.
+ * @param {Element} element
+ * @param {string} value
+ * @returns {boolean}
+ */
+function applyInputValue(element, value) {
+  if (element instanceof HTMLInputElement || element instanceof HTMLTextAreaElement) {
+    element.focus({ preventScroll: true });
+    element.value = value;
+    element.dispatchEvent(new InputEvent('input', { bubbles: true, cancelable: true }));
+    element.dispatchEvent(new Event('change', { bubbles: true }));
+    return true;
+  }
+  if (element instanceof HTMLElement && element.isContentEditable) {
+    element.focus({ preventScroll: true });
+    element.textContent = value;
+    element.dispatchEvent(new InputEvent('input', { bubbles: true, cancelable: true }));
+    element.dispatchEvent(new Event('change', { bubbles: true }));
+    return true;
+  }
+  return false;
+}
+
+/**
+ * Evaluates a flow condition.
+ * @param {FlowCondition} condition
+ * @param {FlowExecutionContext} context
+ * @returns {boolean}
+ */
+function evaluateFlowCondition(condition, context) {
+  if (!condition) {
+    return false;
+  }
+  switch (condition.kind) {
+    case 'exists':
+      return Boolean(resolveFlowElement(condition.selector, context));
+    case 'not':
+      return !evaluateFlowCondition(condition.operand, context);
+    case 'textContains': {
+      const target = resolveFlowElement(condition.selector, context);
+      if (!target) {
+        return false;
+      }
+      const text = (target.textContent || '').toLowerCase();
+      return text.includes(condition.value.toLowerCase());
+    }
+    case 'attributeEquals': {
+      const target = resolveFlowElement(condition.selector, context);
+      if (!target) {
+        return false;
+      }
+      return target.getAttribute(condition.name) === condition.value;
+    }
+    default:
+      return false;
+  }
+}
+
+/**
+ * Waits for the requested duration.
+ * @param {number} ms
+ * @returns {Promise<void>}
+ */
+function delay(ms) {
+  const duration = Number.isFinite(ms) && ms > 0 ? ms : 0;
+  return new Promise((resolve) => setTimeout(resolve, duration));
 }
 
 /**
