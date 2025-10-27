@@ -94,7 +94,7 @@ export function startPicker(options = {}) {
   document.addEventListener('click', handleClick, true);
   document.addEventListener('keydown', handleKeydown, true);
 
-  return () => stop('cancel');
+  return (reason) => stop(reason);
 }
 
 /**
