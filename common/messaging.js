@@ -1,3 +1,4 @@
+// 拡張機能内のメッセージング処理を共通化するヘルパー群。
 import { noop } from './types.js';
 
 export const MessageType = {
@@ -14,9 +15,11 @@ export const MessageType = {
   PICKER_RESULT: 'PICKER_RESULT',
   PICKER_CANCELLED: 'PICKER_CANCELLED',
   REHYDRATE: 'REHYDRATE',
+  IMPORT_STORE: 'IMPORT_STORE',
 };
 
 /**
+ * バックグラウンドへメッセージを送り、レスポンスデータを返す。
  * Sends a message to the background context and resolves with the response payload.
  * @template T
  * @param {string} type
@@ -32,6 +35,7 @@ export async function sendMessage(type, data) {
 }
 
 /**
+ * 値または Promise を返却する非同期ハンドラを登録する。
  * Registers an async message handler that can return values or promises.
  * @param {(message: { type: string; data: unknown }, sender: chrome.runtime.MessageSender) => (Promise<unknown> | unknown)} handler
  * @returns {() => void}
@@ -60,6 +64,7 @@ export function addAsyncMessageListener(handler) {
 }
 
 /**
+ * 長期接続の Port を開き、メッセージ送信用ヘルパーを提供する。
  * Opens a long-lived connection and returns helpers to post messages.
  * @param {string} name
  * @param {(port: chrome.runtime.Port) => void} onMessage

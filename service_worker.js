@@ -1,7 +1,12 @@
-import { getElementsByUrl, upsertElement, deleteElement, getFullStore, clearPage } from './common/storage.js';
+/**
+ * サービスワーカー全体のエントリーポイント。
+ * 注入要素の保存・更新・同期を担い、サイドパネルやコンテンツスクリプトへ通知する。
+ */
+import { getElementsByUrl, upsertElement, deleteElement, getFullStore, clearPage, replaceStore } from './common/storage.js';
 import { addAsyncMessageListener, MessageType } from './common/messaging.js';
 import { openSidePanelOrTab } from './common/compat.js';
 import { parseActionFlowDefinition } from './common/flows.js';
+import { normalizePageUrl } from './common/url.js';
 
 const TOOLTIP_POSITIONS = new Set(['top', 'right', 'bottom', 'left']);
 
@@ -9,7 +14,16 @@ chrome.runtime.onInstalled.addListener(async () => {
   if (chrome.sidePanel?.setPanelBehavior) {
     await chrome.sidePanel.setPanelBehavior({ openPanelOnActionClick: true });
   }
+  await rehydrateTabsFromStore();
 });
+
+if (chrome.runtime.onStartup) {
+  chrome.runtime.onStartup.addListener(() => {
+    rehydrateTabsFromStore().catch((error) => {
+      console.error('[PageAugmentor] Startup rehydrate failed', error);
+    });
+  });
+}
 
 chrome.action.onClicked.addListener(async () => {
   await openSidePanelOrTab();
@@ -27,6 +41,12 @@ addAsyncMessageListener(async (message, sender) => {
     case MessageType.LIST_ALL: {
       const store = await getFullStore();
       return store;
+    }
+    case MessageType.IMPORT_STORE: {
+      const { store } = message.data || {};
+      const result = await importStorePayload(store);
+      await rehydrateTabsFromStore();
+      return result;
     }
     case MessageType.CREATE:
     case MessageType.UPDATE: {
@@ -138,6 +158,7 @@ addAsyncMessageListener(async (message, sender) => {
 });
 
 /**
+ * 要素ペイロードの必須項目を検証し、不足していれば補完する。
  * Ensures the element payload contains the required fields.
  * @param {Partial<import('./common/types.js').InjectedElement>} payload
  * @returns {import('./common/types.js').InjectedElement}
@@ -222,6 +243,7 @@ function validateElementPayload(payload) {
 }
 
 /**
+ * 状態更新をサイドパネルおよび同一ページのタブへ配信する。
  * Broadcasts state updates to side panels and matching tabs.
  * @param {string} pageUrl
  * @param {import('./common/types.js').InjectedElement[]} elements
@@ -231,7 +253,7 @@ async function broadcastState(pageUrl, elements) {
   const tabs = await chrome.tabs.query({});
   await Promise.allSettled(
     tabs
-      .filter((tab) => tab.id && tab.url && normalizeUrl(tab.url) === pageUrl)
+      .filter((tab) => tab.id && tab.url && normalizePageUrl(tab.url) === pageUrl)
       .map((tab) => sendMessageToFrames(tab.id, { type: MessageType.REHYDRATE, pageUrl, data: elements })),
   );
   try {
@@ -242,6 +264,7 @@ async function broadcastState(pageUrl, elements) {
 }
 
 /**
+ * タブへメッセージを送信し、失敗時は静かに握りつぶす。
  * Dispatches a message to a tab, ignoring failures quietly.
  * @param {number} tabId
  * @param {unknown} message
@@ -281,6 +304,7 @@ async function findElement(pageUrl, id) {
 }
 
 /**
+ * ピッカーイベントをリスナーへ転送し、存在しない場合は無視する。
  * Forwards picker events to any listening extension pages.
  * @param {string} type
  * @param {any} payload
@@ -295,15 +319,73 @@ async function notifyPickerResult(type, payload) {
 }
 
 /**
+ * URL を正規化してストレージキーを安定させる。
  * Normalizes URL for consistent storage keys.
  * @param {string} url
  * @returns {string}
  */
-function normalizeUrl(url) {
+
+
+async function importStorePayload(rawStore) {
+  if (!rawStore || typeof rawStore !== 'object' || Array.isArray(rawStore)) {
+    throw new Error('Import payload must be an object.');
+  }
+  const normalizedStore = {};
+  let elementCount = 0;
+  for (const [key, list] of Object.entries(rawStore)) {
+    if (typeof key !== 'string' || !key.trim()) {
+      throw new Error('Import payload contains an invalid pageUrl.');
+    }
+    if (!Array.isArray(list)) {
+      throw new Error(`Invalid element list for ${key}.`);
+    }
+    const pageUrl = normalizePageUrl(key).trim();
+    if (!pageUrl) {
+      throw new Error(`Import payload contains an invalid pageUrl: ${key}`);
+    }
+    const sanitized = [];
+    for (const entry of list) {
+      if (!entry || typeof entry !== 'object') {
+        throw new Error(`Invalid element entry for ${key}.`);
+      }
+      const normalizedEntryUrl = normalizePageUrl(entry.pageUrl || pageUrl, key).trim();
+      const payload = {
+        ...entry,
+        pageUrl: normalizedEntryUrl || pageUrl,
+      };
+      try {
+        const validated = validateElementPayload(payload);
+        validated.pageUrl = pageUrl;
+        sanitized.push(validated);
+      } catch (error) {
+        throw new Error(`Invalid element for ${key}: ${error.message}`);
+      }
+    }
+    if (sanitized.length > 0) {
+      normalizedStore[pageUrl] = sanitized;
+      elementCount += sanitized.length;
+    }
+  }
+  await replaceStore(normalizedStore);
+  return {
+    pageCount: Object.keys(normalizedStore).length,
+    elementCount,
+  };
+}
+
+async function rehydrateTabsFromStore() {
   try {
-    const target = new URL(url);
-    return `${target.origin}${target.pathname}${target.search}`;
+    const store = await getFullStore();
+    if (!store || typeof store !== 'object') {
+      return;
+    }
+    const tasks = Object.entries(store)
+      .filter(([pageUrl]) => Boolean(pageUrl))
+      .map(([pageUrl, elements]) => broadcastState(pageUrl, Array.isArray(elements) ? elements : []));
+    if (tasks.length > 0) {
+      await Promise.allSettled(tasks);
+    }
   } catch (error) {
-    return url;
+    console.error('[PageAugmentor] Failed to rehydrate tabs from storage', error);
   }
 }

@@ -1,6 +1,8 @@
+// 注入要素の永続化と監視を扱うストレージユーティリティ。
 const STORAGE_KEY = 'injectedElements';
 
 /**
+ * 注入要素メタデータを保持するストレージ領域を返す。
  * Returns the storage area that holds the injected element metadata.
  * @returns {chrome.storage.StorageArea}
  */
@@ -9,6 +11,7 @@ function storageArea() {
 }
 
 /**
+ * 永続化済みデータ全体を読み込む。
  * Reads the entire persisted payload.
  * @returns {Promise<Record<string, import('./types.js').InjectedElement[]>>}
  */
@@ -18,6 +21,7 @@ async function readStore() {
 }
 
 /**
+ * 渡されたデータをストレージへ保存する。
  * Persists the provided payload.
  * @param {Record<string, import('./types.js').InjectedElement[]>} value
  * @returns {Promise<void>}
@@ -27,6 +31,7 @@ async function writeStore(value) {
 }
 
 /**
+ * 指定した URL に紐づく注入要素一覧を取得する。
  * Retrieves all injected elements that match the provided URL.
  * @param {string} pageUrl
  * @returns {Promise<import('./types.js').InjectedElement[]>}
@@ -37,6 +42,7 @@ export async function getElementsByUrl(pageUrl) {
 }
 
 /**
+ * 指定した URL に対する要素リストを丸ごと保存する。
  * Writes a full list of elements for the provided URL.
  * @param {string} pageUrl
  * @param {import('./types.js').InjectedElement[]} elements
@@ -49,6 +55,7 @@ export async function setElementsForUrl(pageUrl, elements) {
 }
 
 /**
+ * 要素を追加または更新し、最新の一覧を返す。
  * Inserts or updates a single element, returning the updated collection.
  * @param {import('./types.js').InjectedElement} element
  * @returns {Promise<import('./types.js').InjectedElement[]>}
@@ -79,6 +86,7 @@ export async function upsertElement(element) {
 }
 
 /**
+ * 要素 ID を指定して削除する。
  * Deletes an element by identifier.
  * @param {string} pageUrl
  * @param {string} elementId
@@ -98,6 +106,7 @@ export async function deleteElement(pageUrl, elementId) {
 }
 
 /**
+ * 指定 URL に紐づくメタデータをすべて削除する。
  * Removes all metadata associated with a URL.
  * @param {string} pageUrl
  * @returns {Promise<void>}
@@ -111,6 +120,7 @@ export async function clearPage(pageUrl) {
 }
 
 /**
+ * ストレージに保存されたデータ全体を取得する。
  * Retrieves the entire storage payload.
  * @returns {Promise<Record<string, import('./types.js').InjectedElement[]>>}
  */
@@ -119,6 +129,7 @@ export async function getFullStore() {
 }
 
 /**
+ * ストレージ変更を監視し、データ更新時にコールバックを呼び出す。
  * Subscribes to storage changes on the storage key, invoking the callback when data changes.
  * @param {(current: import('./types.js').InjectedElement[], previous: import('./types.js').InjectedElement[] | undefined, pageUrl: string) => void} callback
  * @returns {() => void} unsubscribe handler
@@ -139,6 +150,22 @@ export function observePage(callback) {
   };
   chrome.storage.onChanged.addListener(listener);
   return () => chrome.storage.onChanged.removeListener(listener);
+}
+
+export async function replaceStore(value) {
+  const payload = {};
+  if (value && typeof value === 'object') {
+    for (const [pageUrl, list] of Object.entries(value)) {
+      if (!Array.isArray(list)) {
+        continue;
+      }
+      payload[pageUrl] = list.map((item) => ({ ...item }));
+      if (payload[pageUrl].length === 0) {
+        delete payload[pageUrl];
+      }
+    }
+  }
+  await writeStore(payload);
 }
 
 export { STORAGE_KEY };

@@ -1,4 +1,5 @@
 /**
+ * フォーカス中ウィンドウでアクティブなタブを取得するユーティリティ。
  * Retrieves the currently active tab in the focused window.
  * @returns {Promise<chrome.tabs.Tab | undefined>}
  */
@@ -8,6 +9,7 @@ export async function getActiveTab() {
 }
 
 /**
+ * サイドパネル API が利用可能かどうかを判定する。
  * Indicates whether the side panel API is available.
  * @returns {boolean}
  */
@@ -16,6 +18,7 @@ export function supportsSidePanel() {
 }
 
 /**
+ * サイドパネルが利用可能なら開き、不可なら新規タブを開くフォールバック処理。
  * Opens the extension's side panel if available, otherwise falls back to a tab.
  * @returns {Promise<void>}
  */
