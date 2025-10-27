@@ -331,11 +331,15 @@ function createElementBubble() {
   const typeField = createField(t('editor.typeLabel'), typeSelect);
   const textField = createField(t('editor.textLabel'), textInput);
   const hrefField = createField(t('editor.hrefLabel'), hrefInput);
+  const positionField = createField(t('editor.positionLabel'), positionSelect);
+  const tooltipPositionField = createField(t('editor.tooltipPositionLabel'), tooltipPositionSelect);
+  const tooltipPersistentField = createField(t('editor.tooltipPersistenceLabel'));
+  tooltipPersistentField.wrapper.append(tooltipPersistentRow, tooltipPersistentHint);
 
   const editorState = createEditorState();
   let state = editorState.get();
   const setState = (patch) => {
-    editorState.patch(patch);
+    editorState.patch({ ...state, ...patch });
     state = editorState.get();
   };
 
@@ -359,7 +363,57 @@ function createElementBubble() {
   const actionFlowHint = actionFlowController.hint;
   const openActionFlowButton = actionFlowController.openButton;
   const actionFlowEditorHost = actionFlowController.editorHost;
+  const styleControls = createStyleControls({ t });
+  const styleFieldset = styleControls.fieldset;
 
+  const actions = document.createElement('div');
+  Object.assign(actions.style, {
+    display: 'flex',
+    justifyContent: 'flex-end',
+    gap: '10px',
+    paddingTop: '12px',
+    borderTop: '1px solid rgba(148, 163, 184, 0.2)',
+  });
+
+  const cancelButton = document.createElement('button');
+  cancelButton.type = 'button';
+  cancelButton.textContent = t('editor.cancel');
+  Object.assign(cancelButton.style, {
+    padding: '8px 14px',
+    borderRadius: '10px',
+    border: '1px solid rgba(148, 163, 184, 0.6)',
+    backgroundColor: '#ffffff',
+    color: '#0f172a',
+    fontSize: '13px',
+    fontWeight: '600',
+    cursor: 'pointer',
+  });
+
+  const saveButton = document.createElement('button');
+  saveButton.type = 'submit';
+  saveButton.textContent = t('editor.saveCreate');
+  Object.assign(saveButton.style, {
+    padding: '8px 16px',
+    borderRadius: '10px',
+    border: 'none',
+    background: 'linear-gradient(135deg, #2563eb, #1d4ed8)',
+    color: '#ffffff',
+    fontSize: '13px',
+    fontWeight: '600',
+    cursor: 'pointer',
+    boxShadow: '0 8px 18px rgba(37, 99, 235, 0.25)',
+  });
+
+  actions.append(cancelButton, saveButton);
+
+  const errorLabel = document.createElement('p');
+  errorLabel.textContent = '';
+  Object.assign(errorLabel.style, {
+    margin: '0',
+    minHeight: '18px',
+    fontSize: '12px',
+    color: '#dc2626',
+  });
 
   const sectionsTabs = createTabGroup();
 
@@ -455,14 +509,22 @@ function createElementBubble() {
         payload.href = hrefValue;
       }
       if (state.actionFlowMode === 'builder') {
-        const serialized = stepsToJSON(Array.isArray(state.actionSteps) ? state.actionSteps : []);
-        setState({ actionFlow: serialized });
-        const { definition, error } = parseActionFlowDefinition(serialized.trim());
-        if (error || !definition) {
-          errorLabel.textContent = t('editor.errorFlowInvalid', { error: error || '' });
-          return;
+        const actionSteps = Array.isArray(state.actionSteps) ? state.actionSteps : [];
+        if (actionSteps.length === 0) {
+          setState({ actionFlow: '' });
+          errorLabel.textContent = '';
+          delete payload.actionFlow;
+        } else {
+          const serialized = stepsToJSON(actionSteps);
+          setState({ actionFlow: serialized });
+          const { definition, error } = parseActionFlowDefinition(serialized.trim());
+          if (error || !definition) {
+            errorLabel.textContent = t('editor.errorFlowInvalid', { error: error || '' });
+            return null;
+          }
+          errorLabel.textContent = '';
+          payload.actionFlow = serialized;
         }
-        payload.actionFlow = serialized;
       } else {
         const flowValue = state.actionFlow.trim();
         if (flowValue) {
@@ -652,6 +714,9 @@ function createElementBubble() {
   form.addEventListener('submit', (event) => {
     event.preventDefault();
     const payload = buildPayload();
+    if (!payload) {
+      return;
+    }
     if (!payload.text) {
       errorLabel.textContent = t('editor.errorTextRequired');
       textInput.focus({ preventScroll: true });

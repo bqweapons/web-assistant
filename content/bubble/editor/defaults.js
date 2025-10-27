@@ -1,9 +1,9 @@
-import { DEFAULT_BUTTON_STYLE } from '../selector/types/button.js';
-import { DEFAULT_LINK_STYLE } from '../selector/types/link.js';
+import { DEFAULT_BUTTON_STYLE } from '../../selector/types/button.js';
+import { DEFAULT_LINK_STYLE } from '../../selector/types/link.js';
 import {
   DEFAULT_TOOLTIP_STYLE,
   VALID_TOOLTIP_POSITIONS,
-} from '../selector/types/tooltip.js';
+} from '../../selector/types/tooltip.js';
 import { getStyleFieldConfigs as buildStyleFieldConfigs } from '../styles/style-config.js';
 
 export function getDefaultElementValues(values = {}, suggestedStyle = {}, t) {
