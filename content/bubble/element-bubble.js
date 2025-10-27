@@ -331,6 +331,14 @@ function createElementBubble() {
   const typeField = createField(t('editor.typeLabel'), typeSelect);
   const textField = createField(t('editor.textLabel'), textInput);
   const hrefField = createField(t('editor.hrefLabel'), hrefInput);
+
+  const editorState = createEditorState();
+  let state = editorState.get();
+  const setState = (patch) => {
+    editorState.patch(patch);
+    state = editorState.get();
+  };
+
   const actionFlowController = createActionFlowController({
     t,
     MAX_FLOW_SOURCE_LENGTH,
@@ -404,11 +412,6 @@ function createElementBubble() {
   let actionPickerCleanup = null;
   let isAttached = false;
   let placementControls = null;
-
-  const editorState = createEditorState();
-    let state = editorState.get();
-    const setState = (patch) => { editorState.patch(patch); state = editorState.get(); 
-  };
 
   const clearError = () => {
     errorLabel.textContent = '';
