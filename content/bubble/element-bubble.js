@@ -1385,6 +1385,10 @@ function createElementBubble() {
 
   const updatePreview = (options = { propagate: true }) => {
     const payload = buildPayload();
+    if (!payload) {
+      updateActionFlowSummary();
+      return;
+    }
     const node = ensurePreviewElement(payload.type);
     applyPreview(node, payload, t);
     if (options.propagate && typeof previewHandler === 'function') {
