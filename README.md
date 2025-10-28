@@ -14,6 +14,7 @@ Page Augmentor is a Manifest V3 Chrome extension for layering custom buttons, li
 - **Frame-aware visual picker**: Highlight DOM nodes in context, including same-origin iframes, auto-generate CSS selectors, and jump straight into the editor bubble.
 - **Rich element types**: Configure buttons, links, tooltips, or area callouts with placement (append, prepend, before, after), optional mirrored click selectors, and granular styles.
 - **Action flow builder**: Chain multi-step automations (click, wait, input, navigate, log, if/while) that run before fallback link or selector behaviour when injected buttons are clicked.
+- **Modular injection runtime**: High-cohesion renderer, flow runner, and tooltip helpers live under `content/injection/`, keeping DOM orchestration composable and easier to extend.
 - **Resilient sync and persistence**: Store data in `chrome.storage.local`, restore on load, and reattach after DOM mutations via a `MutationObserver`, broadcasting updates across tabs and the side panel.
 - **Shadow DOM isolation**: Rendered controls keep their appearance even when the host page ships heavy CSS.
 
@@ -51,6 +52,8 @@ Injected buttons can run scripted flows before falling back to an attached link 
 }
 ```
 
+See `AGENTS.md` for a deeper reference on agent authoring, available steps, guard rails, and best practices.
+
 ### Permissions
 - `activeTab`, `tabs`, `scripting`: inject and control page scripts.
 - `storage`: keep per-page augmentation metadata.
@@ -66,6 +69,14 @@ Injected buttons can run scripted flows before falling back to an attached link 
 |-- content/
 |   |-- content.js
 |   |-- inject.js
+|   |-- injection/
+|   |   |-- constants.js
+|   |   |-- dom.js
+|   |   |-- flow-runner.js
+|   |   |-- registry.js
+|   |   |-- style.js
+|   |   |-- tooltip.js
+|   |   `-- utils.js
 |   |-- selector.js
 |   |-- bubble/
 |   |   |-- element-bubble.js
