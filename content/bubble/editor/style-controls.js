@@ -6,6 +6,7 @@ import { DEFAULT_LINK_STYLE } from '../../selector/types/link.js';
 import { DEFAULT_AREA_STYLE } from '../../selector/types/area.js';
 
 const HEX_COLOR_PATTERN = /^#(?:[0-9a-fA-F]{3}|[0-9a-fA-F]{6})$/i;
+const ADVANCED_FIELDS = new Set(['position', 'top', 'right', 'bottom', 'left', 'zIndex', 'boxShadow']);
 
 /**
  * Creates the style controls for the element bubble editor.
@@ -92,6 +93,48 @@ export function createStyleControls({ t }) {
   const presetField = createField(t('editor.styles.presetsLabel'), presetSelect);
   styleFieldset.appendChild(presetField.wrapper);
 
+  const basicContainer = document.createElement('div');
+  Object.assign(basicContainer.style, {
+    display: 'grid',
+    gap: '12px',
+    gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))',
+  });
+  styleFieldset.appendChild(basicContainer);
+
+  const advancedDetails = document.createElement('details');
+  advancedDetails.open = false;
+  Object.assign(advancedDetails.style, {
+    borderTop: '1px solid rgba(226, 232, 240, 0.6)',
+    paddingTop: '8px',
+  });
+  const advancedSummary = document.createElement('summary');
+  advancedSummary.textContent = t('editor.stylesAdvancedToggle');
+  Object.assign(advancedSummary.style, {
+    fontSize: '12px',
+    fontWeight: '600',
+    color: '#475569',
+    cursor: 'pointer',
+    marginBottom: '8px',
+  });
+  advancedDetails.appendChild(advancedSummary);
+  const advancedContainer = document.createElement('div');
+  Object.assign(advancedContainer.style, {
+    display: 'grid',
+    gap: '12px',
+    gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))',
+  });
+  advancedDetails.appendChild(advancedContainer);
+
+  const advancedHint = document.createElement('p');
+  advancedHint.textContent = t('editor.stylesAdvancedHint');
+  Object.assign(advancedHint.style, {
+    margin: '6px 0 0',
+    fontSize: '11px',
+    color: '#94a3b8',
+  });
+  advancedDetails.appendChild(advancedHint);
+  styleFieldset.appendChild(advancedDetails);
+
   styleFieldConfigs.forEach((config) => {
     const textInput = document.createElement('input');
     textInput.type = 'text';
@@ -136,7 +179,11 @@ export function createStyleControls({ t }) {
       inputRow.appendChild(colorInput);
     }
     field.wrapper.appendChild(inputRow);
-    styleFieldset.appendChild(field.wrapper);
+    if (ADVANCED_FIELDS.has(config.name)) {
+      advancedContainer.appendChild(field.wrapper);
+    } else {
+      basicContainer.appendChild(field.wrapper);
+    }
     styleInputs.set(config.name, { text: textInput, color: colorInput });
   });
 
@@ -284,3 +331,4 @@ export function createStyleControls({ t }) {
     },
   };
 }
+

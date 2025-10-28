@@ -1,8 +1,14 @@
 import { parseActionFlowDefinition } from '../../common/flows.js';
+import { sendMessage, MessageType } from '../../common/messaging.js';
 import { HOST_ATTRIBUTE, HOST_CLASS, NODE_CLASS } from './constants.js';
 import { executeActionFlow } from './flow-runner.js';
 import { applyBaseAppearance, applyStyle, getStyleTarget, normalizeTooltipPosition } from './style.js';
-import { applyTooltipAppearance, configureTooltipPosition, createTooltipNode } from './tooltip.js';
+import {
+  applyTooltipAppearance,
+  configureTooltipPosition,
+  createTooltipNode,
+  bindTooltipViewportGuards,
+} from './tooltip.js';
 import { forwardClick, resolveSelector, sanitizeUrl } from './utils.js';
 
 export function createHost(element) {
@@ -49,6 +55,14 @@ export function createHost(element) {
       color: #2563eb;
       text-decoration: underline;
       cursor: pointer;
+    }
+    .${NODE_CLASS}[data-node-type='area'] {
+      cursor: move;
+      touch-action: none;
+    }
+    .${NODE_CLASS}.page-augmentor-area-dragging {
+      cursor: grabbing;
+      opacity: 0.92;
     }
     .${NODE_CLASS}.tooltip {
       position: relative;
@@ -175,6 +189,11 @@ export function applyMetadata(host, element) {
 
 export function insertHost(host, element) {
   const target = resolveSelector(element.selector);
+  if (element.type === 'area') {
+    document.body.appendChild(host);
+    positionAreaHost(host, element, target);
+    return true;
+  }
   if (!target) {
     return false;
   }
@@ -267,7 +286,7 @@ function hydrateNode(node, element) {
     }
     const trigger = node.querySelector('.tooltip-trigger');
     if (trigger instanceof HTMLElement) {
-      trigger.textContent = 'ⓘ';
+      trigger.textContent = 'i';
       trigger.setAttribute('aria-hidden', 'true');
     }
     const normalizedPosition = normalizeTooltipPosition(element.tooltipPosition);
@@ -278,12 +297,20 @@ function hydrateNode(node, element) {
     node.setAttribute('role', 'group');
     node.tabIndex = 0;
     node.setAttribute('aria-label', element.text || 'tooltip');
+    bindTooltipViewportGuards(node);
   } else if (element.type === 'area') {
     applyBaseAppearance(node, 'area');
     node.textContent = element.text || '';
     delete node.dataset.href;
     delete node.dataset.actionSelector;
     node.onclick = null;
+    node.style.pointerEvents = 'auto';
+    node.style.touchAction = 'none';
+    attachAreaDragBehavior(node, element);
+    const hostElement = shadow.host instanceof HTMLElement ? shadow.host : null;
+    if (hostElement) {
+      positionAreaHost(hostElement, element, resolveSelector(element.selector));
+    }
   }
 }
 
@@ -364,4 +391,148 @@ function applyButtonBehavior(node, href, actionSelector, actionFlow) {
       window.open(sanitized, '_blank', 'noopener');
     }
   };
+}
+
+
+function getHostFromNode(node) {
+  const root = node.getRootNode();
+  if (root instanceof ShadowRoot && root.host instanceof HTMLElement) {
+    return root.host;
+  }
+  return null;
+}
+
+function positionAreaHost(host, element, target) {
+  if (!(host instanceof HTMLElement)) {
+    return;
+  }
+  const style = element?.style || {};
+  const hasAbsolute = typeof style.position === 'string' && style.position.trim().toLowerCase() === 'absolute';
+  const left = typeof style.left === 'string' ? style.left.trim() : '';
+  const top = typeof style.top === 'string' ? style.top.trim() : '';
+
+  host.style.position = 'absolute';
+  host.style.zIndex = typeof style.zIndex === 'string' && style.zIndex.trim() ? style.zIndex : '1000';
+  host.style.width = 'max-content';
+  host.style.height = 'max-content';
+
+  if (hasAbsolute && left && top) {
+    host.style.left = left;
+    host.style.top = top;
+    return;
+  }
+
+  const reference = target instanceof Element ? target.getBoundingClientRect() : null;
+  if (reference) {
+    host.style.left = `${reference.left + window.scrollX + 16}px`;
+    host.style.top = `${reference.top + window.scrollY + 16}px`;
+  } else {
+    host.style.left = `${window.scrollX + 120}px`;
+    host.style.top = `${window.scrollY + 120}px`;
+  }
+}
+
+function attachAreaDragBehavior(node, element) {
+  if (!(node instanceof HTMLElement)) {
+    return;
+  }
+  if (node.dataset.areaDragBound === 'true') {
+    node.dataset.areaElementId = element.id;
+    return;
+  }
+  node.dataset.areaDragBound = 'true';
+  node.dataset.areaElementId = element.id;
+  node.style.touchAction = 'none';
+
+  let dragging = false;
+  let pointerId = null;
+  let startX = 0;
+  let startY = 0;
+  let originLeft = 0;
+  let originTop = 0;
+
+  const handleMove = (event) => {
+    if (!dragging || pointerId !== event.pointerId) {
+      return;
+    }
+    const host = getHostFromNode(node);
+    if (!host) {
+      return;
+    }
+    const nextLeft = originLeft + (event.clientX - startX);
+    const nextTop = originTop + (event.clientY - startY);
+    host.style.left = `${Math.round(nextLeft)}px`;
+    host.style.top = `${Math.round(nextTop)}px`;
+  };
+
+  const finalizeDrag = async () => {
+    if (!dragging) {
+      return;
+    }
+    dragging = false;
+    node.classList.remove('page-augmentor-area-dragging');
+    node.style.userSelect = '';
+    const host = getHostFromNode(node);
+    if (!host) {
+      return;
+    }
+    const rect = host.getBoundingClientRect();
+    const payload = {
+      ...element,
+      style: {
+        ...(element.style || {}),
+        position: 'absolute',
+        left: `${Math.round(rect.left + window.scrollX)}px`,
+        top: `${Math.round(rect.top + window.scrollY)}px`,
+      },
+    };
+    element.style = payload.style;
+    try {
+      await sendMessage(MessageType.UPDATE, payload);
+    } catch (error) {
+      console.error('[PageAugmentor] Failed to persist area position', error);
+    }
+  };
+
+  node.addEventListener('pointerdown', (event) => {
+    if (event.button !== 0) {
+      return;
+    }
+    const host = getHostFromNode(node);
+    if (!host) {
+      return;
+    }
+    dragging = true;
+    pointerId = event.pointerId;
+    startX = event.clientX;
+    startY = event.clientY;
+    const rect = host.getBoundingClientRect();
+    originLeft = rect.left + window.scrollX;
+    originTop = rect.top + window.scrollY;
+    node.classList.add('page-augmentor-area-dragging');
+    node.style.userSelect = 'none';
+    try {
+      node.setPointerCapture(pointerId);
+    } catch (_error) {
+      // ignore pointer capture issues
+    }
+    event.preventDefault();
+  });
+
+  node.addEventListener('pointermove', handleMove);
+  node.addEventListener('pointerup', (event) => {
+    if (event.pointerId === pointerId) {
+      try {
+        node.releasePointerCapture(pointerId);
+      } catch (_error) {
+        // ignore release issues
+      }
+      pointerId = null;
+      finalizeDrag();
+    }
+  });
+  node.addEventListener('pointercancel', () => {
+    pointerId = null;
+    finalizeDrag();
+  });
 }

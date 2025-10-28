@@ -4,7 +4,8 @@ export const DEFAULT_AREA_STYLE = {
   color: '#0f172a',
   padding: '16px',
   borderRadius: '14px',
-  position: 'relative',
+  width: '320px',
+  minHeight: '180px',
 };
 
 export function applyAreaPreview(element) {
