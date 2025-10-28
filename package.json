@@ -4,9 +4,10 @@
   "private": true,
   "type": "module",
   "scripts": {
+    "build:content": "node ./scripts/build.mjs content",
     "build:sidepanel": "node ./scripts/build.mjs sidepanel",
     "build:css": "tailwindcss -c tailwind.config.js -i ./sidepanel/src/index.css -o ./sidepanel/dist/index.css --minify",
-    "build": "npm run build:sidepanel && npm run build:css"
+    "build": "npm run build:content && npm run build:sidepanel && npm run build:css"
   },
   "devDependencies": {
     "@tailwindcss/forms": "^0.5.7",

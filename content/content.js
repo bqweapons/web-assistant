@@ -1,18 +1,15 @@
 /* eslint-disable no-undef */
 // コンテンツスクリプトのエントリーポイント。注入要素の同期とピッカー連携を担当する。
+import { sendMessage, MessageType } from '../common/messaging.js';
+import * as selectorModule from './selector.js';
+import * as injectModule from './inject.js';
+import { normalizePageUrl } from '../common/url.js';
+
 (async () => {
   if (window.__pageAugmentorInitialized) {
     return;
   }
   window.__pageAugmentorInitialized = true;
-
-  const [{ sendMessage, MessageType }, selectorModule, injectModule, urlModule] = await Promise.all([
-    import(chrome.runtime.getURL('common/messaging.js')),
-    import(chrome.runtime.getURL('content/selector.js')),
-    import(chrome.runtime.getURL('content/inject.js')),
-    import(chrome.runtime.getURL('common/url.js')),
-  ]);
-  const { normalizePageUrl } = urlModule;
 
   const frameContext = selectorModule.resolveFrameContext(window);
   const pageUrl = frameContext.pageUrl || getPageUrl();
