@@ -235,6 +235,8 @@ const messages = {
     },
     stylesLegend: 'Style settings',
     stylesHint: 'Pick a preset or adjust individual fields. Leave blank to keep the defaults.',
+    stylesAdvancedToggle: 'Advanced CSS options',
+    stylesAdvancedHint: 'Fine-tune positioning, shadows, and other layout details.',
     styles: {
       color: 'Text color',
       backgroundColor: 'Background color',

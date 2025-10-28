@@ -21,6 +21,7 @@ export const ALLOWED_STYLE_KEYS = new Set([
   'boxShadow',
   'width',
   'height',
+  'minHeight',
   'zIndex',
 ]);
 

@@ -232,6 +232,8 @@ mergeMessages(messages, {
     },
     stylesLegend: '样式设置',
     stylesHint: '留空则使用默认样式。',
+    stylesAdvancedToggle: '高级样式选项',
+    stylesAdvancedHint: '在这里微调位置、阴影等布局细节。',
     styles: {
       color: '文字颜色',
       backgroundColor: '背景颜色',

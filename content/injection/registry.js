@@ -23,9 +23,19 @@ export function ensureElement(element) {
 }
 
 export function updateElement(element) {
+  const previous = elements.get(element.id);
   elements.set(element.id, element);
   const host = hosts.get(element.id);
-  if (!host || !document.contains(host)) {
+  const locationChanged =
+    previous &&
+    (previous.selector !== element.selector ||
+      previous.position !== element.position ||
+      hasAreaPositionChanged(previous, element));
+  if (!host || !document.contains(host) || locationChanged) {
+    if (host && document.contains(host)) {
+      host.remove();
+    }
+    hosts.delete(element.id);
     return ensureElement(element);
   }
   applyMetadata(host, element);
@@ -90,4 +100,17 @@ export function focusElement(elementId) {
 
 export function listElements() {
   return Array.from(elements.values());
+}
+
+function hasAreaPositionChanged(previous, next) {
+  if (!previous || !next || previous.type !== 'area' || next.type !== 'area') {
+    return false;
+  }
+  const prevStyle = previous.style || {};
+  const nextStyle = next.style || {};
+  const prevLeft = typeof prevStyle.left === 'string' ? prevStyle.left.trim() : '';
+  const nextLeft = typeof nextStyle.left === 'string' ? nextStyle.left.trim() : '';
+  const prevTop = typeof prevStyle.top === 'string' ? prevStyle.top.trim() : '';
+  const nextTop = typeof nextStyle.top === 'string' ? nextStyle.top.trim() : '';
+  return prevLeft !== nextLeft || prevTop !== nextTop;
 }

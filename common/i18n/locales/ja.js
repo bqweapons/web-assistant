@@ -232,6 +232,8 @@ mergeMessages(messages, {
     },
     stylesLegend: 'スタイル設定',
     stylesHint: '空欄の項目は既定値が使用されます。',
+    stylesAdvancedToggle: '詳細設定',
+    stylesAdvancedHint: '位置や重なり順などを調整できます。',
     styles: {
       color: '文字色',
       backgroundColor: '背景色',
