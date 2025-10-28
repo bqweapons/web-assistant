@@ -32,7 +32,7 @@ export function applyBaseAppearance(node, type) {
     node.style.position = 'relative';
     node.style.color = '#0f172a';
     node.style.lineHeight = '1.5';
-    node.style.cursor = 'default';
+    node.style.cursor = 'move';
     return;
   }
   if (type === 'link') {
