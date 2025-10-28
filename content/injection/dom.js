@@ -22,7 +22,6 @@ export function createHost(element) {
     :host {
       all: initial;
       display: inline-block;
-      max-width: max-content;
     }
     .${NODE_CLASS} {
       pointer-events: auto;
@@ -307,7 +306,7 @@ function hydrateNode(node, element) {
     node.style.pointerEvents = 'auto';
     node.style.touchAction = 'none';
     attachAreaDragBehavior(node, element);
-    const hostElement = shadow.host instanceof HTMLElement ? shadow.host : null;
+    const hostElement = getHostFromNode(node);
     if (hostElement) {
       positionAreaHost(hostElement, element, resolveSelector(element.selector));
     }
@@ -413,8 +412,8 @@ function positionAreaHost(host, element, target) {
 
   host.style.position = 'absolute';
   host.style.zIndex = typeof style.zIndex === 'string' && style.zIndex.trim() ? style.zIndex : '1000';
-  host.style.width = 'max-content';
-  host.style.height = 'max-content';
+  host.style.width = '300px';
+  host.style.height = '600px';
 
   if (hasAbsolute && left && top) {
     host.style.left = left;
@@ -495,7 +494,7 @@ function attachAreaDragBehavior(node, element) {
   };
 
   node.addEventListener('pointerdown', (event) => {
-    if (event.button !== 0) {
+    if (event.button !== 0 && event.button !== -1) {
       return;
     }
     const host = getHostFromNode(node);

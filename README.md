@@ -1,6 +1,6 @@
 # Page Augmentor
 
-[English](#english) / [日本語](#日本誁E / [简体中文](#简体中斁E
+[English](#english) / [日本語](#日本語) / [简体中文](#简体中文)
 
 ---
 
@@ -78,29 +78,29 @@ See `AGENTS.md` for a deeper reference on agent authoring, available steps, guar
 |   |   |-- registry.js
 |   |   |-- style.js
 |   |   |-- tooltip.js
-|   |   `-- utils.js
+|   |   -- utils.js
 |   |-- selector.js
 |   |-- bubble/
 |   |   |-- element-bubble.js
 |   |   |-- editor/
-|   |   |   `-- action-flow-controller.js
+|   |   |   -- action-flow-controller.js
 |   |   |-- layout/
 |   |   |-- styles/
-|   |   `-- ui/
+|   |   -- ui/
 |   |-- selector/
 |   |   |-- frame.js
 |   |   |-- overlay.js
-|   |   `-- picker.js
-|   `-- dist/
-|       `-- content.js
+|   |   -- picker.js
+|   -- dist/
+|       -- content.js
 |-- sidepanel/
 |   |-- sidepanel.html
-|   `-- src/
+|   -- src/
 |       |-- App.jsx
 |       |-- components/
 |       |-- hooks/
-|       `-- utils/
-`-- common/
+|       -- utils/
+-- common/
     |-- compat.js
     |-- flows.js
     |-- i18n.js
@@ -108,28 +108,53 @@ See `AGENTS.md` for a deeper reference on agent authoring, available steps, guar
     |   |-- locales/
     |   |   |-- en.js
     |   |   |-- ja.js
-    |   |   `-- zh-CN.js
-    |   `-- utils.js
+    |   |   -- zh-CN.js
+    |   -- utils.js
     |-- messaging.js
     |-- storage.js
-    `-- types.js
+    -- types.js
 ```
 
 ### Known limitations
 - Strict CSP headers may block script/style injection on some hosts.
-- Only same-origin `iframe` documents can be augmented.
+- Only same-origin iframe documents can be augmented.
 - Highly dynamic pages may briefly override inserted elements before the observer reinstates them.
 - Action flows are capped at 200 steps, 50 loop iterations, and roughly 10 seconds of runtime; longer automations will abort early.
 
 ---
 
-## 日本誁E
-### 概要EPage Augmentor は Manifest V3 対応�E Chrome 拡張機�Eです。任意�Eペ�Eジにボタン・リンク・チE�Eルチップ�Eエリアコールアウトを追加し、サイドパネル�E�Eanage / Overview / Settings�E�からまとめて管琁E��きます。設定�E容は URL 単位で `chrome.storage.local` に保存され、�E訪時に自動復允E��れます、E
-### 特長
-- **統合サイドパネル**: Manage・Overview・Settings を�Eり替えながら編雁E���E体確認、インポ�EチEエクスポ�Eト、言語�Eり替えを行えます、E- **フレーム対応ピチE��ー**: 同一オリジンの iframe も含めて DOM をハイライトし、CSS セレクターを�E動生成して即座にエチE��ターバブルへ遷移します、E- **リチE��な要素タイチE*: ボタン / リンク / チE�EルチッチE/ エリアを選び、挿入位置・スタイル・ミラークリチE��先を細かく調整できます、E- **アクションフロー**: ボタンにクリチE��・征E���E入力�E遷移・ログ・条件/ループ�EスチE��プを連結し、クリチE��時に自動操作を実行します、E- **永続化と同期**: chrome.storage.local と MutationObserver で再挿入し、タブとサイドパネル間でリアルタイムに状態を共有します、E- **Shadow DOM による刁E��**: ホスト�Eージの重い CSS があっても見た目が崩れません、E
-### 使ぁE��
-1. 拡張アイコンをクリチE��してアクチE��ブタブ�Eサイドパネルを開きます、E2. Manage の **Pick target** を押し、強化したい要素�E�同一オリジンの iframe 冁E��可�E�を選択します、E3. エチE��ターバブルでタイプ（�Eタン / リンク / チE�EルチッチE/ エリア�E�、テキスト、E�E置、スタイル、リンクめE��ラークリチE��、忁E��であればアクションフローを設定して保存します、E4. Manage のフィルターと検索で要素を絞り込み、フォーカス、�E編雁E��削除を行います、E5. Overview で保存済みエントリ全体を確認し、新しいタブで開いたり URL ごとに一括削除します、E6. Settings で JSON のインポ�EチEエクスポ�Eトや UI 言語�E刁E��替えを行います、E
-### アクションフロー�E�任意！E挿入したボタンは、リンクめE��レクターのフォールバックに入る前に JSON ベ�Eスのフローを実行できます。`steps` 配�Eに `click`・`wait`・`input`・`navigate`・`log`・`if`・`while` を絁E��合わせ、最大 200 スチE��プ（ルーチE50 回）�E紁E10 秒まで動作します。�Eタン自身を指定する場合�E `:self` を使用します、E
+## 日本語
+
+### 概要
+Page Augmentor は Manifest V3 対応の Chrome 拡張機能で、任意の Web ページにカスタムボタン、リンク、ツールチップ、リッチなコールアウトを重ねて表示できます。サイドパネルの Manage / Overview / Settings から一元管理され、挿入した要素はページごとに `chrome.storage.local` へ保存されるため、同じサイトへ再訪すると自動で復元されます。
+
+### 主要機能
+- **統合サイドパネル**: Manage、Overview、Settings（インポート/エクスポート、言語切替）を Chrome を離れずに切り替えできます。
+- **iframe 対応ピッカー**: DOM ノードをページ上でハイライトし（同一オリジンの iframe を含む）、CSS セレクターを自動生成して編集バブルを即座に開きます。
+- **多彩な要素タイプ**: ボタン、リンク、ツールチップ、エリアコールアウトを配置（append、prepend、before、after）でき、ミラークリック用セレクターや詳細なスタイルも設定できます。
+- **アクションフロービルダー**: クリック、待機、入力、ナビゲート、ログ、条件・ループなど複数ステップを連結し、ボタンがリンクやセレクターへフォールバックする前に実行させます。
+- **モジュール化された注入ランタイム**: content/injection/ 以下にレンダラー、フローランナー、ツールチップヘルパーを分離し、高凝集で拡張しやすい構成にしています。
+- **ドラッグしやすいエリア要素**: ページキャンバス上でエリア要素をドラッグ&ドロップすると、その座標が自動で保存されます。
+- **直感的なスタイル調整**: よく使う設定はプリセットとコンパクトな基本パネルで素早く調整でき、高度な CSS フィールドはひとつのトグルの裏にまとめています。
+- **堅牢な同期と永続化**: データは `chrome.storage.local` に保存され、読み込み時に復元されます。`MutationObserver` が DOM 変化を監視して再挿入し、タブとサイドパネル間で更新をブロードキャストします。
+- **Shadow DOM の隔離**: ホストページの重い CSS に左右されず、レンダリングしたコントロールの見た目を保ちます。
+
+### インストール
+1. 上記コマンドで依存関係をインストールした後、`chrome://extensions/` を開きます。
+2. **デベロッパーモード** をオンにし、**パッケージ化されていない拡張機能を読み込む** をクリックします。
+3. プロジェクトルートを選択し、必要に応じてサイドパネルやツールバーにピン留めします。
+
+### 使い方
+1. 拡張アイコンをクリックしてアクティブタブのサイドパネルを開きます。
+2. **Manage** で **Pick target** を押し、強化したい要素（同一オリジンの iframe 内も可）を選択します。
+3. 編集バブルでタイプ、テキスト、配置、スタイル、リンクやミラークリック、任意のアクションフローを設定します。エリア要素はページ上でドラッグして位置調整できます。
+4. Manage のフィルターと検索で要素を絞り込み、フォーカス、再編集、削除を行います。
+5. **Overview** に切り替えて保存済みエントリを確認し、新規タブで開いたり URL ごとにまとめて削除したりできます。
+6. **Settings** では JSON のインポート/エクスポートと UI 言語の切り替えができます。
+
+### アクションフロー（任意）
+挿入したボタンは、リンクやミラーセレクターにフォールバックする前にスクリプト化されたフローを実行できます。`steps` 配列を含む JSON を入力し、click、wait、input、navigate、log、if、while などを組み合わせます。最大 200 ステップ（ループ 50 回まで）、およそ 10 秒でタイムアウトします。ボタン自身を操作する場合は `:self` セレクターを使用してください。
+
 ```json
 {
   "steps": [
@@ -140,18 +165,52 @@ See `AGENTS.md` for a deeper reference on agent authoring, available steps, guar
 }
 ```
 
-### 忁E��な権陁E- `activeTab`, `tabs`, `scripting`: アクチE��ブなペ�Eジにスクリプトを注入するため、E- `storage`: ペ�Eジごとの設定を保存するため、E- `sidePanel`: Chrome のサイドパネルに React UI を表示するため、E- `webNavigation`: 同一オリジンのフレームを�E挙し、ピチE��ーと再挿入めEiframe まで届かせるため、E
-チE��レクトリ構�Eの詳細は英語セクションを参照してください、E
-### 既知の制陁E- 厳しい CSP が設定されたサイトではスクリプトめE��タイルの注入が拒否される場合があります、E- 強化できるのは同一オリジンの `iframe` のみです、E- DOM が激しく変化するペ�Eジでは、要素が一時的に上書きされることがありますが監視で再挿入されます、E- アクションフローは最大 200 スチE��チE/ 50 ループ�E紁E10 秒までに制限されてぁE��す、E
+### 必要な権限
+- ActiveTab, tabs, scripting: アクティブなページにスクリプトを注入・制御するため。
+- storage: ページごとの設定を保存するため。
+- sidePanel: Chrome のサイドパネル内に React UI を表示するため。
+- webNavigation: 同一オリジンのフレームを列挙し、ピッカーと再挿入を iframe まで届けるため。
+
+### 既知の制限
+- 厳しい CSP を備えたサイトではスクリプトやスタイルの注入が拒否される場合があります。
+- 強化できるのは同一オリジンの iframe のみです。
+- DOM が激しく変化するページでは、要素が一時的に上書きされることがありますが監視により再挿入されます。
+- アクションフローは最大 200 ステップ / 50 ループ・約 10 秒までに制限されており、制限を超えると停止します。
+
 ---
 
-## 简体中斁E
+## 简体中文
+
 ### 概述
-Page Augmentor 是一款支持EManifest V3 皁EChrome 扩展，可在任意网页叠加自定义按钮、E��接、提示气泡以及区域栁E���E�并通迁E��边栏的 Manage / Overview / Settings 见E��统一管琁E��所有�E置持EURL 保存在 `chrome.storage.local` 中�E�重新访问时会�E动恢复、E
-### 功�E亮点
-- **统一侧边栁E*: 在 Manage、Overview、Settings 之间刁E���E�在同一位置完�E编辑、�E局浏览、导入/导出与语言刁E��、E- **支持Eiframe 皁E��见E��拾取器**: 高亮页面�E�含同溁Eiframe�E�中皁EDOM 节点�E��E动生�E CSS 选择器并直接打开编辑气泡、E- **丰富的允E��类垁E*: 配置按钮 / 链接 / 提示气泡 / 区域卡牁E��设置插�E位置、样式以及可选的镜像点击目栁E��E- **动作流程编辑器**: 为按钮串联点击、等征E��输�E、跳转、日志、条件与循环步骤�E�在点击时先执行�E动化流程、E- **持乁E��与同步**: 利用 `chrome.storage.local` 丁E`MutationObserver` 复原允E���E�并在栁E��页与侧边栏之间实时广播更新、E- **Shadow DOM 隔离**: 即便宿主页面样式复杂�E��E定义�E素也�E保持外观、E
-### 使用方況E1. 点击扩展图栁E��在当前栁E��页中打开侧边栏、E2. 在 Manage 中点击 **Pick target**�E�选择需要增强皁E�E素�E�支持同溁Eiframe�E�、E3. 在编辑气泡中选择类型（按钮 / 链接 / 提示气泡 / 区域）、编辑文本、位置、样式，并可选地关聁EURL、E��像选择器或动作流程后保存、E4. 使用 Manage 皁E��选与搜索功�E聚焦、E��新编辑�E删除每个页面皁E�E素、E5. 刁E��到 Overview 查看所有存档条目�E�按 URL 打开页面或批量渁E��、E6. 在 Settings 中导入/导出 JSON 夁E���E�并刁E��界面语言、E
-### 动作流程（可选！E插�E皁E��钮可以在执行链接或镜像选择器之前运衁EJSON 描述皁E��程。`steps` 数绁E��持E`click`、`wait`、`input`、`navigate`、`log`、`if`、`while` 等步骤�E�最夁E200 步�E�循环 50 次�E�，执行时间约 10 秒后会�E动停止。若需要引用按钮自身�E�可使用 `:self` 选择器、E
+Page Augmentor 是一款支持 Manifest V3 的 Chrome 扩展，可在任意网页叠加自定义按钮、链接、提示气泡以及区域标注。所有配置都在侧边栏的 Manage / Overview / Settings 中集中管理，并按页面 URL 存储到 `chrome.storage.local`，再次访问同一站点时会自动恢复。
+
+### 功能亮点
+- **统一侧边栏**: 在 Manage、Overview、Settings（导入/导出、语言切换）之间切换，无需离开 Chrome。
+- **支持 iframe 的可视化拾取器**: 高亮页面上的 DOM 节点（包含同源 iframe），自动生成 CSS 选择器并立即打开编辑气泡。
+- **丰富的元素类型**: 配置按钮、链接、提示气泡或区域标注，可选 append、prepend、before、after 插入位置以及镜像点击选择器，并精细控制样式。
+- **动作流程构建器**: 串联点击、等待、输入、跳转、日志、条件、循环等步骤，在按钮回退到链接或选择器前先执行自动化流程。
+- **模块化注入运行时**: content/injection/ 下的渲染器、流程执行器、提示气泡辅助工具拆分为高内聚模块，结构清晰且易于扩展。
+- **易于拖动的区域元素**: 区域元素可以拖动到页面任意位置，坐标会自动保存。
+- **更易上手的样式控制**: 常用设置集中在简洁的基础面板和快捷预设，高级 CSS 字段隐藏在一个开关之后。
+- **可靠的同步与持久化**: 数据存储在 `chrome.storage.local` 中，加载时恢复；`MutationObserver` 监听 DOM 变化并重新挂载，同时向所有标签页和侧边栏广播更新。
+- **Shadow DOM 隔离**: 即使宿主页面样式复杂，自定义控件仍能保持外观一致。
+
+### 安装
+1. 运行上方命令安装依赖后，打开 `chrome://extensions/`。
+2. 启用 **开发者模式** 并点击 **加载已解压的扩展程序**。
+3. 选择项目根目录，按需将侧边栏固定在工具栏中。
+
+### 使用步骤
+1. 点击 Page Augmentor 图标，在当前标签页中打开侧边栏。
+2. 在 **Manage** 中点击 **Pick target**，选择需要增强的元素（支持同源 iframe）。
+3. 在编辑气泡中选择类型、文本、位置、样式，并可选配置 URL、镜像选择器或动作流程。区域元素可以直接在页面上拖动微调位置。
+4. 利用 Manage 的筛选器搜索、聚焦、重新编辑或按页面删除已注入的项目。
+5. 切换到 **Overview** 查看所有已保存的条目，可按 URL 在新标签页打开或批量清除。
+6. 在 **Settings** 中导入/导出 JSON 备份并切换界面语言。
+
+### 动作流程（可选）
+按钮在回退到链接或镜像选择器之前，可以执行脚本化流程。提供包含 `steps` 数组的 JSON，步骤类型支持 click、wait、input、navigate、log、if、while 等。流程最多 200 步（循环 50 次以内），运行约 10 秒后会自动停止。若需要引用按钮自身，请使用 `:self` 选择器。
+
 ```json
 {
   "steps": [
@@ -162,9 +221,14 @@ Page Augmentor 是一款支持EManifest V3 皁EChrome 扩展，可在任意网�
 }
 ```
 
-### 所需杁E��
-- `activeTab`, `tabs`, `scripting`: 向当前页面注入并控制脚本、E- `storage`: 按页面保存�E定义�E置、E- `sidePanel`: 在 Chrome 侧边栏中展示 React UI、E- `webNavigation`: 枚举同溁Eiframe�E�以便拾取和重建嵌套文档中皁E�E素、E
-目录结构详惁E��参老E��斁E��刁E��E
-### 已知限制
-- 严格皁ECSP 可能会阻止脚本或样式注入、E- 仁E��持增强同源的 `iframe` 斁E��、E- 对于高度动态的页面�E��E素可能短暂被要E�E�E�随后会通迁E��听重新插�E、E- 动作流程最夁E200 步、循环 50 次�E�运行时间约 10 秒，趁E��E��制会提前终止、E
+### 权限说明
+- ActiveTab, tabs, scripting: 向当前页面注入并控制脚本。
+- storage: 按页面保存自定义配置。
+- sidePanel: 在 Chrome 侧边栏中展示 React UI。
+- webNavigation: 枚举同源 iframe，使拾取器和重新挂载能够作用到嵌套文档。
 
+### 已知限制
+- 严格的 CSP 可能阻止脚本或样式注入。
+- 仅支持增强同源 iframe。
+- 对于高度动态的页面，元素可能被临时覆盖，但监听器会重新挂载。
+- 动作流程限制为最多 200 步、50 次循环，运行约 10 秒后会被终止。

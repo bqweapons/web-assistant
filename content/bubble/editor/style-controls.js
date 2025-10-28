@@ -327,8 +327,7 @@ export function createStyleControls({ t }) {
       return { ...styleState };
     },
     getNormalizedStyle() {
-      return normalizeStyleState(styleState);
+      return normalizeStyleState(styleState, () => styleFieldConfigs);
     },
   };
 }
-
