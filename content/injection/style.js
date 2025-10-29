@@ -22,7 +22,9 @@ export function applyBaseAppearance(node, type) {
   node.removeAttribute('style');
   node.style.fontFamily = 'inherit';
   if (type === 'area') {
-    node.style.display = 'block';
+    node.style.display = 'flex';
+    node.style.flexDirection = 'column';
+    node.style.gap = '0.75rem';
     node.style.boxSizing = 'border-box';
     node.style.minHeight = '80px';
     node.style.padding = '16px';

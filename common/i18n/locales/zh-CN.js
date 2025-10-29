@@ -54,7 +54,8 @@ mergeMessages(messages, {
     sections: {
       add: {
         title: '新增元素',
-        description: '在页面上选取目标后，即可打开编辑气泡。',
+        description: '选择元素类型后即可在页面上放置并编辑。',
+        typeLabel: '元素类型',
       },
       filters: {
         searchLabel: '搜索',
@@ -65,17 +66,21 @@ mergeMessages(messages, {
           button: '按钮',
           link: '链接',
           tooltip: '提示',
+          area: '区域',
         },
       },
     },
     actions: {
-      pick: '选取目标',
-      picking: '正在选取…',
+      addElement: '添加元素',
       cancel: '取消',
       export: '导出数据',
       exporting: '正在导出…',
       import: '导入数据',
       importing: '正在导入…',
+    },
+    creation: {
+      started: '元素已准备好，请在页面上摆放。',
+      error: '无法准备元素：{error}',
     },
     empty: '当前筛选条件下没有匹配的元素。',
     item: {
@@ -154,6 +159,7 @@ mergeMessages(messages, {
     textLabel: '文本',
     textPlaceholder: '显示给访客的文本',
     tooltipTextPlaceholder: '提示文本',
+    areaTextPlaceholder: '可在区域中展示的备注（可选）',
     hrefLabel: '链接地址',
     hrefOptionalLabel: '可选链接地址',
     hrefTooltipLabel: '链接地址',

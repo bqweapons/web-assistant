@@ -17,6 +17,8 @@ export function getDefaultElementValues(values = {}, suggestedStyle = {}, t) {
   const position = resolvePosition(values.position);
   const tooltipPosition = resolveTooltipPosition(values.tooltipPosition);
   const tooltipPersistent = Boolean(values.tooltipPersistent);
+  const containerId = typeof values.containerId === 'string' ? values.containerId : '';
+  const floating = values.floating !== false;
   const defaults =
     type === 'link'
       ? DEFAULT_LINK_STYLE
@@ -55,6 +57,8 @@ export function getDefaultElementValues(values = {}, suggestedStyle = {}, t) {
     position,
     tooltipPosition,
     tooltipPersistent,
+    containerId,
+    floating,
     style,
     styleSuggestions,
   };

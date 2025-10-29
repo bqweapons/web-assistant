@@ -1,5 +1,4 @@
 import { parseActionFlowDefinition } from '../../common/flows.js';
-import { sendMessage, MessageType } from '../../common/messaging.js';
 import { HOST_ATTRIBUTE, HOST_CLASS, NODE_CLASS } from './constants.js';
 import { executeActionFlow } from './flow-runner.js';
 import { applyBaseAppearance, applyStyle, getStyleTarget, normalizeTooltipPosition } from './style.js';
@@ -26,6 +25,10 @@ export function createHost(element) {
     .${NODE_CLASS} {
       pointer-events: auto;
       font-family: inherit;
+    }
+    :host([data-page-augmentor-editing='true']) .${NODE_CLASS} {
+      outline: 1px dashed rgba(37, 99, 235, 0.4);
+      outline-offset: 2px;
     }
     button.${NODE_CLASS} {
       display: inline-flex;
@@ -58,10 +61,30 @@ export function createHost(element) {
     .${NODE_CLASS}[data-node-type='area'] {
       cursor: move;
       touch-action: none;
+      display: flex;
+      flex-direction: column;
+      gap: 0.75rem;
     }
     .${NODE_CLASS}.page-augmentor-area-dragging {
       cursor: grabbing;
       opacity: 0.92;
+    }
+    .${NODE_CLASS}.page-augmentor-floating-dragging {
+      cursor: grabbing;
+      opacity: 0.96;
+    }
+    .${NODE_CLASS}[data-node-type='area'] .page-augmentor-area-header {
+      font-weight: 600;
+      font-size: 0.95rem;
+      color: #1f2937;
+    }
+    .${NODE_CLASS}[data-node-type='area'] .page-augmentor-area-content {
+      display: flex;
+      flex-direction: column;
+      gap: 0.5rem;
+    }
+    .${NODE_CLASS}[data-node-type='area'].page-augmentor-area-drop-target {
+      box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.35);
     }
     .${NODE_CLASS}.tooltip {
       position: relative;
@@ -190,7 +213,25 @@ export function insertHost(host, element) {
   const target = resolveSelector(element.selector);
   if (element.type === 'area') {
     document.body.appendChild(host);
-    positionAreaHost(host, element, target);
+    positionFloatingHost(host, element, target);
+    return true;
+  }
+  if (element.containerId) {
+    const escapedId =
+      typeof CSS !== 'undefined' && typeof CSS.escape === 'function'
+        ? CSS.escape(element.containerId)
+        : String(element.containerId).replace(/["\\]/g, '\\$&');
+    const parent = document.querySelector(`[${HOST_ATTRIBUTE}="${escapedId}"]`);
+    const container = resolveAreaContent(parent);
+    if (container) {
+      container.appendChild(host);
+      resetHostPosition(host);
+      return true;
+    }
+  }
+  if (element.floating) {
+    document.body.appendChild(host);
+    positionFloatingHost(host, element, target);
     return true;
   }
   if (!target) {
@@ -243,7 +284,13 @@ function createNodeForType(type) {
     return createTooltipNode();
   }
   if (type === 'area') {
-    return document.createElement('div');
+    const wrapper = document.createElement('div');
+    const header = document.createElement('div');
+    header.className = 'page-augmentor-area-header';
+    const content = document.createElement('div');
+    content.className = 'page-augmentor-area-content';
+    wrapper.append(header, content);
+    return wrapper;
   }
   const button = document.createElement('button');
   button.type = 'button';
@@ -269,10 +316,12 @@ function hydrateNode(node, element) {
     delete node.dataset.actionSelector;
     node.onclick = null;
     node.removeAttribute('aria-describedby');
+    attachFloatingDragBehavior(node, element);
   } else if (element.type === 'button' && node instanceof HTMLButtonElement) {
     applyBaseAppearance(node, 'button');
     node.textContent = element.text;
     applyButtonBehavior(node, element.href, element.actionSelector, element.actionFlow);
+    attachFloatingDragBehavior(node, element);
   } else if (element.type === 'tooltip') {
     applyTooltipAppearance(node);
     const bubble = node.querySelector('.tooltip-bubble');
@@ -297,18 +346,29 @@ function hydrateNode(node, element) {
     node.tabIndex = 0;
     node.setAttribute('aria-label', element.text || 'tooltip');
     bindTooltipViewportGuards(node);
+    attachFloatingDragBehavior(node, element);
   } else if (element.type === 'area') {
     applyBaseAppearance(node, 'area');
-    node.textContent = element.text || '';
     delete node.dataset.href;
     delete node.dataset.actionSelector;
     node.onclick = null;
     node.style.pointerEvents = 'auto';
     node.style.touchAction = 'none';
     attachAreaDragBehavior(node, element);
+    node.dataset.areaId = element.id;
+    const header = node.querySelector('.page-augmentor-area-header');
+    if (header instanceof HTMLElement) {
+      const textValue = element.text || '';
+      header.textContent = textValue;
+      header.style.display = textValue ? 'block' : 'none';
+    }
+    const content = node.querySelector('.page-augmentor-area-content');
+    if (content instanceof HTMLElement) {
+      content.dataset.areaContent = element.id;
+    }
     const hostElement = getHostFromNode(node);
     if (hostElement) {
-      positionAreaHost(hostElement, element, resolveSelector(element.selector));
+      positionFloatingHost(hostElement, element, resolveSelector(element.selector));
     }
   }
 }
@@ -401,7 +461,92 @@ function getHostFromNode(node) {
   return null;
 }
 
-function positionAreaHost(host, element, target) {
+function resolveAreaContent(host) {
+  if (!(host instanceof HTMLElement)) {
+    return null;
+  }
+  const shadow = host.shadowRoot;
+  if (!shadow) {
+    return null;
+  }
+  const areaNode = shadow.querySelector(`.${NODE_CLASS}[data-node-type='area']`);
+  if (!(areaNode instanceof HTMLElement)) {
+    return null;
+  }
+  const content = areaNode.querySelector('.page-augmentor-area-content');
+  if (content instanceof HTMLElement) {
+    return content;
+  }
+  return areaNode;
+}
+
+function resetHostPosition(host) {
+  if (!(host instanceof HTMLElement)) {
+    return;
+  }
+  host.style.position = '';
+  host.style.left = '';
+  host.style.top = '';
+  host.style.right = '';
+  host.style.bottom = '';
+  host.style.zIndex = '';
+  host.style.width = '';
+  host.style.height = '';
+}
+
+function findAreaDropTarget(clientX, clientY, excludeId) {
+  const hosts = document.querySelectorAll(`[${HOST_ATTRIBUTE}]`);
+  for (const host of hosts) {
+    if (!(host instanceof HTMLElement)) {
+      continue;
+    }
+    const elementId = host.getAttribute(HOST_ATTRIBUTE);
+    if (!elementId || elementId === excludeId) {
+      continue;
+    }
+    const shadow = host.shadowRoot;
+    if (!shadow) {
+      continue;
+    }
+    const areaNode = shadow.querySelector(`.${NODE_CLASS}[data-node-type='area']`);
+    if (!(areaNode instanceof HTMLElement)) {
+      continue;
+    }
+    const rect = areaNode.getBoundingClientRect();
+    if (clientX >= rect.left && clientX <= rect.right && clientY >= rect.top && clientY <= rect.bottom) {
+      const content = areaNode.querySelector('.page-augmentor-area-content');
+      return {
+        id: elementId,
+        host,
+        areaNode,
+        content: content instanceof HTMLElement ? content : areaNode,
+      };
+    }
+  }
+  return null;
+}
+
+function dispatchDraftUpdateFromHost(host, detail) {
+  if (!(host instanceof HTMLElement)) {
+    return;
+  }
+  const elementId = host.getAttribute(HOST_ATTRIBUTE);
+  const payload = {
+    ...(detail || {}),
+  };
+  if (!payload.elementId && elementId) {
+    payload.elementId = elementId;
+  }
+  host.dispatchEvent(
+    new CustomEvent('page-augmentor-draft-update', {
+      detail: payload,
+      bubbles: true,
+      composed: true,
+    }),
+  );
+}
+
+function positionFloatingHost(host, element, target) {
   if (!(host instanceof HTMLElement)) {
     return;
   }
@@ -412,8 +557,8 @@ function positionAreaHost(host, element, target) {
 
   host.style.position = 'absolute';
   host.style.zIndex = typeof style.zIndex === 'string' && style.zIndex.trim() ? style.zIndex : '1000';
-  host.style.width = '300px';
-  host.style.height = '600px';
+  host.style.width = '';
+  host.style.height = '';
 
   if (hasAbsolute && left && top) {
     host.style.left = left;
@@ -476,21 +621,24 @@ function attachAreaDragBehavior(node, element) {
       return;
     }
     const rect = host.getBoundingClientRect();
-    const payload = {
-      ...element,
-      style: {
-        ...(element.style || {}),
-        position: 'absolute',
-        left: `${Math.round(rect.left + window.scrollX)}px`,
-        top: `${Math.round(rect.top + window.scrollY)}px`,
-      },
+    const style = {
+      ...(element.style || {}),
+      position: 'absolute',
+      left: `${Math.round(rect.left + window.scrollX)}px`,
+      top: `${Math.round(rect.top + window.scrollY)}px`,
     };
-    element.style = payload.style;
-    try {
-      await sendMessage(MessageType.UPDATE, payload);
-    } catch (error) {
-      console.error('[PageAugmentor] Failed to persist area position', error);
-    }
+    element.style = style;
+    dispatchDraftUpdateFromHost(host, {
+      elementId: element.id,
+      style: {
+        position: style.position,
+        left: style.left,
+        top: style.top,
+      },
+      floating: true,
+      containerId: '',
+      bubbleSide: 'right',
+    });
   };
 
   node.addEventListener('pointerdown', (event) => {
@@ -498,9 +646,10 @@ function attachAreaDragBehavior(node, element) {
       return;
     }
     const host = getHostFromNode(node);
-    if (!host) {
+    if (!host || host.dataset.pageAugmentorEditing !== 'true') {
       return;
     }
+    dispatchDraftUpdateFromHost(host, { bubbleSide: 'left' });
     dragging = true;
     pointerId = event.pointerId;
     startX = event.clientX;
@@ -533,5 +682,226 @@ function attachAreaDragBehavior(node, element) {
   node.addEventListener('pointercancel', () => {
     pointerId = null;
     finalizeDrag();
+  });
+}
+
+function attachFloatingDragBehavior(node, element) {
+  if (!(node instanceof HTMLElement)) {
+    return;
+  }
+  if (!element || !element.id) {
+    return;
+  }
+  if (node.dataset.floatingDragBound === 'true') {
+    node.dataset.floatingElementId = element.id;
+    return;
+  }
+  node.dataset.floatingDragBound = 'true';
+  node.dataset.floatingElementId = element.id;
+  node.style.touchAction = 'none';
+
+  let dragging = false;
+  let pointerId = null;
+  let startX = 0;
+  let startY = 0;
+  let originLeft = 0;
+  let originTop = 0;
+  let originalContainerId = typeof element.containerId === 'string' ? element.containerId : '';
+  let originalFloating = element.floating !== false;
+  let originalStyle = { ...(element.style || {}) };
+  let originalParent = null;
+  let originalNextSibling = null;
+  let currentDropTarget = null;
+  let highlightedArea = null;
+
+  const updateHighlight = (target) => {
+    if (highlightedArea && highlightedArea !== target) {
+      highlightedArea.areaNode.classList.remove('page-augmentor-area-drop-target');
+      highlightedArea = null;
+    }
+    if (target && target.areaNode && highlightedArea !== target) {
+      target.areaNode.classList.add('page-augmentor-area-drop-target');
+      highlightedArea = target;
+    }
+  };
+
+  const finalizeDrag = (commit) => {
+    const host = getHostFromNode(node);
+    if (!host) {
+      return;
+    }
+    if (pointerId !== null) {
+      try {
+        node.releasePointerCapture(pointerId);
+      } catch (_error) {
+        // ignore release failures
+      }
+    }
+    pointerId = null;
+    dragging = false;
+    node.classList.remove('page-augmentor-floating-dragging');
+    node.style.userSelect = '';
+    updateHighlight(null);
+    host.style.width = '';
+    host.style.height = '';
+
+    if (!commit) {
+      if (originalParent instanceof Node) {
+        if (originalNextSibling instanceof Node) {
+          originalParent.insertBefore(host, originalNextSibling);
+        } else {
+          originalParent.appendChild(host);
+        }
+      }
+      element.floating = originalFloating;
+      if (originalContainerId) {
+        element.containerId = originalContainerId;
+      } else {
+        delete element.containerId;
+      }
+      element.style = { ...originalStyle };
+      if (originalFloating) {
+        host.style.position = 'absolute';
+        host.style.left = originalStyle.left || '';
+        host.style.top = originalStyle.top || '';
+        host.style.zIndex = originalStyle.zIndex || '';
+      } else {
+        resetHostPosition(host);
+      }
+      dispatchDraftUpdateFromHost(host, {
+        elementId: element.id,
+        style: {
+          position: originalStyle.position || '',
+          left: originalStyle.left || '',
+          top: originalStyle.top || '',
+          zIndex: originalStyle.zIndex || '',
+        },
+        containerId: originalContainerId,
+        floating: originalFloating,
+        bubbleSide: 'right',
+      });
+      return;
+    }
+
+    const dropTarget = currentDropTarget;
+    if (dropTarget && dropTarget.content) {
+      dropTarget.content.appendChild(host);
+      resetHostPosition(host);
+      element.floating = false;
+      element.containerId = dropTarget.id;
+      const nextStyle = { ...(element.style || {}) };
+      nextStyle.position = '';
+      nextStyle.left = '';
+      nextStyle.top = '';
+      element.style = nextStyle;
+      dispatchDraftUpdateFromHost(host, {
+        elementId: element.id,
+        style: {
+          position: '',
+          left: '',
+          top: '',
+        },
+        containerId: dropTarget.id,
+        floating: false,
+        bubbleSide: 'right',
+      });
+    } else {
+      document.body.appendChild(host);
+      const rect = host.getBoundingClientRect();
+      const left = Math.round(rect.left + window.scrollX);
+      const top = Math.round(rect.top + window.scrollY);
+      host.style.position = 'absolute';
+      host.style.left = `${left}px`;
+      host.style.top = `${top}px`;
+      const nextStyle = { ...(element.style || {}) };
+      nextStyle.position = 'absolute';
+      nextStyle.left = `${left}px`;
+      nextStyle.top = `${top}px`;
+      nextStyle.zIndex = nextStyle.zIndex && nextStyle.zIndex.trim() ? nextStyle.zIndex : '2147482000';
+      element.style = nextStyle;
+      element.floating = true;
+      delete element.containerId;
+      dispatchDraftUpdateFromHost(host, {
+        elementId: element.id,
+        style: {
+          position: 'absolute',
+          left: nextStyle.left,
+          top: nextStyle.top,
+          zIndex: nextStyle.zIndex || '',
+        },
+        containerId: '',
+        floating: true,
+        bubbleSide: 'right',
+      });
+    }
+  };
+
+  const handleMove = (event) => {
+    if (!dragging || event.pointerId !== pointerId) {
+      return;
+    }
+    const host = getHostFromNode(node);
+    if (!host) {
+      return;
+    }
+    const nextLeft = originLeft + (event.clientX - startX);
+    const nextTop = originTop + (event.clientY - startY);
+    host.style.left = `${Math.round(nextLeft)}px`;
+    host.style.top = `${Math.round(nextTop)}px`;
+    const dropTarget = findAreaDropTarget(event.clientX, event.clientY, element.id);
+    currentDropTarget = dropTarget;
+    updateHighlight(dropTarget);
+  };
+
+  node.addEventListener('pointerdown', (event) => {
+    if (event.button !== 0 && event.button !== -1) {
+      return;
+    }
+    const host = getHostFromNode(node);
+    if (!host || host.dataset.pageAugmentorEditing !== 'true') {
+      return;
+    }
+    dispatchDraftUpdateFromHost(host, { bubbleSide: 'left' });
+    dragging = true;
+    pointerId = event.pointerId;
+    startX = event.clientX;
+    startY = event.clientY;
+    const rect = host.getBoundingClientRect();
+    originLeft = rect.left + window.scrollX;
+    originTop = rect.top + window.scrollY;
+    originalContainerId = typeof element.containerId === 'string' ? element.containerId : '';
+    originalFloating = element.floating !== false;
+    originalStyle = { ...(element.style || {}) };
+    originalParent = host.parentNode;
+    originalNextSibling = host.nextSibling;
+    host.style.width = `${rect.width}px`;
+    host.style.height = `${rect.height}px`;
+    host.style.position = 'absolute';
+    host.style.left = `${Math.round(originLeft)}px`;
+    host.style.top = `${Math.round(originTop)}px`;
+    host.style.zIndex = originalStyle.zIndex && originalStyle.zIndex.trim() ? originalStyle.zIndex : '2147482000';
+    if (host.parentElement !== document.body) {
+      document.body.appendChild(host);
+    }
+    node.classList.add('page-augmentor-floating-dragging');
+    node.style.userSelect = 'none';
+    currentDropTarget = null;
+    highlightedArea = null;
+    try {
+      node.setPointerCapture(pointerId);
+    } catch (_error) {
+      // ignore capture issues
+    }
+    event.preventDefault();
+  });
+
+  node.addEventListener('pointermove', handleMove);
+  node.addEventListener('pointerup', (event) => {
+    if (event.pointerId === pointerId) {
+      finalizeDrag(true);
+    }
+  });
+  node.addEventListener('pointercancel', () => {
+    finalizeDrag(false);
   });
 }
