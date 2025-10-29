@@ -9,6 +9,243 @@ import {
   bindTooltipViewportGuards,
 } from './tooltip.js';
 import { forwardClick, resolveSelector, sanitizeUrl } from './utils.js';
+import { generateSelector } from '../selector/utils.js';
+
+/** @type {Map<string, { host: HTMLElement; containerId: string }>} */
+const pendingContainerAttachments = new Map();
+let pendingContainerRetryHandle = 0;
+
+const VOID_ELEMENT_TAGS = new Set([
+  'AREA',
+  'BASE',
+  'BR',
+  'COL',
+  'EMBED',
+  'HR',
+  'IMG',
+  'INPUT',
+  'KEYGEN',
+  'LINK',
+  'META',
+  'PARAM',
+  'SOURCE',
+  'TRACK',
+  'WBR',
+]);
+const AUGMENTOR_ROOT_SELECTOR = '[data-page-augmentor-root]';
+
+/** @type {HTMLElement | null} */
+let domDropIndicator = null;
+/** @type {HTMLElement | null} */
+let dropPreviewHost = null;
+let dropPreviewSourceId = '';
+
+function ensureDomDropIndicator() {
+  if (domDropIndicator && domDropIndicator.isConnected) {
+    return domDropIndicator;
+  }
+  const indicator = document.createElement('div');
+  indicator.dataset.pageAugmentorRoot = 'drop-indicator';
+  Object.assign(indicator.style, {
+    position: 'fixed',
+    zIndex: '2147482001',
+    pointerEvents: 'none',
+    borderRadius: '10px',
+    border: '2px dashed rgba(37, 99, 235, 0.55)',
+    backgroundColor: 'rgba(37, 99, 235, 0.1)',
+    boxSizing: 'border-box',
+    display: 'none',
+    transition: 'none',
+  });
+  document.body.appendChild(indicator);
+  domDropIndicator = indicator;
+  return indicator;
+}
+
+function showDomDropIndicator(indicator) {
+  if (!indicator) {
+    hideDomDropIndicator();
+    return;
+  }
+  const node = ensureDomDropIndicator();
+  if (!node.isConnected) {
+    document.body.appendChild(node);
+  }
+  const { top, left, width, height, mode } = indicator;
+  const safeTop = Number.isFinite(top) ? Math.max(0, top) : 0;
+  const safeLeft = Number.isFinite(left) ? Math.max(0, left) : 0;
+  const safeWidth = Number.isFinite(width) ? Math.max(1, width) : 1;
+  const minHeight = mode === 'line' ? 2 : 4;
+  const safeHeight = Number.isFinite(height) ? Math.max(minHeight, height) : minHeight;
+  node.style.display = 'block';
+  node.style.left = `${Math.round(safeLeft)}px`;
+  node.style.top = `${Math.round(safeTop)}px`;
+  node.style.width = `${Math.round(safeWidth)}px`;
+  node.style.height = `${Math.round(safeHeight)}px`;
+  if (mode === 'line') {
+    node.style.border = 'none';
+    node.style.borderRadius = '9999px';
+    node.style.backgroundColor = 'rgba(37, 99, 235, 0.8)';
+  } else {
+    node.style.border = '2px dashed rgba(37, 99, 235, 0.55)';
+    node.style.borderRadius = '12px';
+    node.style.backgroundColor = 'rgba(37, 99, 235, 0.12)';
+  }
+}
+
+function hideDomDropIndicator() {
+  if (domDropIndicator) {
+    domDropIndicator.style.display = 'none';
+  }
+}
+
+function removeDropPreviewHost() {
+  if (dropPreviewHost && dropPreviewHost.isConnected) {
+    dropPreviewHost.remove();
+  }
+  dropPreviewHost = null;
+  dropPreviewSourceId = '';
+}
+
+function ensureDropPreviewHost(element) {
+  if (dropPreviewHost && dropPreviewSourceId === element.id && dropPreviewHost.isConnected) {
+    return dropPreviewHost;
+  }
+  removeDropPreviewHost();
+  if (!element || !element.id) {
+    return null;
+  }
+  const previewElement = {
+    ...element,
+    id: `${element.id}-preview`,
+    containerId: '',
+    floating: false,
+    style: { ...(element.style || {}) },
+  };
+  const host = createHost(previewElement);
+  host.removeAttribute(HOST_ATTRIBUTE);
+  host.dataset.pageAugmentorPreview = 'true';
+  host.dataset.previewSourceId = element.id;
+  host.style.pointerEvents = 'none';
+  dropPreviewHost = host;
+  dropPreviewSourceId = element.id;
+  return host;
+}
+
+function showAreaDropPreview(dropTarget, element) {
+  if (!dropTarget?.content) {
+    removeDropPreviewHost();
+    return;
+  }
+  const host = ensureDropPreviewHost(element);
+  if (!host) {
+    return;
+  }
+  if (host.parentNode !== dropTarget.content) {
+    if (host.parentNode) {
+      host.parentNode.removeChild(host);
+    }
+    dropTarget.content.appendChild(host);
+  }
+  resetHostPosition(host);
+}
+
+function showDomDropPreview(placement, element) {
+  if (!placement || !(placement.reference instanceof HTMLElement)) {
+    removeDropPreviewHost();
+    return;
+  }
+  const host = ensureDropPreviewHost(element);
+  if (!host) {
+    return;
+  }
+  if (host.parentNode && host.parentNode !== placement.reference && host.parentNode !== placement.reference.parentElement) {
+    host.parentNode.removeChild(host);
+  }
+  const { reference, position } = placement;
+  if (position === 'append') {
+    reference.appendChild(host);
+  } else if (position === 'prepend') {
+    reference.insertBefore(host, reference.firstChild);
+  } else if (position === 'before' && reference.parentElement) {
+    reference.parentElement.insertBefore(host, reference);
+  } else if (position === 'after' && reference.parentElement) {
+    reference.parentElement.insertBefore(host, reference.nextSibling);
+  } else {
+    reference.appendChild(host);
+  }
+  resetHostPosition(host);
+}
+
+function escapeAttributeSelector(value) {
+  if (typeof CSS !== 'undefined' && typeof CSS.escape === 'function') {
+    return CSS.escape(value);
+  }
+  return String(value).replace(/["\\]/g, '\\$&');
+}
+
+function findHostByElementId(elementId) {
+  if (!elementId) {
+    return null;
+  }
+  const escapedId = escapeAttributeSelector(elementId);
+  return document.querySelector(`[${HOST_ATTRIBUTE}="${escapedId}"]`);
+}
+
+function flushPendingContainerAttachments() {
+  pendingContainerRetryHandle = 0;
+  if (pendingContainerAttachments.size === 0) {
+    return;
+  }
+  for (const [elementId, entry] of pendingContainerAttachments) {
+    const { host, containerId } = entry;
+    if (!(host instanceof HTMLElement) || !containerId) {
+      pendingContainerAttachments.delete(elementId);
+      continue;
+    }
+    const areaHost = findHostByElementId(containerId);
+    const container = resolveAreaContent(areaHost);
+    if (container) {
+      container.appendChild(host);
+      resetHostPosition(host);
+      pendingContainerAttachments.delete(elementId);
+    }
+  }
+  schedulePendingContainerAttachments();
+}
+
+function schedulePendingContainerAttachments() {
+  if (pendingContainerAttachments.size === 0) {
+    if (pendingContainerRetryHandle) {
+      clearTimeout(pendingContainerRetryHandle);
+      pendingContainerRetryHandle = 0;
+    }
+    return;
+  }
+  if (pendingContainerRetryHandle) {
+    return;
+  }
+  pendingContainerRetryHandle = window.setTimeout(flushPendingContainerAttachments, 160);
+}
+
+function queuePendingContainerAttachment(host, element) {
+  if (!(host instanceof HTMLElement) || !element || !element.id || !element.containerId) {
+    return;
+  }
+  pendingContainerAttachments.set(element.id, {
+    host,
+    containerId: element.containerId,
+  });
+  schedulePendingContainerAttachments();
+}
+
+export function clearPendingContainerAttachment(elementId) {
+  if (!elementId) {
+    return;
+  }
+  pendingContainerAttachments.delete(elementId);
+  schedulePendingContainerAttachments();
+}
 
 export function createHost(element) {
   const host = document.createElement('span');
@@ -29,6 +266,12 @@ export function createHost(element) {
     :host([data-page-augmentor-editing='true']) .${NODE_CLASS} {
       outline: 1px dashed rgba(37, 99, 235, 0.4);
       outline-offset: 2px;
+    }
+    :host([data-page-augmentor-preview='true']) {
+      opacity: 0.65;
+    }
+    :host([data-page-augmentor-preview='true']) .${NODE_CLASS} {
+      pointer-events: none;
     }
     button.${NODE_CLASS} {
       display: inline-flex;
@@ -214,20 +457,19 @@ export function insertHost(host, element) {
   if (element.type === 'area') {
     document.body.appendChild(host);
     positionFloatingHost(host, element, target);
+    schedulePendingContainerAttachments();
     return true;
   }
   if (element.containerId) {
-    const escapedId =
-      typeof CSS !== 'undefined' && typeof CSS.escape === 'function'
-        ? CSS.escape(element.containerId)
-        : String(element.containerId).replace(/["\\]/g, '\\$&');
-    const parent = document.querySelector(`[${HOST_ATTRIBUTE}="${escapedId}"]`);
+    const parent = findHostByElementId(element.containerId);
     const container = resolveAreaContent(parent);
     if (container) {
       container.appendChild(host);
       resetHostPosition(host);
       return true;
     }
+    queuePendingContainerAttachment(host, element);
+    return true;
   }
   if (element.floating) {
     document.body.appendChild(host);
@@ -370,6 +612,7 @@ function hydrateNode(node, element) {
     if (hostElement) {
       positionFloatingHost(hostElement, element, resolveSelector(element.selector));
     }
+    schedulePendingContainerAttachments();
   }
 }
 
@@ -524,6 +767,153 @@ function findAreaDropTarget(clientX, clientY, excludeId) {
     }
   }
   return null;
+}
+
+function isVoidElement(element) {
+  if (!(element instanceof HTMLElement)) {
+    return false;
+  }
+  return VOID_ELEMENT_TAGS.has(element.tagName);
+}
+
+function findDomDropTarget(clientX, clientY, draggedHost) {
+  if (draggedHost instanceof HTMLElement) {
+    const previous = draggedHost.style.pointerEvents;
+    draggedHost.style.pointerEvents = 'none';
+    try {
+      const candidates = document.elementsFromPoint(clientX, clientY);
+      for (const candidate of candidates) {
+        if (!(candidate instanceof HTMLElement)) {
+          continue;
+        }
+        if (candidate === draggedHost || draggedHost.contains(candidate)) {
+          continue;
+        }
+        if (candidate.closest(`[${HOST_ATTRIBUTE}]`)) {
+          continue;
+        }
+        if (candidate.closest(AUGMENTOR_ROOT_SELECTOR)) {
+          continue;
+        }
+        return candidate;
+      }
+    } finally {
+      draggedHost.style.pointerEvents = previous || '';
+    }
+    return null;
+  }
+  const candidates = document.elementsFromPoint(clientX, clientY);
+  for (const candidate of candidates) {
+    if (
+      candidate instanceof HTMLElement &&
+      !candidate.closest(`[${HOST_ATTRIBUTE}]`) &&
+      !candidate.closest(AUGMENTOR_ROOT_SELECTOR)
+    ) {
+      return candidate;
+    }
+  }
+  return null;
+}
+
+function resolveDomDropPlacement(target, clientX, clientY) {
+  if (!(target instanceof HTMLElement)) {
+    return null;
+  }
+  if (target.closest(`[${HOST_ATTRIBUTE}]`)) {
+    return null;
+  }
+  if (target === document.documentElement) {
+    const body = document.body;
+    if (!(body instanceof HTMLElement)) {
+      return null;
+    }
+    const bodyRect = body.getBoundingClientRect();
+    return {
+      reference: body,
+      selector: 'body',
+      position: 'append',
+      indicator: {
+        mode: 'box',
+        top: bodyRect.top,
+        left: bodyRect.left,
+        width: bodyRect.width,
+        height: bodyRect.height,
+      },
+    };
+  }
+  const rect = target.getBoundingClientRect();
+  const height = rect.height || 1;
+  const relY = (clientY - rect.top) / height;
+
+  let selector;
+  try {
+    selector = generateSelector(target);
+  } catch (_error) {
+    selector = '';
+  }
+  if (!selector) {
+    return null;
+  }
+
+  if (isVoidElement(target) || !target.parentElement) {
+    const position = relY < 0.5 ? 'before' : 'after';
+    const lineTop = position === 'before' ? rect.top : rect.bottom;
+    return {
+      reference: target,
+      selector,
+      position,
+      indicator: {
+        mode: 'line',
+        top: lineTop - 2,
+        left: rect.left,
+        width: rect.width,
+        height: 4,
+      },
+    };
+  }
+
+  if (relY < 0.25) {
+    return {
+      reference: target,
+      selector,
+      position: 'prepend',
+      indicator: {
+        mode: 'box',
+        top: rect.top,
+        left: rect.left,
+        width: rect.width,
+        height: rect.height,
+      },
+    };
+  }
+
+  if (relY > 0.75) {
+    return {
+      reference: target,
+      selector,
+      position: 'append',
+      indicator: {
+        mode: 'box',
+        top: rect.top,
+        left: rect.left,
+        width: rect.width,
+        height: rect.height,
+      },
+    };
+  }
+
+  return {
+    reference: target,
+    selector,
+    position: 'append',
+    indicator: {
+      mode: 'box',
+      top: rect.top,
+      left: rect.left,
+      width: rect.width,
+      height: rect.height,
+    },
+  };
 }
 
 function dispatchDraftUpdateFromHost(host, detail) {
@@ -711,17 +1101,21 @@ function attachFloatingDragBehavior(node, element) {
   let originalStyle = { ...(element.style || {}) };
   let originalParent = null;
   let originalNextSibling = null;
-  let currentDropTarget = null;
+  let currentDropTarget = /** @type {null | { kind: 'area'; area: ReturnType<typeof findAreaDropTarget> } | { kind: 'dom'; placement: ReturnType<typeof resolveDomDropPlacement> }} */ (
+    null
+  );
   let highlightedArea = null;
+  let lastPointerX = 0;
+  let lastPointerY = 0;
 
-  const updateHighlight = (target) => {
-    if (highlightedArea && highlightedArea !== target) {
+  const updateHighlight = (areaTarget) => {
+    if (highlightedArea && highlightedArea !== areaTarget) {
       highlightedArea.areaNode.classList.remove('page-augmentor-area-drop-target');
       highlightedArea = null;
     }
-    if (target && target.areaNode && highlightedArea !== target) {
-      target.areaNode.classList.add('page-augmentor-area-drop-target');
-      highlightedArea = target;
+    if (areaTarget && areaTarget.areaNode && highlightedArea !== areaTarget) {
+      areaTarget.areaNode.classList.add('page-augmentor-area-drop-target');
+      highlightedArea = areaTarget;
     }
   };
 
@@ -742,8 +1136,13 @@ function attachFloatingDragBehavior(node, element) {
     node.classList.remove('page-augmentor-floating-dragging');
     node.style.userSelect = '';
     updateHighlight(null);
+    hideDomDropIndicator();
+    removeDropPreviewHost();
     host.style.width = '';
     host.style.height = '';
+
+    const dropTarget = currentDropTarget;
+    currentDropTarget = null;
 
     if (!commit) {
       if (originalParent instanceof Node) {
@@ -783,17 +1182,17 @@ function attachFloatingDragBehavior(node, element) {
       return;
     }
 
-    const dropTarget = currentDropTarget;
-    if (dropTarget && dropTarget.content) {
-      dropTarget.content.appendChild(host);
+    if (dropTarget && dropTarget.kind === 'area' && dropTarget.area?.content) {
+      dropTarget.area.content.appendChild(host);
       resetHostPosition(host);
       element.floating = false;
-      element.containerId = dropTarget.id;
+      element.containerId = dropTarget.area.id;
       const nextStyle = { ...(element.style || {}) };
       nextStyle.position = '';
       nextStyle.left = '';
       nextStyle.top = '';
       element.style = nextStyle;
+      clearPendingContainerAttachment(element.id);
       dispatchDraftUpdateFromHost(host, {
         elementId: element.id,
         style: {
@@ -801,45 +1200,100 @@ function attachFloatingDragBehavior(node, element) {
           left: '',
           top: '',
         },
-        containerId: dropTarget.id,
+        containerId: dropTarget.area.id,
         floating: false,
         bubbleSide: 'right',
       });
-    } else {
-      document.body.appendChild(host);
-      const rect = host.getBoundingClientRect();
-      const left = Math.round(rect.left + window.scrollX);
-      const top = Math.round(rect.top + window.scrollY);
-      host.style.position = 'absolute';
-      host.style.left = `${left}px`;
-      host.style.top = `${top}px`;
-      const nextStyle = { ...(element.style || {}) };
-      nextStyle.position = 'absolute';
-      nextStyle.left = `${left}px`;
-      nextStyle.top = `${top}px`;
-      nextStyle.zIndex = nextStyle.zIndex && nextStyle.zIndex.trim() ? nextStyle.zIndex : '2147482000';
-      element.style = nextStyle;
-      element.floating = true;
-      delete element.containerId;
-      dispatchDraftUpdateFromHost(host, {
-        elementId: element.id,
-        style: {
-          position: 'absolute',
-          left: nextStyle.left,
-          top: nextStyle.top,
-          zIndex: nextStyle.zIndex || '',
-        },
-        containerId: '',
-        floating: true,
-        bubbleSide: 'right',
-      });
+      return;
     }
+
+    if (dropTarget && dropTarget.kind === 'dom' && dropTarget.placement) {
+      let reference = dropTarget.placement.reference;
+      const selector = dropTarget.placement.selector;
+      const position = dropTarget.placement.position;
+      if (!(reference instanceof HTMLElement) || !reference.isConnected) {
+        const fallback = typeof selector === 'string' ? resolveSelector(selector) : null;
+        if (fallback instanceof HTMLElement) {
+          reference = fallback;
+        }
+      }
+      if (reference instanceof HTMLElement && selector) {
+        if (position === 'append') {
+          reference.appendChild(host);
+        } else if (position === 'prepend') {
+          reference.insertBefore(host, reference.firstChild);
+        } else if (position === 'before' && reference.parentElement) {
+          reference.parentElement.insertBefore(host, reference);
+        } else if (position === 'after' && reference.parentElement) {
+          reference.parentElement.insertBefore(host, reference.nextSibling);
+        } else {
+          document.body.appendChild(host);
+        }
+        resetHostPosition(host);
+        element.floating = false;
+        delete element.containerId;
+        element.selector = selector;
+        element.position = position;
+        const nextStyle = { ...(element.style || {}) };
+        nextStyle.position = '';
+        nextStyle.left = '';
+        nextStyle.top = '';
+        nextStyle.zIndex = '';
+        element.style = nextStyle;
+        clearPendingContainerAttachment(element.id);
+        dispatchDraftUpdateFromHost(host, {
+          elementId: element.id,
+          selector,
+          position,
+          style: {
+            position: '',
+            left: '',
+            top: '',
+            zIndex: '',
+          },
+          containerId: '',
+          floating: false,
+          bubbleSide: 'right',
+        });
+        return;
+      }
+    }
+    document.body.appendChild(host);
+    const rect = host.getBoundingClientRect();
+    const left = Math.round(rect.left + window.scrollX);
+    const top = Math.round(rect.top + window.scrollY);
+    host.style.position = 'absolute';
+    host.style.left = `${left}px`;
+    host.style.top = `${top}px`;
+    const nextStyle = { ...(element.style || {}) };
+    nextStyle.position = 'absolute';
+    nextStyle.left = `${left}px`;
+    nextStyle.top = `${top}px`;
+    nextStyle.zIndex = nextStyle.zIndex && nextStyle.zIndex.trim() ? nextStyle.zIndex : '2147482000';
+    element.style = nextStyle;
+    element.floating = true;
+    delete element.containerId;
+    clearPendingContainerAttachment(element.id);
+    dispatchDraftUpdateFromHost(host, {
+      elementId: element.id,
+      style: {
+        position: 'absolute',
+        left: nextStyle.left,
+        top: nextStyle.top,
+        zIndex: nextStyle.zIndex || '',
+      },
+      containerId: '',
+      floating: true,
+      bubbleSide: 'right',
+    });
   };
 
   const handleMove = (event) => {
     if (!dragging || event.pointerId !== pointerId) {
       return;
     }
+    lastPointerX = event.clientX;
+    lastPointerY = event.clientY;
     const host = getHostFromNode(node);
     if (!host) {
       return;
@@ -848,9 +1302,29 @@ function attachFloatingDragBehavior(node, element) {
     const nextTop = originTop + (event.clientY - startY);
     host.style.left = `${Math.round(nextLeft)}px`;
     host.style.top = `${Math.round(nextTop)}px`;
-    const dropTarget = findAreaDropTarget(event.clientX, event.clientY, element.id);
-    currentDropTarget = dropTarget;
-    updateHighlight(dropTarget);
+    const areaDropTarget = findAreaDropTarget(event.clientX, event.clientY, element.id);
+    if (areaDropTarget) {
+      currentDropTarget = { kind: 'area', area: areaDropTarget };
+      updateHighlight(areaDropTarget);
+      showAreaDropPreview(areaDropTarget, element);
+      hideDomDropIndicator();
+      return;
+    }
+    updateHighlight(null);
+    removeDropPreviewHost();
+    const domTarget = findDomDropTarget(event.clientX, event.clientY, host);
+    if (domTarget instanceof HTMLElement) {
+      const placement = resolveDomDropPlacement(domTarget, event.clientX, event.clientY);
+      if (placement) {
+        currentDropTarget = { kind: 'dom', placement };
+        showDomDropPreview(placement, element);
+        showDomDropIndicator(placement.indicator);
+        return;
+      }
+    }
+    currentDropTarget = null;
+    hideDomDropIndicator();
+    removeDropPreviewHost();
   };
 
   node.addEventListener('pointerdown', (event) => {
@@ -866,6 +1340,8 @@ function attachFloatingDragBehavior(node, element) {
     pointerId = event.pointerId;
     startX = event.clientX;
     startY = event.clientY;
+    lastPointerX = event.clientX;
+    lastPointerY = event.clientY;
     const rect = host.getBoundingClientRect();
     originLeft = rect.left + window.scrollX;
     originTop = rect.top + window.scrollY;
@@ -885,8 +1361,12 @@ function attachFloatingDragBehavior(node, element) {
     }
     node.classList.add('page-augmentor-floating-dragging');
     node.style.userSelect = 'none';
+    updateHighlight(null);
     currentDropTarget = null;
     highlightedArea = null;
+    hideDomDropIndicator();
+    removeDropPreviewHost();
+    hideDomDropIndicator();
     try {
       node.setPointerCapture(pointerId);
     } catch (_error) {

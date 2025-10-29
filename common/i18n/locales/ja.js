@@ -77,6 +77,14 @@ mergeMessages(messages, {
       exporting: 'エクスポート中…',
       import: 'データをインポート',
       importing: 'インポート中…',
+      editModeEnable: '編集モードを開始',
+      editModeDisable: '編集モードを終了',
+    },
+    editMode: {
+      hint: 'すべての注入要素をハイライトし、ドラッグやクリックで直接編集できます。',
+      enabled: '編集モードを有効にしました。ページ上の要素をクリックすると編集バブルが開きます。',
+      disabled: '編集モードを終了しました。',
+      error: '編集モードを切り替えられませんでした: {error}',
     },
     creation: {
       started: 'ページ上に配置できる状態になりました。',

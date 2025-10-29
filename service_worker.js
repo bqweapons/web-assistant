@@ -165,6 +165,19 @@ addAsyncMessageListener(async (message, sender) => {
       });
       return true;
     }
+    case MessageType.SET_EDIT_MODE: {
+      const { enabled, tabId, pageUrl } = message.data || {};
+      const targetTabId = tabId ?? sender.tab?.id;
+      if (!targetTabId) {
+        throw new Error('Missing tabId for edit mode toggle.');
+      }
+      await sendMessageToFrames(targetTabId, {
+        type: MessageType.SET_EDIT_MODE,
+        pageUrl,
+        data: { enabled: Boolean(enabled) },
+      });
+      return true;
+    }
     default:
       return null;
   }

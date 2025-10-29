@@ -15,7 +15,7 @@ import { stepsToJSON } from './actionflow/serializer.js';
 import { createEditorState } from './state.js';
 import { parseFlowForBuilder } from './actionflow/parser-bridge.js';
 import { startPicker } from './actionflow/picker.js';
-import { attach as attachBubble, detach as detachBubble, positionRelativeTo } from './layout/placement.js';
+import { attach as attachBubble, detach as detachBubble } from './layout/placement.js';
 import { createStyleControls } from './editor/style-controls.js';
 import { createActionFlowController } from './editor/action-flow-controller.js';
 import {
@@ -505,6 +505,10 @@ function createElementBubble() {
       position,
       style,
     };
+    const selectorText = typeof state.selector === 'string' ? state.selector.trim() : '';
+    if (selectorText) {
+      payload.selector = selectorText;
+    }
     if (state.containerId && typeof state.containerId === 'string' && state.containerId.trim()) {
       payload.containerId = state.containerId.trim();
     } else {
@@ -660,6 +664,8 @@ function createElementBubble() {
     const hasContainerUpdate = Object.prototype.hasOwnProperty.call(detail || {}, 'containerId');
     const hasFloatingUpdate = Object.prototype.hasOwnProperty.call(detail || {}, 'floating');
     const hasBubbleSideUpdate = Object.prototype.hasOwnProperty.call(detail || {}, 'bubbleSide');
+    const hasSelectorUpdate = Object.prototype.hasOwnProperty.call(detail || {}, 'selector');
+    const hasPositionUpdate = Object.prototype.hasOwnProperty.call(detail || {}, 'position');
     const nextPatch = {};
     if (stylePatch) {
       nextPatch.style = { ...state.style, ...stylePatch };
@@ -674,6 +680,15 @@ function createElementBubble() {
     if (hasBubbleSideUpdate) {
       nextPatch.bubbleSide = detail.bubbleSide === 'left' ? 'left' : 'right';
     }
+    if (hasSelectorUpdate) {
+      const selectorValue =
+        typeof detail.selector === 'string' ? detail.selector.trim() : state.selector;
+      nextPatch.selector = selectorValue;
+    }
+    if (hasPositionUpdate) {
+      const positionValue = typeof detail.position === 'string' ? detail.position : state.position;
+      nextPatch.position = positionValue;
+    }
     if (Object.keys(nextPatch).length === 0) {
       return;
     }
@@ -682,9 +697,15 @@ function createElementBubble() {
       styleControls.merge(stylePatch);
     }
     if (hasBubbleSideUpdate) {
-      bubble.dataset.pageAugmentorPlacement = state.bubbleSide;
+      bubble.dataset.pageAugmentorPlacement = 'right';
     }
-    if (hasContainerUpdate || hasFloatingUpdate || hasBubbleSideUpdate) {
+    if (hasSelectorUpdate) {
+      selectorValue.textContent = state.selector;
+    }
+    if (hasPositionUpdate) {
+      positionSelect.value = state.position;
+    }
+    if (hasContainerUpdate || hasFloatingUpdate || hasBubbleSideUpdate || hasSelectorUpdate || hasPositionUpdate) {
       placementControls?.update();
     }
     updatePreview();
@@ -845,18 +866,40 @@ function createElementBubble() {
       return;
     }
     isAttached = true;
-    bubble.dataset.pageAugmentorPlacement = state.bubbleSide === 'left' ? 'left' : 'right';
+    bubble.dataset.pageAugmentorPlacement = 'right';
     attachBubble(bubble);
+    const margin = 32;
+    const desiredTop = 96;
+    const updateFixedPlacement = () => {
+      const bubbleHeight = bubble.offsetHeight || 0;
+      const maxTop = Math.max(margin, window.innerHeight - bubbleHeight - margin);
+      const top = Math.min(maxTop, Math.max(margin, desiredTop));
+      bubble.style.left = 'auto';
+      bubble.style.right = `${margin}px`;
+      bubble.style.bottom = 'auto';
+      bubble.style.top = `${Math.round(top)}px`;
+    };
+    const handleKeydown = (event) => {
+      if (event.key === 'Escape') {
+        event.preventDefault();
+        cancelHandler();
+      }
+    };
+    placementControls = {
+      update: updateFixedPlacement,
+      dispose() {
+        window.removeEventListener('resize', updateFixedPlacement);
+        window.removeEventListener('keydown', handleKeydown, true);
+      },
+    };
+    window.addEventListener('resize', updateFixedPlacement);
+    window.addEventListener('keydown', handleKeydown, true);
+    updateFixedPlacement();
     requestAnimationFrame(() => {
       bubble.style.opacity = '1';
       bubble.style.transform = 'translateY(0)';
+      updateFixedPlacement();
       textInput.focus({ preventScroll: true });
-    });
-    placementControls = positionRelativeTo(currentTarget, bubble, {
-      onRequestClose: () => {
-        cancelHandler();
-      },
-      getPreferredSide: () => state.bubbleSide,
     });
     draftUpdateListener = (event) => handleDraftUpdate(event);
     window.addEventListener('page-augmentor-draft-update', draftUpdateListener);
@@ -891,6 +934,7 @@ function createElementBubble() {
       const { selector, target, values, suggestedStyle, onSubmit, onCancel, onPreview, mode } = config;
       currentTarget = target;
       selectorValue.textContent = selector;
+      state.selector = typeof selector === 'string' ? selector.trim() : '';
       previewHandler = typeof onPreview === 'function' ? onPreview : null;
       currentElementId = typeof values?.id === 'string' ? values.id : null;
       const initial = getDefaultElementValues(values, suggestedStyle, t);

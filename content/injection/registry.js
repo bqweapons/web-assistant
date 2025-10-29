@@ -1,19 +1,21 @@
-import { applyMetadata, createHost, flashHighlight, insertHost } from './dom.js';
+import { applyMetadata, createHost, flashHighlight, insertHost, clearPendingContainerAttachment } from './dom.js';
 
 /** @type {Map<string, import('../../common/types.js').InjectedElement>} */
 const elements = new Map();
 /** @type {Map<string, HTMLElement>} */
 const hosts = new Map();
 const editingElements = new Set();
+let editingMode = false;
 
 export function ensureElement(element) {
   elements.set(element.id, element);
   let host = hosts.get(element.id);
-  if (!host || !document.contains(host)) {
+  if (!host || !host.isConnected) {
     host = createHost(element);
     const inserted = insertHost(host, element);
     if (!inserted) {
       host.remove();
+      clearPendingContainerAttachment(element.id);
       return false;
     }
     hosts.set(element.id, host);
@@ -33,10 +35,11 @@ export function updateElement(element) {
     (previous.selector !== element.selector ||
       previous.position !== element.position ||
       hasAreaPositionChanged(previous, element));
-  if (!host || !document.contains(host) || locationChanged) {
-    if (host && document.contains(host)) {
+  if (!host || !host.isConnected || locationChanged) {
+    if (host?.isConnected) {
       host.remove();
     }
+    clearPendingContainerAttachment(element.id);
     hosts.delete(element.id);
     return ensureElement(element);
   }
@@ -48,6 +51,7 @@ export function updateElement(element) {
 export function removeElement(elementId) {
   elements.delete(elementId);
   const host = hosts.get(elementId);
+  clearPendingContainerAttachment(elementId);
   if (host) {
     hosts.delete(elementId);
     host.remove();
@@ -69,7 +73,7 @@ export function getElement(elementId) {
 
 export function getHost(elementId) {
   const host = hosts.get(elementId);
-  return host && document.contains(host) ? host : null;
+  return host?.isConnected ? host : null;
 }
 
 export function setEditingElement(elementId, editing) {
@@ -82,8 +86,17 @@ export function setEditingElement(elementId, editing) {
     editingElements.delete(elementId);
   }
   const host = hosts.get(elementId);
-  if (host && document.contains(host)) {
+  if (host?.isConnected) {
     applyEditingState(host, elementId);
+  }
+}
+
+export function setEditingMode(enabled) {
+  editingMode = Boolean(enabled);
+  for (const [elementId, host] of hosts.entries()) {
+    if (host?.isConnected) {
+      applyEditingState(host, elementId);
+    }
   }
 }
 
@@ -93,7 +106,7 @@ export function previewElement(elementId, overrides) {
     return;
   }
   const host = hosts.get(elementId);
-  if (!host || !document.contains(host)) {
+  if (!host || !host.isConnected) {
     return;
   }
   const merged = {
@@ -109,7 +122,7 @@ export function previewElement(elementId, overrides) {
 
 export function focusElement(elementId) {
   const host = hosts.get(elementId);
-  if (!host || !document.contains(host)) {
+  if (!host || !host.isConnected) {
     return false;
   }
   host.scrollIntoView({ behavior: 'smooth', block: 'center' });
@@ -138,7 +151,7 @@ function applyEditingState(host, elementId) {
   if (!(host instanceof HTMLElement)) {
     return;
   }
-  if (editingElements.has(elementId)) {
+  if (editingMode || editingElements.has(elementId)) {
     host.dataset.pageAugmentorEditing = 'true';
   } else {
     delete host.dataset.pageAugmentorEditing;

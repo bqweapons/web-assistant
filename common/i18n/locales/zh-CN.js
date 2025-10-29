@@ -77,6 +77,14 @@ mergeMessages(messages, {
       exporting: '正在导出…',
       import: '导入数据',
       importing: '正在导入…',
+      editModeEnable: '编辑模式',
+      editModeDisable: '退出编辑模式',
+    },
+    editMode: {
+      hint: '高亮所有已注入的元素，可直接拖动并点击进入编辑。',
+      enabled: '已开启编辑模式。在页面上点击任意元素即可打开编辑气泡。',
+      disabled: '已退出编辑模式。',
+      error: '无法切换编辑模式：{error}',
     },
     creation: {
       started: '元素已准备好，请在页面上摆放。',
