@@ -36,7 +36,7 @@ export function positionRelativeTo(target, bubble, options = {}) {
   let closed = false;
 
   const update = () => {
-    if (!target || !document.contains(target)) {
+    if (!target || !target.isConnected) {
       if (!closed && typeof onRequestClose === 'function') {
         closed = true;
         onRequestClose();

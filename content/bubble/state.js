@@ -3,6 +3,7 @@ const DEFAULT_STATE = {
   text: '',
   href: '',
   position: 'append',
+  selector: '',
   style: {},
   containerId: '',
   floating: true,
@@ -79,6 +80,7 @@ function mergeState(base, patch) {
   next.containerId = typeof patch.containerId === 'string' ? patch.containerId : base.containerId;
   next.floating = typeof patch.floating === 'boolean' ? patch.floating : base.floating;
   next.bubbleSide = typeof patch.bubbleSide === 'string' ? patch.bubbleSide : base.bubbleSide;
+  next.selector = typeof patch.selector === 'string' ? patch.selector : base.selector;
   return next;
 }
 
@@ -102,6 +104,7 @@ function cloneState(value) {
     text: value.text,
     href: value.href,
     position: value.position,
+    selector: value.selector || '',
     style: cloneRecord(value.style),
     containerId: typeof value.containerId === 'string' ? value.containerId : '',
     floating: Boolean(value.floating),

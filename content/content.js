@@ -4,6 +4,7 @@ import { sendMessage, MessageType } from '../common/messaging.js';
 import * as selectorModule from './selector.js';
 import * as injectModule from './inject.js';
 import { normalizePageUrl } from '../common/url.js';
+import { HOST_ATTRIBUTE } from './injection/constants.js';
 
 (async () => {
   if (window.__pageAugmentorInitialized) {
@@ -19,7 +20,60 @@ import { normalizePageUrl } from '../common/url.js';
     editorSession: /** @type {{ close: () => void } | null} */ (null),
     activeEditorElementId: /** @type {string | null} */ (null),
     creationElementId: /** @type {string | null} */ (null),
+    editingMode: false,
   };
+
+  function resolveHostFromEvent(event) {
+    if (!event || typeof event.composedPath !== 'function') {
+      return null;
+    }
+    const path = event.composedPath();
+    for (const node of path) {
+      if (node instanceof HTMLElement) {
+        if (node.dataset?.pageAugmentorRoot) {
+          return null;
+        }
+        if (node.hasAttribute(HOST_ATTRIBUTE)) {
+          return node;
+        }
+      }
+    }
+    return null;
+  }
+
+  function handleEditingClick(event) {
+    if (!state.editingMode) {
+      return;
+    }
+    const host = resolveHostFromEvent(event);
+    if (!(host instanceof HTMLElement)) {
+      return;
+    }
+    const elementId = host.getAttribute(HOST_ATTRIBUTE);
+    if (!elementId) {
+      return;
+    }
+    event.preventDefault();
+    event.stopPropagation();
+    if (typeof event.stopImmediatePropagation === 'function') {
+      event.stopImmediatePropagation();
+    }
+    openEditorBubble(elementId);
+  }
+
+  function applyEditingMode(enabled) {
+    const next = Boolean(enabled);
+    injectModule.setEditingMode(next);
+    if (state.editingMode === next) {
+      return;
+    }
+    state.editingMode = next;
+    if (next) {
+      document.addEventListener('click', handleEditingClick, true);
+    } else {
+      document.removeEventListener('click', handleEditingClick, true);
+    }
+  }
 
   await hydrateElements();
   setupMessageBridge();
@@ -63,8 +117,24 @@ import { normalizePageUrl } from '../common/url.js';
     if (!Array.isArray(list)) {
       return;
     }
+    const sorted = [...list].sort((a, b) => {
+      const rank = (value) => {
+        if (!value || typeof value !== 'object') {
+          return 2;
+        }
+        if (value.type === 'area') {
+          return 0;
+        }
+        if (typeof value.containerId === 'string' && value.containerId) {
+          return 1;
+        }
+        return 2;
+      };
+      const diff = rank(a) - rank(b);
+      return diff === 0 ? 0 : diff;
+    });
     const incomingIds = new Set();
-    list.forEach((element) => {
+    sorted.forEach((element) => {
       if (elementMatchesFrame(element)) {
         incomingIds.add(element.id);
         injectModule.ensureElement(element);
@@ -151,6 +221,11 @@ import { normalizePageUrl } from '../common/url.js';
             const opened = openEditorBubble(message.data.id);
             sendResponse?.({ ok: opened });
           }
+          break;
+        }
+        case MessageType.SET_EDIT_MODE: {
+          applyEditingMode(Boolean(message.data?.enabled));
+          sendResponse?.({ ok: true });
           break;
         }
         default:

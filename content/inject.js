@@ -9,4 +9,5 @@ export {
   focusElement,
   listElements,
   setEditingElement,
+  setEditingMode,
 } from './injection/registry.js';

@@ -23,7 +23,21 @@ export default function App() {
   const [creationType, setCreationType] = useState('button');
   const [exporting, setExporting] = useState(false);
   const [importing, setImporting] = useState(false);
+  const [editingMode, setEditingModeState] = useState(false);
   const importInputRef = useRef(null);
+  const editingModeRef = useRef(false);
+
+  useEffect(() => {
+    editingModeRef.current = editingMode;
+  }, [editingMode]);
+
+  useEffect(() => {
+    return () => {
+      if (editingModeRef.current && tabId) {
+        sendMessage(MessageType.SET_EDIT_MODE, { enabled: false, tabId, pageUrl }).catch(() => {});
+      }
+    };
+  }, [tabId, pageUrl]);
 
   const typeLabels = useMemo(
     () => ({
@@ -94,19 +108,26 @@ export default function App() {
     [pageUrl],
   );
 
-  const applyTabContext = useCallback((tab) => {
-    if (tab?.url) {
-      const normalized = normalizePageUrl(tab.url);
-      setTabId(tab.id);
-      setPageUrl((current) => (current === normalized ? current : normalized));
-      setContextInfo({ kind: 'url', value: normalized });
-    } else {
-      setTabId(undefined);
-      setPageUrl((current) => (current ? '' : current));
-      setContextInfo({ kind: 'message', key: 'context.noActiveTab' });
-      setItems([]);
-    }
-  }, []);
+  const applyTabContext = useCallback(
+    (tab) => {
+      const normalized = tab?.url ? normalizePageUrl(tab.url) : '';
+      if (editingModeRef.current && tabId && (!tab || tab.id !== tabId || (normalized && normalized !== pageUrl))) {
+        sendMessage(MessageType.SET_EDIT_MODE, { enabled: false, tabId, pageUrl }).catch(() => {});
+        setEditingModeState(false);
+      }
+      if (tab?.url) {
+        setTabId(tab.id);
+        setPageUrl((current) => (current === normalized ? current : normalized));
+        setContextInfo({ kind: 'url', value: normalized });
+      } else {
+        setTabId(undefined);
+        setPageUrl((current) => (current ? '' : current));
+        setContextInfo({ kind: 'message', key: 'context.noActiveTab' });
+        setItems([]);
+      }
+    },
+    [pageUrl, tabId],
+  );
 
   const resolveActiveTabContext = useCallback(async () => {
     try {
@@ -383,6 +404,26 @@ export default function App() {
     [pageUrl, tabId],
   );
 
+  const toggleEditingMode = useCallback(async () => {
+    if (!tabId) {
+      setCreationMessage(createMessage('context.tabUnavailable'));
+      return;
+    }
+    try {
+      await chrome.tabs.update(tabId, { active: true });
+    } catch (error) {
+      console.warn('Failed to activate tab before toggling edit mode', error);
+    }
+    const next = !editingMode;
+    try {
+      await sendMessage(MessageType.SET_EDIT_MODE, { enabled: next, tabId, pageUrl });
+      setEditingModeState(next);
+      setCreationMessage(createMessage(next ? 'manage.editMode.enabled' : 'manage.editMode.disabled'));
+    } catch (error) {
+      setCreationMessage(createMessage('manage.editMode.error', { error: error.message }));
+    }
+  }, [editingMode, pageUrl, tabId]);
+
   const contextLabelText = contextInfo?.kind === 'url' ? contextInfo.value : t(contextInfo.key, contextInfo.values);
   const statusMessageText = creationMessage ? t(creationMessage.key, creationMessage.values) : '';
 
@@ -450,8 +491,27 @@ export default function App() {
                   {t('manage.actions.addElement')}
                 </button>
               </div>
-            </div>
-          </section>
+              </div>
+            </section>
+
+            <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-brand">
+              <div className="flex flex-wrap items-center gap-3">
+                <button
+                  type="button"
+                  aria-pressed={editingMode}
+                  className={`rounded-xl px-4 py-2 text-sm font-semibold transition focus:outline-none focus:ring-2 focus:ring-blue-100 ${
+                    editingMode
+                      ? 'bg-emerald-500 text-white shadow-lg hover:bg-emerald-600'
+                      : 'border border-slate-200 bg-white text-slate-700 shadow-sm hover:bg-slate-100'
+                  } disabled:cursor-not-allowed disabled:opacity-60`}
+                  onClick={toggleEditingMode}
+                  disabled={!tabId}
+                >
+                  {editingMode ? t('manage.actions.editModeDisable') : t('manage.actions.editModeEnable')}
+                </button>
+                <span className="text-sm text-slate-500">{t('manage.editMode.hint')}</span>
+              </div>
+            </section>
 
           <section className="flex flex-col gap-3 rounded-2xl border border-slate-200 bg-white p-5 shadow-brand md:flex-row md:items-end md:justify-between">
             <label className="flex w-full flex-col gap-2 text-sm text-slate-700 md:max-w-md">

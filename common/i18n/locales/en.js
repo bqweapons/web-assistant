@@ -72,6 +72,14 @@ const messages = {
       exporting: 'Exporting...',
       import: 'Import data',
       importing: 'Importing...',
+      editModeEnable: 'Enter edit mode',
+      editModeDisable: 'Exit edit mode',
+    },
+    editMode: {
+      hint: 'Highlight every injected element to drag and edit directly.',
+      enabled: 'Edit mode enabled. Click an element on the page to open its editor.',
+      disabled: 'Edit mode disabled.',
+      error: 'Unable to toggle edit mode: {error}',
     },
     creation: {
       started: 'Element ready to place on the page.',
