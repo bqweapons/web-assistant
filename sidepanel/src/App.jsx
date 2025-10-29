@@ -20,10 +20,9 @@ export default function App() {
   const [filterType, setFilterType] = useState('all');
   const [creationMessage, setCreationMessage] = useState(null);
   const [activeTab, setActiveTab] = useState('home');
-  const [pendingPicker, setPendingPicker] = useState(false);
+  const [creationType, setCreationType] = useState('button');
   const [exporting, setExporting] = useState(false);
   const [importing, setImporting] = useState(false);
-  const pendingPickerRef = useRef(false);
   const importInputRef = useRef(null);
 
   const typeLabels = useMemo(
@@ -183,12 +182,14 @@ export default function App() {
                 : createMessage('manage.picker.selected'),
             );
           }
-          setPendingPicker(false);
           break;
         }
         case MessageType.PICKER_CANCELLED:
-          setCreationMessage(createMessage('manage.picker.cancelled'));
-          setPendingPicker(false);
+          if (message.data?.error) {
+            setCreationMessage(createMessage('manage.creation.error', { error: message.data.error }));
+          } else {
+            setCreationMessage(createMessage('manage.picker.cancelled'));
+          }
           break;
         case MessageType.REHYDRATE:
           setItems(Array.isArray(message.data) ? message.data : []);
@@ -224,18 +225,6 @@ export default function App() {
     };
   }, [pageUrl, t]);
 
-  useEffect(() => {
-    pendingPickerRef.current = pendingPicker;
-  }, [pendingPicker]);
-
-  useEffect(() => {
-    return () => {
-      if (pendingPickerRef.current && tabId && pageUrl) {
-        sendMessage(MessageType.CANCEL_PICKER, { tabId, pageUrl }).catch(() => {});
-      }
-    };
-  }, [pageUrl, tabId]);
-
   const filteredItems = useMemo(() => {
     const query = filterText.trim().toLowerCase();
     return items
@@ -258,18 +247,6 @@ export default function App() {
       .slice()
       .sort((a, b) => b.createdAt - a.createdAt);
   }, [filterText, filterType, items]);
-
-  const cancelActivePicker = useCallback(async () => {
-    if (!pendingPicker || !tabId || !pageUrl) {
-      return;
-    }
-    setPendingPicker(false);
-    try {
-      await sendMessage(MessageType.CANCEL_PICKER, { tabId, pageUrl });
-    } catch (error) {
-      console.warn('Failed to cancel picker', error);
-    }
-  }, [pendingPicker, tabId, pageUrl]);
 
   const handleExport = useCallback(async () => {
     setExporting(true);
@@ -337,9 +314,6 @@ export default function App() {
   );
 
   const handleStartCreation = useCallback(async () => {
-    if (pendingPicker) {
-      await cancelActivePicker();
-    }
     if (!pageUrl) {
       setCreationMessage(createMessage('context.pageUrlUnavailable'));
       return;
@@ -348,15 +322,13 @@ export default function App() {
       setCreationMessage(createMessage('context.tabUnavailable'));
       return;
     }
-    setPendingPicker(true);
-    setCreationMessage(createMessage('manage.picker.instructions'));
     try {
-      await sendMessage(MessageType.START_PICKER, { tabId, pageUrl, mode: 'create' });
+      await sendMessage(MessageType.INIT_CREATE, { tabId, pageUrl, type: creationType });
+      setCreationMessage(createMessage('manage.creation.started'));
     } catch (error) {
-      setPendingPicker(false);
-      setCreationMessage(createMessage('manage.picker.startError', { error: error.message }));
+      setCreationMessage(createMessage('manage.creation.error', { error: error.message }));
     }
-  }, [cancelActivePicker, pageUrl, pendingPicker, tabId]);
+  }, [creationType, pageUrl, tabId]);
 
   const focusElement = useCallback(
     async (id) => {
@@ -451,29 +423,32 @@ export default function App() {
       {activeTab === 'home' && (
         <>
           <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-brand">
-            <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-              <div>
+            <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+              <div className="space-y-1">
                 <h2 className="text-lg font-semibold text-slate-900">{t('manage.sections.add.title')}</h2>
                 <p className="text-xs text-slate-500">{t('manage.sections.add.description')}</p>
               </div>
-              <div className="flex gap-3">
+              <div className="flex flex-col gap-2 md:flex-row md:items-center md:gap-3">
+                <label className="flex flex-col gap-2 text-xs font-semibold uppercase tracking-wide text-slate-500">
+                  {t('manage.sections.add.typeLabel')}
+                  <select
+                    className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-700 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-100"
+                    value={creationType}
+                    onChange={(event) => setCreationType(event.target.value)}
+                  >
+                    <option value="button">{t('type.button')}</option>
+                    <option value="link">{t('type.link')}</option>
+                    <option value="tooltip">{t('type.tooltip')}</option>
+                    <option value="area">{t('type.area')}</option>
+                  </select>
+                </label>
                 <button
                   type="button"
-                  className="rounded-xl bg-gradient-to-r from-blue-600 to-violet-500 px-4 py-2 text-sm font-semibold text-white shadow-lg transition hover:shadow-xl disabled:cursor-not-allowed disabled:opacity-60"
+                  className="rounded-xl bg-gradient-to-r from-blue-600 to-violet-500 px-4 py-2 text-sm font-semibold text-white shadow-lg transition hover:shadow-xl"
                   onClick={handleStartCreation}
-                  disabled={pendingPicker}
                 >
-                  {pendingPicker ? t('manage.actions.picking') : t('manage.actions.pick')}
+                  {t('manage.actions.addElement')}
                 </button>
-                {pendingPicker && (
-                  <button
-                    type="button"
-                    className="rounded-xl border border-slate-200 bg-slate-100 px-4 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-200"
-                    onClick={cancelActivePicker}
-                  >
-                    {t('manage.actions.cancel')}
-                  </button>
-                )}
               </div>
             </div>
           </section>

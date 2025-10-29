@@ -54,7 +54,8 @@ mergeMessages(messages, {
     sections: {
       add: {
         title: '要素を追加',
-        description: 'ページ上のターゲットを選択すると、バブルエディターが開きます。',
+        description: '追加したい種類を選んで、ページ上の好きな場所に配置できます。',
+        typeLabel: '要素タイプ',
       },
       filters: {
         searchLabel: '検索',
@@ -65,17 +66,21 @@ mergeMessages(messages, {
           button: 'ボタン',
           link: 'リンク',
           tooltip: 'ツールチップ',
+          area: 'エリア',
         },
       },
     },
     actions: {
-      pick: 'ターゲットを選択',
-      picking: '選択中…',
+      addElement: '要素を追加',
       cancel: 'キャンセル',
       export: 'データをエクスポート',
       exporting: 'エクスポート中…',
       import: 'データをインポート',
       importing: 'インポート中…',
+    },
+    creation: {
+      started: 'ページ上に配置できる状態になりました。',
+      error: '要素の準備に失敗しました: {error}',
     },
     empty: '条件に一致する要素がありません。',
     item: {
@@ -154,6 +159,7 @@ mergeMessages(messages, {
     textLabel: 'テキスト',
     textPlaceholder: '表示するテキスト',
     tooltipTextPlaceholder: 'ツールチップのテキスト',
+    areaTextPlaceholder: 'このエリアに表示するメモ（任意）',
     hrefLabel: 'リンク URL',
     hrefOptionalLabel: '任意の URL',
     hrefTooltipLabel: 'リンク URL',

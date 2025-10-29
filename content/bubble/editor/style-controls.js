@@ -322,6 +322,9 @@ export function createStyleControls({ t }) {
   return {
     fieldset: styleFieldset,
     reset: resetStyleState,
+    merge(partial = {}) {
+      applyStylesToInputs(partial);
+    },
     attachInteractions,
     getStyle() {
       return { ...styleState };

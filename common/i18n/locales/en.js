@@ -49,7 +49,8 @@ const messages = {
     sections: {
       add: {
         title: 'Add element',
-        description: 'Pick a target on the page to open the bubble editor.',
+        description: 'Choose an element type and place it anywhere on the page.',
+        typeLabel: 'Element type',
       },
       filters: {
         searchLabel: 'Search',
@@ -65,13 +66,16 @@ const messages = {
       },
     },
     actions: {
-      pick: 'Pick target',
-      picking: 'Picking...',
+      addElement: 'Add element',
       cancel: 'Cancel',
       export: 'Export data',
       exporting: 'Exporting...',
       import: 'Import data',
       importing: 'Importing...',
+    },
+    creation: {
+      started: 'Element ready to place on the page.',
+      error: 'Unable to prepare the element: {error}',
     },
     empty: 'No elements match the current filters.',
     item: {

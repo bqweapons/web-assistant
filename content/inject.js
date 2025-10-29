@@ -8,4 +8,5 @@ export {
   previewElement,
   focusElement,
   listElements,
+  setEditingElement,
 } from './injection/registry.js';
