@@ -4,6 +4,9 @@ const DEFAULT_STATE = {
   href: '',
   position: 'append',
   style: {},
+  containerId: '',
+  floating: true,
+  bubbleSide: 'right',
   actionFlowMode: 'builder',
   actionFlow: '',
   actionFlowError: '',
@@ -73,6 +76,9 @@ function mergeState(base, patch) {
   };
   next.style = cloneRecord(patch.style !== undefined ? patch.style : base.style);
   next.actionSteps = cloneArray(patch.actionSteps !== undefined ? patch.actionSteps : base.actionSteps);
+  next.containerId = typeof patch.containerId === 'string' ? patch.containerId : base.containerId;
+  next.floating = typeof patch.floating === 'boolean' ? patch.floating : base.floating;
+  next.bubbleSide = typeof patch.bubbleSide === 'string' ? patch.bubbleSide : base.bubbleSide;
   return next;
 }
 
@@ -97,6 +103,9 @@ function cloneState(value) {
     href: value.href,
     position: value.position,
     style: cloneRecord(value.style),
+    containerId: typeof value.containerId === 'string' ? value.containerId : '',
+    floating: Boolean(value.floating),
+    bubbleSide: value.bubbleSide === 'left' ? 'left' : 'right',
     actionFlowMode: value.actionFlowMode,
     actionFlow: value.actionFlow,
     actionFlowError: value.actionFlowError,

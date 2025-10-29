@@ -4,6 +4,7 @@ import { applyMetadata, createHost, flashHighlight, insertHost } from './dom.js'
 const elements = new Map();
 /** @type {Map<string, HTMLElement>} */
 const hosts = new Map();
+const editingElements = new Set();
 
 export function ensureElement(element) {
   elements.set(element.id, element);
@@ -19,6 +20,7 @@ export function ensureElement(element) {
   } else {
     applyMetadata(host, element);
   }
+  applyEditingState(host, element.id);
   return true;
 }
 
@@ -39,6 +41,7 @@ export function updateElement(element) {
     return ensureElement(element);
   }
   applyMetadata(host, element);
+  applyEditingState(host, element.id);
   return true;
 }
 
@@ -48,6 +51,7 @@ export function removeElement(elementId) {
   if (host) {
     hosts.delete(elementId);
     host.remove();
+    editingElements.delete(elementId);
     return true;
   }
   return false;
@@ -66,6 +70,21 @@ export function getElement(elementId) {
 export function getHost(elementId) {
   const host = hosts.get(elementId);
   return host && document.contains(host) ? host : null;
+}
+
+export function setEditingElement(elementId, editing) {
+  if (!elementId) {
+    return;
+  }
+  if (editing) {
+    editingElements.add(elementId);
+  } else {
+    editingElements.delete(elementId);
+  }
+  const host = hosts.get(elementId);
+  if (host && document.contains(host)) {
+    applyEditingState(host, elementId);
+  }
 }
 
 export function previewElement(elementId, overrides) {
@@ -113,4 +132,15 @@ function hasAreaPositionChanged(previous, next) {
   const prevTop = typeof prevStyle.top === 'string' ? prevStyle.top.trim() : '';
   const nextTop = typeof nextStyle.top === 'string' ? nextStyle.top.trim() : '';
   return prevLeft !== nextLeft || prevTop !== nextTop;
+}
+
+function applyEditingState(host, elementId) {
+  if (!(host instanceof HTMLElement)) {
+    return;
+  }
+  if (editingElements.has(elementId)) {
+    host.dataset.pageAugmentorEditing = 'true';
+  } else {
+    delete host.dataset.pageAugmentorEditing;
+  }
 }

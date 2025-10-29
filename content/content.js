@@ -18,6 +18,7 @@ import { normalizePageUrl } from '../common/url.js';
     pickerSession: /** @type {{ stop: () => void } | null} */ (null),
     editorSession: /** @type {{ close: () => void } | null} */ (null),
     activeEditorElementId: /** @type {string | null} */ (null),
+    creationElementId: /** @type {string | null} */ (null),
   };
 
   await hydrateElements();
@@ -71,6 +72,9 @@ import { normalizePageUrl } from '../common/url.js';
     });
     injectModule.listElements().forEach((existing) => {
       if (existing.pageUrl === pageUrl && elementMatchesFrame(existing) && !incomingIds.has(existing.id)) {
+        if (state.creationElementId && existing.id === state.creationElementId) {
+          return;
+        }
         injectModule.removeElement(existing.id);
       }
     });
@@ -129,6 +133,11 @@ import { normalizePageUrl } from '../common/url.js';
         }
         case MessageType.START_PICKER: {
           beginPicker(message.data || {});
+          sendResponse?.({ ok: true });
+          break;
+        }
+        case MessageType.INIT_CREATE: {
+          beginCreationSession(message.data || {});
           sendResponse?.({ ok: true });
           break;
         }
@@ -215,6 +224,141 @@ import { normalizePageUrl } from '../common/url.js';
     });
   }
 
+  function cancelCreationDraft() {
+    if (!state.creationElementId) {
+      return;
+    }
+    const draftId = state.creationElementId;
+    state.creationElementId = null;
+    if (state.activeEditorElementId === draftId) {
+      state.activeEditorElementId = null;
+    }
+    try {
+      injectModule.setEditingElement(draftId, false);
+    } catch (_error) {
+      // ignore editing cleanup failures
+    }
+    try {
+      injectModule.removeElement(draftId);
+    } catch (_error) {
+      // ignore removal failures
+    }
+  }
+
+  function buildDraftElement(type) {
+    const normalized = type === 'link' || type === 'tooltip' || type === 'area' ? type : 'button';
+    const id = crypto.randomUUID();
+    const now = Date.now();
+    const viewportWidth = Math.max(window.innerWidth || 0, 320);
+    const viewportHeight = Math.max(window.innerHeight || 0, 240);
+    const baseLeft = window.scrollX + viewportWidth / 2 - 140;
+    const baseTop = window.scrollY + viewportHeight / 2 - 60;
+    const style = {
+      position: 'absolute',
+      left: `${Math.round(Math.max(window.scrollX + 40, baseLeft))}px`,
+      top: `${Math.round(Math.max(window.scrollY + 40, baseTop))}px`,
+      zIndex: '2147482000',
+    };
+    if (normalized === 'area') {
+      style.minHeight = '180px';
+      style.width = '320px';
+    }
+    return {
+      id,
+      pageUrl,
+      type: normalized,
+      text: '',
+      selector: 'body',
+      position: 'append',
+      style,
+      tooltipPosition: normalized === 'tooltip' ? 'top' : undefined,
+      tooltipPersistent: normalized === 'tooltip' ? false : undefined,
+      frameSelectors: Array.isArray(frameContext.frameSelectors)
+        ? frameContext.frameSelectors.slice()
+        : [],
+      frameLabel: frameContext.frameLabel,
+      frameUrl: frameContext.frameUrl,
+      createdAt: now,
+      updatedAt: now,
+      floating: true,
+    };
+  }
+
+  function beginCreationSession(options = {}) {
+    stopPicker();
+    closeEditorBubble();
+    cancelCreationDraft();
+    const requestedType = typeof options.type === 'string' ? options.type : 'button';
+    const draft = buildDraftElement(requestedType);
+    const ensured = injectModule.ensureElement(draft);
+    if (!ensured) {
+      try {
+        chrome.runtime.sendMessage({
+          type: MessageType.PICKER_CANCELLED,
+          pageUrl,
+          data: { error: 'Unable to insert the element on this page.' },
+        });
+      } catch (_error) {
+        // ignore notification failures
+      }
+      return;
+    }
+    injectModule.setEditingElement(draft.id, true);
+    state.creationElementId = draft.id;
+    state.activeEditorElementId = draft.id;
+    const host = injectModule.getHost(draft.id);
+    if (!host) {
+      cancelCreationDraft();
+      return;
+    }
+    const session = selectorModule.openElementEditor({
+      mode: 'create',
+      target: host,
+      selector: draft.selector,
+      values: draft,
+      onPreview(updated) {
+        injectModule.previewElement(draft.id, updated || {});
+      },
+      onSubmit(updated) {
+        injectModule.previewElement(draft.id, updated || {});
+        injectModule.setEditingElement(draft.id, false);
+        state.creationElementId = null;
+        state.activeEditorElementId = null;
+        state.editorSession = null;
+        const payload = {
+          ...draft,
+          ...updated,
+          id: draft.id,
+          pageUrl,
+          selector: draft.selector,
+          position: draft.position,
+          frameSelectors: Array.isArray(frameContext.frameSelectors)
+            ? frameContext.frameSelectors.slice()
+            : [],
+          frameLabel: frameContext.frameLabel,
+          frameUrl: frameContext.frameUrl,
+          createdAt: draft.createdAt,
+          updatedAt: Date.now(),
+        };
+        sendMessage(MessageType.CREATE, payload).catch((error) =>
+          console.error('[PageAugmentor] Failed to save new element', error),
+        );
+      },
+      onCancel() {
+        injectModule.setEditingElement(draft.id, false);
+        cancelCreationDraft();
+        state.editorSession = null;
+        try {
+          chrome.runtime.sendMessage({ type: MessageType.PICKER_CANCELLED, pageUrl });
+        } catch (_error) {
+          // ignore notification errors
+        }
+      },
+    });
+    state.editorSession = session;
+    injectModule.focusElement(draft.id);
+  }
+
   /**
    * アクティブなピッカーを停止する。
    * Stops the active picker session.
@@ -258,6 +402,7 @@ import { normalizePageUrl } from '../common/url.js';
       return false;
     }
     state.activeEditorElementId = elementId;
+    injectModule.setEditingElement(elementId, true);
     const session = selectorModule.openElementEditor({
       target: host,
       selector: element.selector,
@@ -268,6 +413,7 @@ import { normalizePageUrl } from '../common/url.js';
       onSubmit(updated) {
         injectModule.previewElement(elementId, updated || {});
         state.activeEditorElementId = null;
+        injectModule.setEditingElement(elementId, false);
         closeEditorBubble();
         const payload = {
           ...element,
@@ -281,6 +427,7 @@ import { normalizePageUrl } from '../common/url.js';
         );
       },
       onCancel() {
+        injectModule.setEditingElement(elementId, false);
         closeEditorBubble();
       },
     });
@@ -304,11 +451,15 @@ import { normalizePageUrl } from '../common/url.js';
     }
     if (state.activeEditorElementId) {
       try {
+        injectModule.setEditingElement(state.activeEditorElementId, false);
         injectModule.previewElement(state.activeEditorElementId, {});
       } catch (error) {
         console.warn('[PageAugmentor] Failed to reset preview element', error);
       }
       state.activeEditorElementId = null;
+    }
+    if (state.creationElementId) {
+      cancelCreationDraft();
     }
   }
 

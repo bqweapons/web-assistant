@@ -17,6 +17,8 @@
  * @property {InjectedElementStyle | undefined} style
  * @property {'top' | 'right' | 'bottom' | 'left' | undefined} [tooltipPosition]
  * @property {boolean | undefined} [tooltipPersistent]
+ * @property {string | undefined} [containerId]
+ * @property {boolean | undefined} [floating]
  * @property {number} createdAt
  * @property {number | undefined} updatedAt
  */
@@ -42,6 +44,7 @@
  * @property {string | undefined} [width]
  * @property {string | undefined} [height]
  * @property {string | undefined} [zIndex]
+ * @property {string | undefined} [minHeight]
 */
 
 /**

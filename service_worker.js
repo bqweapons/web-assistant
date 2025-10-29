@@ -89,6 +89,18 @@ addAsyncMessageListener(async (message, sender) => {
       await sendMessageToFrames(targetTabId, { type: MessageType.START_PICKER, pageUrl, data: forwarded });
       return true;
     }
+    case MessageType.INIT_CREATE: {
+      const { tabId, pageUrl } = message.data || {};
+      const targetTabId = tabId ?? sender.tab?.id;
+      if (!targetTabId) {
+        throw new Error('Missing tabId for element creation.');
+      }
+      const forwarded = { ...(message.data || {}) };
+      delete forwarded.tabId;
+      delete forwarded.pageUrl;
+      await sendMessageToFrames(targetTabId, { type: MessageType.INIT_CREATE, pageUrl, data: forwarded });
+      return true;
+    }
     case MessageType.CANCEL_PICKER: {
       const { tabId, pageUrl } = message.data || {};
       const targetTabId = tabId ?? sender.tab?.id;
@@ -186,6 +198,21 @@ function validateElementPayload(payload) {
   if (!ELEMENT_TYPES.has(element.type)) {
     element.type = 'button';
   }
+  if (typeof element.containerId === 'string') {
+    const trimmed = element.containerId.trim();
+    if (trimmed && trimmed !== element.id) {
+      element.containerId = trimmed;
+    } else {
+      delete element.containerId;
+    }
+  } else {
+    delete element.containerId;
+  }
+  if (typeof element.floating === 'boolean') {
+    element.floating = element.floating;
+  } else {
+    delete element.floating;
+  }
   if (element.type === 'tooltip') {
     element.tooltipPosition = TOOLTIP_POSITIONS.has(element.tooltipPosition)
       ? element.tooltipPosition
@@ -239,9 +266,14 @@ function validateElementPayload(payload) {
     delete element.actionSelector;
     delete element.actionFlow;
     delete element.href;
+    element.floating = true;
+    delete element.containerId;
   } else {
     delete element.actionSelector;
     delete element.actionFlow;
+  }
+  if (element.containerId) {
+    element.floating = false;
   }
   if (Array.isArray(element.frameSelectors)) {
     element.frameSelectors = element.frameSelectors.map((value) => String(value));

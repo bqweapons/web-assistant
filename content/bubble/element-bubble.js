@@ -468,6 +468,8 @@ function createElementBubble() {
   let actionPickerCleanup = null;
   let isAttached = false;
   let placementControls = null;
+  let currentElementId = null;
+  let draftUpdateListener = null;
 
   const clearError = () => {
     errorLabel.textContent = '';
@@ -503,6 +505,12 @@ function createElementBubble() {
       position,
       style,
     };
+    if (state.containerId && typeof state.containerId === 'string' && state.containerId.trim()) {
+      payload.containerId = state.containerId.trim();
+    } else {
+      delete payload.containerId;
+    }
+    payload.floating = Boolean(state.floating);
     if (type === 'link') {
       if (hrefValue) {
         payload.href = hrefValue;
@@ -637,6 +645,48 @@ function createElementBubble() {
       }
     }
     actionFlowController.syncUI();
+    updatePreview();
+  };
+
+  const handleDraftUpdate = (event) => {
+    if (!event || typeof event !== 'object') {
+      return;
+    }
+    const detail = event.detail || {};
+    if (!detail || (currentElementId && detail.elementId && detail.elementId !== currentElementId)) {
+      return;
+    }
+    const stylePatch = detail && typeof detail.style === 'object' ? detail.style : null;
+    const hasContainerUpdate = Object.prototype.hasOwnProperty.call(detail || {}, 'containerId');
+    const hasFloatingUpdate = Object.prototype.hasOwnProperty.call(detail || {}, 'floating');
+    const hasBubbleSideUpdate = Object.prototype.hasOwnProperty.call(detail || {}, 'bubbleSide');
+    const nextPatch = {};
+    if (stylePatch) {
+      nextPatch.style = { ...state.style, ...stylePatch };
+    }
+    if (hasContainerUpdate) {
+      const containerValue = typeof detail.containerId === 'string' ? detail.containerId : '';
+      nextPatch.containerId = containerValue;
+    }
+    if (hasFloatingUpdate) {
+      nextPatch.floating = Boolean(detail.floating);
+    }
+    if (hasBubbleSideUpdate) {
+      nextPatch.bubbleSide = detail.bubbleSide === 'left' ? 'left' : 'right';
+    }
+    if (Object.keys(nextPatch).length === 0) {
+      return;
+    }
+    setState(nextPatch);
+    if (stylePatch) {
+      styleControls.merge(stylePatch);
+    }
+    if (hasBubbleSideUpdate) {
+      bubble.dataset.pageAugmentorPlacement = state.bubbleSide;
+    }
+    if (hasContainerUpdate || hasFloatingUpdate || hasBubbleSideUpdate) {
+      placementControls?.update();
+    }
     updatePreview();
   };
 
@@ -795,6 +845,7 @@ function createElementBubble() {
       return;
     }
     isAttached = true;
+    bubble.dataset.pageAugmentorPlacement = state.bubbleSide === 'left' ? 'left' : 'right';
     attachBubble(bubble);
     requestAnimationFrame(() => {
       bubble.style.opacity = '1';
@@ -805,7 +856,10 @@ function createElementBubble() {
       onRequestClose: () => {
         cancelHandler();
       },
+      getPreferredSide: () => state.bubbleSide,
     });
+    draftUpdateListener = (event) => handleDraftUpdate(event);
+    window.addEventListener('page-augmentor-draft-update', draftUpdateListener);
   }
 
   function detach() {
@@ -824,6 +878,10 @@ function createElementBubble() {
         detachBubble(bubble);
       }
     }, 160);
+    if (draftUpdateListener) {
+      window.removeEventListener('page-augmentor-draft-update', draftUpdateListener);
+      draftUpdateListener = null;
+    }
   }
 
   actionFlowController.setMainBubbleControls({ attach, detach });
@@ -834,6 +892,7 @@ function createElementBubble() {
       currentTarget = target;
       selectorValue.textContent = selector;
       previewHandler = typeof onPreview === 'function' ? onPreview : null;
+      currentElementId = typeof values?.id === 'string' ? values.id : null;
       const initial = getDefaultElementValues(values, suggestedStyle, t);
       state.type = initial.type;
       state.text = initial.text;
@@ -846,6 +905,9 @@ function createElementBubble() {
       state.position = initial.position;
       state.tooltipPosition = initial.tooltipPosition;
       state.tooltipPersistent = initial.tooltipPersistent;
+      state.containerId = typeof initial.containerId === 'string' ? initial.containerId : '';
+      state.floating = initial.floating !== false;
+      state.bubbleSide = 'right';
       typeSelect.value = state.type;
       textInput.value = state.text;
       hrefInput.value = state.href;
@@ -902,6 +964,7 @@ function createElementBubble() {
     close() {
       detach();
       currentTarget = null;
+      currentElementId = null;
     },
     destroy() {
       detach();
