@@ -984,6 +984,7 @@ function attachAreaDragBehavior(node, element) {
   let startY = 0;
   let originLeft = 0;
   let originTop = 0;
+  let startRect = null;
 
   const handleMove = (event) => {
     if (!dragging || pointerId !== event.pointerId) {
@@ -1004,12 +1005,15 @@ function attachAreaDragBehavior(node, element) {
       return;
     }
     dragging = false;
+    pointerId = null;
     node.classList.remove('page-augmentor-area-dragging');
     node.style.userSelect = '';
     const host = getHostFromNode(node);
     if (!host) {
       return;
     }
+    host.style.width = '';
+    host.style.height = '';
     const rect = host.getBoundingClientRect();
     const style = {
       ...(element.style || {}),
@@ -1047,6 +1051,16 @@ function attachAreaDragBehavior(node, element) {
     const rect = host.getBoundingClientRect();
     originLeft = rect.left + window.scrollX;
     originTop = rect.top + window.scrollY;
+    startRect = rect;
+    host.style.width = `${rect.width}px`;
+    host.style.height = `${rect.height}px`;
+    host.style.position = 'absolute';
+    host.style.left = `${Math.round(originLeft)}px`;
+    host.style.top = `${Math.round(originTop)}px`;
+    host.style.zIndex = element.style?.zIndex && element.style.zIndex.trim() ? element.style.zIndex : '2147482000';
+    if (host.parentElement !== document.body) {
+      document.body.appendChild(host);
+    }
     node.classList.add('page-augmentor-area-dragging');
     node.style.userSelect = 'none';
     try {
@@ -1065,12 +1079,10 @@ function attachAreaDragBehavior(node, element) {
       } catch (_error) {
         // ignore release issues
       }
-      pointerId = null;
       finalizeDrag();
     }
   });
   node.addEventListener('pointercancel', () => {
-    pointerId = null;
     finalizeDrag();
   });
 }
