@@ -151,6 +151,11 @@ function applyEditingState(host, elementId) {
   if (!(host instanceof HTMLElement)) {
     return;
   }
+  if (editingMode) {
+    host.dataset.pageAugmentorGlobalEditing = 'true';
+  } else {
+    delete host.dataset.pageAugmentorGlobalEditing;
+  }
   if (editingMode || editingElements.has(elementId)) {
     host.dataset.pageAugmentorEditing = 'true';
   } else {

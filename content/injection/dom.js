@@ -1090,12 +1090,16 @@ function attachFloatingDragBehavior(node, element) {
   node.dataset.floatingElementId = element.id;
   node.style.touchAction = 'none';
 
+  const DRAG_ACTIVATION_THRESHOLD = 4;
   let dragging = false;
+  let dragStarted = false;
   let pointerId = null;
   let startX = 0;
   let startY = 0;
   let originLeft = 0;
   let originTop = 0;
+  let lastPointerX = 0;
+  let lastPointerY = 0;
   let originalContainerId = typeof element.containerId === 'string' ? element.containerId : '';
   let originalFloating = element.floating !== false;
   let originalStyle = { ...(element.style || {}) };
@@ -1105,8 +1109,7 @@ function attachFloatingDragBehavior(node, element) {
     null
   );
   let highlightedArea = null;
-  let lastPointerX = 0;
-  let lastPointerY = 0;
+  let startRect = null;
 
   const updateHighlight = (areaTarget) => {
     if (highlightedArea && highlightedArea !== areaTarget) {
@@ -1116,6 +1119,41 @@ function attachFloatingDragBehavior(node, element) {
     if (areaTarget && areaTarget.areaNode && highlightedArea !== areaTarget) {
       areaTarget.areaNode.classList.add('page-augmentor-area-drop-target');
       highlightedArea = areaTarget;
+    }
+  };
+
+  const startDragging = () => {
+    if (dragStarted) {
+      return;
+    }
+    const host = getHostFromNode(node);
+    if (!host) {
+      return;
+    }
+    dragStarted = true;
+    if (startRect) {
+      host.style.width = `${startRect.width}px`;
+      host.style.height = `${startRect.height}px`;
+    }
+    host.style.position = 'absolute';
+    host.style.left = `${Math.round(originLeft)}px`;
+    host.style.top = `${Math.round(originTop)}px`;
+    host.style.zIndex = originalStyle.zIndex && originalStyle.zIndex.trim() ? originalStyle.zIndex : '2147482000';
+    if (host.parentElement !== document.body) {
+      document.body.appendChild(host);
+    }
+    node.classList.add('page-augmentor-floating-dragging');
+    node.style.userSelect = 'none';
+    currentDropTarget = null;
+    highlightedArea = null;
+    hideDomDropIndicator();
+    removeDropPreviewHost();
+    if (pointerId !== null) {
+      try {
+        node.setPointerCapture(pointerId);
+      } catch (_error) {
+        // ignore capture issues
+      }
     }
   };
 
@@ -1133,6 +1171,8 @@ function attachFloatingDragBehavior(node, element) {
     }
     pointerId = null;
     dragging = false;
+    dragStarted = false;
+    startRect = null;
     node.classList.remove('page-augmentor-floating-dragging');
     node.style.userSelect = '';
     updateHighlight(null);
@@ -1140,9 +1180,6 @@ function attachFloatingDragBehavior(node, element) {
     removeDropPreviewHost();
     host.style.width = '';
     host.style.height = '';
-
-    const dropTarget = currentDropTarget;
-    currentDropTarget = null;
 
     if (!commit) {
       if (originalParent instanceof Node) {
@@ -1182,6 +1219,8 @@ function attachFloatingDragBehavior(node, element) {
       return;
     }
 
+    const dropTarget = currentDropTarget;
+    currentDropTarget = null;
     if (dropTarget && dropTarget.kind === 'area' && dropTarget.area?.content) {
       dropTarget.area.content.appendChild(host);
       resetHostPosition(host);
@@ -1258,6 +1297,7 @@ function attachFloatingDragBehavior(node, element) {
         return;
       }
     }
+
     document.body.appendChild(host);
     const rect = host.getBoundingClientRect();
     const left = Math.round(rect.left + window.scrollX);
@@ -1298,6 +1338,14 @@ function attachFloatingDragBehavior(node, element) {
     if (!host) {
       return;
     }
+    if (!dragStarted) {
+      const deltaX = Math.abs(event.clientX - startX);
+      const deltaY = Math.abs(event.clientY - startY);
+      if (deltaX <= DRAG_ACTIVATION_THRESHOLD && deltaY <= DRAG_ACTIVATION_THRESHOLD) {
+        return;
+      }
+      startDragging();
+    }
     const nextLeft = originLeft + (event.clientX - startX);
     const nextTop = originTop + (event.clientY - startY);
     host.style.left = `${Math.round(nextLeft)}px`;
@@ -1337,6 +1385,7 @@ function attachFloatingDragBehavior(node, element) {
     }
     dispatchDraftUpdateFromHost(host, { bubbleSide: 'left' });
     dragging = true;
+    dragStarted = false;
     pointerId = event.pointerId;
     startX = event.clientX;
     startY = event.clientY;
@@ -1350,35 +1399,22 @@ function attachFloatingDragBehavior(node, element) {
     originalStyle = { ...(element.style || {}) };
     originalParent = host.parentNode;
     originalNextSibling = host.nextSibling;
-    host.style.width = `${rect.width}px`;
-    host.style.height = `${rect.height}px`;
-    host.style.position = 'absolute';
-    host.style.left = `${Math.round(originLeft)}px`;
-    host.style.top = `${Math.round(originTop)}px`;
-    host.style.zIndex = originalStyle.zIndex && originalStyle.zIndex.trim() ? originalStyle.zIndex : '2147482000';
-    if (host.parentElement !== document.body) {
-      document.body.appendChild(host);
-    }
-    node.classList.add('page-augmentor-floating-dragging');
-    node.style.userSelect = 'none';
-    updateHighlight(null);
     currentDropTarget = null;
     highlightedArea = null;
+    startRect = rect;
     hideDomDropIndicator();
     removeDropPreviewHost();
-    hideDomDropIndicator();
-    try {
-      node.setPointerCapture(pointerId);
-    } catch (_error) {
-      // ignore capture issues
+    const isGlobalEditing = host.dataset.pageAugmentorGlobalEditing === 'true';
+    if (!isGlobalEditing) {
+      startDragging();
+      event.preventDefault();
     }
-    event.preventDefault();
   });
 
   node.addEventListener('pointermove', handleMove);
   node.addEventListener('pointerup', (event) => {
     if (event.pointerId === pointerId) {
-      finalizeDrag(true);
+      finalizeDrag(dragStarted);
     }
   });
   node.addEventListener('pointercancel', () => {
