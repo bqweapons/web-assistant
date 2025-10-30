@@ -72,25 +72,6 @@ import { HOST_ATTRIBUTE } from './injection/constants.js';
       document.addEventListener('click', handleEditingClick, true);
     } else {
       document.removeEventListener('click', handleEditingClick, true);
-      persistPendingChanges().catch((error) => {
-        console.error('[PageAugmentor] Failed to persist changes', error);
-      });
-    }
-  }
-
-  async function persistPendingChanges() {
-    const elements = injectModule
-      .listElements()
-      .filter((element) => elementMatchesFrame(element));
-    if (elements.length === 0) {
-      return;
-    }
-    for (const element of elements) {
-      try {
-        await sendMessage(MessageType.UPDATE, element);
-      } catch (error) {
-        console.error('[PageAugmentor] Persist update failed', error);
-      }
     }
   }
 
