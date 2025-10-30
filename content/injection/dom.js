@@ -21,6 +21,7 @@ export function createHost(element) {
     :host {
       all: initial;
       display: inline-block;
+      position: relative;
     }
     .${NODE_CLASS} {
       pointer-events: auto;
@@ -29,6 +30,46 @@ export function createHost(element) {
     :host([data-page-augmentor-editing='true']) .${NODE_CLASS} {
       outline: 1px dashed rgba(37, 99, 235, 0.4);
       outline-offset: 2px;
+    }
+    :host([data-page-augmentor-editing='true'][data-page-augmentor-resizable='true']) .page-augmentor-resize-overlay {
+      display: block;
+    }
+    :host([data-page-augmentor-editing='true'][data-page-augmentor-resizable='true']) .page-augmentor-resize-handle {
+      opacity: 1;
+    }
+    .page-augmentor-resize-overlay {
+      position: absolute;
+      inset: 0;
+      pointer-events: none;
+      display: none;
+    }
+    .page-augmentor-resize-handle {
+      position: absolute;
+      width: 10px;
+      height: 10px;
+      border-radius: 9999px;
+      background-color: rgba(37, 99, 235, 0.9);
+      box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.9);
+      pointer-events: auto;
+      opacity: 0;
+      transition: opacity 0.15s ease;
+    }
+    .page-augmentor-resize-handle[data-resize='east'] {
+      top: 50%;
+      right: -6px;
+      transform: translateY(-50%);
+      cursor: ew-resize;
+    }
+    .page-augmentor-resize-handle[data-resize='south'] {
+      left: 50%;
+      bottom: -6px;
+      transform: translateX(-50%);
+      cursor: ns-resize;
+    }
+    .page-augmentor-resize-handle[data-resize='southeast'] {
+      right: -6px;
+      bottom: -6px;
+      cursor: nwse-resize;
     }
     button.${NODE_CLASS} {
       display: inline-flex;
@@ -186,6 +227,8 @@ export function createHost(element) {
   hydrateNode(node, element);
   const styleTarget = getStyleTarget(node);
   applyStyle(styleTarget, element.style);
+  ensureResizeOverlay(host, node, element);
+  bindInlineEditorRequest(host, element.id);
   return host;
 }
 
@@ -207,6 +250,8 @@ export function applyMetadata(host, element) {
   hydrateNode(node, element);
   const styleTarget = getStyleTarget(node);
   applyStyle(styleTarget, element.style);
+  ensureResizeOverlay(host, node, element);
+  bindInlineEditorRequest(host, element.id);
 }
 
 export function insertHost(host, element) {
@@ -453,6 +498,277 @@ function applyButtonBehavior(node, href, actionSelector, actionFlow) {
 }
 
 
+function isElementResizable(element) {
+  if (!element) {
+    return false;
+  }
+  if (element.type === 'area') {
+    return true;
+  }
+  if (element.type === 'tooltip') {
+    return false;
+  }
+  return element.floating !== false;
+}
+
+function ensureResizeOverlay(host, node, element) {
+  if (!(host instanceof HTMLElement) || !(node instanceof HTMLElement)) {
+    return;
+  }
+  const shadow = host.shadowRoot;
+  if (!shadow) {
+    return;
+  }
+  const shouldEnable = isElementResizable(element);
+  let overlay = shadow.querySelector('.page-augmentor-resize-overlay');
+  if (!shouldEnable) {
+    delete host.dataset.pageAugmentorResizable;
+    if (overlay) {
+      overlay.remove();
+    }
+    return;
+  }
+  host.dataset.pageAugmentorResizable = 'true';
+  if (overlay) {
+    overlay.remove();
+  }
+  overlay = createResizeOverlay(node, element);
+  if (overlay) {
+    shadow.appendChild(overlay);
+  }
+}
+
+function createResizeOverlay(node, element) {
+  if (!(node instanceof HTMLElement)) {
+    return null;
+  }
+  const overlay = document.createElement('div');
+  overlay.className = 'page-augmentor-resize-overlay';
+  overlay.dataset.pageAugmentorResizeElement = typeof element?.id === 'string' ? element.id : '';
+  const handles = [
+    { name: 'east', axes: ['width'] },
+    { name: 'south', axes: ['height'] },
+    { name: 'southeast', axes: ['width', 'height'] },
+  ];
+  handles.forEach((config) => {
+    const handle = document.createElement('div');
+    handle.className = 'page-augmentor-resize-handle';
+    handle.dataset.resize = config.name;
+    handle.dataset.axes = config.axes.join(',');
+    overlay.appendChild(handle);
+  });
+  bindResizeHandles(overlay, node, element);
+  return overlay;
+}
+
+function bindResizeHandles(overlay, node, element) {
+  if (!(overlay instanceof HTMLElement) || !(node instanceof HTMLElement)) {
+    return;
+  }
+  const handles = overlay.querySelectorAll('.page-augmentor-resize-handle');
+  handles.forEach((handle) => {
+    if (!(handle instanceof HTMLElement)) {
+      return;
+    }
+    handle.addEventListener('pointerdown', (event) => {
+      if (event.button !== 0 && event.button !== -1) {
+        return;
+      }
+      const host = getHostFromNode(node);
+      if (!host || host.dataset.pageAugmentorEditing !== 'true') {
+        return;
+      }
+      const styleTarget = getStyleTarget(node) || node;
+      if (!(styleTarget instanceof HTMLElement)) {
+        return;
+      }
+      const axes = (handle.dataset.axes || '').split(',').filter(Boolean);
+      if (axes.length === 0) {
+        return;
+      }
+      const rect = styleTarget.getBoundingClientRect();
+      const pointerId = event.pointerId;
+      const startX = event.clientX;
+      const startY = event.clientY;
+      const initialWidth = rect.width;
+      const initialHeight = rect.height;
+      const MIN_WIDTH = 48;
+      const MIN_HEIGHT = 32;
+      const originalInlineWidth = styleTarget.style.width;
+      const originalInlineHeight = styleTarget.style.height;
+      let nextWidth = initialWidth;
+      let nextHeight = initialHeight;
+
+      const applySize = (width, height) => {
+        if (axes.includes('width')) {
+          nextWidth = Math.max(MIN_WIDTH, width);
+          styleTarget.style.width = `${Math.round(nextWidth)}px`;
+        }
+        if (axes.includes('height')) {
+          nextHeight = Math.max(MIN_HEIGHT, height);
+          styleTarget.style.height = `${Math.round(nextHeight)}px`;
+        }
+      };
+
+      const handleMove = (moveEvent) => {
+        if (moveEvent.pointerId !== pointerId) {
+          return;
+        }
+        moveEvent.preventDefault();
+        const deltaX = moveEvent.clientX - startX;
+        const deltaY = moveEvent.clientY - startY;
+        applySize(initialWidth + deltaX, initialHeight + deltaY);
+      };
+
+      const finishResize = (commit) => {
+        const activeHost = getHostFromNode(node);
+        if (commit && activeHost) {
+          const style = { ...(element.style || {}) };
+          const patch = {};
+          if (axes.includes('width')) {
+            const value = `${Math.round(nextWidth)}px`;
+            style.width = value;
+            patch.width = value;
+          }
+          if (axes.includes('height')) {
+            const value = `${Math.round(nextHeight)}px`;
+            style.height = value;
+            patch.height = value;
+          }
+          element.style = style;
+          dispatchDraftUpdateFromHost(activeHost, { style: patch });
+        } else if (!commit) {
+          styleTarget.style.width = originalInlineWidth;
+          styleTarget.style.height = originalInlineHeight;
+        }
+        window.removeEventListener('pointermove', handleMove, true);
+        window.removeEventListener('pointerup', handleUp, true);
+        window.removeEventListener('pointercancel', handleCancel, true);
+        if (activeHost) {
+          delete activeHost.dataset.pageAugmentorPointerDrag;
+        }
+        try {
+          handle.releasePointerCapture(pointerId);
+        } catch (_error) {
+          // ignore capture release failures
+        }
+      };
+
+      const handleUp = (upEvent) => {
+        if (upEvent.pointerId === pointerId) {
+          finishResize(true);
+        }
+      };
+
+      const handleCancel = () => {
+        finishResize(false);
+      };
+
+      try {
+        handle.setPointerCapture(pointerId);
+      } catch (_error) {
+        // ignore capture issues
+      }
+
+      host.dataset.pageAugmentorPointerDrag = 'true';
+      window.addEventListener('pointermove', handleMove, true);
+      window.addEventListener('pointerup', handleUp, true);
+      window.addEventListener('pointercancel', handleCancel, true);
+      event.preventDefault();
+      event.stopPropagation();
+    });
+  });
+}
+
+function bindInlineEditorRequest(host, elementId) {
+  if (!(host instanceof HTMLElement) || !elementId) {
+    return;
+  }
+  if (host.dataset.pageAugmentorInlineBound === 'true') {
+    host.dataset.pageAugmentorInlineElementId = elementId;
+    return;
+  }
+  host.dataset.pageAugmentorInlineBound = 'true';
+  host.dataset.pageAugmentorInlineElementId = elementId;
+  let pointerActive = false;
+  let pointerMoved = false;
+
+  const resetPointerState = () => {
+    pointerActive = false;
+    pointerMoved = false;
+  };
+
+  host.addEventListener(
+    'pointerdown',
+    (event) => {
+      if (event.button !== 0 && event.button !== -1) {
+        resetPointerState();
+        return;
+      }
+      if (host.dataset.pageAugmentorEditing !== 'true') {
+        resetPointerState();
+        return;
+      }
+      pointerActive = true;
+      pointerMoved = false;
+    },
+    true,
+  );
+
+  host.addEventListener(
+    'pointermove',
+    () => {
+      if (pointerActive) {
+        pointerMoved = true;
+      }
+    },
+    true,
+  );
+
+  host.addEventListener(
+    'pointerup',
+    () => {
+      pointerActive = false;
+    },
+    true,
+  );
+
+  host.addEventListener(
+    'pointercancel',
+    () => {
+      resetPointerState();
+    },
+    true,
+  );
+
+  host.addEventListener('click', (event) => {
+    if (host.dataset.pageAugmentorEditing !== 'true') {
+      return;
+    }
+    if (host.dataset.pageAugmentorPointerDrag === 'true') {
+      return;
+    }
+    if (pointerMoved) {
+      pointerMoved = false;
+      return;
+    }
+    const targetId = host.dataset.pageAugmentorInlineElementId || elementId;
+    if (!targetId) {
+      return;
+    }
+    event.preventDefault();
+    event.stopPropagation();
+    host.dispatchEvent(
+      new CustomEvent('page-augmentor-inline-edit-request', {
+        detail: { elementId: targetId },
+        bubbles: true,
+        composed: true,
+      }),
+    );
+  });
+}
+
+
 function getHostFromNode(node) {
   const root = node.getRootNode();
   if (root instanceof ShadowRoot && root.host instanceof HTMLElement) {
@@ -590,10 +906,8 @@ function attachAreaDragBehavior(node, element) {
 
   let dragging = false;
   let pointerId = null;
-  let startX = 0;
-  let startY = 0;
-  let originLeft = 0;
-  let originTop = 0;
+  let pointerOffsetX = 0;
+  let pointerOffsetY = 0;
 
   const handleMove = (event) => {
     if (!dragging || pointerId !== event.pointerId) {
@@ -603,8 +917,8 @@ function attachAreaDragBehavior(node, element) {
     if (!host) {
       return;
     }
-    const nextLeft = originLeft + (event.clientX - startX);
-    const nextTop = originTop + (event.clientY - startY);
+    const nextLeft = event.clientX + window.scrollX - pointerOffsetX;
+    const nextTop = event.clientY + window.scrollY - pointerOffsetY;
     host.style.left = `${Math.round(nextLeft)}px`;
     host.style.top = `${Math.round(nextTop)}px`;
   };
@@ -620,6 +934,7 @@ function attachAreaDragBehavior(node, element) {
     if (!host) {
       return;
     }
+    delete host.dataset.pageAugmentorPointerDrag;
     const rect = host.getBoundingClientRect();
     const style = {
       ...(element.style || {}),
@@ -652,13 +967,12 @@ function attachAreaDragBehavior(node, element) {
     dispatchDraftUpdateFromHost(host, { bubbleSide: 'left' });
     dragging = true;
     pointerId = event.pointerId;
-    startX = event.clientX;
-    startY = event.clientY;
     const rect = host.getBoundingClientRect();
-    originLeft = rect.left + window.scrollX;
-    originTop = rect.top + window.scrollY;
+    pointerOffsetX = event.clientX - rect.left;
+    pointerOffsetY = event.clientY - rect.top;
     node.classList.add('page-augmentor-area-dragging');
     node.style.userSelect = 'none';
+    host.dataset.pageAugmentorPointerDrag = 'true';
     try {
       node.setPointerCapture(pointerId);
     } catch (_error) {
@@ -702,10 +1016,8 @@ function attachFloatingDragBehavior(node, element) {
 
   let dragging = false;
   let pointerId = null;
-  let startX = 0;
-  let startY = 0;
-  let originLeft = 0;
-  let originTop = 0;
+  let pointerOffsetX = 0;
+  let pointerOffsetY = 0;
   let originalContainerId = typeof element.containerId === 'string' ? element.containerId : '';
   let originalFloating = element.floating !== false;
   let originalStyle = { ...(element.style || {}) };
@@ -744,6 +1056,7 @@ function attachFloatingDragBehavior(node, element) {
     updateHighlight(null);
     host.style.width = '';
     host.style.height = '';
+    delete host.dataset.pageAugmentorPointerDrag;
 
     if (!commit) {
       if (originalParent instanceof Node) {
@@ -844,8 +1157,8 @@ function attachFloatingDragBehavior(node, element) {
     if (!host) {
       return;
     }
-    const nextLeft = originLeft + (event.clientX - startX);
-    const nextTop = originTop + (event.clientY - startY);
+    const nextLeft = event.clientX + window.scrollX - pointerOffsetX;
+    const nextTop = event.clientY + window.scrollY - pointerOffsetY;
     host.style.left = `${Math.round(nextLeft)}px`;
     host.style.top = `${Math.round(nextTop)}px`;
     const dropTarget = findAreaDropTarget(event.clientX, event.clientY, element.id);
@@ -864,11 +1177,11 @@ function attachFloatingDragBehavior(node, element) {
     dispatchDraftUpdateFromHost(host, { bubbleSide: 'left' });
     dragging = true;
     pointerId = event.pointerId;
-    startX = event.clientX;
-    startY = event.clientY;
     const rect = host.getBoundingClientRect();
-    originLeft = rect.left + window.scrollX;
-    originTop = rect.top + window.scrollY;
+    const originLeft = rect.left + window.scrollX;
+    const originTop = rect.top + window.scrollY;
+    pointerOffsetX = event.clientX - rect.left;
+    pointerOffsetY = event.clientY - rect.top;
     originalContainerId = typeof element.containerId === 'string' ? element.containerId : '';
     originalFloating = element.floating !== false;
     originalStyle = { ...(element.style || {}) };
@@ -892,6 +1205,7 @@ function attachFloatingDragBehavior(node, element) {
     } catch (_error) {
       // ignore capture issues
     }
+    host.dataset.pageAugmentorPointerDrag = 'true';
     event.preventDefault();
   });
 

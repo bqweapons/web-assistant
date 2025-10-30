@@ -19,11 +19,277 @@ import { normalizePageUrl } from '../common/url.js';
     editorSession: /** @type {{ close: () => void } | null} */ (null),
     activeEditorElementId: /** @type {string | null} */ (null),
     creationElementId: /** @type {string | null} */ (null),
+    inlineEditing: false,
+    pendingDraft: /** @type {Record<string, unknown> | null} */ (null),
+    pendingDraftDirty: false,
+    previewInitialized: false,
+    activeElementSnapshot: /** @type {import('../common/types.js').InjectedElement | null} */ (null),
+    lastCommittedElementId: /** @type {string | null} */ (null),
   };
+
+  function cloneElementSnapshot(element) {
+    if (!element) {
+      return null;
+    }
+    try {
+      if (typeof structuredClone === 'function') {
+        return structuredClone(element);
+      }
+    } catch (_error) {
+      // ignore structured clone failures
+    }
+    try {
+      return JSON.parse(JSON.stringify(element));
+    } catch (_error) {
+      return { ...element };
+    }
+  }
+
+  function cloneDraftPayload(payload) {
+    if (!payload) {
+      return {};
+    }
+    try {
+      if (typeof structuredClone === 'function') {
+        return structuredClone(payload);
+      }
+    } catch (_error) {
+      // ignore structured clone failures
+    }
+    try {
+      return JSON.parse(JSON.stringify(payload));
+    } catch (_error) {
+      const copy = {};
+      Object.keys(payload).forEach((key) => {
+        const value = payload[key];
+        if (value && typeof value === 'object') {
+          copy[key] = { ...value };
+        } else {
+          copy[key] = value;
+        }
+      });
+      return copy;
+    }
+  }
+
+  function normalizeStyleMap(style) {
+    const source = style && typeof style === 'object' ? style : {};
+    const normalized = {};
+    Object.keys(source).forEach((key) => {
+      const value = source[key];
+      if (typeof value === 'string') {
+        const trimmed = value.trim();
+        if (trimmed) {
+          normalized[key] = trimmed;
+        }
+      }
+    });
+    return normalized;
+  }
+
+  function mergeElementSnapshot(base, patch) {
+    if (!base) {
+      return patch ? cloneElementSnapshot(patch) : null;
+    }
+    if (!patch) {
+      return cloneElementSnapshot(base);
+    }
+    const next = cloneElementSnapshot(base) || {};
+    const hasOwn = (object, key) => Object.prototype.hasOwnProperty.call(object, key);
+    if (patch.type) {
+      next.type = patch.type;
+    }
+    if (hasOwn(patch, 'text')) {
+      next.text = patch.text;
+    }
+    if (hasOwn(patch, 'href')) {
+      if (typeof patch.href === 'string') {
+        next.href = patch.href;
+      } else {
+        delete next.href;
+      }
+    }
+    if (hasOwn(patch, 'position')) {
+      next.position = patch.position;
+    }
+    if (hasOwn(patch, 'tooltipPosition')) {
+      next.tooltipPosition = patch.tooltipPosition;
+    }
+    if (hasOwn(patch, 'tooltipPersistent')) {
+      next.tooltipPersistent = patch.tooltipPersistent;
+    }
+    if (hasOwn(patch, 'containerId')) {
+      next.containerId = patch.containerId;
+    }
+    if (hasOwn(patch, 'floating')) {
+      next.floating = patch.floating;
+    }
+    if (hasOwn(patch, 'actionFlow')) {
+      if (typeof patch.actionFlow === 'string' && patch.actionFlow) {
+        next.actionFlow = patch.actionFlow;
+      } else {
+        delete next.actionFlow;
+      }
+    }
+    if (patch.style && typeof patch.style === 'object') {
+      next.style = { ...(patch.style || {}) };
+    }
+    return next;
+  }
+
+  function areElementsEquivalent(base, next) {
+    if (!base && !next) {
+      return true;
+    }
+    if (!base || !next) {
+      return false;
+    }
+    const keys = [
+      'type',
+      'text',
+      'href',
+      'position',
+      'tooltipPosition',
+      'tooltipPersistent',
+      'containerId',
+      'floating',
+      'actionFlow',
+    ];
+    for (const key of keys) {
+      if ((base[key] ?? undefined) !== (next[key] ?? undefined)) {
+        return false;
+      }
+    }
+    const baseStyle = normalizeStyleMap(base.style);
+    const nextStyle = normalizeStyleMap(next.style);
+    const baseKeys = Object.keys(baseStyle);
+    if (baseKeys.length !== Object.keys(nextStyle).length) {
+      return false;
+    }
+    for (const key of baseKeys) {
+      if (baseStyle[key] !== nextStyle[key]) {
+        return false;
+      }
+    }
+    return true;
+  }
+
+  function recordPreviewDraft(elementId, patch) {
+    if (!elementId || state.activeEditorElementId !== elementId) {
+      return;
+    }
+    const draft = cloneDraftPayload(patch || {});
+    state.pendingDraft = draft;
+    if (!state.previewInitialized) {
+      state.previewInitialized = true;
+      state.pendingDraftDirty = false;
+      return;
+    }
+    const baseSnapshot = state.activeElementSnapshot || null;
+    const merged = mergeElementSnapshot(baseSnapshot, draft);
+    state.pendingDraftDirty = !areElementsEquivalent(baseSnapshot, merged);
+  }
+
+  function clearDraftState() {
+    state.pendingDraft = null;
+    state.pendingDraftDirty = false;
+    state.previewInitialized = false;
+  }
+
+  async function commitActiveDraft() {
+    if (!state.pendingDraftDirty || !state.activeEditorElementId) {
+      return;
+    }
+    const baseElement =
+      injectModule.getElement(state.activeEditorElementId) || state.activeElementSnapshot;
+    if (!baseElement) {
+      clearDraftState();
+      return;
+    }
+    const draft = cloneDraftPayload(state.pendingDraft || {});
+    const merged = mergeElementSnapshot(baseElement, draft) || baseElement;
+    const payload = {
+      ...baseElement,
+      ...draft,
+      pageUrl,
+      id: state.activeEditorElementId,
+      updatedAt: Date.now(),
+    };
+    try {
+      await sendMessage(MessageType.UPDATE, payload);
+      state.activeElementSnapshot = merged;
+      state.lastCommittedElementId = state.activeEditorElementId;
+    } catch (error) {
+      console.error('[PageAugmentor] Failed to persist inline edit', error);
+    } finally {
+      clearDraftState();
+    }
+  }
+
+  function applyInlineEditingOutline(active) {
+    const elements = injectModule.listElements();
+    elements.forEach((item) => {
+      if (!item?.id) {
+        return;
+      }
+      if (active) {
+        injectModule.setEditingElement(item.id, true);
+      } else if (state.activeEditorElementId === item.id) {
+        injectModule.setEditingElement(item.id, true);
+      } else {
+        injectModule.setEditingElement(item.id, false);
+      }
+    });
+  }
+
+  function enableInlineEditing() {
+    if (state.inlineEditing) {
+      applyInlineEditingOutline(true);
+      return;
+    }
+    state.inlineEditing = true;
+    applyInlineEditingOutline(true);
+  }
+
+  async function disableInlineEditing() {
+    if (!state.inlineEditing) {
+      return;
+    }
+    state.inlineEditing = false;
+    try {
+      await commitActiveDraft();
+    } finally {
+      closeEditorBubble();
+      applyInlineEditingOutline(false);
+    }
+  }
 
   await hydrateElements();
   setupMessageBridge();
   setupMutationWatcher();
+
+  window.addEventListener('page-augmentor-inline-edit-request', (event) => {
+    if (!state.inlineEditing) {
+      return;
+    }
+    const detail = event?.detail || {};
+    const elementId = typeof detail.elementId === 'string' ? detail.elementId : '';
+    if (!elementId) {
+      return;
+    }
+    openEditorBubble(elementId);
+  });
+
+  window.addEventListener('page-augmentor-edit-mode-change', (event) => {
+    const active = Boolean(event?.detail?.active);
+    if (active) {
+      enableInlineEditing();
+    } else {
+      disableInlineEditing().catch((error) =>
+        console.warn('[PageAugmentor] Failed to exit inline editing', error),
+      );
+    }
+  });
 
   function matchesFrameSelectors(candidate) {
     const selectors = Array.isArray(candidate) ? candidate : [];
@@ -68,6 +334,9 @@ import { normalizePageUrl } from '../common/url.js';
       if (elementMatchesFrame(element)) {
         incomingIds.add(element.id);
         injectModule.ensureElement(element);
+        if (state.inlineEditing && element?.id) {
+          injectModule.setEditingElement(element.id, true);
+        }
       }
     });
     injectModule.listElements().forEach((existing) => {
@@ -233,6 +502,8 @@ import { normalizePageUrl } from '../common/url.js';
     if (state.activeEditorElementId === draftId) {
       state.activeEditorElementId = null;
     }
+    state.activeElementSnapshot = null;
+    clearDraftState();
     try {
       injectModule.setEditingElement(draftId, false);
     } catch (_error) {
@@ -306,6 +577,9 @@ import { normalizePageUrl } from '../common/url.js';
     injectModule.setEditingElement(draft.id, true);
     state.creationElementId = draft.id;
     state.activeEditorElementId = draft.id;
+    state.activeElementSnapshot = cloneElementSnapshot(draft);
+    state.lastCommittedElementId = null;
+    clearDraftState();
     const host = injectModule.getHost(draft.id);
     if (!host) {
       cancelCreationDraft();
@@ -325,6 +599,9 @@ import { normalizePageUrl } from '../common/url.js';
         state.creationElementId = null;
         state.activeEditorElementId = null;
         state.editorSession = null;
+        state.activeElementSnapshot = mergeElementSnapshot(draft, updated || {});
+        state.lastCommittedElementId = draft.id;
+        clearDraftState();
         const payload = {
           ...draft,
           ...updated,
@@ -348,6 +625,8 @@ import { normalizePageUrl } from '../common/url.js';
         injectModule.setEditingElement(draft.id, false);
         cancelCreationDraft();
         state.editorSession = null;
+        state.activeElementSnapshot = null;
+        clearDraftState();
         try {
           chrome.runtime.sendMessage({ type: MessageType.PICKER_CANCELLED, pageUrl });
         } catch (_error) {
@@ -401,6 +680,9 @@ import { normalizePageUrl } from '../common/url.js';
       console.warn('[PageAugmentor] Host element not found for editor', elementId);
       return false;
     }
+    state.activeElementSnapshot = cloneElementSnapshot(element);
+    state.lastCommittedElementId = null;
+    clearDraftState();
     state.activeEditorElementId = elementId;
     injectModule.setEditingElement(elementId, true);
     const session = selectorModule.openElementEditor({
@@ -409,10 +691,13 @@ import { normalizePageUrl } from '../common/url.js';
       values: element,
       onPreview(updated) {
         injectModule.previewElement(elementId, updated || {});
+        recordPreviewDraft(elementId, updated || {});
       },
       onSubmit(updated) {
         injectModule.previewElement(elementId, updated || {});
-        state.activeEditorElementId = null;
+        state.lastCommittedElementId = elementId;
+        state.activeElementSnapshot = mergeElementSnapshot(element, updated || {});
+        clearDraftState();
         injectModule.setEditingElement(elementId, false);
         closeEditorBubble();
         const payload = {
@@ -429,6 +714,8 @@ import { normalizePageUrl } from '../common/url.js';
       onCancel() {
         injectModule.setEditingElement(elementId, false);
         closeEditorBubble();
+        state.activeElementSnapshot = null;
+        clearDraftState();
       },
     });
     state.editorSession = session;
@@ -449,14 +736,24 @@ import { normalizePageUrl } from '../common/url.js';
       }
       state.editorSession = null;
     }
+    const lastCommittedId = state.lastCommittedElementId;
     if (state.activeEditorElementId) {
       try {
-        injectModule.setEditingElement(state.activeEditorElementId, false);
-        injectModule.previewElement(state.activeEditorElementId, {});
+        const keepEditing = state.inlineEditing;
+        injectModule.setEditingElement(state.activeEditorElementId, keepEditing);
+        if (state.activeEditorElementId !== lastCommittedId) {
+          injectModule.previewElement(state.activeEditorElementId, {});
+        }
       } catch (error) {
         console.warn('[PageAugmentor] Failed to reset preview element', error);
       }
       state.activeEditorElementId = null;
+    }
+    state.activeElementSnapshot = null;
+    clearDraftState();
+    state.lastCommittedElementId = null;
+    if (state.inlineEditing) {
+      applyInlineEditingOutline(true);
     }
     if (state.creationElementId) {
       cancelCreationDraft();
