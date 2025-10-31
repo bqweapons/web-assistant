@@ -6,7 +6,15 @@ export function applyStyle(node, style) {
     return;
   }
   const whitelist = style || {};
+  const nodeType = node.dataset?.nodeType || '';
   ALLOWED_STYLE_KEYS.forEach((key) => {
+    if (
+      nodeType === 'area' &&
+      (key === 'position' || key === 'top' || key === 'right' || key === 'bottom' || key === 'left' || key === 'zIndex')
+    ) {
+      node.style.removeProperty(kebabCase(key));
+      return;
+    }
     const value = whitelist[key];
     if (typeof value === 'string' && value.trim() !== '') {
       node.style[key] = value.trim();
