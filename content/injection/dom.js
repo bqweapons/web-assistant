@@ -1011,40 +1011,23 @@ function attachAreaDragBehavior(node, element) {
       return;
     }
     const rect = host.getBoundingClientRect();
-    const nextLeft = Math.round(rect.left + window.scrollX);
-    const nextTop = Math.round(rect.top + window.scrollY);
-    const previousStyle = element.style || {};
-    const resolvedZIndex =
-      previousStyle.zIndex && String(previousStyle.zIndex).trim()
-        ? String(previousStyle.zIndex).trim()
-        : '2147482000';
-    const nextStyle = {
-      ...previousStyle,
+    const style = {
+      ...(element.style || {}),
       position: 'absolute',
-      left: `${nextLeft}px`,
-      top: `${nextTop}px`,
-      zIndex: resolvedZIndex,
+      left: `${Math.round(rect.left + window.scrollX)}px`,
+      top: `${Math.round(rect.top + window.scrollY)}px`,
     };
-    element.style = nextStyle;
-    element.floating = true;
-    delete element.containerId;
-    host.style.position = 'absolute';
-    host.style.left = `${nextLeft}px`;
-    host.style.top = `${nextTop}px`;
-    host.style.zIndex = nextStyle.zIndex || '';
+    element.style = style;
     dispatchDraftUpdateFromHost(host, {
       elementId: element.id,
       style: {
-        position: nextStyle.position,
-        left: nextStyle.left,
-        top: nextStyle.top,
-        zIndex: nextStyle.zIndex,
+        position: style.position,
+        left: style.left,
+        top: style.top,
       },
       floating: true,
       containerId: '',
       bubbleSide: 'right',
-      dragging: false,
-      preview: false,
     });
   };
 
@@ -1056,7 +1039,7 @@ function attachAreaDragBehavior(node, element) {
     if (!host || host.dataset.pageAugmentorEditing !== 'true') {
       return;
     }
-    dispatchDraftUpdateFromHost(host, { bubbleSide: 'left', dragging: true, preview: false });
+    dispatchDraftUpdateFromHost(host, { bubbleSide: 'left' });
     dragging = true;
     pointerId = event.pointerId;
     startX = event.clientX;
@@ -1232,8 +1215,6 @@ function attachFloatingDragBehavior(node, element) {
         containerId: originalContainerId,
         floating: originalFloating,
         bubbleSide: 'right',
-        dragging: false,
-        preview: false,
       });
       return;
     }
@@ -1261,8 +1242,6 @@ function attachFloatingDragBehavior(node, element) {
         containerId: dropTarget.area.id,
         floating: false,
         bubbleSide: 'right',
-        dragging: false,
-        preview: false,
       });
       return;
     }
@@ -1314,8 +1293,6 @@ function attachFloatingDragBehavior(node, element) {
           containerId: '',
           floating: false,
           bubbleSide: 'right',
-          dragging: false,
-          preview: false,
         });
         return;
       }
@@ -1348,8 +1325,6 @@ function attachFloatingDragBehavior(node, element) {
       containerId: '',
       floating: true,
       bubbleSide: 'right',
-      dragging: false,
-      preview: false,
     });
   };
 
@@ -1408,7 +1383,7 @@ function attachFloatingDragBehavior(node, element) {
     if (!host || host.dataset.pageAugmentorEditing !== 'true') {
       return;
     }
-    dispatchDraftUpdateFromHost(host, { bubbleSide: 'left', dragging: true, preview: false });
+    dispatchDraftUpdateFromHost(host, { bubbleSide: 'left' });
     dragging = true;
     dragStarted = false;
     pointerId = event.pointerId;
