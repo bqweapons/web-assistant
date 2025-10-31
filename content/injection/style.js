@@ -6,7 +6,15 @@ export function applyStyle(node, style) {
     return;
   }
   const whitelist = style || {};
+  const nodeType = node.dataset?.nodeType || '';
   ALLOWED_STYLE_KEYS.forEach((key) => {
+    if (
+      nodeType === 'area' &&
+      (key === 'position' || key === 'top' || key === 'right' || key === 'bottom' || key === 'left' || key === 'zIndex')
+    ) {
+      node.style.removeProperty(kebabCase(key));
+      return;
+    }
     const value = whitelist[key];
     if (typeof value === 'string' && value.trim() !== '') {
       node.style[key] = value.trim();
@@ -31,7 +39,6 @@ export function applyBaseAppearance(node, type) {
     node.style.borderRadius = '14px';
     node.style.backgroundColor = 'rgba(37, 99, 235, 0.12)';
     node.style.border = '1px dashed rgba(37, 99, 235, 0.4)';
-    node.style.position = 'relative';
     node.style.color = '#0f172a';
     node.style.lineHeight = '1.5';
     node.style.cursor = 'move';

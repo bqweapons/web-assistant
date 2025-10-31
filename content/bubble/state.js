@@ -8,6 +8,7 @@ const DEFAULT_STATE = {
   containerId: '',
   floating: true,
   bubbleSide: 'right',
+  dragging: false,
   actionFlowMode: 'builder',
   actionFlow: '',
   actionFlowError: '',
@@ -80,6 +81,7 @@ function mergeState(base, patch) {
   next.containerId = typeof patch.containerId === 'string' ? patch.containerId : base.containerId;
   next.floating = typeof patch.floating === 'boolean' ? patch.floating : base.floating;
   next.bubbleSide = typeof patch.bubbleSide === 'string' ? patch.bubbleSide : base.bubbleSide;
+  next.dragging = typeof patch.dragging === 'boolean' ? patch.dragging : base.dragging;
   next.selector = typeof patch.selector === 'string' ? patch.selector : base.selector;
   return next;
 }
@@ -109,6 +111,7 @@ function cloneState(value) {
     containerId: typeof value.containerId === 'string' ? value.containerId : '',
     floating: Boolean(value.floating),
     bubbleSide: value.bubbleSide === 'left' ? 'left' : 'right',
+    dragging: Boolean(value.dragging),
     actionFlowMode: value.actionFlowMode,
     actionFlow: value.actionFlow,
     actionFlowError: value.actionFlowError,
