@@ -575,7 +575,9 @@ function createElementBubble() {
     }
     const node = ensurePreviewElement(payload.type);
     applyPreview(node, payload, t);
-    if (options.propagate && typeof previewHandler === 'function') {
+    const shouldPropagate =
+      Boolean(options?.propagate) && !state.dragging && typeof previewHandler === 'function';
+    if (shouldPropagate) {
       previewHandler(payload);
     }
     actionFlowController.updateSummary();
@@ -666,6 +668,7 @@ function createElementBubble() {
     const hasBubbleSideUpdate = Object.prototype.hasOwnProperty.call(detail || {}, 'bubbleSide');
     const hasSelectorUpdate = Object.prototype.hasOwnProperty.call(detail || {}, 'selector');
     const hasPositionUpdate = Object.prototype.hasOwnProperty.call(detail || {}, 'position');
+    const hasDraggingUpdate = Object.prototype.hasOwnProperty.call(detail || {}, 'dragging');
     const nextPatch = {};
     if (stylePatch) {
       nextPatch.style = { ...state.style, ...stylePatch };
@@ -689,6 +692,9 @@ function createElementBubble() {
       const positionValue = typeof detail.position === 'string' ? detail.position : state.position;
       nextPatch.position = positionValue;
     }
+    if (hasDraggingUpdate) {
+      nextPatch.dragging = Boolean(detail.dragging);
+    }
     if (Object.keys(nextPatch).length === 0) {
       return;
     }
@@ -697,7 +703,8 @@ function createElementBubble() {
       styleControls.merge(stylePatch);
     }
     if (hasBubbleSideUpdate) {
-      bubble.dataset.pageAugmentorPlacement = 'right';
+      bubble.dataset.pageAugmentorPlacement =
+        detail.bubbleSide === 'left' ? 'left' : 'right';
     }
     if (hasSelectorUpdate) {
       selectorValue.textContent = state.selector;
@@ -708,7 +715,9 @@ function createElementBubble() {
     if (hasContainerUpdate || hasFloatingUpdate || hasBubbleSideUpdate || hasSelectorUpdate || hasPositionUpdate) {
       placementControls?.update();
     }
-    updatePreview();
+    const shouldPropagatePreview =
+      !state.dragging && detail?.preview !== false;
+    updatePreview({ propagate: shouldPropagatePreview });
   };
 
   typeSelect.addEventListener('change', (event) => {
