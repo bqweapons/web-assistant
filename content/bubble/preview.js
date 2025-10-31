@@ -3,6 +3,8 @@ import { applyLinkPreview } from '../selector/types/link.js';
 import { applyTooltipPreview } from '../selector/types/tooltip.js';
 import { applyAreaPreview } from '../selector/types/area.js';
 
+const POSITION_STYLE_KEYS = new Set(['position', 'top', 'right', 'bottom', 'left', 'zIndex']);
+
 /**
  * Ensures the preview element matches the desired type, replacing the node if needed.
  * @param {HTMLElement | null} currentElement
@@ -92,6 +94,9 @@ export function applyPreview(previewElement, payload, t) {
     previewElement.textContent = textValue;
     if (payload.style) {
       Object.entries(payload.style).forEach(([key, value]) => {
+        if (POSITION_STYLE_KEYS.has(key)) {
+          return;
+        }
         previewElement.style[key] = value;
       });
     }
@@ -115,6 +120,9 @@ export function applyPreview(previewElement, payload, t) {
 
   if (payload.style) {
     Object.entries(payload.style).forEach(([key, value]) => {
+        if (POSITION_STYLE_KEYS.has(key)) {
+          return;
+        }
       previewElement.style[key] = value;
     });
   }

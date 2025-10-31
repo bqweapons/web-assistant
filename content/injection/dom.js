@@ -1011,23 +1011,38 @@ function attachAreaDragBehavior(node, element) {
       return;
     }
     const rect = host.getBoundingClientRect();
-    const style = {
-      ...(element.style || {}),
+    const nextLeft = Math.round(rect.left + window.scrollX);
+    const nextTop = Math.round(rect.top + window.scrollY);
+    const previousStyle = element.style || {};
+    const resolvedZIndex =
+      previousStyle.zIndex && String(previousStyle.zIndex).trim()
+        ? String(previousStyle.zIndex).trim()
+        : '2147482000';
+    const nextStyle = {
+      ...previousStyle,
       position: 'absolute',
-      left: `${Math.round(rect.left + window.scrollX)}px`,
-      top: `${Math.round(rect.top + window.scrollY)}px`,
+      left: `${nextLeft}px`,
+      top: `${nextTop}px`,
+      zIndex: resolvedZIndex,
     };
-    element.style = style;
+    element.style = nextStyle;
+    element.floating = true;
+    delete element.containerId;
+    host.style.position = 'absolute';
+    host.style.left = `${nextLeft}px`;
+    host.style.top = `${nextTop}px`;
+    host.style.zIndex = nextStyle.zIndex || '';
     dispatchDraftUpdateFromHost(host, {
       elementId: element.id,
       style: {
-        position: style.position,
-        left: style.left,
-        top: style.top,
+        position: nextStyle.position,
+        left: nextStyle.left,
+        top: nextStyle.top,
+        zIndex: nextStyle.zIndex,
       },
       floating: true,
       containerId: '',
-      bubbleSide: 'right',
+      bubbleSide: 'right'
     });
   };
 
