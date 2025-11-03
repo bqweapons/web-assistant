@@ -1,5 +1,5 @@
 import { HOST_ATTRIBUTE, HOST_CLASS, NODE_CLASS } from '../core/index.js';
-import { applyStyle, getStyleTarget, createTooltipNode } from '../ui/index.js';
+import { applyStyle, getStyleTarget, createTooltipNode, applyBaseAppearance } from '../ui/index.js';
 
 function createNodeForType(type) {
   if (type === 'link') {
@@ -144,6 +144,17 @@ export function createHost(element) {
   `;
   shadowRoot.appendChild(style);
   const node = createNodeForType(element.type);
+  // Ensure the initial node matches the expected runtime selector
+  // so orchestrator.applyMetadata() can reuse it instead of creating
+  // a duplicate fallback node on first render.
+  if (node instanceof HTMLElement) {
+    if (element.type === 'tooltip') {
+      // createTooltipNode() already applies NODE_CLASS and dataset
+      // via applyTooltipAppearance().
+    } else {
+      applyBaseAppearance(node, element.type);
+    }
+  }
   shadowRoot.appendChild(node);
   const styleTarget = getStyleTarget(node);
   applyStyle(styleTarget, element.style);

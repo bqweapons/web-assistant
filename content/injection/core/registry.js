@@ -28,6 +28,9 @@ export function ensureElement(element) {
         return false;
       }
       hosts.set(element.id, host);
+      // Ensure the freshly created host is hydrated immediately so
+      // the user sees content on first render (text, href, tooltip, etc.).
+      applyMetadata(host, element);
     }
   } else {
     applyMetadata(host, element);
@@ -191,5 +194,4 @@ function findExistingHostInDom(elementId) {
     return null;
   }
 }
-
 
