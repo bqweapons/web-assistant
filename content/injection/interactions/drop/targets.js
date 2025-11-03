@@ -21,6 +21,12 @@ const VOID_ELEMENT_TAGS = new Set([
 
 const AUGMENTOR_ROOT_SELECTOR = '[data-page-augmentor-root]';
 
+/**
+ * 対象要素が内容を持たないボイド要素か判定する。
+ * Checks whether the element is a void (self-closing) tag.
+ * @param {Element | null} element
+ * @returns {boolean}
+ */
 function isVoidElement(element) {
   if (!(element instanceof HTMLElement)) {
     return false;
@@ -28,6 +34,14 @@ function isVoidElement(element) {
   return VOID_ELEMENT_TAGS.has(element.tagName);
 }
 
+/**
+ * エリアホストの中からポインタ座標が属するターゲットを探す。
+ * Finds the area drop target at the given pointer coordinates.
+ * @param {number} clientX
+ * @param {number} clientY
+ * @param {string} excludeId
+ * @returns {{ id: string; host: HTMLElement; areaNode: HTMLElement; content: HTMLElement } | null}
+ */
 export function findAreaDropTarget(clientX, clientY, excludeId) {
   const hosts = document.querySelectorAll(`[${HOST_ATTRIBUTE}]`);
   for (const host of hosts) {
@@ -52,6 +66,14 @@ export function findAreaDropTarget(clientX, clientY, excludeId) {
   return null;
 }
 
+/**
+ * DOM 上でドロップ可能な要素をヒットテストする。
+ * Performs a hit-test to find a droppable DOM target.
+ * @param {number} clientX
+ * @param {number} clientY
+ * @param {HTMLElement | null} draggedHost
+ * @returns {HTMLElement | null}
+ */
 export function findDomDropTarget(clientX, clientY, draggedHost) {
   if (draggedHost instanceof HTMLElement) {
     const previous = draggedHost.style.pointerEvents;
@@ -83,6 +105,14 @@ export function findDomDropTarget(clientX, clientY, draggedHost) {
   return null;
 }
 
+/**
+ * ドロップ対象に応じて挿入位置とインジケーター情報を決定する。
+ * Resolves the drop placement and indicator for a DOM target.
+ * @param {HTMLElement | null} target
+ * @param {number} clientX
+ * @param {number} clientY
+ * @returns {{ reference: HTMLElement; selector: string; position: 'append'|'prepend'|'before'|'after'; indicator: { mode: "line" | "box"; top: number; left: number; width: number; height: number } } | null}
+ */
 export function resolveDomDropPlacement(target, clientX, clientY) {
   if (!(target instanceof HTMLElement)) {
     return null;

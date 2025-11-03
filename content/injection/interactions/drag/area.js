@@ -10,6 +10,12 @@ import {
   dispatchDraftUpdateFromHost,
 } from './core.js';
 
+/**
+ * エリア要素に対してドラッグでの位置変更と浮動化を提供する。
+ * Attaches drag behaviour that converts an area into a floating element.
+ * @param {HTMLElement | null} node
+ * @param {import('../../../../common/types.js').InjectedElement} element
+ */
 export function attachAreaDragBehavior(node, element) {
   if (!(node instanceof HTMLElement)) {
     return;
@@ -30,6 +36,7 @@ export function attachAreaDragBehavior(node, element) {
   let originTop = 0;
   let movedSincePointerDown = false;
 
+  // ドラッグ中のポインタ移動に応じてホスト位置を更新する。
   const handleMove = (event) => {
     if (!dragging || pointerId !== event.pointerId) {
       return;
@@ -50,6 +57,7 @@ export function attachAreaDragBehavior(node, element) {
     setHostPosition(host, nextLeft, nextTop);
   };
 
+  // ドラッグ終了後に浮動モードへ切り替え、ドラフト更新を送信する。
   const finalizeDrag = async () => {
     if (!dragging) {
       return;

@@ -1,5 +1,10 @@
 let domDropIndicator = null;
 
+/**
+ * ドロップガイド用のインジケーター DOM を確保する。
+ * Ensures the DOM drop indicator element exists and is connected.
+ * @returns {HTMLDivElement}
+ */
 function ensureDomDropIndicator() {
   if (domDropIndicator && domDropIndicator.isConnected) {
     return domDropIndicator;
@@ -22,6 +27,11 @@ function ensureDomDropIndicator() {
   return indicator;
 }
 
+/**
+ * 指定された位置・サイズでドロップインジケーターを表示する。
+ * Shows the drop indicator at the provided coordinates.
+ * @param {{ top: number; left: number; width: number; height: number; mode: 'line' | 'box' } | null} indicator
+ */
 export function showDomDropIndicator(indicator) {
   if (!indicator) {
     hideDomDropIndicator();
@@ -53,6 +63,10 @@ export function showDomDropIndicator(indicator) {
   }
 }
 
+/**
+ * ドロップインジケーターを非表示にする。
+ * Hides the drop indicator element.
+ */
 export function hideDomDropIndicator() {
   if (domDropIndicator) {
     domDropIndicator.style.display = 'none';

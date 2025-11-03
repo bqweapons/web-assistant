@@ -346,6 +346,13 @@ async function safeSendMessage(tabId, message, frameId) {
   }
 }
 
+/**
+ * タブ内の全フレームへメッセージを送信し、失敗時はフォールバックする。
+ * Sends a message to every frame in the tab, falling back to the top frame on failure.
+ * @param {number} tabId
+ * @param {unknown} message
+ * @returns {Promise<void>}
+ */
 async function sendMessageToFrames(tabId, message) {
   try {
     const frames = await chrome.webNavigation.getAllFrames({ tabId });
@@ -359,6 +366,13 @@ async function sendMessageToFrames(tabId, message) {
   }
 }
 
+/**
+ * ストア内から指定 ID の要素を検索する。
+ * Finds an element in storage by page URL and identifier.
+ * @param {string} pageUrl
+ * @param {string} id
+ * @returns {Promise<import('./common/types.js').InjectedElement | null>}
+ */
 async function findElement(pageUrl, id) {
   if (!pageUrl || !id) {
     return null;
@@ -383,13 +397,11 @@ async function notifyPickerResult(type, payload) {
 }
 
 /**
- * URL を正規化してストレージキーを安定させる。
- * Normalizes URL for consistent storage keys.
- * @param {string} url
- * @returns {string}
+ * JSON インポートされたストアデータを検証し、永続化する。
+ * Validates and persists an imported store payload.
+ * @param {Record<string, unknown>} rawStore
+ * @returns {Promise<{ pageCount: number; elementCount: number }>}
  */
-
-
 async function importStorePayload(rawStore) {
   if (!rawStore || typeof rawStore !== 'object' || Array.isArray(rawStore)) {
     throw new Error('Import payload must be an object.');
@@ -437,6 +449,11 @@ async function importStorePayload(rawStore) {
   };
 }
 
+/**
+ * ストレージに保存された要素を全タブへ再配信する。
+ * Rehydrates open tabs with the persisted store state.
+ * @returns {Promise<void>}
+ */
 async function rehydrateTabsFromStore() {
   try {
     const store = await getFullStore();

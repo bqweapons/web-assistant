@@ -1,6 +1,8 @@
 import enMessages from './en.js';
 import { cloneMessages, mergeMessages } from '../utils.js';
 
+// 英語辞書を基に簡体字中国語へ翻訳したロケール定義。
+// clone + merge でキー構造を共有しつつ、表現のみをローカライズしている。
 const messages = cloneMessages(enMessages);
 
 mergeMessages(messages, {

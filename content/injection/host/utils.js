@@ -1,5 +1,11 @@
 import { NODE_CLASS } from '../core/constants.js';
 
+/**
+ * エリア型ホストのコンテンツ要素を返す。
+ * Resolves the content container inside an area host.
+ * @param {HTMLElement | null} host
+ * @returns {HTMLElement | null}
+ */
 export function resolveAreaContent(host) {
   if (!(host instanceof HTMLElement)) {
     return null;
@@ -19,6 +25,11 @@ export function resolveAreaContent(host) {
   return areaNode;
 }
 
+/**
+ * フローティングホストに適用された位置スタイルをリセットする。
+ * Resets positioning styles applied to a floating host.
+ * @param {HTMLElement | null} host
+ */
 export function resetHostPosition(host) {
   if (!(host instanceof HTMLElement)) {
     return;

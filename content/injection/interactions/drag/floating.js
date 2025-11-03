@@ -15,6 +15,13 @@ import {
 //   removeDropPreviewHost, findDomDropTarget, resolveDomDropPlacement,
 //   showDomDropIndicator, resetHostPosition, clearPendingContainerAttachment
 // }
+/**
+ * フローティング要素にドラッグ移動とドロップ先判定を付与する。
+ * Attaches floating drag interactions and drop handling to a node.
+ * @param {HTMLElement | null} node
+ * @param {import('../../../../common/types.js').InjectedElement} element
+ * @param {import('../drag/strategy.js').DragDeps} deps
+ */
 export function attachFloatingDragBehavior(node, element, deps) {
   if (!(node instanceof HTMLElement)) {
     return;
@@ -49,6 +56,7 @@ export function attachFloatingDragBehavior(node, element, deps) {
   let highlightedArea = null;
   let startRect = null;
 
+  // ドロップ候補のエリアを強調表示し、前回のハイライトを解除する。
   const updateHighlight = (areaTarget) => {
     if (highlightedArea && highlightedArea !== areaTarget) {
       highlightedArea.areaNode.classList.remove('page-augmentor-area-drop-target');
@@ -60,6 +68,7 @@ export function attachFloatingDragBehavior(node, element, deps) {
     }
   };
 
+  // 最初のドラッグ移動時にホストを絶対配置へ切り替える。
   const startDragging = () => {
     if (dragStarted) {
       return;
@@ -91,6 +100,7 @@ export function attachFloatingDragBehavior(node, element, deps) {
     }
   };
 
+  // ドラッグ終了時に位置を確定または元に戻す。
   const finalizeDrag = (commit) => {
     const host = getHostFromNode(node);
     if (!host) {

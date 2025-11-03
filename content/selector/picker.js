@@ -1,9 +1,12 @@
 import { createOverlay } from './overlay.js';
 import { getElementBubble, getSuggestedStyles } from './bubble.js';
 import { generateSelector, resolveTarget } from './utils.js';
+// ページ上で注入対象の DOM 要素を選択するインタラクティブなピッカー。
+// バブル UI・ハイライトオーバーレイ・フレーム解決を組み合わせてエディタに必要な情報を収集する。
 import { resolveFrameContext } from './frame.js';
 
 /**
+ * DOM 要素を選択するインタラクティブなピッカーを起動する。
  * Starts the interactive element picker.
  * @param {{
  *   mode?: 'create' | 'edit';
@@ -23,6 +26,7 @@ export function startElementPicker(options = {}) {
 
   let disposed = false;
 
+  // ホバー中の要素を追跡し、オーバーレイを更新する。
   const handleMouseMove = (event) => {
     const hovered = resolveTarget(event.target);
     if (!hovered || (filter && !filter(hovered))) {
@@ -32,6 +36,7 @@ export function startElementPicker(options = {}) {
     overlay.show(hovered);
   };
 
+  // クリックされた要素を確定し、エディタバブルを開く。
   const handleClick = (event) => {
     const target = resolveTarget(event.target);
     if (!target || (filter && !filter(target))) {
@@ -67,6 +72,7 @@ export function startElementPicker(options = {}) {
     onTarget?.(target, selector);
   };
 
+  // Escape キーでピッカーをキャンセルできるようにする。
   const handleKeyDown = (event) => {
     if (event.key === 'Escape') {
       event.preventDefault();
@@ -75,12 +81,14 @@ export function startElementPicker(options = {}) {
     }
   };
 
+  // 登録済みのイベントリスナーをまとめて解除する。
   const removeListeners = () => {
     document.removeEventListener('mousemove', handleMouseMove, true);
     document.removeEventListener('click', handleClick, true);
     document.removeEventListener('keydown', handleKeyDown, true);
   };
 
+  // ピッカー終了時にオーバーレイとバブルを破棄する。
   const dispose = (reason) => {
     if (disposed) {
       return;
