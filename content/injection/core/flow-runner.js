@@ -1,4 +1,4 @@
-import { FLOW_MAX_DEPTH, FLOW_MAX_RUNTIME_MS, FLOW_SELF_SELECTOR } from './constants.js';
+import { FLOW_MAX_DEPTH, FLOW_MAX_RUNTIME_MS, FLOW_SELF_SELECTOR } from '../core/constants.js';
 import { delay, forwardClick, sanitizeUrl } from './utils.js';
 
 /**
@@ -204,3 +204,6 @@ function evaluateFlowCondition(condition, context) {
       return false;
   }
 }
+
+
+

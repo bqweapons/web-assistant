@@ -10,4 +10,5 @@ export {
   listElements,
   setEditingElement,
   setEditingMode,
-} from './injection/registry.js';
+} from './injection/core/registry.js';
+

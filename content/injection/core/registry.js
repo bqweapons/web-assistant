@@ -1,4 +1,5 @@
-import { applyMetadata, createHost, flashHighlight, insertHost, clearPendingContainerAttachment } from './dom.js';
+import { applyMetadata, flashHighlight, insertHost, clearPendingContainerAttachment } from './orchestrator/orchestrator.js';
+import { createHost } from './host/create-host.js';
 
 /** @type {Map<string, import('../../common/types.js').InjectedElement>} */
 const elements = new Map();
@@ -162,3 +163,5 @@ function applyEditingState(host, elementId) {
     delete host.dataset.pageAugmentorEditing;
   }
 }
+
+

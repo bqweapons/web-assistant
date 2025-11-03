@@ -30,3 +30,9 @@ export const TOOLTIP_POSITIONS = new Set(['top', 'right', 'bottom', 'left']);
 export const FLOW_SELF_SELECTOR = ':self';
 export const FLOW_MAX_RUNTIME_MS = 10000;
 export const FLOW_MAX_DEPTH = 8;
+
+// Drag/positioning defaults
+export const Z_INDEX_FLOATING_DEFAULT = '2147482000';
+export const Z_INDEX_HOST_DEFAULT = '1000';
+
+
