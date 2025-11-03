@@ -1,4 +1,4 @@
-import { parseActionFlowDefinition } from '../../common/flows.js';
+import { parseActionFlowDefinition } from '../../../common/flows.js';
 import { forwardClick, resolveSelector, sanitizeUrl, executeActionFlow } from '../core/index.js';
 
 export function applyButtonBehavior(node, href, actionSelector, actionFlow) {
