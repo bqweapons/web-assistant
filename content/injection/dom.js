@@ -264,9 +264,31 @@ export function createHost(element) {
       font-family: inherit;
     }
     :host([data-page-augmentor-editing='true']) .${NODE_CLASS} {
-      outline: 1px dashed rgba(37, 99, 235, 0.4);
+      outline: 2px dashed rgba(37, 99, 235, 0.6);
       outline-offset: 2px;
     }
+    :host([data-page-augmentor-editing='true']) .${NODE_CLASS} .page-augmentor-resize-handle {
+      display: block;
+    }
+    .page-augmentor-resize-handle {
+      position: absolute;
+      width: 10px;
+      height: 10px;
+      background: #ffffff;
+      border: 2px solid rgba(37, 99, 235, 0.9);
+      border-radius: 9999px;
+      box-shadow: 0 1px 4px rgba(15, 23, 42, 0.25);
+      display: none;
+      pointer-events: auto;
+    }
+    .page-augmentor-resize-handle.nw { left: -6px; top: -6px; cursor: nwse-resize; }
+    .page-augmentor-resize-handle.ne { right: -6px; top: -6px; cursor: nesw-resize; }
+    .page-augmentor-resize-handle.sw { left: -6px; bottom: -6px; cursor: nesw-resize; }
+    .page-augmentor-resize-handle.se { right: -6px; bottom: -6px; cursor: nwse-resize; }
+    .page-augmentor-resize-handle.n { top: -6px; left: 50%; transform: translateX(-50%); cursor: ns-resize; }
+    .page-augmentor-resize-handle.s { bottom: -6px; left: 50%; transform: translateX(-50%); cursor: ns-resize; }
+    .page-augmentor-resize-handle.w { left: -6px; top: 50%; transform: translateY(-50%); cursor: ew-resize; }
+    .page-augmentor-resize-handle.e { right: -6px; top: 50%; transform: translateY(-50%); cursor: ew-resize; }
     :host([data-page-augmentor-preview='true']) {
       opacity: 0.65;
     }
@@ -450,6 +472,7 @@ export function applyMetadata(host, element) {
   hydrateNode(node, element);
   const styleTarget = getStyleTarget(node);
   applyStyle(styleTarget, element.style);
+  bindEditingEnhancements(node, element);
 }
 
 export function insertHost(host, element) {
@@ -559,11 +582,13 @@ function hydrateNode(node, element) {
     node.onclick = null;
     node.removeAttribute('aria-describedby');
     attachFloatingDragBehavior(node, element);
+    bindEditingEnhancements(node, element);
   } else if (element.type === 'button' && node instanceof HTMLButtonElement) {
     applyBaseAppearance(node, 'button');
     node.textContent = element.text;
     applyButtonBehavior(node, element.href, element.actionSelector, element.actionFlow);
     attachFloatingDragBehavior(node, element);
+    bindEditingEnhancements(node, element);
   } else if (element.type === 'tooltip') {
     applyTooltipAppearance(node);
     const bubble = node.querySelector('.tooltip-bubble');
@@ -589,6 +614,7 @@ function hydrateNode(node, element) {
     node.setAttribute('aria-label', element.text || 'tooltip');
     bindTooltipViewportGuards(node);
     attachFloatingDragBehavior(node, element);
+    bindEditingEnhancements(node, element);
   } else if (element.type === 'area') {
     applyBaseAppearance(node, 'area');
     delete node.dataset.href;
@@ -613,6 +639,207 @@ function hydrateNode(node, element) {
       positionFloatingHost(hostElement, element, resolveSelector(element.selector));
     }
     schedulePendingContainerAttachments();
+    bindEditingEnhancements(node, element);
+  }
+}
+
+function bindEditingEnhancements(node, element) {
+  if (!(node instanceof HTMLElement) || !element?.id) {
+    return;
+  }
+  if (node.dataset.editEnhanceBound === 'true') {
+    return;
+  }
+  node.dataset.editEnhanceBound = 'true';
+
+  const host = getHostFromNode(node);
+  if (!(host instanceof HTMLElement)) {
+    return;
+  }
+
+  // Inline text editing for simple types
+  const resolveEditableNode = () => {
+    if (element.type === 'area') {
+      const header = node.querySelector('.page-augmentor-area-header');
+      return header instanceof HTMLElement ? header : null;
+    }
+    return node;
+  };
+
+  const applyInlineEditingState = () => {
+    const editing = host.dataset.pageAugmentorEditing === 'true';
+    const editable = resolveEditableNode();
+    const isTextual = Boolean(editable) && (element.type === 'button' || element.type === 'link' || element.type === 'area');
+    if (isTextual && editable) {
+      editable.contentEditable = editing ? 'plaintext-only' : 'false';
+      editable.spellcheck = false;
+    }
+  };
+
+  const handleInlineInput = (event) => {
+    const editable = resolveEditableNode();
+    if (!editable) return;
+    const text = (editable.textContent || '').trim();
+    dispatchDraftUpdateFromHost(host, { elementId: element.id, style: {}, bubbleSide: 'left' });
+    // Update text via preview patch; the bubble listens and merges style via merge(), text is handled via preview
+    try {
+      host.dispatchEvent(
+        new CustomEvent('page-augmentor-draft-update', {
+          detail: { elementId: element.id, text, bubbleSide: 'left' },
+          bubbles: true,
+          composed: true,
+        }),
+      );
+    } catch (_e) {}
+  };
+
+  // Resize handles
+  const ensureResizeHandles = () => {
+    if (node.querySelector('.page-augmentor-resize-handle')) {
+      return;
+    }
+    const positions = ['nw', 'n', 'ne', 'e', 'se', 's', 'sw', 'w'];
+    positions.forEach((pos) => {
+      const handle = document.createElement('div');
+      handle.className = `page-augmentor-resize-handle ${pos}`;
+      handle.dataset.handle = pos;
+      handle.addEventListener('pointerdown', (event) => startResize(event, pos));
+      node.appendChild(handle);
+    });
+  };
+
+  let resizing = false;
+  let pointerId = null;
+  let startX = 0;
+  let startY = 0;
+  let originLeft = 0;
+  let originTop = 0;
+  let originWidth = 0;
+  let originHeight = 0;
+  const MIN_SIZE = 24;
+
+  const startResize = (event, edge) => {
+    if (!(event instanceof PointerEvent)) return;
+    if (event.button !== 0 && event.button !== -1) return;
+    if (host.dataset.pageAugmentorEditing !== 'true') return;
+    resizing = true;
+    pointerId = event.pointerId;
+    const rect = host.getBoundingClientRect();
+    originLeft = rect.left + window.scrollX;
+    originTop = rect.top + window.scrollY;
+    originWidth = rect.width;
+    originHeight = rect.height;
+    startX = event.clientX;
+    startY = event.clientY;
+    try { node.setPointerCapture(pointerId); } catch (_e) {}
+    dispatchDraftUpdateFromHost(host, { bubbleSide: 'left' });
+    window.addEventListener('pointermove', handleResizeMove, true);
+    window.addEventListener('pointerup', handleResizeUp, true);
+    event.preventDefault();
+    event.stopPropagation();
+  };
+
+  const handleResizeMove = (event) => {
+    if (!resizing || event.pointerId !== pointerId) return;
+    const dx = event.clientX - startX;
+    const dy = event.clientY - startY;
+
+    let nextLeft = originLeft;
+    let nextTop = originTop;
+    let nextWidth = originWidth;
+    let nextHeight = originHeight;
+
+    const edge = getActiveHandle();
+    if (edge.includes('e')) {
+      nextWidth = Math.max(MIN_SIZE, originWidth + dx);
+    }
+    if (edge.includes('s')) {
+      nextHeight = Math.max(MIN_SIZE, originHeight + dy);
+    }
+    if (edge.includes('w')) {
+      nextWidth = Math.max(MIN_SIZE, originWidth - dx);
+      nextLeft = originLeft + dx;
+    }
+    if (edge.includes('n')) {
+      nextHeight = Math.max(MIN_SIZE, originHeight - dy);
+      nextTop = originTop + dy;
+    }
+
+    // Apply live visuals
+    const styleTarget = getStyleTarget(node);
+    if (styleTarget instanceof HTMLElement) {
+      styleTarget.style.width = `${Math.round(nextWidth)}px`;
+      styleTarget.style.height = `${Math.round(nextHeight)}px`;
+    }
+    if (element.floating !== false) {
+      host.style.left = `${Math.round(nextLeft)}px`;
+      host.style.top = `${Math.round(nextTop)}px`;
+      host.style.position = 'absolute';
+      host.style.zIndex = (element.style?.zIndex && String(element.style.zIndex).trim()) || '2147482000';
+    }
+    event.preventDefault();
+  };
+
+  const handleResizeUp = (event) => {
+    if (!resizing || event.pointerId !== pointerId) return;
+    try { node.releasePointerCapture(pointerId); } catch (_e) {}
+    window.removeEventListener('pointermove', handleResizeMove, true);
+    window.removeEventListener('pointerup', handleResizeUp, true);
+    resizing = false;
+    pointerId = null;
+
+    const rect = host.getBoundingClientRect();
+    const finalLeft = Math.round(rect.left + window.scrollX);
+    const finalTop = Math.round(rect.top + window.scrollY);
+    const finalWidth = Math.max(MIN_SIZE, Math.round(rect.width));
+    const finalHeight = Math.max(MIN_SIZE, Math.round(rect.height));
+    const nextStyle = { ...(element.style || {}) };
+    nextStyle.width = `${finalWidth}px`;
+    nextStyle.height = `${finalHeight}px`;
+    if (element.floating !== false) {
+      nextStyle.position = 'absolute';
+      nextStyle.left = `${finalLeft}px`;
+      nextStyle.top = `${finalTop}px`;
+      if (!nextStyle.zIndex || !String(nextStyle.zIndex).trim()) {
+        nextStyle.zIndex = '2147482000';
+      }
+    }
+    element.style = nextStyle;
+    dispatchDraftUpdateFromHost(host, {
+      elementId: element.id,
+      style: {
+        position: nextStyle.position,
+        left: nextStyle.left,
+        top: nextStyle.top,
+        width: nextStyle.width,
+        height: nextStyle.height,
+        zIndex: nextStyle.zIndex || '',
+      },
+      floating: element.floating !== false,
+      containerId: element.containerId || '',
+      bubbleSide: 'right',
+    });
+  };
+
+  const getActiveHandle = () => {
+    const active = node.querySelector('.page-augmentor-resize-handle:hover');
+    if (active instanceof HTMLElement) {
+      return active.dataset.handle || '';
+    }
+    // Fallback: default to se if none hovered (shouldn’t happen during drag)
+    return 'se';
+  };
+
+  // Watch editing attribute to toggle inline edit + handles visibility
+  const observer = new MutationObserver(() => applyInlineEditingState());
+  observer.observe(host, { attributes: true, attributeFilter: ['data-page-augmentor-editing'] });
+  applyInlineEditingState();
+  ensureResizeHandles();
+
+  const editable = resolveEditableNode();
+  if (editable) {
+    editable.addEventListener('input', handleInlineInput);
+    editable.addEventListener('blur', handleInlineInput);
   }
 }
 

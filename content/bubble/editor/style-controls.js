@@ -178,14 +178,85 @@ export function createStyleControls({ t }) {
     if (colorInput) {
       inputRow.appendChild(colorInput);
     }
+
+    // Font size quick adjust buttons
+    let incBtn = null;
+    let decBtn = null;
+    if (config.name === 'fontSize') {
+      const makeBtn = (label) => {
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.textContent = label;
+        Object.assign(btn.style, {
+          width: '28px',
+          height: '28px',
+          borderRadius: '8px',
+          border: '1px solid rgba(148, 163, 184, 0.6)',
+          background: '#ffffff',
+          color: '#0f172a',
+          cursor: 'pointer',
+        });
+        return btn;
+      };
+      decBtn = makeBtn('−');
+      incBtn = makeBtn('+');
+      inputRow.append(decBtn, incBtn);
+    }
+
+    // Color palette swatches for color fields
+    let palette = null;
+    if (config.colorPicker) {
+      const colors = ['#2563eb', '#ef4444', '#10b981', '#f59e0b', '#8b5cf6', '#64748b', '#000000', '#ffffff'];
+      palette = document.createElement('div');
+      Object.assign(palette.style, {
+        display: 'flex',
+        gap: '6px',
+        flexWrap: 'wrap',
+        marginTop: '4px',
+      });
+      colors.forEach((hex) => {
+        const swatch = document.createElement('button');
+        swatch.type = 'button';
+        Object.assign(swatch.style, {
+          width: '18px',
+          height: '18px',
+          borderRadius: '6px',
+          border: '1px solid rgba(148, 163, 184, 0.6)',
+          background: hex,
+          cursor: 'pointer',
+        });
+        swatch.dataset.value = hex;
+        palette.appendChild(swatch);
+      });
+    }
     field.wrapper.appendChild(inputRow);
+    if (palette) {
+      field.wrapper.appendChild(palette);
+    }
     if (ADVANCED_FIELDS.has(config.name)) {
       advancedContainer.appendChild(field.wrapper);
     } else {
       basicContainer.appendChild(field.wrapper);
     }
-    styleInputs.set(config.name, { text: textInput, color: colorInput });
+    styleInputs.set(config.name, { text: textInput, color: colorInput, inc: incBtn, dec: decBtn, palette });
   });
+
+  // Custom CSS textarea in Advanced
+  const customCss = document.createElement('textarea');
+  customCss.placeholder = 'color: #2563eb; text-transform: uppercase;';
+  Object.assign(customCss.style, {
+    width: '100%',
+    minHeight: '64px',
+    borderRadius: '10px',
+    border: '1px solid rgba(148, 163, 184, 0.6)',
+    background: 'rgba(241, 245, 249, 0.6)',
+    fontSize: '12px',
+    color: '#0f172a',
+    padding: '8px 10px',
+    boxSizing: 'border-box',
+  });
+  const customCssField = createField(t('editor.styles.customCss'), customCss);
+  advancedContainer.appendChild(customCssField.wrapper);
 
   const styleHint = document.createElement('p');
   styleHint.textContent = t('editor.stylesHint');
@@ -293,6 +364,36 @@ export function createStyleControls({ t }) {
           record.color.dataset.defaultValue = event.target.value;
           updatePreview();
         });
+        if (record.palette) {
+          record.palette.querySelectorAll('button').forEach((btn) => {
+            btn.addEventListener('click', () => {
+              clearError();
+              const value = btn.dataset.value || '';
+              styleState[name] = value;
+              record.text.value = value;
+              if (record.color) {
+                record.color.value = value;
+                record.color.dataset.defaultValue = value;
+              }
+              updatePreview();
+            });
+          });
+        }
+      }
+
+      if (name === 'fontSize' && (record.inc || record.dec)) {
+        const adjust = (delta) => {
+          clearError();
+          const current = parseInt((record.text.value || '').replace(/[^0-9-]/g, ''), 10);
+          const base = Number.isFinite(current) ? current : 16;
+          const next = Math.max(8, base + delta);
+          const value = `${next}px`;
+          styleState[name] = value;
+          record.text.value = value;
+          updatePreview();
+        };
+        record.inc?.addEventListener('click', () => adjust(+1));
+        record.dec?.addEventListener('click', () => adjust(-1));
       }
     });
 
@@ -315,6 +416,30 @@ export function createStyleControls({ t }) {
         }
       });
       applyStylesToInputs(preset.styles);
+      updatePreview();
+    });
+
+    // Parse and apply custom CSS declarations
+    const toCamel = (prop) => prop.trim().replace(/-([a-z])/g, (_, c) => c.toUpperCase());
+    customCss.addEventListener('input', () => {
+      clearError();
+      const text = customCss.value || '';
+      const updates = {};
+      text
+        .split(';')
+        .map((line) => line.trim())
+        .filter(Boolean)
+        .forEach((decl) => {
+          const idx = decl.indexOf(':');
+          if (idx === -1) return;
+          const key = toCamel(decl.slice(0, idx));
+          const value = decl.slice(idx + 1).trim();
+          if (Object.prototype.hasOwnProperty.call(styleState, key) && value) {
+            updates[key] = value;
+          }
+        });
+      Object.assign(styleState, updates);
+      applyStylesToInputs(updates);
       updatePreview();
     });
   }
