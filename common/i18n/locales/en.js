@@ -252,6 +252,7 @@ const messages = {
     styles: {
       color: 'Text color',
       backgroundColor: 'Background color',
+      customCss: 'Custom CSS',
       position: 'CSS position',
       top: 'Top offset',
       right: 'Right offset',

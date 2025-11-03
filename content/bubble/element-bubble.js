@@ -661,6 +661,7 @@ function createElementBubble() {
       return;
     }
     const stylePatch = detail && typeof detail.style === 'object' ? detail.style : null;
+    const hasTextUpdate = Object.prototype.hasOwnProperty.call(detail || {}, 'text');
     const hasContainerUpdate = Object.prototype.hasOwnProperty.call(detail || {}, 'containerId');
     const hasFloatingUpdate = Object.prototype.hasOwnProperty.call(detail || {}, 'floating');
     const hasBubbleSideUpdate = Object.prototype.hasOwnProperty.call(detail || {}, 'bubbleSide');
@@ -689,6 +690,10 @@ function createElementBubble() {
       const positionValue = typeof detail.position === 'string' ? detail.position : state.position;
       nextPatch.position = positionValue;
     }
+    if (hasTextUpdate) {
+      const textValue = typeof detail.text === 'string' ? detail.text : '';
+      nextPatch.text = textValue;
+    }
     if (Object.keys(nextPatch).length === 0) {
       return;
     }
@@ -698,6 +703,9 @@ function createElementBubble() {
     }
     if (hasBubbleSideUpdate) {
       bubble.dataset.pageAugmentorPlacement = 'right';
+    }
+    if (hasTextUpdate) {
+      textInput.value = state.text;
     }
     if (hasSelectorUpdate) {
       selectorValue.textContent = state.selector;
