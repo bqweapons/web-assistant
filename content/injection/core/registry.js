@@ -1,5 +1,6 @@
 import { applyMetadata, flashHighlight, insertHost, clearPendingContainerAttachment } from '../orchestrator/orchestrator.js';
 import { createHost } from '../host/create-host.js';
+import { HOST_ATTRIBUTE } from './constants.js';
 
 /** @type {Map<string, import('../../../common/types.js').InjectedElement>} */
 const elements = new Map();
@@ -12,14 +13,22 @@ export function ensureElement(element) {
   elements.set(element.id, element);
   let host = hosts.get(element.id);
   if (!host || !host.isConnected) {
-    host = createHost(element);
-    const inserted = insertHost(host, element);
-    if (!inserted) {
-      host.remove();
-      clearPendingContainerAttachment(element.id);
-      return false;
+    // Adopt an existing DOM host first (avoids accidental duplication)
+    const adopted = findExistingHostInDom(element.id);
+    if (adopted) {
+      host = adopted;
+      hosts.set(element.id, host);
+      applyMetadata(host, element);
+    } else {
+      host = createHost(element);
+      const inserted = insertHost(host, element);
+      if (!inserted) {
+        host.remove();
+        clearPendingContainerAttachment(element.id);
+        return false;
+      }
+      hosts.set(element.id, host);
     }
-    hosts.set(element.id, host);
   } else {
     applyMetadata(host, element);
   }
@@ -161,6 +170,25 @@ function applyEditingState(host, elementId) {
     host.dataset.pageAugmentorEditing = 'true';
   } else {
     delete host.dataset.pageAugmentorEditing;
+  }
+}
+function escapeAttributeSelector(value) {
+  try {
+    if (typeof CSS !== 'undefined' && typeof CSS.escape === 'function') {
+      return CSS.escape(value);
+    }
+  } catch (_e) {}
+  return String(value).replace(/["\\]/g, '\\$&');
+}
+
+function findExistingHostInDom(elementId) {
+  try {
+    if (!elementId) return null;
+    const escaped = escapeAttributeSelector(elementId);
+    const node = document.querySelector(`[${HOST_ATTRIBUTE}="${escaped}"]`);
+    return node instanceof HTMLElement ? node : null;
+  } catch (_e) {
+    return null;
   }
 }
 
