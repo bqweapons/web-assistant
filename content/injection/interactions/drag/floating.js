@@ -55,6 +55,7 @@ export function attachFloatingDragBehavior(node, element, deps) {
   let currentDropTarget = null; // { kind: 'area'|'dom', area|placement }
   let highlightedArea = null;
   let startRect = null;
+  let suppressNextClick = false;
 
   // ドロップ候補のエリアを強調表示し、前回のハイライトを解除する。
   const updateHighlight = (areaTarget) => {
@@ -78,6 +79,7 @@ export function attachFloatingDragBehavior(node, element, deps) {
       return;
     }
     dragStarted = true;
+    suppressNextClick = true;
     if (startRect) {
       host.style.width = `${startRect.width}px`;
       host.style.height = `${startRect.height}px`;
@@ -112,6 +114,7 @@ export function attachFloatingDragBehavior(node, element, deps) {
     pointerId = null;
     dragging = false;
     dragStarted = false;
+    // keep suppressNextClick true until click is bubbled after drag when commit succeeded
     startRect = null;
     node.classList.remove('page-augmentor-floating-dragging');
     node.style.userSelect = '';
@@ -324,7 +327,9 @@ export function attachFloatingDragBehavior(node, element, deps) {
     dispatchDraftUpdateFromHost(host, { bubbleSide: 'left' });
     dragging = true;
     dragStarted = false;
+    suppressNextClick = false;
     pointerId = event.pointerId;
+    setPointerCaptureSafe(node, pointerId);
     startX = event.clientX;
     startY = event.clientY;
     lastPointerX = event.clientX;
@@ -358,6 +363,18 @@ export function attachFloatingDragBehavior(node, element, deps) {
   node.addEventListener('pointercancel', () => {
     finalizeDrag(false);
   });
+
+  node.addEventListener(
+    'click',
+    (event) => {
+      if (suppressNextClick) {
+        event.stopPropagation();
+        event.preventDefault();
+        suppressNextClick = false;
+      }
+    },
+    true,
+  );
 }
 
 

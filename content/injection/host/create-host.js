@@ -52,12 +52,16 @@ export function createHost(element) {
       /* Ensure resize handles positioned relative to node bounds */
       position: relative;
     }
-    :host([data-page-augmentor-editing='true']) .${NODE_CLASS} {
-      outline: 2px dashed rgba(37, 99, 235, 0.6);
-      outline-offset: 2px;
+    :host([data-page-augmentor-global-editing='true']) .${NODE_CLASS} {
+      outline: 1px dashed rgba(37, 99, 235, 0.35);
+      outline-offset: 1px;
     }
-    :host([data-page-augmentor-editing='true']) .${NODE_CLASS} .page-augmentor-resize-handle,
-    :host([data-page-augmentor-global-editing='true']) .${NODE_CLASS} .page-augmentor-resize-handle {
+    :host([data-page-augmentor-editing='true']) .${NODE_CLASS} {
+      outline: 2px solid rgba(37, 99, 235, 0.75);
+      outline-offset: 2px;
+      box-shadow: 0 0 0 4px rgba(191, 219, 254, 0.6);
+    }
+    :host([data-page-augmentor-editing='true']) .${NODE_CLASS} .page-augmentor-resize-handle {
       display: block !important;
     }
     .page-augmentor-resize-handle {

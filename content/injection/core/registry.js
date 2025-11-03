@@ -265,7 +265,7 @@ function applyEditingState(host, elementId) {
   } else {
     delete host.dataset.pageAugmentorGlobalEditing;
   }
-  if (editingMode || editingElements.has(elementId)) {
+  if (editingElements.has(elementId)) {
     host.dataset.pageAugmentorEditing = 'true';
   } else {
     delete host.dataset.pageAugmentorEditing;

@@ -8,6 +8,9 @@ import { attachResizeBehavior } from './resize.js';
  * @param {HTMLElement} host
  */
 export function attachResizeStrategy(node, element, host) {
+  if (element?.type === 'tooltip') {
+    return;
+  }
   attachResizeBehavior(node, element, host);
 }
 
