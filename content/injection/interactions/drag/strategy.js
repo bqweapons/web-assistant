@@ -17,10 +17,11 @@ import { attachFloatingDragBehavior } from './floating.js';
  */
 
 /**
+ * 要素タイプに応じて適切なドラッグ戦略を紐付ける。
  * Attaches the appropriate drag behavior based on element type.
  * @param {HTMLElement} node
  * @param {import('../../../../common/types.js').InjectedElement} element
- * @param {object} deps - Dependencies required by floating drag (area drag ignores)
+ * @param {DragDeps} deps - Dependencies required by floating drag (area drag ignores)
  */
 export function attachDragBehavior(node, element, deps /** @type {DragDeps} */) {
   if (!element || !element.type) return;

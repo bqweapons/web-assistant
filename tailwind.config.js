@@ -1,5 +1,6 @@
 import forms from '@tailwindcss/forms';
-
+// サイドパネルのスタイルをビルドするための Tailwind 設定ファイル。
+// tree-shaking の対象パスやブランドカラーをここで宣言し、開発時とビルド時の設定を共通化する。
 export default {
   content: [
     './sidepanel/src/**/*.{js,jsx}',

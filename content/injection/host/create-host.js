@@ -1,6 +1,12 @@
 import { HOST_ATTRIBUTE, HOST_CLASS, NODE_CLASS } from '../core/index.js';
 import { applyStyle, getStyleTarget, createTooltipNode, applyBaseAppearance } from '../ui/index.js';
 
+/**
+ * 要素タイプごとに適切な初期ノードを生成する。
+ * Creates an initial shadow node for a given element type.
+ * @param {import('../../../common/types.js').InjectedElement['type']} type
+ * @returns {HTMLElement}
+ */
 function createNodeForType(type) {
   if (type === 'link') {
     return document.createElement('a');
@@ -22,6 +28,12 @@ function createNodeForType(type) {
   return button;
 }
 
+/**
+ * 注入要素を囲むホストコンテナと Shadow DOM を構築する。
+ * Creates the host container and shadow DOM scaffold for an injected element.
+ * @param {import('../../../common/types.js').InjectedElement} element
+ * @returns {HTMLElement}
+ */
 export function createHost(element) {
   const host = document.createElement('span');
   host.className = HOST_CLASS;

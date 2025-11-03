@@ -3,6 +3,11 @@ export const DEFAULT_LINK_STYLE = {
   textDecoration: 'underline',
 };
 
+/**
+ * プレビュー用リンク要素に基本スタイルを適用する。
+ * Applies the default preview styling to link nodes.
+ * @param {HTMLElement | null} element
+ */
 export function applyLinkPreview(element) {
   if (!(element instanceof HTMLElement)) {
     return;

@@ -115,6 +115,13 @@ See `AGENTS.md` for a deeper reference on agent authoring, available steps, guar
     -- types.js
 ```
 
+### Runtime architecture overview
+- **Messaging layer (`common/messaging.js`)**: Wraps `chrome.runtime.sendMessage` and port connections so every context exchanges `{ ok, data | error }` payloads. Async handlers are normalised to promises, letting the side panel, background service worker, and content scripts share identical request patterns.
+- **Persistent store (`common/storage.js`)**: Keeps all injected element metadata under a single `injectedElements` key. Update helpers clone payloads (including nested style/frame fields) to avoid shared references, while `observePage` fans out `chrome.storage.onChanged` events by URL.
+- **URL normalisation (`common/url.js`)**: Produces stable page keys by stripping query strings and hashes, falling back to manual trimming when the URL constructor is unavailable.
+- **Injection registry (`content/injection/core/registry.js`)**: Tracks element descriptors alongside live host nodes, reuses existing DOM hosts when possible, toggles editing state via `data-*` attributes, and rebuilds hosts whenever placement metadata changes.
+- **Renderer lifecycle**: Newly created hosts hydrate immediately through `applyMetadata` so users see text, hrefs, and tooltip content without waiting for external observers.
+
 ### Known limitations
 - Strict CSP headers may block script/style injection on some hosts.
 - Only same-origin iframe documents can be augmented.
@@ -171,6 +178,13 @@ Page Augmentor は Manifest V3 対応の Chrome 拡張機能で、任意の Web 
 - sidePanel: Chrome のサイドパネル内に React UI を表示するため。
 - webNavigation: 同一オリジンのフレームを列挙し、ピッカーと再挿入を iframe まで届けるため。
 
+### ランタイム構成の概要
+- **メッセージング層（`common/messaging.js`）**: `chrome.runtime.sendMessage` や Port 接続をラップし、すべてのコンテキストが `{ ok, data | error }` 形式で通信できるよう整えています。非同期ハンドラは Promise として正規化され、サイドパネル・バックグラウンド・コンテンツスクリプト間で同じ呼び出しパターンを共有します。
+- **永続ストア（`common/storage.js`）**: 注入要素メタデータを `injectedElements` キーに集約。更新ヘルパーはスタイルや frameSelectors などの入れ子プロパティまで複製して共有参照を避け、`observePage` が `chrome.storage.onChanged` の差分を URL ごとに配信します。
+- **URL 正規化（`common/url.js`）**: クエリ文字列とハッシュを除去して安定したページキーを生成し、URL コンストラクタが利用できない環境では手動トリミングでフォールバックします。
+- **注入レジストリ（`content/injection/core/registry.js`）**: 要素ディスクリプターと DOM 上のホストノードを同期。既存ホストを優先的に再利用し、`data-*` 属性で編集状態を切り替え、配置メタデータが変わった場合はノードを再構築します。
+- **レンダラーのライフサイクル**: 新しく生成したホストには `applyMetadata` を即座に適用し、テキストやリンク、ツールチップ内容が遅延なく表示されるようにしています。
+
 ### 既知の制限
 - 厳しい CSP を備えたサイトではスクリプトやスタイルの注入が拒否される場合があります。
 - 強化できるのは同一オリジンの iframe のみです。
@@ -226,6 +240,13 @@ Page Augmentor 是一款支持 Manifest V3 的 Chrome 扩展，可在任意网�
 - storage: 按页面保存自定义配置。
 - sidePanel: 在 Chrome 侧边栏中展示 React UI。
 - webNavigation: 枚举同源 iframe，使拾取器和重新挂载能够作用到嵌套文档。
+
+### 运行时结构概览
+- **消息层（`common/messaging.js`）**：封装 `chrome.runtime.sendMessage` 与长连接端口，统一使用 `{ ok, data | error }` 结构传递结果，让侧边栏、后台 Service Worker 与内容脚本共享同一套异步调用方式。
+- **持久化存储（`common/storage.js`）**：把所有注入元素的元数据集中在 `injectedElements` 键下，写入前连同样式和 frameSelectors 等子字段一起复制，避免引用共享；`observePage` 会把 `chrome.storage.onChanged` 的更新按 URL 分发。
+- **URL 规范化（`common/url.js`）**：去除查询参数与哈希片段，生成稳定的页面键；当无法使用 URL 构造函数时，会退回到手动裁剪字符串。
+- **注入注册表（`content/injection/core/registry.js`）**：同时跟踪元素描述与实际 DOM 宿主，优先复用现有节点，在位置元数据变化时清理并重建宿主，并通过 `data-*` 属性驱动编辑态。
+- **渲染生命周期**：新建宿主立即调用 `applyMetadata`，确保文本、链接与提示气泡内容无需等待即可呈现。
 
 ### 已知限制
 - 严格的 CSP 可能阻止脚本或样式注入。

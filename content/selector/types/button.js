@@ -7,6 +7,11 @@ export const DEFAULT_BUTTON_STYLE = {
   borderRadius: '8px',
 };
 
+/**
+ * プレビュー用ボタン要素に標準スタイルを適用する。
+ * Applies the default preview styling to button nodes.
+ * @param {HTMLElement | null} element
+ */
 export function applyButtonPreview(element) {
   if (!(element instanceof HTMLElement)) {
     return;

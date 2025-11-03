@@ -1,6 +1,8 @@
 import enMessages from './en.js';
 import { cloneMessages, mergeMessages } from '../utils.js';
 
+// 英語辞書をベースに日本語の差分をマージしたロケール定義。
+// 英語と同じキー構造を保ちながら、文言だけを日本語向けに上書きしている。
 const messages = cloneMessages(enMessages);
 
 mergeMessages(messages, {

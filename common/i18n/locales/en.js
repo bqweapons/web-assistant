@@ -1,3 +1,4 @@
+// 英語 UI 向けの翻訳文字列セット。サイドパネル・バブル・サービスワーカーで共有する。
 const messages = {
   app: {
     title: 'Page Augmentor',
