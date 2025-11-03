@@ -1,5 +1,38 @@
 /* eslint-disable no-undef */
-// コンチE��チE��クリプトのエントリーポイント。注入要素の同期とピッカー連携を担当する、E
+  const TARGET_HIGHLIGHT_CLASS = 'page-augmentor-target-highlight';
+
+  function ensureTargetHighlightStyles() {
+    if (document.getElementById('page-augmentor-target-highlight-style')) {
+      return;
+    }
+    const style = document.createElement('style');
+    style.id = 'page-augmentor-target-highlight-style';
+    style.textContent = `
+      .${TARGET_HIGHLIGHT_CLASS} {
+        outline: 2px solid rgba(37, 99, 235, 0.55) !important;
+        outline-offset: 2px !important;
+        transition: outline-color 0.2s ease;
+      }
+    `;
+    document.head?.appendChild(style);
+  }
+
+  function highlightPlacementTarget(element) {
+    if (!(element instanceof HTMLElement)) {
+      return;
+    }
+    ensureTargetHighlightStyles();
+    element.classList.add(TARGET_HIGHLIGHT_CLASS);
+    window.setTimeout(() => {
+      try {
+        element.classList.remove(TARGET_HIGHLIGHT_CLASS);
+      } catch (_error) {
+        // Element may have been removed; ignore cleanup failures
+      }
+    }, 1200);
+  }
+
+// 繧ｳ繝ｳ繝・Φ繝・せ繧ｯ繝ｪ繝励ヨ縺ｮ繧ｨ繝ｳ繝医Μ繝ｼ繝昴う繝ｳ繝医よｳｨ蜈･隕∫ｴ縺ｮ蜷梧悄縺ｨ繝斐ャ繧ｫ繝ｼ騾｣謳ｺ繧呈球蠖薙☆繧九・
 import { sendMessage, MessageType } from '../common/messaging.js';
 import * as selectorModule from '../selector.js';
 import * as injectModule from '../inject.js';
@@ -98,8 +131,21 @@ import { HOST_ATTRIBUTE, Z_INDEX_FLOATING_DEFAULT } from '../injection/core/cons
       if (!elementId) return;
       // Skip autosave for unsaved creation drafts; the Save action will persist
       if (state.creationElementId && state.creationElementId === elementId) return;
-      // When editing bubble is open, its onPreview handler already autosaves
-      if (state.activeEditorElementId && state.activeEditorElementId === elementId) return;
+      // When editing bubble is open, skip autosave only when no placement changes were requested
+      const hasPlacementMutation =
+        Object.prototype.hasOwnProperty.call(detail, 'containerId') ||
+        Object.prototype.hasOwnProperty.call(detail, 'floating') ||
+        Object.prototype.hasOwnProperty.call(detail, 'selector') ||
+        Object.prototype.hasOwnProperty.call(detail, 'position') ||
+        (detail.style &&
+          (Object.prototype.hasOwnProperty.call(detail.style || {}, 'left') ||
+            Object.prototype.hasOwnProperty.call(detail.style || {}, 'top') ||
+            Object.prototype.hasOwnProperty.call(detail.style || {}, 'position') ||
+            Object.prototype.hasOwnProperty.call(detail.style || {}, 'zIndex'))) ||
+        Object.prototype.hasOwnProperty.call(detail, 'text');
+      if (state.activeEditorElementId && state.activeEditorElementId === elementId && !hasPlacementMutation) {
+        return;
+      }
       const base = injectModule.getElement(elementId);
       if (!base) return;
 
@@ -154,8 +200,150 @@ import { HOST_ATTRIBUTE, Z_INDEX_FLOATING_DEFAULT } from '../injection/core/cons
     return element ? matchesFrameSelectors(element.frameSelectors) : false;
   }
 
+  function beginTooltipPlacement() {
+    stopPicker();
+    const overlay = selectorModule.createOverlay();
+    document.body.appendChild(overlay.container);
+    document.body.style.cursor = 'crosshair';
+    let disposed = false;
+
+    const cleanup = (notifyCancel) => {
+      if (disposed) {
+        return;
+      }
+      disposed = true;
+      document.removeEventListener('mousemove', handleMove, true);
+      document.removeEventListener('click', handleClick, true);
+      document.removeEventListener('keydown', handleKeyDown, true);
+      overlay.dispose();
+      document.body.style.cursor = '';
+      state.pickerSession = null;
+      if (notifyCancel) {
+        try {
+          chrome.runtime.sendMessage({ type: MessageType.PICKER_CANCELLED, pageUrl });
+        } catch (_error) {
+          // ignore notification errors
+        }
+      }
+    };
+
+    const handleMove = (event) => {
+      const target = selectorModule.resolveTarget(event.target);
+      if (target instanceof Element) {
+        overlay.show(target);
+      } else {
+        overlay.hide();
+      }
+    };
+
+    const handleClick = (event) => {
+      const target = selectorModule.resolveTarget(event.target);
+      if (!(target instanceof HTMLElement)) {
+        return;
+      }
+      event.preventDefault();
+      event.stopPropagation();
+      cleanup(false);
+      const draft = buildDraftElement('tooltip');
+      const attached = applyDraftPlacementToTarget(draft, target);
+      if (!attached) {
+        try {
+          chrome.runtime.sendMessage({
+            type: MessageType.PICKER_CANCELLED,
+            pageUrl,
+            data: { error: 'Unable to resolve a selector for the chosen element.' },
+          });
+        } catch (_error) {
+          // ignore notification failures
+        }
+        return;
+      }
+      highlightPlacementTarget(target);
+      const ensured = injectModule.ensureElement(draft);
+      if (!ensured) {
+        try {
+          chrome.runtime.sendMessage({
+            type: MessageType.PICKER_CANCELLED,
+            pageUrl,
+            data: { error: 'Unable to insert the tooltip on this page.' },
+          });
+        } catch (_error) {
+          // ignore notification failures
+        }
+        return;
+      }
+      injectModule.setEditingElement(draft.id, true);
+      state.creationElementId = draft.id;
+      state.activeEditorElementId = draft.id;
+      const host = injectModule.getHost(draft.id);
+      if (!host) {
+        cancelCreationDraft();
+        return;
+      }
+      const session = selectorModule.openElementEditor({
+        mode: 'create',
+        target: host,
+        selector: draft.selector,
+        values: draft,
+        onPreview(updated) {
+          injectModule.previewElement(draft.id, updated || {});
+        },
+        onSubmit(updated) {
+          injectModule.previewElement(draft.id, updated || {});
+          injectModule.setEditingElement(draft.id, false);
+          state.creationElementId = null;
+          state.activeEditorElementId = null;
+          state.editorSession = null;
+          const payload = {
+            ...draft,
+            ...updated,
+            id: draft.id,
+            pageUrl,
+            selector: draft.selector,
+            position: draft.position,
+            frameSelectors: Array.isArray(frameContext.frameSelectors)
+              ? frameContext.frameSelectors.slice()
+              : [],
+            frameLabel: frameContext.frameLabel,
+            frameUrl: frameContext.frameUrl,
+            createdAt: draft.createdAt,
+            updatedAt: Date.now(),
+          };
+          sendMessage(MessageType.CREATE, payload).catch((error) =>
+            console.error('[PageAugmentor] Failed to save new element', error),
+          );
+        },
+        onCancel() {
+          injectModule.setEditingElement(draft.id, false);
+          cancelCreationDraft();
+          state.editorSession = null;
+          try {
+            chrome.runtime.sendMessage({ type: MessageType.PICKER_CANCELLED, pageUrl });
+          } catch (_error) {
+            // ignore notification errors
+          }
+        },
+      });
+      state.editorSession = session;
+      injectModule.focusElement(draft.id);
+    };
+
+    const handleKeyDown = (event) => {
+      if (event.key === 'Escape') {
+        event.preventDefault();
+        cleanup(true);
+      }
+    };
+
+    document.addEventListener('mousemove', handleMove, true);
+    document.addEventListener('click', handleClick, true);
+    document.addEventListener('keydown', handleKeyDown, true);
+
+    state.pickerSession = { stop: () => cleanup(true) };
+  }
+
   /**
-   * バックグラウンドから保存済み要素を取得し、�Eージへ反映する、E
+   * 繝舌ャ繧ｯ繧ｰ繝ｩ繧ｦ繝ｳ繝峨°繧我ｿ晏ｭ俶ｸ医∩隕∫ｴ繧貞叙蠕励＠縲√・繝ｼ繧ｸ縺ｸ蜿肴丐縺吶ｋ縲・
    * Requests stored elements from the background script and renders them.
    * @returns {Promise<void>}
    */
@@ -169,7 +357,7 @@ import { HOST_ATTRIBUTE, Z_INDEX_FLOATING_DEFAULT } from '../injection/core/cons
   }
 
   /**
-   * 渡された要素リストと DOM を同期させる、E
+   * 貂｡縺輔ｌ縺溯ｦ∫ｴ繝ｪ繧ｹ繝医→ DOM 繧貞酔譛溘＆縺帙ｋ縲・
    * Synchronizes the injected DOM with the provided list.
    * @param {import('../common/types.js').InjectedElement[]} list
    */
@@ -211,7 +399,7 @@ import { HOST_ATTRIBUTE, Z_INDEX_FLOATING_DEFAULT } from '../injection/core/cons
   }
 
   /**
-   * バックグラウンドから�EメチE��ージを受け取るリスナ�Eを設定する、E
+   * 繝舌ャ繧ｯ繧ｰ繝ｩ繧ｦ繝ｳ繝峨°繧峨・繝｡繝・そ繝ｼ繧ｸ繧貞女縺大叙繧九Μ繧ｹ繝翫・繧定ｨｭ螳壹☆繧九・
    * Configures messaging listeners for background-originated events.
    */
   function setupMessageBridge() {
@@ -296,7 +484,7 @@ import { HOST_ATTRIBUTE, Z_INDEX_FLOATING_DEFAULT } from '../injection/core/cons
   }
 
   /**
-   * DOM 変化を監視し、忁E��に応じて要素を�E描画する、E
+   * DOM 螟牙喧繧堤屮隕悶＠縲∝ｿ・ｦ√↓蠢懊§縺ｦ隕∫ｴ繧貞・謠冗判縺吶ｋ縲・
    * Observes DOM mutations and re-applies injected elements when necessary.
    */
   function setupMutationWatcher() {
@@ -317,7 +505,7 @@ import { HOST_ATTRIBUTE, Z_INDEX_FLOATING_DEFAULT } from '../injection/core/cons
   }
 
   /**
-   * 要素ピッカーを開始し、E��択完亁E��にバブルフローを起動する、E
+   * 隕∫ｴ繝斐ャ繧ｫ繝ｼ繧帝幕蟋九＠縲・∈謚槫ｮ御ｺ・凾縺ｫ繝舌ヶ繝ｫ繝輔Ο繝ｼ繧定ｵｷ蜍輔☆繧九・
    * Starts the element picker and opens the bubble workflow on selection.
    * @param {{ mode?: 'create' }} [options]
    */
@@ -419,24 +607,79 @@ import { HOST_ATTRIBUTE, Z_INDEX_FLOATING_DEFAULT } from '../injection/core/cons
     };
   }
 
+  function resolvePlacementTargetFromRect(rect) {
+    if (!rect || typeof rect.left !== 'number' || typeof rect.top !== 'number') {
+      return null;
+    }
+    const clientX = Math.round(rect.left - window.scrollX + rect.width / 2);
+    const clientY = Math.round(rect.top - window.scrollY + rect.height / 2);
+    let candidate = document.elementFromPoint(clientX, clientY);
+    candidate = selectorModule.resolveTarget(candidate);
+    return candidate instanceof HTMLElement ? candidate : null;
+  }
+
+  function applyDraftPlacementToTarget(draft, target) {
+    if (!draft || !(target instanceof HTMLElement)) {
+      return false;
+    }
+    let selector = '';
+    try {
+      selector = selectorModule.generateSelector(target);
+    } catch (_error) {
+      selector = '';
+    }
+    if (!selector) {
+      return false;
+    }
+    draft.selector = selector;
+    draft.position = 'append';
+    draft.floating = false;
+    draft.containerId = '';
+    const nextStyle = { ...(draft.style || {}) };
+    delete nextStyle.position;
+    delete nextStyle.left;
+    delete nextStyle.top;
+    delete nextStyle.zIndex;
+    delete nextStyle.width;
+    delete nextStyle.height;
+    draft.style = nextStyle;
+    return true;
+  }
+
   function beginCreationSession(options = {}) {
     stopPicker();
     closeEditorBubble();
     cancelCreationDraft();
     const requestedType = typeof options.type === 'string' ? options.type : 'button';
+    if (requestedType === 'tooltip') {
+      beginTooltipPlacement();
+      return;
+    }
     // Let the user drag a rectangle to define placement and size
     const drawer = selectorModule.startRectDraw({
       onComplete(rect) {
         const draft = buildDraftElement(requestedType);
-        draft.style = {
-          ...(draft.style || {}),
-          position: 'absolute',
-          left: `${Math.max(0, rect.left)}px`,
-          top: `${Math.max(0, rect.top)}px`,
-          width: `${Math.max(24, rect.width)}px`,
-          height: `${Math.max(24, rect.height)}px`,
-          zIndex: (draft.style?.zIndex && String(draft.style.zIndex).trim()) || Z_INDEX_FLOATING_DEFAULT,
-        };
+        let placementTarget = null;
+        let attachedToTarget = false;
+        if (requestedType !== 'area') {
+          placementTarget = resolvePlacementTargetFromRect(rect);
+          attachedToTarget = applyDraftPlacementToTarget(draft, placementTarget);
+          if (attachedToTarget && placementTarget) {
+            highlightPlacementTarget(placementTarget);
+          }
+        }
+        if (!attachedToTarget || requestedType === 'area') {
+          draft.style = {
+            ...(draft.style || {}),
+            position: 'absolute',
+            left: `${Math.max(0, rect.left)}px`,
+            top: `${Math.max(0, rect.top)}px`,
+            width: `${Math.max(24, rect.width)}px`,
+            height: `${Math.max(24, rect.height)}px`,
+            zIndex: (draft.style?.zIndex && String(draft.style.zIndex).trim()) || Z_INDEX_FLOATING_DEFAULT,
+          };
+          draft.floating = true;
+        }
         const ensured = injectModule.ensureElement(draft);
         if (!ensured) {
           try {
@@ -518,7 +761,7 @@ import { HOST_ATTRIBUTE, Z_INDEX_FLOATING_DEFAULT } from '../injection/core/cons
   }
 
   /**
-   * アクチE��ブなピッカーを停止する、E
+   * 繧｢繧ｯ繝・ぅ繝悶↑繝斐ャ繧ｫ繝ｼ繧貞●豁｢縺吶ｋ縲・
    * Stops the active picker session.
    */
   function stopPicker() {
@@ -534,7 +777,7 @@ import { HOST_ATTRIBUTE, Z_INDEX_FLOATING_DEFAULT } from '../injection/core/cons
   }
 
   /**
-   * 既存�E注入要素に対してペ�Eジ冁E��チE��ターを表示する、E
+   * 譌｢蟄倥・豕ｨ蜈･隕∫ｴ縺ｫ蟇ｾ縺励※繝壹・繧ｸ蜀・お繝・ぅ繧ｿ繝ｼ繧定｡ｨ遉ｺ縺吶ｋ縲・
    * Opens the in-page editor bubble for an existing injected element.
    * @param {string} elementId
    * @returns {boolean}
@@ -608,7 +851,7 @@ import { HOST_ATTRIBUTE, Z_INDEX_FLOATING_DEFAULT } from '../injection/core/cons
   }
 
   /**
-   * エチE��ターバブルがあれ�E閉じる、E
+   * 繧ｨ繝・ぅ繧ｿ繝ｼ繝舌ヶ繝ｫ縺後≠繧後・髢峨§繧九・
    * Closes the editor bubble if present.
    */
   function closeEditorBubble() {
@@ -635,7 +878,7 @@ import { HOST_ATTRIBUTE, Z_INDEX_FLOATING_DEFAULT } from '../injection/core/cons
   }
 
   /**
-   * 選択した要素の概要テキストを生�Eする、E
+   * 驕ｸ謚槭＠縺溯ｦ∫ｴ縺ｮ讎りｦ√ユ繧ｭ繧ｹ繝医ｒ逕滓・縺吶ｋ縲・
    * Produces a human-friendly description of the selected element.
    * @param {Element} element
    * @returns {{ tag: string; text: string; classes: string }}
@@ -657,7 +900,7 @@ import { HOST_ATTRIBUTE, Z_INDEX_FLOATING_DEFAULT } from '../injection/core/cons
 })();
 
 /**
- * ストレージ識別用に正規化した URL を返す、E
+ * 繧ｹ繝医Ξ繝ｼ繧ｸ隴伜挨逕ｨ縺ｫ豁｣隕丞喧縺励◆ URL 繧定ｿ斐☆縲・
  * Returns a normalized URL for storage grouping.
  * @returns {string}
  */
