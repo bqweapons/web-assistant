@@ -7,7 +7,7 @@ import { resolveFrameContext } from './frame.js';
  * Starts the interactive element picker.
  * @param {{
  *   mode?: 'create' | 'edit';
- *   onSubmit?: (result: import('../common/types.js').InjectedElement) => void;
+ *   onSubmit?: (result: import('../../common/types.js').InjectedElement) => void;
  *   onCancel?: () => void;
  *   onTarget?: (element: Element, selector: string) => void;
  *   defaults?: Record<string, unknown>;

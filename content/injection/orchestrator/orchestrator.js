@@ -150,8 +150,7 @@ export function clearPendingContainerAttachment(elementId) {
 
 
 
-//
- moved to host/create-host.js
+// moved to host/create-host.js
 
 
 

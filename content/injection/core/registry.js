@@ -1,7 +1,7 @@
-import { applyMetadata, flashHighlight, insertHost, clearPendingContainerAttachment } from './orchestrator/orchestrator.js';
-import { createHost } from './host/create-host.js';
+import { applyMetadata, flashHighlight, insertHost, clearPendingContainerAttachment } from '../orchestrator/orchestrator.js';
+import { createHost } from '../host/create-host.js';
 
-/** @type {Map<string, import('../../common/types.js').InjectedElement>} */
+/** @type {Map<string, import('../../../common/types.js').InjectedElement>} */
 const elements = new Map();
 /** @type {Map<string, HTMLElement>} */
 const hosts = new Map();
