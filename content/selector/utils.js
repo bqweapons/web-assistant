@@ -8,6 +8,7 @@ const cssEscape =
       (value) => String(value).replace(/[^a-zA-Z0-9_\-]/g, (char) => `\\${char}`);
 
 /**
+ * 指定コンテキストで ID が一意か判定する。
  * Determines whether an id is unique within the provided document context.
  * @param {string} id
  * @param {Document} [contextDocument]
@@ -22,6 +23,7 @@ function isIdUnique(id, contextDocument) {
 }
 
 /**
+ * 同一タグ内で要素が何番目かを算出する。
  * Calculates the position of the element among siblings of the same type.
  * @param {Element} element
  * @returns {number}
@@ -36,6 +38,7 @@ function nthOfType(element) {
 }
 
 /**
+ * イベントターゲットから実際に編集対象とする要素を導出する。
  * Resolves the best candidate element from an event target.
  * @param {EventTarget | null} target
  * @returns {Element | null}
@@ -51,6 +54,7 @@ export function resolveTarget(target) {
 }
 
 /**
+ * ID や nth-of-type を用いて一意な CSS セレクターを生成する。
  * Generates a unique CSS selector for the provided element using ids or nth-of-type fallback.
  * @param {Element} element
  * @returns {string}

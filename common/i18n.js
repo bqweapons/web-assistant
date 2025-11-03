@@ -1,3 +1,5 @@
+// 拡張機能全体で共有する国際化ストアとヘルパー。
+// ロケールの解決・永続化・購読・翻訳関数をひとまとめに管理し、UI から簡潔に利用できるようにする。
 import enMessages from './i18n/locales/en.js';
 import jaMessages from './i18n/locales/ja.js';
 import zhCNMessages from './i18n/locales/zh-CN.js';
@@ -25,6 +27,7 @@ let currentLocale = systemLocale;
 const subscribers = new Set();
 
 /**
+ * ロケール文字列をサポート対象の最も近い候補へ丸め込む。
  * Resolves a locale string to the closest supported locale.
  * @param {string} input
  * @returns {keyof typeof messages}
@@ -53,6 +56,7 @@ export function resolveLocale(input) {
 }
 
 /**
+ * 現在アクティブなロケールを取得する。
  * Returns the currently active locale.
  * @returns {keyof typeof messages}
  */
@@ -61,6 +65,7 @@ export function getLocale() {
 }
 
 /**
+ * アクティブなロケールを更新し、購読者に通知する。
  * Updates the active locale and notifies subscribers.
  * @param {string} locale
  * @returns {keyof typeof messages}
@@ -77,6 +82,7 @@ export function setLocale(locale) {
 }
 
 /**
+ * 利用可能であれば現在のロケールをストレージへ永続化する。
  * Persists the current locale to storage when available.
  * @param {string} locale
  */
@@ -91,6 +97,7 @@ function persistLocale(locale) {
 }
 
 /**
+ * 購読中のリスナー全員にロケール変更を通知する。
  * Notifies all subscribed listeners of the locale change.
  */
 function notifySubscribers() {
@@ -104,6 +111,7 @@ function notifySubscribers() {
 }
 
 /**
+ * ロケール変更通知を購読する。
  * Subscribes to locale changes.
  * @param {(locale: keyof typeof messages) => void} listener
  * @returns {() => void}
@@ -114,6 +122,7 @@ export function subscribe(listener) {
 }
 
 /**
+ * 指定されたキーに対応するローカライズ済み文字列を取得する。
  * Retrieves a localized string for the provided key.
  * @param {string} key
  * @param {Record<string, string | number>} [values]
@@ -138,6 +147,7 @@ export function t(key, values) {
 }
 
 /**
+ * メッセージオブジェクトからネストした値を辿って取り出す。
  * Resolves a nested value from the messages object.
  * @param {any} source
  * @param {string} key
@@ -156,6 +166,7 @@ function resolveMessage(source, key) {
 }
 
 /**
+ * ラベル付きの利用可能なロケール一覧を返す。
  * Returns the available locale options with labels.
  * @returns {{ value: string; label: string }[]}
  */
@@ -177,6 +188,7 @@ export function getLocaleOptions() {
 }
 
 /**
+ * アクティブなロケールでタイムスタンプを整形する。
  * Formats a timestamp using the active locale.
  * @param {number} timestamp
  * @returns {string}
@@ -195,6 +207,7 @@ export function formatDateTime(timestamp) {
 }
 
 /**
+ * 永続化されたロケール設定を読み込む。
  * Loads any persisted locale preference.
  * @returns {Promise<keyof typeof messages>}
  */

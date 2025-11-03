@@ -2,6 +2,12 @@ import { HOST_ATTRIBUTE, Z_INDEX_FLOATING_DEFAULT, Z_INDEX_HOST_DEFAULT } from '
 
 export const AREA_DRAG_THRESHOLD = 4;
 
+/**
+ * ホストが編集モードで操作可能かを判定する。
+ * Determines whether drag interactions are permitted for the host.
+ * @param {HTMLElement | null} host
+ * @returns {boolean}
+ */
 export function isEditingAllowed(host) {
   return (
     host?.dataset?.pageAugmentorEditing === 'true' ||
@@ -9,6 +15,12 @@ export function isEditingAllowed(host) {
   );
 }
 
+/**
+ * Pointer Capture を安全に設定し、失敗時は握り潰す。
+ * Safely sets pointer capture ignoring unsupported errors.
+ * @param {Element & { setPointerCapture?: (pointerId: number) => void }} el
+ * @param {number | undefined | null} pointerId
+ */
 export function setPointerCaptureSafe(el, pointerId) {
   if (pointerId == null) return;
   try {
@@ -16,6 +28,12 @@ export function setPointerCaptureSafe(el, pointerId) {
   } catch (_e) {}
 }
 
+/**
+ * Pointer Capture を安全に解除する。
+ * Safely releases pointer capture when supported.
+ * @param {Element & { releasePointerCapture?: (pointerId: number) => void }} el
+ * @param {number | undefined | null} pointerId
+ */
 export function releasePointerCaptureSafe(el, pointerId) {
   if (pointerId == null) return;
   try {
@@ -23,6 +41,12 @@ export function releasePointerCaptureSafe(el, pointerId) {
   } catch (_e) {}
 }
 
+/**
+ * 任意ノードから所属するホスト要素を解決する。
+ * Resolves the host element that owns a given node.
+ * @param {Node | null} node
+ * @returns {HTMLElement | null}
+ */
 export function getHostFromNode(node) {
   const root = node?.getRootNode?.();
   if (root instanceof ShadowRoot && root.host instanceof HTMLElement) {
@@ -31,6 +55,12 @@ export function getHostFromNode(node) {
   return null;
 }
 
+/**
+ * ホストの境界をビューポートではなくページ座標で返す。
+ * Returns the host bounding box in page coordinates.
+ * @param {HTMLElement} host
+ * @returns {{ left: number; top: number; width: number; height: number }}
+ */
 export function getHostRectScreen(host) {
   const rect = host.getBoundingClientRect();
   return {
@@ -41,11 +71,26 @@ export function getHostRectScreen(host) {
   };
 }
 
+/**
+ * ホストの left/top スタイルを整数ピクセルで更新する。
+ * Sets the host's left and top styles rounded to integers.
+ * @param {HTMLElement} host
+ * @param {number} left
+ * @param {number} top
+ */
 export function setHostPosition(host, left, top) {
   host.style.left = `${Math.round(left)}px`;
   host.style.top = `${Math.round(top)}px`;
 }
 
+/**
+ * フローティング要素用に絶対配置スタイルを組み立てる。
+ * Builds an absolute-positioned style object for floating elements.
+ * @param {Record<string, string>} previousStyle
+ * @param {number} left
+ * @param {number} top
+ * @returns {Record<string, string>}
+ */
 export function buildAbsoluteStyle(previousStyle, left, top) {
   const base = previousStyle || {};
   const zIndex = base.zIndex && String(base.zIndex).trim() ? String(base.zIndex).trim() : Z_INDEX_FLOATING_DEFAULT;
@@ -58,6 +103,12 @@ export function buildAbsoluteStyle(previousStyle, left, top) {
   };
 }
 
+/**
+ * ホストからドラフト更新イベントをバブルさせる。
+ * Dispatches a draft update event from the host.
+ * @param {HTMLElement | null} host
+ * @param {Record<string, any>} detail
+ */
 export function dispatchDraftUpdateFromHost(host, detail) {
   if (!(host instanceof HTMLElement)) {
     return;
@@ -78,6 +129,13 @@ export function dispatchDraftUpdateFromHost(host, detail) {
   );
 }
 
+/**
+ * フローティングホストの配置座標を決定する。
+ * Positions a floating host relative to an element or target.
+ * @param {HTMLElement | null} host
+ * @param {import('../../../../common/types.js').InjectedElement} element
+ * @param {Element | null} target
+ */
 export function positionFloatingHost(host, element, target) {
   if (!(host instanceof HTMLElement)) {
     return;

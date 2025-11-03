@@ -8,6 +8,11 @@ export const DEFAULT_AREA_STYLE = {
   minHeight: '180px',
 };
 
+/**
+ * プレビュー用エリア要素にデフォルトの装飾を適用する。
+ * Applies default preview styling to area nodes.
+ * @param {HTMLElement | null} element
+ */
 export function applyAreaPreview(element) {
   if (!(element instanceof HTMLElement)) {
     return;

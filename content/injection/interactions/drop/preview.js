@@ -3,6 +3,10 @@ import { HOST_ATTRIBUTE } from '../../core/constants.js';
 let dropPreviewHost = null;
 let dropPreviewSourceId = '';
 
+/**
+ * 既存のドロッププレビューホストを破棄する。
+ * Removes the currently rendered drop preview host.
+ */
 export function removeDropPreviewHost() {
   if (dropPreviewHost && dropPreviewHost.isConnected) {
     dropPreviewHost.remove();
@@ -11,6 +15,13 @@ export function removeDropPreviewHost() {
   dropPreviewSourceId = '';
 }
 
+/**
+ * プレビュー用ホストを使い回し、必要なら新規生成する。
+ * Ensures a preview host exists for the given element snapshot.
+ * @param {import('../../../../common/types.js').InjectedElement} element
+ * @param {(element: import('../../../../common/types.js').InjectedElement) => HTMLElement} createHost
+ * @returns {HTMLElement | null}
+ */
 export function ensureDropPreviewHost(element, createHost) {
   if (dropPreviewHost && dropPreviewSourceId === element.id && dropPreviewHost.isConnected) {
     return dropPreviewHost;
@@ -36,6 +47,13 @@ export function ensureDropPreviewHost(element, createHost) {
   return host;
 }
 
+/**
+ * エリア型ターゲット内へプレビューを表示する。
+ * Renders the preview host inside an area drop target.
+ * @param {{ content: HTMLElement | null }} dropTarget
+ * @param {import('../../../../common/types.js').InjectedElement} element
+ * @param {(element: import('../../../../common/types.js').InjectedElement) => HTMLElement} createHost
+ */
 export function showAreaDropPreview(dropTarget, element, createHost) {
   if (!dropTarget?.content) {
     removeDropPreviewHost();
@@ -54,6 +72,13 @@ export function showAreaDropPreview(dropTarget, element, createHost) {
   resetHostPosition(host);
 }
 
+/**
+ * DOM ドロップ候補にプレビューを挿入する。
+ * Inserts the preview host into a DOM placement target.
+ * @param {{ reference: HTMLElement; position: 'append'|'prepend'|'before'|'after'; selector?: string }} placement
+ * @param {import('../../../../common/types.js').InjectedElement} element
+ * @param {(element: import('../../../../common/types.js').InjectedElement) => HTMLElement} createHost
+ */
 export function showDomDropPreview(placement, element, createHost) {
   if (!placement || !(placement.reference instanceof HTMLElement)) {
     removeDropPreviewHost();
@@ -81,6 +106,11 @@ export function showDomDropPreview(placement, element, createHost) {
   resetHostPosition(host);
 }
 
+/**
+ * プレビューホストの位置スタイルを初期化する。
+ * Resets positioning styles applied to the preview host.
+ * @param {HTMLElement | null} host
+ */
 function resetHostPosition(host) {
   if (!(host instanceof HTMLElement)) {
     return;

@@ -1,6 +1,14 @@
 import { parseActionFlowDefinition } from '../../../common/flows.js';
 import { forwardClick, resolveSelector, sanitizeUrl, executeActionFlow } from '../core/index.js';
 
+/**
+ * ボタン要素へクリック時の遷移・セレクター操作・フロー実行を組み込む。
+ * Applies navigation, selector actions, and flow execution to button nodes.
+ * @param {HTMLElement | null} node
+ * @param {string | undefined} href
+ * @param {string | undefined} actionSelector
+ * @param {string | undefined} actionFlow
+ */
 export function applyButtonBehavior(node, href, actionSelector, actionFlow) {
   if (!(node instanceof HTMLButtonElement)) {
     return;

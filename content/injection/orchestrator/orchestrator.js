@@ -50,7 +50,8 @@ let pendingContainerRetryHandle = 0;
 // moved to drop/targets.js (VOID elements), drop/indicator.js, and drop/preview.js
 
 /**
- * Provides drag dependencies to strategies (DI port)
+ * ドラッグ挙動の各戦略へ依存関係を供給する。
+ * Provides drag dependencies to strategies (DI port).
  * @returns {DragDeps}
  */
 function getFloatingDragDeps() {
@@ -78,6 +79,12 @@ function getFloatingDragDeps() {
 
 // moved to drop/preview.js (dom)
 
+/**
+ * 属性セレクターに埋め込む値をエスケープする。
+ * Escapes a value for safe attribute selector usage.
+ * @param {string} value
+ * @returns {string}
+ */
 function escapeAttributeSelector(value) {
   if (typeof CSS !== 'undefined' && typeof CSS.escape === 'function') {
     return CSS.escape(value);
@@ -85,6 +92,12 @@ function escapeAttributeSelector(value) {
   return String(value).replace(/["\\]/g, '\\$&');
 }
 
+/**
+ * 要素 ID から既存ホストを検索する。
+ * Finds an existing host node by element ID.
+ * @param {string} elementId
+ * @returns {Element | null}
+ */
 function findHostByElementId(elementId) {
   if (!elementId) {
     return null;
@@ -93,6 +106,10 @@ function findHostByElementId(elementId) {
   return document.querySelector(`[${HOST_ATTRIBUTE}="${escapedId}"]`);
 }
 
+/**
+ * 保留中のコンテナ割り当てを即時処理する。
+ * Flushes queued container attachments immediately.
+ */
 function flushPendingContainerAttachments() {
   pendingContainerRetryHandle = 0;
   if (pendingContainerAttachments.size === 0) {
@@ -115,6 +132,10 @@ function flushPendingContainerAttachments() {
   schedulePendingContainerAttachments();
 }
 
+/**
+ * 保留中のコンテナ割り当て処理をスケジュールする。
+ * Schedules pending container attachment retries.
+ */
 function schedulePendingContainerAttachments() {
   if (pendingContainerAttachments.size === 0) {
     if (pendingContainerRetryHandle) {
@@ -129,6 +150,12 @@ function schedulePendingContainerAttachments() {
   pendingContainerRetryHandle = window.setTimeout(flushPendingContainerAttachments, 160);
 }
 
+/**
+ * エリア型要素のコンテナへの挿入を保留キューに追加する。
+ * Queues a pending container attachment for area elements.
+ * @param {HTMLElement} host
+ * @param {import('../../../common/types.js').InjectedElement} element
+ */
 function queuePendingContainerAttachment(host, element) {
   if (!(host instanceof HTMLElement) || !element || !element.id || !element.containerId) {
     return;
@@ -140,6 +167,11 @@ function queuePendingContainerAttachment(host, element) {
   schedulePendingContainerAttachments();
 }
 
+/**
+ * 保留中のコンテナ割り当てをキャンセルする。
+ * Clears a pending container attachment for an element ID.
+ * @param {string} elementId
+ */
 export function clearPendingContainerAttachment(elementId) {
   if (!elementId) {
     return;
@@ -154,6 +186,12 @@ export function clearPendingContainerAttachment(elementId) {
 
 
 
+/**
+ * ホストの Shadow DOM を要素メタデータで初期化する。
+ * Applies metadata into the host's shadow DOM content.
+ * @param {HTMLElement} host
+ * @param {import('../../../common/types.js').InjectedElement} element
+ */
 export function applyMetadata(host, element) {
   const shadow = host.shadowRoot;
   if (!shadow) {
@@ -175,6 +213,13 @@ export function applyMetadata(host, element) {
   bindEditingEnhancements(node, element);
 }
 
+/**
+ * ホスト要素をコンテナや対象ノードへ挿入する。
+ * Inserts the host into the DOM according to element positioning.
+ * @param {HTMLElement} host
+ * @param {import('../../../common/types.js').InjectedElement} element
+ * @returns {boolean}
+ */
 export function insertHost(host, element) {
   const target = resolveSelector(element.selector);
   if (element.type === 'area') {
@@ -227,6 +272,11 @@ export function insertHost(host, element) {
   return true;
 }
 
+/**
+ * 一時的にアウトラインを点滅させてホストを強調表示する。
+ * Flashes a highlight outline on the host.
+ * @param {HTMLElement} host
+ */
 export function flashHighlight(host) {
   const shadow = host.shadowRoot;
   if (!shadow) {
@@ -268,6 +318,12 @@ if (typeof process !== 'undefined' && process.env && process.env.NODE_ENV !== 'p
   } catch (_e) {}
 }
 
+/**
+ * 要素タイプに応じた Shadow DOM ノードを生成する。
+ * Creates a shadow node that matches the element type.
+ * @param {import('../../../common/types.js').InjectedElement['type']} type
+ * @returns {HTMLElement}
+ */
 function createNodeForType(type) {
   if (type === 'link') {
     return document.createElement('a');
@@ -289,6 +345,12 @@ function createNodeForType(type) {
   return button;
 }
 
+/**
+ * Shadow DOM ノードへ注入要素の内容・属性を反映する。
+ * Hydrates the shadow node with element data and behaviours.
+ * @param {HTMLElement} node
+ * @param {import('../../../common/types.js').InjectedElement} element
+ */
 function hydrateNode(node, element) {
   if (!(node instanceof HTMLElement)) {
     return;
@@ -392,6 +454,12 @@ function hydrateNode(node, element) {
   }
 }
 
+/**
+ * 編集モード用のイベントや MutationObserver を結び付ける。
+ * Binds editing enhancements like inline editing and resize handles.
+ * @param {HTMLElement} node
+ * @param {import('../../../common/types.js').InjectedElement} element
+ */
 function bindEditingEnhancements(node, element) {
   if (!(node instanceof HTMLElement) || !element?.id) {
     return;

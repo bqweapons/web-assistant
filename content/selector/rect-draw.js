@@ -1,4 +1,5 @@
 /**
+ * 位置とサイズを指定する矩形描画オーバーレイを開始する。
  * Starts a rectangle drawing overlay to choose position and size.
  * - Shows a full-screen overlay and crosshair cursor.
  * - User drags to draw a rectangle; on release, calls onComplete with page coords.
@@ -43,8 +44,10 @@ export function startRectDraw(options = {}) {
   let startX = 0;
   let startY = 0;
 
+  // 表示領域外へはみ出さないよう値をクランプするヘルパー。
   const clamp = (value, min, max) => Math.min(max, Math.max(min, value));
 
+  // ドラッグ開始時に初期座標を記録し、矩形の描画を開始する。
   const handlePointerDown = (event) => {
     if (event.button !== 0 && event.button !== -1) return;
     drawing = true;
@@ -58,6 +61,7 @@ export function startRectDraw(options = {}) {
     event.stopPropagation();
   };
 
+  // 現在のポインタ位置に応じて矩形サイズと位置を更新する。
   const updateBox = (currentX, currentY) => {
     const x1 = clamp(startX, 0, window.innerWidth);
     const y1 = clamp(startY, 0, window.innerHeight);
@@ -73,12 +77,14 @@ export function startRectDraw(options = {}) {
     box.style.height = `${height}px`;
   };
 
+  // ドラッグ中のポインタ移動で矩形を描画する。
   const handlePointerMove = (event) => {
     if (!drawing) return;
     updateBox(event.clientX, event.clientY);
     event.preventDefault();
   };
 
+  // ドラッグ終了時に座標を確定させ、コールバックへ結果を渡す。
   const handlePointerUp = (event) => {
     if (!drawing) return;
     drawing = false;
@@ -100,6 +106,7 @@ export function startRectDraw(options = {}) {
     event.stopPropagation();
   };
 
+  // Escape キーで描画操作をキャンセルする。
   const handleKeyDown = (event) => {
     if (event.key === 'Escape') {
       dispose('cancel');
@@ -108,6 +115,7 @@ export function startRectDraw(options = {}) {
     }
   };
 
+  // オーバーレイとイベントリスナーを破棄する共通処理。
   const dispose = (reason) => {
     if (disposed) return;
     disposed = true;
