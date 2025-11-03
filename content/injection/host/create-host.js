@@ -37,13 +37,16 @@ export function createHost(element) {
     .${NODE_CLASS} {
       pointer-events: auto;
       font-family: inherit;
+      /* Ensure resize handles positioned relative to node bounds */
+      position: relative;
     }
     :host([data-page-augmentor-editing='true']) .${NODE_CLASS} {
       outline: 2px dashed rgba(37, 99, 235, 0.6);
       outline-offset: 2px;
     }
-    :host([data-page-augmentor-editing='true']) .${NODE_CLASS} .page-augmentor-resize-handle {
-      display: block;
+    :host([data-page-augmentor-editing='true']) .${NODE_CLASS} .page-augmentor-resize-handle,
+    :host([data-page-augmentor-global-editing='true']) .${NODE_CLASS} .page-augmentor-resize-handle {
+      display: block !important;
     }
     .page-augmentor-resize-handle {
       position: absolute;
@@ -55,6 +58,7 @@ export function createHost(element) {
       box-shadow: 0 1px 4px rgba(15, 23, 42, 0.25);
       display: none;
       pointer-events: auto;
+      z-index: 1;
     }
     .page-augmentor-resize-handle.nw { left: -6px; top: -6px; cursor: nwse-resize; }
     .page-augmentor-resize-handle.ne { right: -6px; top: -6px; cursor: nesw-resize; }

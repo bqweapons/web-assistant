@@ -293,9 +293,29 @@ function hydrateNode(node, element) {
   if (!(node instanceof HTMLElement)) {
     return;
   }
+  const preserveResizeHandlesDuring = (target, mutator) => {
+    try {
+      const handles = Array.from(target.querySelectorAll('.page-augmentor-resize-handle'));
+      // Temporarily detach handles to avoid being wiped by textContent updates
+      handles.forEach((h) => h.parentElement === target && h.remove());
+      try {
+        mutator();
+      } finally {
+        // Re-attach in original order
+        handles.forEach((h) => target.appendChild(h));
+      }
+    } catch (_e) {
+      // Fallback to plain mutation if anything goes wrong
+      try {
+        mutator();
+      } catch (_ignored) {}
+    }
+  };
   if (element.type === 'link' && node instanceof HTMLAnchorElement) {
     applyBaseAppearance(node, 'link');
-    node.textContent = element.text;
+    preserveResizeHandlesDuring(node, () => {
+      node.textContent = element.text;
+    });
     const sanitized = sanitizeUrl(element.href || '');
     if (sanitized) {
       node.setAttribute('href', sanitized);
@@ -312,7 +332,9 @@ function hydrateNode(node, element) {
     bindEditingEnhancements(node, element);
   } else if (element.type === 'button' && node instanceof HTMLButtonElement) {
     applyBaseAppearance(node, 'button');
-    node.textContent = element.text;
+    preserveResizeHandlesDuring(node, () => {
+      node.textContent = element.text;
+    });
     applyButtonBehavior(node, element.href, element.actionSelector, element.actionFlow);
     attachDragBehavior(node, element, getFloatingDragDeps());
     bindEditingEnhancements(node, element);
