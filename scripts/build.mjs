@@ -22,7 +22,7 @@ const targetConfigs = {
     },
   },
   content: {
-    entryPoints: [path.resolve(__dirname, '../content/content.js')],
+    entryPoints: [path.resolve(__dirname, '../content/app/content.js')],
     outfile: path.resolve(__dirname, '../content/dist/content.js'),
     format: 'iife',
   },

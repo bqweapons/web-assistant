@@ -1,5 +1,5 @@
-import { NODE_CLASS, TOOLTIP_POSITIONS } from './constants.js';
-import { normalizeTooltipPosition } from './style.js';
+import { NODE_CLASS, TOOLTIP_POSITIONS } from '../core/constants.js';
+import { normalizeTooltipPosition } from '../ui/style.js';
 
 export function createTooltipNode() {
   const container = document.createElement('div');
@@ -106,5 +106,8 @@ function adjustTooltipViewport(container) {
     configureTooltipPosition(container, bubble, desired);
   }
 }
+
+
+
 
 

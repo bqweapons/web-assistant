@@ -56,3 +56,25 @@
 // 何もしないダミー関数。コールバック初期値として利用する。
 export const noop = () => {};
 
+/**
+ * Dependencies passed to drag strategies (DI ports)
+ * @typedef {Object} DragDeps
+ * @property {(x:number,y:number,excludeId:string)=>any} findAreaDropTarget
+ * @property {(dropTarget:any, element: InjectedElement)=>void} showAreaDropPreview
+ * @property {(placement:any, element: InjectedElement)=>void} showDomDropPreview
+ * @property {(x:number,y:number,draggedHost?:HTMLElement)=>HTMLElement|null} findDomDropTarget
+ * @property {(target:Element, x:number, y:number)=>any} resolveDomDropPlacement
+ * @property {(indicator:{mode:'line'|'box',top:number,left:number,width:number,height:number})=>void} showDomDropIndicator
+ * @property {()=>void} hideDomDropIndicator
+ * @property {()=>void} removeDropPreviewHost
+ * @property {(host:HTMLElement)=>void} resetHostPosition
+ * @property {(id:string)=>void} clearPendingContainerAttachment
+ * @property {(selector:string)=>Element|null} resolveSelector
+ */
+
+/**
+ * Resize strategy dependencies (kept minimal for parity)
+ * @typedef {Object} ResizeDeps
+ * @property {(node: HTMLElement, element: InjectedElement, host: HTMLElement)=>void} attachResize
+ */
+

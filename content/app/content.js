@@ -1,10 +1,10 @@
 /* eslint-disable no-undef */
-// コンテンツスクリプトのエントリーポイント。注入要素の同期とピッカー連携を担当する。
+// コンチE��チE��クリプトのエントリーポイント。注入要素の同期とピッカー連携を担当する、E
 import { sendMessage, MessageType } from '../common/messaging.js';
-import * as selectorModule from './selector.js';
-import * as injectModule from './inject.js';
+import * as selectorModule from '../selector.js';
+import * as injectModule from '../inject.js';
 import { normalizePageUrl } from '../common/url.js';
-import { HOST_ATTRIBUTE } from './injection/constants.js';
+import { HOST_ATTRIBUTE, Z_INDEX_FLOATING_DEFAULT } from '../injection/core/constants.js';
 
 (async () => {
   if (window.__pageAugmentorInitialized) {
@@ -155,7 +155,7 @@ import { HOST_ATTRIBUTE } from './injection/constants.js';
   }
 
   /**
-   * バックグラウンドから保存済み要素を取得し、ページへ反映する。
+   * バックグラウンドから保存済み要素を取得し、�Eージへ反映する、E
    * Requests stored elements from the background script and renders them.
    * @returns {Promise<void>}
    */
@@ -169,7 +169,7 @@ import { HOST_ATTRIBUTE } from './injection/constants.js';
   }
 
   /**
-   * 渡された要素リストと DOM を同期させる。
+   * 渡された要素リストと DOM を同期させる、E
    * Synchronizes the injected DOM with the provided list.
    * @param {import('../common/types.js').InjectedElement[]} list
    */
@@ -211,7 +211,7 @@ import { HOST_ATTRIBUTE } from './injection/constants.js';
   }
 
   /**
-   * バックグラウンドからのメッセージを受け取るリスナーを設定する。
+   * バックグラウンドから�EメチE��ージを受け取るリスナ�Eを設定する、E
    * Configures messaging listeners for background-originated events.
    */
   function setupMessageBridge() {
@@ -296,7 +296,7 @@ import { HOST_ATTRIBUTE } from './injection/constants.js';
   }
 
   /**
-   * DOM 変化を監視し、必要に応じて要素を再描画する。
+   * DOM 変化を監視し、忁E��に応じて要素を�E描画する、E
    * Observes DOM mutations and re-applies injected elements when necessary.
    */
   function setupMutationWatcher() {
@@ -317,7 +317,7 @@ import { HOST_ATTRIBUTE } from './injection/constants.js';
   }
 
   /**
-   * 要素ピッカーを開始し、選択完了時にバブルフローを起動する。
+   * 要素ピッカーを開始し、E��択完亁E��にバブルフローを起動する、E
    * Starts the element picker and opens the bubble workflow on selection.
    * @param {{ mode?: 'create' }} [options]
    */
@@ -392,7 +392,7 @@ import { HOST_ATTRIBUTE } from './injection/constants.js';
       position: 'absolute',
       left: `${Math.round(Math.max(window.scrollX + 40, baseLeft))}px`,
       top: `${Math.round(Math.max(window.scrollY + 40, baseTop))}px`,
-      zIndex: '2147482000',
+      zIndex: Z_INDEX_FLOATING_DEFAULT,
     };
     if (normalized === 'area') {
       style.minHeight = '180px';
@@ -435,7 +435,7 @@ import { HOST_ATTRIBUTE } from './injection/constants.js';
           top: `${Math.max(0, rect.top)}px`,
           width: `${Math.max(24, rect.width)}px`,
           height: `${Math.max(24, rect.height)}px`,
-          zIndex: (draft.style?.zIndex && String(draft.style.zIndex).trim()) || '2147482000',
+          zIndex: (draft.style?.zIndex && String(draft.style.zIndex).trim()) || Z_INDEX_FLOATING_DEFAULT,
         };
         const ensured = injectModule.ensureElement(draft);
         if (!ensured) {
@@ -518,7 +518,7 @@ import { HOST_ATTRIBUTE } from './injection/constants.js';
   }
 
   /**
-   * アクティブなピッカーを停止する。
+   * アクチE��ブなピッカーを停止する、E
    * Stops the active picker session.
    */
   function stopPicker() {
@@ -534,7 +534,7 @@ import { HOST_ATTRIBUTE } from './injection/constants.js';
   }
 
   /**
-   * 既存の注入要素に対してページ内エディターを表示する。
+   * 既存�E注入要素に対してペ�Eジ冁E��チE��ターを表示する、E
    * Opens the in-page editor bubble for an existing injected element.
    * @param {string} elementId
    * @returns {boolean}
@@ -608,7 +608,7 @@ import { HOST_ATTRIBUTE } from './injection/constants.js';
   }
 
   /**
-   * エディターバブルがあれば閉じる。
+   * エチE��ターバブルがあれ�E閉じる、E
    * Closes the editor bubble if present.
    */
   function closeEditorBubble() {
@@ -635,7 +635,7 @@ import { HOST_ATTRIBUTE } from './injection/constants.js';
   }
 
   /**
-   * 選択した要素の概要テキストを生成する。
+   * 選択した要素の概要テキストを生�Eする、E
    * Produces a human-friendly description of the selected element.
    * @param {Element} element
    * @returns {{ tag: string; text: string; classes: string }}
@@ -657,10 +657,12 @@ import { HOST_ATTRIBUTE } from './injection/constants.js';
 })();
 
 /**
- * ストレージ識別用に正規化した URL を返す。
+ * ストレージ識別用に正規化した URL を返す、E
  * Returns a normalized URL for storage grouping.
  * @returns {string}
  */
 function getPageUrl() {
   return normalizePageUrl(window.location.href);
 }
+
+

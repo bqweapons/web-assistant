@@ -1,5 +1,4 @@
-import { ALLOWED_STYLE_KEYS, NODE_CLASS, TOOLTIP_POSITIONS } from './constants.js';
-import { kebabCase } from './utils.js';
+import { ALLOWED_STYLE_KEYS, NODE_CLASS, TOOLTIP_POSITIONS, kebabCase } from '../core/index.js';
 
 export function applyStyle(node, style) {
   if (!(node instanceof HTMLElement)) {
@@ -98,3 +97,6 @@ export function normalizeTooltipPosition(position) {
   }
   return 'top';
 }
+
+
+
