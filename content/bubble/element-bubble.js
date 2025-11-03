@@ -9,8 +9,6 @@ import {
 import { DEFAULT_AREA_STYLE } from '../selector/types/area.js';
 import { createField, styleInput, createSection } from './ui/field.js';
 import { createTabGroup } from './ui/tab-group.js';
-import { ensureTooltipPreviewStyle } from './ui/tooltip-preview-style.js';
-import { ensurePreviewElement as ensurePreviewNode, applyPreview } from './preview.js';
 import { stepsToJSON } from './actionflow/serializer.js';
 import { createEditorState } from './state.js';
 import { parseFlowForBuilder } from './actionflow/parser-bridge.js';
@@ -206,35 +204,7 @@ function createElementBubble() {
 
   selectorWrapper.append(selectorTitle, selectorValue);
 
-  const previewWrapper = document.createElement('div');
-  Object.assign(previewWrapper.style, {
-    display: 'flex',
-    flexDirection: 'column',
-    gap: '8px',
-    padding: '12px',
-    borderRadius: '12px',
-    border: '1px solid rgba(148, 163, 184, 0.25)',
-    backgroundColor: 'rgba(241, 245, 249, 0.6)',
-    margin: '0',
-  });
-
-  const previewLabel = document.createElement('span');
-  previewLabel.textContent = t('editor.previewLabel');
-  Object.assign(previewLabel.style, {
-    fontSize: '11px',
-    fontWeight: '600',
-    color: '#64748b',
-    textTransform: 'uppercase',
-    letterSpacing: '0.03em',
-  });
-
-  ensureTooltipPreviewStyle(previewWrapper);
-
-  let previewElement = document.createElement('button');
-  previewElement.tabIndex = -1;
-  previewElement.style.cursor = 'default';
-  previewElement.addEventListener('click', (event) => event.preventDefault());
-  previewWrapper.append(previewLabel, previewElement);
+  // Preview UI removed
 
   const form = document.createElement('form');
   Object.assign(form.style, {
@@ -454,7 +424,7 @@ function createElementBubble() {
 
   form.append(formBody, actions);
 
-  bubble.append(title, selectorWrapper, previewWrapper, form, errorLabel);
+  bubble.append(title, selectorWrapper, form, errorLabel);
 
   /** @type {Element | null} */
   let currentTarget = null;
@@ -559,22 +529,12 @@ function createElementBubble() {
     return payload;
   };
 
-  const ensurePreviewElement = (type) => {
-    const updated = ensurePreviewNode(previewElement, type);
-    if (updated !== previewElement) {
-      previewElement = updated;
-    }
-    return previewElement;
-  };
-
   const updatePreview = (options = { propagate: true }) => {
     const payload = buildPayload();
     if (!payload) {
       actionFlowController.updateSummary();
       return;
     }
-    const node = ensurePreviewElement(payload.type);
-    applyPreview(node, payload, t);
     if (options.propagate && typeof previewHandler === 'function') {
       previewHandler(payload);
     }

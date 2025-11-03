@@ -53,10 +53,15 @@ import { HOST_ATTRIBUTE } from './injection/constants.js';
     if (!elementId) {
       return;
     }
+    // If the editor bubble is already open for this element, suppress re-open
+    // to avoid resetting its transient state during drag/resize interactions.
     event.preventDefault();
     event.stopPropagation();
     if (typeof event.stopImmediatePropagation === 'function') {
       event.stopImmediatePropagation();
+    }
+    if (state.activeEditorElementId && state.activeEditorElementId === elementId && state.editorSession) {
+      return;
     }
     openEditorBubble(elementId);
   }
@@ -84,6 +89,55 @@ import { HOST_ATTRIBUTE } from './injection/constants.js';
   await hydrateElements();
   setupMessageBridge();
   setupMutationWatcher();
+
+  // Persist drag/placement changes even when the editor bubble isn't open
+  window.addEventListener('page-augmentor-draft-update', (event) => {
+    try {
+      const detail = (event && event.detail) || {};
+      const elementId = typeof detail.elementId === 'string' ? detail.elementId : null;
+      if (!elementId) return;
+      // Skip autosave for unsaved creation drafts; the Save action will persist
+      if (state.creationElementId && state.creationElementId === elementId) return;
+      // When editing bubble is open, its onPreview handler already autosaves
+      if (state.activeEditorElementId && state.activeEditorElementId === elementId) return;
+      const base = injectModule.getElement(elementId);
+      if (!base) return;
+
+      const merged = { ...base };
+      if (detail && typeof detail.style === 'object') {
+        merged.style = { ...(base.style || {}), ...detail.style };
+      }
+      if (Object.prototype.hasOwnProperty.call(detail || {}, 'containerId')) {
+        merged.containerId = typeof detail.containerId === 'string' ? detail.containerId : '';
+      }
+      if (Object.prototype.hasOwnProperty.call(detail || {}, 'floating')) {
+        merged.floating = Boolean(detail.floating);
+      }
+      if (Object.prototype.hasOwnProperty.call(detail || {}, 'selector')) {
+        merged.selector = detail.selector;
+      }
+      if (Object.prototype.hasOwnProperty.call(detail || {}, 'position')) {
+        merged.position = detail.position;
+      }
+      if (Object.prototype.hasOwnProperty.call(detail || {}, 'text')) {
+        merged.text = typeof detail.text === 'string' ? detail.text : merged.text;
+      }
+
+      const payload = {
+        ...merged,
+        id: elementId,
+        pageUrl,
+        updatedAt: Date.now(),
+      };
+      // Update local registry immediately to avoid visual snap-back before background roundtrip
+      try {
+        injectModule.updateElement(payload);
+      } catch (_e) {}
+      sendMessage(MessageType.UPDATE, payload).catch(() => {});
+    } catch (_e) {
+      // ignore autosave failures in drag handler
+    }
+  });
 
   function matchesFrameSelectors(candidate) {
     const selectors = Array.isArray(candidate) ? candidate : [];

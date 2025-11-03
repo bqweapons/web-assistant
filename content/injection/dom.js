@@ -1211,6 +1211,7 @@ function attachAreaDragBehavior(node, element) {
   let startY = 0;
   let originLeft = 0;
   let originTop = 0;
+  let movedSincePointerDown = false;
 
   const handleMove = (event) => {
     if (!dragging || pointerId !== event.pointerId) {
@@ -1219,6 +1220,13 @@ function attachAreaDragBehavior(node, element) {
     const host = getHostFromNode(node);
     if (!host) {
       return;
+    }
+    if (!movedSincePointerDown) {
+      const deltaX = Math.abs(event.clientX - startX);
+      const deltaY = Math.abs(event.clientY - startY);
+      if (deltaX > 2 || deltaY > 2) {
+        movedSincePointerDown = true;
+      }
     }
     const nextLeft = originLeft + (event.clientX - startX);
     const nextTop = originTop + (event.clientY - startY);
@@ -1278,12 +1286,16 @@ function attachAreaDragBehavior(node, element) {
       return;
     }
     const host = getHostFromNode(node);
-    if (!host || host.dataset.pageAugmentorEditing !== 'true') {
+    if (
+      !host ||
+      (host.dataset.pageAugmentorEditing !== 'true' && host.dataset.pageAugmentorGlobalEditing !== 'true')
+    ) {
       return;
     }
     dispatchDraftUpdateFromHost(host, { bubbleSide: 'left' });
     dragging = true;
     pointerId = event.pointerId;
+    movedSincePointerDown = false;
     startX = event.clientX;
     startY = event.clientY;
     const rect = host.getBoundingClientRect();
@@ -1297,6 +1309,7 @@ function attachAreaDragBehavior(node, element) {
       // ignore pointer capture issues
     }
     event.preventDefault();
+    event.stopPropagation();
   });
 
   node.addEventListener('pointermove', handleMove);
@@ -1315,6 +1328,19 @@ function attachAreaDragBehavior(node, element) {
     pointerId = null;
     finalizeDrag();
   });
+
+  // Suppress click that follows a drag to avoid re-triggering the editor click handler
+  node.addEventListener(
+    'click',
+    (event) => {
+      if (movedSincePointerDown) {
+        event.stopPropagation();
+        event.preventDefault();
+        movedSincePointerDown = false;
+      }
+    },
+    true,
+  );
 }
 
 function attachFloatingDragBehavior(node, element) {
@@ -1622,7 +1648,10 @@ function attachFloatingDragBehavior(node, element) {
       return;
     }
     const host = getHostFromNode(node);
-    if (!host || host.dataset.pageAugmentorEditing !== 'true') {
+    if (
+      !host ||
+      (host.dataset.pageAugmentorEditing !== 'true' && host.dataset.pageAugmentorGlobalEditing !== 'true')
+    ) {
       return;
     }
     dispatchDraftUpdateFromHost(host, { bubbleSide: 'left' });
