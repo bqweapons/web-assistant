@@ -142,6 +142,8 @@ export function createHost(element) {
       display: flex;
       flex-direction: column;
       gap: 0.5rem;
+      /* Prevent children from stretching to full width */
+      align-items: flex-start;
     }
     .${NODE_CLASS}[data-node-type='area'].page-augmentor-area-drop-target {
       box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.35);

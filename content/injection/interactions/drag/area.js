@@ -9,6 +9,7 @@ import {
   buildAbsoluteStyle,
   dispatchDraftUpdateFromHost,
 } from './core.js';
+import { NODE_CLASS } from '../../core/constants.js';
 
 /**
  * エリア要素に対してドラッグでの位置変更と浮動化を提供する。
@@ -97,6 +98,21 @@ export function attachAreaDragBehavior(node, element) {
   node.addEventListener('pointerdown', (event) => {
     if (event.button !== 0 && event.button !== -1) {
       return;
+    }
+    // If the pointerdown originated from a child injected node inside this area,
+    // let the child's own drag handler take over and do not start area dragging.
+    try {
+      const path = typeof event.composedPath === 'function' ? event.composedPath() : [];
+      const interactedChildNode = Array.isArray(path)
+        ? path.find(
+            (n) => n instanceof HTMLElement && n !== node && n.classList && n.classList.contains(NODE_CLASS),
+          )
+        : null;
+      if (interactedChildNode) {
+        return;
+      }
+    } catch (_err) {
+      // Ignore composedPath issues; fall back to default behaviour.
     }
     const host = getHostFromNode(node);
     if (!host || !isEditingAllowed(host)) {

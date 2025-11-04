@@ -37,6 +37,7 @@ import { sendMessage, MessageType } from '../common/messaging.js';
 import * as selectorModule from '../selector.js';
 import * as injectModule from '../inject.js';
 import { normalizePageUrl } from '../common/url.js';
+import { t } from '../../common/i18n.js';
 import { HOST_ATTRIBUTE, Z_INDEX_FLOATING_DEFAULT } from '../injection/core/constants.js';
 
 (async () => {
@@ -63,11 +64,26 @@ import { HOST_ATTRIBUTE, Z_INDEX_FLOATING_DEFAULT } from '../injection/core/cons
     const path = event.composedPath();
     for (const node of path) {
       if (node instanceof HTMLElement) {
+        // Ignore clicks inside our own UI (bubbles/overlays)
         if (node.dataset?.pageAugmentorRoot) {
           return null;
         }
+        // Direct host hit
         if (node.hasAttribute(HOST_ATTRIBUTE)) {
           return node;
+        }
+        // Fallback: when the composedPath does not surface the host,
+        // resolve the shadow host and check it.
+        try {
+          const root = typeof node.getRootNode === 'function' ? node.getRootNode() : null;
+          if (root instanceof ShadowRoot && root.host instanceof HTMLElement) {
+            const host = root.host;
+            if (host.hasAttribute(HOST_ATTRIBUTE)) {
+              return host;
+            }
+          }
+        } catch (_e) {
+          // ignore root resolution failures
         }
       }
     }
@@ -586,11 +602,17 @@ import { HOST_ATTRIBUTE, Z_INDEX_FLOATING_DEFAULT } from '../injection/core/cons
       style.minHeight = '180px';
       style.width = '320px';
     }
+    const defaultText =
+      normalized === 'tooltip'
+        ? t('editor.tooltipTextPlaceholder')
+        : normalized === 'area'
+          ? t('editor.areaTextPlaceholder')
+          : t('editor.textPlaceholder');
     return {
       id,
       pageUrl,
       type: normalized,
-      text: '',
+      text: defaultText,
       selector: 'body',
       position: 'append',
       style,
