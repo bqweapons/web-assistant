@@ -113,7 +113,6 @@ export async function upsertElement(element) {
     // 既存エントリがある場合、作成日時はそのまま残し、更新日時のみ上書きする。
     // また、渡された要素に含まれていないプロパティも existing を展開することで保持する。
     list[index] = {
-      ...existing,
       ...element,
       createdAt: existing.createdAt,
       updatedAt: Date.now(),
@@ -164,7 +163,7 @@ export async function deleteElement(pageUrl, elementId) {
 export async function clearPage(pageUrl) {
   const store = await readStore();
   if (store[pageUrl]) {
-    // 存在しないキーに対して書き込みを行わないことで無駄な I/O を避ける。
+    // 存在しなぁE��ーに対して書き込みを行わなぁE��とで無駁E�� I/O を避ける、E
     delete store[pageUrl];
     await writeStore(store);
   }
