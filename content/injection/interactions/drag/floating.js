@@ -7,6 +7,7 @@ import {
   setPointerCaptureSafe,
   releasePointerCaptureSafe,
   dispatchDraftUpdateFromHost,
+  dispatchUiUpdateFromHost,
 } from '../drag/core.js';
 
 // deps: functions provided by dom.js to avoid circular imports
@@ -147,18 +148,9 @@ export function attachFloatingDragBehavior(node, element, deps) {
       } else {
         deps.resetHostPosition(host);
       }
-      dispatchDraftUpdateFromHost(host, {
-        elementId: element.id,
-        style: {
-          position: originalStyle.position || '',
-          left: originalStyle.left || '',
-          top: originalStyle.top || '',
-          zIndex: originalStyle.zIndex || '',
-        },
-        containerId: originalContainerId,
-        floating: originalFloating,
-        bubbleSide: 'right',
-      });
+      dispatchDraftUpdateFromHost(host, {});
+      dispatchUiUpdateFromHost(host, { bubbleSide: 'right' });
+      dispatchUiUpdateFromHost(host, { bubbleSide: 'right' });
       return;
     }
 
@@ -175,17 +167,9 @@ export function attachFloatingDragBehavior(node, element, deps) {
       nextStyle.top = '';
       element.style = nextStyle;
       deps.clearPendingContainerAttachment(element.id);
-      dispatchDraftUpdateFromHost(host, {
-        elementId: element.id,
-        style: {
-          position: '',
-          left: '',
-          top: '',
-        },
-        containerId: dropTarget.area.id,
-        floating: false,
-        bubbleSide: 'right',
-      });
+      dispatchDraftUpdateFromHost(host, {});
+      dispatchUiUpdateFromHost(host, { bubbleSide: 'right' });
+      dispatchUiUpdateFromHost(host, { bubbleSide: 'right' });
       return;
     }
 
@@ -223,20 +207,9 @@ export function attachFloatingDragBehavior(node, element, deps) {
         nextStyle.zIndex = '';
         element.style = nextStyle;
         deps.clearPendingContainerAttachment(element.id);
-        dispatchDraftUpdateFromHost(host, {
-          elementId: element.id,
-          selector,
-          position,
-          style: {
-            position: '',
-            left: '',
-            top: '',
-            zIndex: '',
-          },
-          containerId: '',
-          floating: false,
-          bubbleSide: 'right',
-        });
+        dispatchDraftUpdateFromHost(host, {});
+        dispatchUiUpdateFromHost(host, { bubbleSide: 'right' });
+        dispatchUiUpdateFromHost(host, { bubbleSide: 'right' });
         return;
       }
     }
@@ -256,18 +229,9 @@ export function attachFloatingDragBehavior(node, element, deps) {
     element.floating = true;
     delete element.containerId;
     deps.clearPendingContainerAttachment(element.id);
-    dispatchDraftUpdateFromHost(host, {
-      elementId: element.id,
-      style: {
-        position: 'absolute',
-        left: nextStyle.left,
-        top: nextStyle.top,
-        zIndex: nextStyle.zIndex || '',
-      },
-      containerId: '',
-      floating: true,
-      bubbleSide: 'right',
-    });
+    dispatchDraftUpdateFromHost(host, {});
+      dispatchUiUpdateFromHost(host, { bubbleSide: 'right' });
+    dispatchUiUpdateFromHost(host, { bubbleSide: 'right' });
   };
 
   const handleMove = (event) => {
@@ -324,7 +288,7 @@ export function attachFloatingDragBehavior(node, element, deps) {
     if (!host || !isEditingAllowed(host)) {
       return;
     }
-    dispatchDraftUpdateFromHost(host, { bubbleSide: 'left' });
+    dispatchUiUpdateFromHost(host, { bubbleSide: 'left' });
     dragging = true;
     dragStarted = false;
     suppressNextClick = false;

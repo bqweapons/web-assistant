@@ -310,6 +310,7 @@ function createElementBubble() {
 
   const editorState = createEditorState();
   let state = editorState.get();
+  let uiUpdateListener = null;
   const setState = (patch) => {
     editorState.patch({ ...state, ...patch });
     state = editorState.get();
@@ -662,7 +663,7 @@ function createElementBubble() {
       styleControls.merge(stylePatch);
     }
     if (hasBubbleSideUpdate) {
-      bubble.dataset.pageAugmentorPlacement = 'right';
+      bubble.dataset.pageAugmentorPlacement = state.bubbleSide === 'left' ? 'left' : 'right';
     }
     if (hasTextUpdate) {
       textInput.value = state.text;
@@ -842,8 +843,15 @@ function createElementBubble() {
       const bubbleHeight = bubble.offsetHeight || 0;
       const maxTop = Math.max(margin, window.innerHeight - bubbleHeight - margin);
       const top = Math.min(maxTop, Math.max(margin, desiredTop));
-      bubble.style.left = 'auto';
-      bubble.style.right = `${margin}px`;
+      const side = state.bubbleSide === 'left' ? 'left' : 'right';
+      bubble.dataset.pageAugmentorPlacement = side;
+      if (side === 'left') {
+        bubble.style.left = `${margin}px`;
+        bubble.style.right = 'auto';
+      } else {
+        bubble.style.left = 'auto';
+        bubble.style.right = `${margin}px`;
+      }
       bubble.style.bottom = 'auto';
       bubble.style.top = `${Math.round(top)}px`;
     };
@@ -871,6 +879,15 @@ function createElementBubble() {
     });
     draftUpdateListener = (event) => handleDraftUpdate(event);
     window.addEventListener('page-augmentor-draft-update', draftUpdateListener);
+    uiUpdateListener = (event) => {
+      const detail = (event && event.detail) || {};
+      if (!detail || (currentElementId && detail.elementId && detail.elementId !== currentElementId)) return;
+      if (Object.prototype.hasOwnProperty.call(detail || {}, 'bubbleSide')) {
+        state.bubbleSide = detail.bubbleSide === 'left' ? 'left' : 'right';
+        placementControls?.update();
+      }
+    };
+    window.addEventListener('page-augmentor-ui-update', uiUpdateListener);
   }
 
   function detach() {
@@ -892,6 +909,10 @@ function createElementBubble() {
     if (draftUpdateListener) {
       window.removeEventListener('page-augmentor-draft-update', draftUpdateListener);
       draftUpdateListener = null;
+    }
+    if (uiUpdateListener) {
+      window.removeEventListener('page-augmentor-ui-update', uiUpdateListener);
+      uiUpdateListener = null;
     }
   }
 
@@ -986,3 +1007,4 @@ function createElementBubble() {
     },
   };
 }
+

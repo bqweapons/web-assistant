@@ -147,23 +147,28 @@ import { HOST_ATTRIBUTE, Z_INDEX_FLOATING_DEFAULT } from '../injection/core/cons
       if (!elementId) return;
       // Skip autosave for unsaved creation drafts; the Save action will persist
       if (state.creationElementId && state.creationElementId === elementId) return;
-      // When editing bubble is open, skip autosave only when no placement changes were requested
-      const hasPlacementMutation =
-        Object.prototype.hasOwnProperty.call(detail, 'containerId') ||
-        Object.prototype.hasOwnProperty.call(detail, 'floating') ||
-        Object.prototype.hasOwnProperty.call(detail, 'selector') ||
-        Object.prototype.hasOwnProperty.call(detail, 'position') ||
-        (detail.style &&
-          (Object.prototype.hasOwnProperty.call(detail.style || {}, 'left') ||
-            Object.prototype.hasOwnProperty.call(detail.style || {}, 'top') ||
-            Object.prototype.hasOwnProperty.call(detail.style || {}, 'position') ||
-            Object.prototype.hasOwnProperty.call(detail.style || {}, 'zIndex'))) ||
-        Object.prototype.hasOwnProperty.call(detail, 'text');
-      if (state.activeEditorElementId && state.activeEditorElementId === elementId && !hasPlacementMutation) {
-        return;
-      }
+      // Only persist when there's a real change vs. current element
       const base = injectModule.getElement(elementId);
       if (!base) return;
+      const baseStyle = base.style || {};
+      const stylePatch = detail && typeof detail.style === 'object' ? detail.style : null;
+      const changedStyle = Boolean(
+        stylePatch && (
+          (Object.prototype.hasOwnProperty.call(stylePatch, 'left') && String(stylePatch.left || '').trim() !== String(baseStyle.left || '').trim()) ||
+          (Object.prototype.hasOwnProperty.call(stylePatch, 'top') && String(stylePatch.top || '').trim() !== String(baseStyle.top || '').trim()) ||
+          (Object.prototype.hasOwnProperty.call(stylePatch, 'position') && String(stylePatch.position || '').trim() !== String(baseStyle.position || '').trim()) ||
+          (Object.prototype.hasOwnProperty.call(stylePatch, 'zIndex') && String(stylePatch.zIndex || '').trim() !== String(baseStyle.zIndex || '').trim()) ||
+          (Object.prototype.hasOwnProperty.call(stylePatch, 'width') && String(stylePatch.width || '').trim() !== String(baseStyle.width || '').trim()) ||
+          (Object.prototype.hasOwnProperty.call(stylePatch, 'height') && String(stylePatch.height || '').trim() !== String(baseStyle.height || '').trim())
+        ),
+      );
+      const changedContainer = Object.prototype.hasOwnProperty.call(detail || {}, 'containerId') && ((detail.containerId || '') !== (base.containerId || ''));
+      const changedFloating = Object.prototype.hasOwnProperty.call(detail || {}, 'floating') && Boolean(detail.floating) !== Boolean(base.floating !== false);
+      const changedSelector = Object.prototype.hasOwnProperty.call(detail || {}, 'selector') && detail.selector !== base.selector;
+      const changedPosition = Object.prototype.hasOwnProperty.call(detail || {}, 'position') && detail.position !== base.position;
+      const changedText = Object.prototype.hasOwnProperty.call(detail || {}, 'text') && (typeof detail.text === 'string' ? detail.text : '') !== (typeof base.text === 'string' ? base.text : '');
+      const hasMeaningfulMutation = changedStyle || changedContainer || changedFloating || changedSelector || changedPosition || changedText;
+      if (!hasMeaningfulMutation) return;
 
       const merged = { ...base };
       if (detail && typeof detail.style === 'object') {
