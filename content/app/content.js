@@ -1,6 +1,8 @@
 /* eslint-disable no-undef */
   const TARGET_HIGHLIGHT_CLASS = 'page-augmentor-target-highlight';
-
+/**
+ * ターゲット要素のハイライト用スタイルを挿入する
+ */
   function ensureTargetHighlightStyles() {
     if (document.getElementById('page-augmentor-target-highlight-style')) {
       return;
@@ -16,7 +18,9 @@
     `;
     document.head?.appendChild(style);
   }
-
+/**
+ * ターゲット要素を一時的にハイライト表示する
+ */
   function highlightPlacementTarget(element) {
     if (!(element instanceof HTMLElement)) {
       return;
@@ -32,7 +36,7 @@
     }, 1200);
   }
 
-// 繧ｳ繝ｳ繝・Φ繝・せ繧ｯ繝ｪ繝励ヨ縺ｮ繧ｨ繝ｳ繝医Μ繝ｼ繝昴う繝ｳ繝医よｳｨ蜈･隕∫ｴ縺ｮ蜷梧悄縺ｨ繝斐ャ繧ｫ繝ｼ騾｣謳ｺ繧呈球蠖薙☆繧九・
+// コンテンツスクリプトのエントリーポイント：セレクタや注入処理などの初期化
 import { sendMessage, MessageType } from '../common/messaging.js';
 import * as selectorModule from '../selector.js';
 import * as injectModule from '../inject.js';
@@ -364,7 +368,7 @@ import { HOST_ATTRIBUTE, Z_INDEX_FLOATING_DEFAULT } from '../injection/core/cons
   }
 
   /**
-   * 繝舌ャ繧ｯ繧ｰ繝ｩ繧ｦ繝ｳ繝峨°繧我ｿ晏ｭ俶ｸ医∩隕∫ｴ繧貞叙蠕励＠縲√・繝ｼ繧ｸ縺ｸ蜿肴丐縺吶ｋ縲・
+   * ページ内に保存されている要素情報を取得し、描画を再現する
    * Requests stored elements from the background script and renders them.
    * @returns {Promise<void>}
    */
@@ -378,7 +382,7 @@ import { HOST_ATTRIBUTE, Z_INDEX_FLOATING_DEFAULT } from '../injection/core/cons
   }
 
   /**
-   * 貂｡縺輔ｌ縺溯ｦ∫ｴ繝ｪ繧ｹ繝医→ DOM 繧貞酔譛溘＆縺帙ｋ縲・
+   * 取得した要素リストをもとに DOM と同期させる
    * Synchronizes the injected DOM with the provided list.
    * @param {import('../common/types.js').InjectedElement[]} list
    */
@@ -420,7 +424,7 @@ import { HOST_ATTRIBUTE, Z_INDEX_FLOATING_DEFAULT } from '../injection/core/cons
   }
 
   /**
-   * 繝舌ャ繧ｯ繧ｰ繝ｩ繧ｦ繝ｳ繝峨°繧峨・繝｡繝・そ繝ｼ繧ｸ繧貞女縺大叙繧九Μ繧ｹ繝翫・繧定ｨｭ螳壹☆繧九・
+   * バックグラウンドからのメッセージを受信し、ページ上の要素を更新する
    * Configures messaging listeners for background-originated events.
    */
   function setupMessageBridge() {
@@ -505,7 +509,7 @@ import { HOST_ATTRIBUTE, Z_INDEX_FLOATING_DEFAULT } from '../injection/core/cons
   }
 
   /**
-   * DOM 螟牙喧繧堤屮隕悶＠縲∝ｿ・ｦ√↓蠢懊§縺ｦ隕∫ｴ繧貞・謠冗判縺吶ｋ縲・
+   * DOM の変化を監視し、必要に応じて再描画を行う
    * Observes DOM mutations and re-applies injected elements when necessary.
    */
   function setupMutationWatcher() {
@@ -526,7 +530,7 @@ import { HOST_ATTRIBUTE, Z_INDEX_FLOATING_DEFAULT } from '../injection/core/cons
   }
 
   /**
-   * 隕∫ｴ繝斐ャ繧ｫ繝ｼ繧帝幕蟋九＠縲・∈謚槫ｮ御ｺ・凾縺ｫ繝舌ヶ繝ｫ繝輔Ο繝ｼ繧定ｵｷ蜍輔☆繧九・
+   * 要素ピッカーを開始し、ユーザーが選択した要素に対してエディタを開く
    * Starts the element picker and opens the bubble workflow on selection.
    * @param {{ mode?: 'create' }} [options]
    */
@@ -567,7 +571,9 @@ import { HOST_ATTRIBUTE, Z_INDEX_FLOATING_DEFAULT } from '../injection/core/cons
       },
     });
   }
-
+  /**
+   * 新規作成ドラフトを破棄する
+   */
   function cancelCreationDraft() {
     if (!state.creationElementId) {
       return;
@@ -589,6 +595,9 @@ import { HOST_ATTRIBUTE, Z_INDEX_FLOATING_DEFAULT } from '../injection/core/cons
     }
   }
 
+  /**
+   * 新しい要素のドラフトデータを生成する
+   */
   function buildDraftElement(type) {
     const normalized = type === 'link' || type === 'tooltip' || type === 'area' ? type : 'button';
     const id = crypto.randomUUID();
@@ -634,6 +643,9 @@ import { HOST_ATTRIBUTE, Z_INDEX_FLOATING_DEFAULT } from '../injection/core/cons
     };
   }
 
+  /**
+   * 矩形情報から配置対象要素を推定する
+   */
   function resolvePlacementTargetFromRect(rect) {
     if (!rect || typeof rect.left !== 'number' || typeof rect.top !== 'number') {
       return null;
@@ -645,6 +657,9 @@ import { HOST_ATTRIBUTE, Z_INDEX_FLOATING_DEFAULT } from '../injection/core/cons
     return candidate instanceof HTMLElement ? candidate : null;
   }
 
+  /**
+   * ドラフト要素を指定ターゲットに適用する
+   */
   function applyDraftPlacementToTarget(draft, target) {
     if (!draft || !(target instanceof HTMLElement)) {
       return false;
@@ -673,6 +688,9 @@ import { HOST_ATTRIBUTE, Z_INDEX_FLOATING_DEFAULT } from '../injection/core/cons
     return true;
   }
 
+  /**
+   * 新規要素作成セッションを開始する
+   */
   function beginCreationSession(options = {}) {
     stopPicker();
     closeEditorBubble();
@@ -788,7 +806,7 @@ import { HOST_ATTRIBUTE, Z_INDEX_FLOATING_DEFAULT } from '../injection/core/cons
   }
 
   /**
-   * 繧｢繧ｯ繝・ぅ繝悶↑繝斐ャ繧ｫ繝ｼ繧貞●豁｢縺吶ｋ縲・
+   * 現在のピッカー操作を停止する
    * Stops the active picker session.
    */
   function stopPicker() {
@@ -804,7 +822,7 @@ import { HOST_ATTRIBUTE, Z_INDEX_FLOATING_DEFAULT } from '../injection/core/cons
   }
 
   /**
-   * 譌｢蟄倥・豕ｨ蜈･隕∫ｴ縺ｫ蟇ｾ縺励※繝壹・繧ｸ蜀・お繝・ぅ繧ｿ繝ｼ繧定｡ｨ遉ｺ縺吶ｋ縲・
+   * 既存の要素に対してインラインエディタを開く
    * Opens the in-page editor bubble for an existing injected element.
    * @param {string} elementId
    * @returns {boolean}
@@ -878,7 +896,7 @@ import { HOST_ATTRIBUTE, Z_INDEX_FLOATING_DEFAULT } from '../injection/core/cons
   }
 
   /**
-   * 繧ｨ繝・ぅ繧ｿ繝ｼ繝舌ヶ繝ｫ縺後≠繧後・髢峨§繧九・
+   * エディタバブルを閉じる
    * Closes the editor bubble if present.
    */
   function closeEditorBubble() {
@@ -905,7 +923,7 @@ import { HOST_ATTRIBUTE, Z_INDEX_FLOATING_DEFAULT } from '../injection/core/cons
   }
 
   /**
-   * 驕ｸ謚槭＠縺溯ｦ∫ｴ縺ｮ讎りｦ√ユ繧ｭ繧ｹ繝医ｒ逕滓・縺吶ｋ縲・
+   * ユーザーが選択した要素を説明するための簡易メタ情報を生成する
    * Produces a human-friendly description of the selected element.
    * @param {Element} element
    * @returns {{ tag: string; text: string; classes: string }}
@@ -927,7 +945,7 @@ import { HOST_ATTRIBUTE, Z_INDEX_FLOATING_DEFAULT } from '../injection/core/cons
 })();
 
 /**
- * 繧ｹ繝医Ξ繝ｼ繧ｸ隴伜挨逕ｨ縺ｫ豁｣隕丞喧縺励◆ URL 繧定ｿ斐☆縲・
+ * ページURLを正規化して返す（保存時のキーとして使用）
  * Returns a normalized URL for storage grouping.
  * @returns {string}
  */
