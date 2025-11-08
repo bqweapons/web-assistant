@@ -137,13 +137,7 @@ export function attachFloatingDragBehavior(node, element, deps) {
           originalParent.appendChild(host);
         }
       }
-      element.floating = originalFloating;
-      if (originalContainerId) {
-        element.containerId = originalContainerId;
-      } else {
-        delete element.containerId;
-      }
-      element.style = { ...originalStyle };
+      // Do not mutate the element object on cancel; only revert host visuals
       if (originalFloating) {
         host.style.position = 'absolute';
         host.style.left = originalStyle.left || '';
@@ -163,16 +157,27 @@ export function attachFloatingDragBehavior(node, element, deps) {
     if (dropTarget && dropTarget.kind === 'area' && dropTarget.area?.content) {
       dropTarget.area.content.appendChild(host);
       deps.resetHostPosition(host);
-      element.floating = false;
-      element.containerId = dropTarget.area.id;
+      // Build next style for payload without mutating element
       const nextStyle = { ...(element.style || {}) };
       nextStyle.position = '';
       nextStyle.left = '';
       nextStyle.top = '';
-      element.style = nextStyle;
       deps.clearPendingContainerAttachment(element.id);
-      dispatchDraftUpdateFromHost(host, {});
-      dispatchUiUpdateFromHost(host, { bubbleSide: 'right' });
+      // Persist container attachment + floating state via draft update
+      dispatchDraftUpdateFromHost(host, {
+        elementId: element.id,
+        containerId: dropTarget.area.id,
+        floating: false,
+        // Explicitly clear absolute positioning when moved into an area
+        style: {
+          position: nextStyle.position || '',
+          left: nextStyle.left || '',
+          top: nextStyle.top || '',
+          zIndex: nextStyle.zIndex || '',
+          width: '',
+          height: '',
+        },
+      });
       dispatchUiUpdateFromHost(host, { bubbleSide: 'right' });
       return;
     }
@@ -200,19 +205,27 @@ export function attachFloatingDragBehavior(node, element, deps) {
           document.body.appendChild(host);
         }
         deps.resetHostPosition(host);
-        element.floating = false;
-        delete element.containerId;
-        element.selector = selector;
-        element.position = position;
+        // Do not mutate element; build next style for payload
         const nextStyle = { ...(element.style || {}) };
         nextStyle.position = '';
         nextStyle.left = '';
         nextStyle.top = '';
         nextStyle.zIndex = '';
-        element.style = nextStyle;
         deps.clearPendingContainerAttachment(element.id);
-        dispatchDraftUpdateFromHost(host, {});
-        dispatchUiUpdateFromHost(host, { bubbleSide: 'right' });
+        // Persist selector/position change via draft update so autosave triggers
+        dispatchDraftUpdateFromHost(host, {
+          elementId: element.id,
+          selector,
+          position,
+          containerId: '',
+          floating: false,
+          style: {
+            position: nextStyle.position,
+            left: nextStyle.left,
+            top: nextStyle.top,
+            zIndex: nextStyle.zIndex,
+          },
+        });
         dispatchUiUpdateFromHost(host, { bubbleSide: 'right' });
         return;
       }
@@ -229,12 +242,20 @@ export function attachFloatingDragBehavior(node, element, deps) {
     nextStyle.left = `${left}px`;
     nextStyle.top = `${top}px`;
     nextStyle.zIndex = nextStyle.zIndex && nextStyle.zIndex.trim() ? nextStyle.zIndex : Z_INDEX_FLOATING_DEFAULT;
-    element.style = nextStyle;
-    element.floating = true;
-    delete element.containerId;
+    // Do not mutate element; persist via draft update below
     deps.clearPendingContainerAttachment(element.id);
-    dispatchDraftUpdateFromHost(host, {});
-      dispatchUiUpdateFromHost(host, { bubbleSide: 'right' });
+    // Persist floating position so preview/state stay in sync
+    dispatchDraftUpdateFromHost(host, {
+      elementId: element.id,
+      floating: true,
+      containerId: '',
+      style: {
+        position: nextStyle.position,
+        left: nextStyle.left,
+        top: nextStyle.top,
+        zIndex: nextStyle.zIndex,
+      },
+    });
     dispatchUiUpdateFromHost(host, { bubbleSide: 'right' });
   };
 

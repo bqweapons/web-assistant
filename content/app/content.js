@@ -60,6 +60,11 @@ import { HOST_ATTRIBUTE, Z_INDEX_FLOATING_DEFAULT } from '../injection/core/cons
     creationElementId: /** @type {string | null} */ (null),
     editingMode: false,
   };
+  /**
+   * Tracks element ids that had in-page mutations during this editing session.
+   * Used to persist a final snapshot when exiting edit mode.
+   */
+  const dirtyIds = new Set();
 
   function resolveHostFromEvent(event) {
     if (!event || typeof event.composedPath !== 'function') {
@@ -134,14 +139,17 @@ import { HOST_ATTRIBUTE, Z_INDEX_FLOATING_DEFAULT } from '../injection/core/cons
       try {
         const lastEditingId = state.activeEditorElementId || null;
         closeEditorBubble();
-        // Fallback persist: if an editor was active, persist the latest registry state
-        if (lastEditingId) {
-          const latest = injectModule.getElement(lastEditingId);
+        // Fallback persist: persist any elements that mutated during this session
+        const idsToPersist = new Set(dirtyIds);
+        if (lastEditingId) idsToPersist.add(lastEditingId);
+        idsToPersist.forEach((id) => {
+          const latest = injectModule.getElement(id);
           if (latest) {
-            const payload = { ...latest, id: lastEditingId, pageUrl, updatedAt: Date.now() };
+            const payload = { ...latest, id, pageUrl, updatedAt: Date.now() };
             sendMessage(MessageType.UPDATE, payload).catch(() => {});
           }
-        }
+        });
+        dirtyIds.clear();
       } catch (_error) {
         // ignore cleanup failures
       }
@@ -214,6 +222,7 @@ import { HOST_ATTRIBUTE, Z_INDEX_FLOATING_DEFAULT } from '../injection/core/cons
         injectModule.updateElement(payload);
       } catch (_e) {}
       sendMessage(MessageType.UPDATE, payload).catch(() => {});
+      try { dirtyIds.add(elementId); } catch (_e) {}
     } catch (_e) {
       // ignore autosave failures in drag handler
     }
@@ -879,6 +888,7 @@ import { HOST_ATTRIBUTE, Z_INDEX_FLOATING_DEFAULT } from '../injection/core/cons
             updatedAt: Date.now(),
           };
           sendMessage(MessageType.UPDATE, autosavePayload).catch(() => {});
+          try { dirtyIds.add(elementId); } catch (_e) {}
         } catch (_error) {
           // ignore autosave failures
         }
@@ -903,6 +913,7 @@ import { HOST_ATTRIBUTE, Z_INDEX_FLOATING_DEFAULT } from '../injection/core/cons
         sendMessage(MessageType.UPDATE, payload).catch((error) =>
           console.error('[PageAugmentor] Failed to update element', error),
         );
+        try { dirtyIds.add(elementId); } catch (_e) {}
       },
       onCancel() {
         injectModule.setEditingElement(elementId, false);

@@ -108,6 +108,15 @@ function findHostByElementId(elementId) {
 }
 
 /**
+ * Creates a shallow, per-interaction copy of an injected element so that
+ * drag/resize handlers don't mutate the registry object by reference.
+ * @param {import('../../../common/types.js').InjectedElement} element
+ */
+// NOTE: Interactions should treat the element object as immutable during a user
+// gesture. Drag/resize handlers must not mutate it directly; instead they
+// should dispatch 'page-augmentor-draft-update' with the intended changes.
+
+/**
  * 保留中のコンテナ割り当てを即時処理する。
  * Flushes queued container attachments immediately.
  */

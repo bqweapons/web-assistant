@@ -126,7 +126,7 @@ export function attachResizeBehavior(node, element, host) {
         nextStyle.zIndex = Z_INDEX_FLOATING_DEFAULT;
       }
     }
-    element.style = nextStyle;
+    // Do not mutate element; persist via draft update only
     dispatchDraftUpdateFromHost(host, {
       elementId: element.id,
       style: {
