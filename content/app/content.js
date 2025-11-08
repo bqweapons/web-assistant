@@ -132,7 +132,16 @@ import { HOST_ATTRIBUTE, Z_INDEX_FLOATING_DEFAULT } from '../injection/core/cons
       document.removeEventListener('click', handleEditingClick, true);
       // Close any open editor bubble and clear highlights when exiting edit mode
       try {
+        const lastEditingId = state.activeEditorElementId || null;
         closeEditorBubble();
+        // Fallback persist: if an editor was active, persist the latest registry state
+        if (lastEditingId) {
+          const latest = injectModule.getElement(lastEditingId);
+          if (latest) {
+            const payload = { ...latest, id: lastEditingId, pageUrl, updatedAt: Date.now() };
+            sendMessage(MessageType.UPDATE, payload).catch(() => {});
+          }
+        }
       } catch (_error) {
         // ignore cleanup failures
       }
@@ -857,9 +866,14 @@ import { HOST_ATTRIBUTE, Z_INDEX_FLOATING_DEFAULT } from '../injection/core/cons
         // Live preview and autosave while editing existing elements
         injectModule.previewElement(elementId, updated || {});
         try {
+          const baseLatest = injectModule.getElement(elementId) || element;
           const autosavePayload = {
-            ...element,
+            ...baseLatest,
             ...(updated || {}),
+            style: {
+              ...((baseLatest && baseLatest.style) || {}),
+              ...(((updated || {}).style) || {}),
+            },
             id: elementId,
             pageUrl,
             updatedAt: Date.now(),
@@ -874,11 +888,16 @@ import { HOST_ATTRIBUTE, Z_INDEX_FLOATING_DEFAULT } from '../injection/core/cons
         state.activeEditorElementId = null;
         injectModule.setEditingElement(elementId, false);
         closeEditorBubble();
+        const baseLatest = injectModule.getElement(elementId) || element;
         const payload = {
-          ...element,
-          ...updated,
-          pageUrl,
+          ...baseLatest,
+          ...(updated || {}),
+          style: {
+            ...((baseLatest && baseLatest.style) || {}),
+            ...(((updated || {}).style) || {}),
+          },
           id: elementId,
+          pageUrl,
           updatedAt: Date.now(),
         };
         sendMessage(MessageType.UPDATE, payload).catch((error) =>
@@ -952,5 +971,3 @@ import { HOST_ATTRIBUTE, Z_INDEX_FLOATING_DEFAULT } from '../injection/core/cons
 function getPageUrl() {
   return normalizePageUrl(window.location.href);
 }
-
-

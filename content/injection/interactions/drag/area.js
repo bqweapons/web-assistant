@@ -37,6 +37,7 @@ export function attachAreaDragBehavior(node, element) {
   let originLeft = 0;
   let originTop = 0;
   let movedSincePointerDown = false;
+  let lastBubbleSide = 'right';
 
   // ドラッグ中のポインタ移動に応じてホスト位置を更新する。
   const handleMove = (event) => {
@@ -52,12 +53,20 @@ export function attachAreaDragBehavior(node, element) {
       const deltaY = Math.abs(event.clientY - startY);
       if (deltaX > AREA_DRAG_THRESHOLD || deltaY > AREA_DRAG_THRESHOLD) {
         movedSincePointerDown = true;
+        try {
+          const desired = event.clientX > window.innerWidth / 2 ? 'left' : 'right';
+          if (desired !== lastBubbleSide) {
+            const h = getHostFromNode(node);
+            if (h) dispatchUiUpdateFromHost(h, { bubbleSide: desired });
+            lastBubbleSide = desired;
+          }
+        } catch (_e) { }
       }
     }
-    const nextLeft = originLeft + (event.clientX - startX);
-    const nextTop = originTop + (event.clientY - startY);
-    setHostPosition(host, nextLeft, nextTop);
-  };
+  const nextLeft = originLeft + (event.clientX - startX);
+  const nextTop = originTop + (event.clientY - startY);
+  setHostPosition(host, nextLeft, nextTop);
+};
 
   // ドラッグ終了後に浮動モードへ切り替え、ドラフト更新を送信する。
   const finalizeDrag = async () => {
@@ -161,6 +170,7 @@ export function attachAreaDragBehavior(node, element) {
     true,
   );
 }
+
 
 
 

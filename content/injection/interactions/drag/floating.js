@@ -10,12 +10,6 @@ import {
   dispatchUiUpdateFromHost,
 } from '../drag/core.js';
 
-// deps: functions provided by dom.js to avoid circular imports
-// {
-//   findAreaDropTarget, showAreaDropPreview, hideDomDropIndicator,
-//   removeDropPreviewHost, findDomDropTarget, resolveDomDropPlacement,
-//   showDomDropIndicator, resetHostPosition, clearPendingContainerAttachment
-// }
 /**
  * フローティング要素にドラッグ移動とドロップ先判定を付与する。
  * Attaches floating drag interactions and drop handling to a node.
@@ -57,6 +51,7 @@ export function attachFloatingDragBehavior(node, element, deps) {
   let highlightedArea = null;
   let startRect = null;
   let suppressNextClick = false;
+  let lastBubbleSide = 'right';
 
   // ドロップ候補のエリアを強調表示し、前回のハイライトを解除する。
   const updateHighlight = (areaTarget) => {
@@ -85,6 +80,15 @@ export function attachFloatingDragBehavior(node, element, deps) {
       host.style.width = `${startRect.width}px`;
       host.style.height = `${startRect.height}px`;
     }
+    // Hint bubble side on drag start based on initial position
+    try {
+      const hostCenterX = Math.round(originLeft + (startRect ? startRect.width / 2 : 0));
+      const desired = hostCenterX > window.scrollX + window.innerWidth / 2 ? 'left' : 'right';
+      if (desired !== lastBubbleSide) {
+        dispatchUiUpdateFromHost(host, { bubbleSide: desired });
+        lastBubbleSide = desired;
+      }
+    } catch (_e) {}
     host.style.position = 'absolute';
     host.style.left = `${Math.round(originLeft)}px`;
     host.style.top = `${Math.round(originTop)}px`;
@@ -252,6 +256,14 @@ export function attachFloatingDragBehavior(node, element, deps) {
       }
       startDragging();
     }
+    // While dragging, keep bubble on the opposite side of pointer X
+    try {
+      const desired = event.clientX > window.innerWidth / 2 ? 'left' : 'right';
+      if (desired !== lastBubbleSide) {
+        dispatchUiUpdateFromHost(host, { bubbleSide: desired });
+        lastBubbleSide = desired;
+      }
+    } catch (_e) {}
     const nextLeft = originLeft + (event.clientX - startX);
     const nextTop = originTop + (event.clientY - startY);
     setHostPosition(host, nextLeft, nextTop);
@@ -288,7 +300,7 @@ export function attachFloatingDragBehavior(node, element, deps) {
     if (!host || !isEditingAllowed(host)) {
       return;
     }
-    dispatchUiUpdateFromHost(host, { bubbleSide: 'left' });
+    // Do not change bubble side on mere click; wait for actual drag.
     dragging = true;
     dragStarted = false;
     suppressNextClick = false;
