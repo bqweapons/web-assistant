@@ -4,6 +4,7 @@ import {
   setPointerCaptureSafe,
   releasePointerCaptureSafe,
   dispatchDraftUpdateFromHost,
+  dispatchUiUpdateFromHost,
 } from '../drag/core.js';
 
 export function attachResizeBehavior(node, element, host) {
@@ -53,7 +54,7 @@ export function attachResizeBehavior(node, element, host) {
     startX = event.clientX;
     startY = event.clientY;
     setPointerCaptureSafe(node, pointerId);
-    dispatchDraftUpdateFromHost(host, { bubbleSide: 'left' });
+    dispatchUiUpdateFromHost(host, { bubbleSide: 'left' });
     window.addEventListener('pointermove', handleResizeMove, true);
     window.addEventListener('pointerup', handleResizeUp, true);
     event.preventDefault();
@@ -138,8 +139,8 @@ export function attachResizeBehavior(node, element, host) {
       },
       floating: element.floating !== false,
       containerId: element.containerId || '',
-      bubbleSide: 'right',
     });
+    dispatchUiUpdateFromHost(host, { bubbleSide: 'right' });
   };
 
   const getActiveHandle = () => {

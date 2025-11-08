@@ -8,6 +8,7 @@ import {
   releasePointerCaptureSafe,
   buildAbsoluteStyle,
   dispatchDraftUpdateFromHost,
+  dispatchUiUpdateFromHost,
 } from './core.js';
 import { NODE_CLASS } from '../../core/constants.js';
 
@@ -91,8 +92,8 @@ export function attachAreaDragBehavior(node, element) {
       },
       floating: true,
       containerId: '',
-      bubbleSide: 'right',
     });
+    dispatchUiUpdateFromHost(host, { bubbleSide: 'right' });
   };
 
   node.addEventListener('pointerdown', (event) => {
@@ -118,7 +119,7 @@ export function attachAreaDragBehavior(node, element) {
     if (!host || !isEditingAllowed(host)) {
       return;
     }
-    dispatchDraftUpdateFromHost(host, { bubbleSide: 'left' });
+    dispatchUiUpdateFromHost(host, { bubbleSide: 'left' });
     dragging = true;
     pointerId = event.pointerId;
     movedSincePointerDown = false;

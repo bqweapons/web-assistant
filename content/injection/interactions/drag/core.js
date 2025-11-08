@@ -130,6 +130,30 @@ export function dispatchDraftUpdateFromHost(host, detail) {
 }
 
 /**
+ * Dispatches a UI-only update event from the host (not persisted).
+ * Used for transient hints like bubbleSide during interactions.
+ * @param {HTMLElement | null} host
+ * @param {Record<string, any>} detail
+ */
+export function dispatchUiUpdateFromHost(host, detail) {
+  if (!(host instanceof HTMLElement)) {
+    return;
+  }
+  const elementId = host.getAttribute(HOST_ATTRIBUTE);
+  const payload = { ...(detail || {}) };
+  if (!payload.elementId && elementId) {
+    payload.elementId = elementId;
+  }
+  host.dispatchEvent(
+    new CustomEvent('page-augmentor-ui-update', {
+      detail: payload,
+      bubbles: true,
+      composed: true,
+    }),
+  );
+}
+
+/**
  * フローティングホストの配置座標を決定する。
  * Positions a floating host relative to an element or target.
  * @param {HTMLElement | null} host

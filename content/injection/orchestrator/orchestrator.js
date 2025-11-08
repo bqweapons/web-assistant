@@ -41,6 +41,7 @@ import {
   resolveDomDropPlacement,
 } from '../interactions/drop/index.js';
 import { applyButtonBehavior } from '../behaviors/index.js';
+import { dispatchUiUpdateFromHost } from '../interactions/drag/core.js';
 import { resolveAreaContent, resetHostPosition } from '../host/index.js';
 
 /** @type {Map<string, { host: HTMLElement; containerId: string }>} */
@@ -497,12 +498,22 @@ function bindEditingEnhancements(node, element) {
     const editable = resolveEditableNode();
     if (!editable) return;
     const text = (editable.textContent || '').trim();
-    dispatchDraftUpdateFromHost(host, { elementId: element.id, style: {}, bubbleSide: 'left' });
+    // UI-only hint to move the editor bubble to the left while typing
+    dispatchUiUpdateFromHost(host, { elementId: element.id, bubbleSide: 'left' });
+    dispatchDraftUpdateFromHost(host, { elementId: element.id, style: {} });
     // Update text via preview patch; the bubble listens and merges style via merge(), text is handled via preview
     try {
+      // Persist text via draft; keep bubble-side as a separate UI update
       host.dispatchEvent(
         new CustomEvent('page-augmentor-draft-update', {
-          detail: { elementId: element.id, text, bubbleSide: 'left' },
+          detail: { elementId: element.id, text },
+          bubbles: true,
+          composed: true,
+        }),
+      );
+      host.dispatchEvent(
+        new CustomEvent('page-augmentor-ui-update', {
+          detail: { elementId: element.id, bubbleSide: 'left' },
           bubbles: true,
           composed: true,
         }),
@@ -524,28 +535,6 @@ function bindEditingEnhancements(node, element) {
     editable.addEventListener('blur', handleInlineInput);
   }
 }
-
-// moved to ./behaviors/button.js: applyButtonBehavior
-
-
-// moved to ./drag/core.js: getHostFromNode
-
-// moved to ./host/utils.js: resolveAreaContent, resetHostPosition
-
-// moved to drop/targets.js: findAreaDropTarget
-
-// moved to drop/targets.js: isVoidElement
-
-// moved to drop/targets.js: findDomDropTarget
-
-// moved to drop/targets.js: resolveDomDropPlacement
-
-// moved to ./drag/core.js: dispatchDraftUpdateFromHost
-
-// moved to ./drag/core.js: positionFloatingHost
-
-
-
 
 
 
