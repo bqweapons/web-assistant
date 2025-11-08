@@ -85,9 +85,6 @@ export function attachAreaDragBehavior(node, element) {
     const nextTop = Math.round(rect.top);
     const previousStyle = element.style || {};
     const nextStyle = buildAbsoluteStyle(previousStyle, nextLeft, nextTop);
-    element.style = nextStyle;
-    element.floating = true;
-    delete element.containerId;
     host.style.position = 'absolute';
     setHostPosition(host, nextLeft, nextTop);
     host.style.zIndex = nextStyle.zIndex || '';
