@@ -329,7 +329,9 @@ export function attachFloatingDragBehavior(node, element, deps) {
     dragStarted = false;
     suppressNextClick = false;
     pointerId = event.pointerId;
-    setPointerCaptureSafe(node, pointerId);
+    // Defer pointer capture until an actual drag starts to avoid
+    // interfering with click handling in editing mode. Pointer capture
+    // will be set inside startDragging() after threshold is exceeded.
     startX = event.clientX;
     startY = event.clientY;
     lastPointerX = event.clientX;
@@ -356,9 +358,20 @@ export function attachFloatingDragBehavior(node, element, deps) {
 
   node.addEventListener('pointermove', handleMove);
   node.addEventListener('pointerup', (event) => {
-    if (event.pointerId === pointerId) {
-      finalizeDrag(dragStarted);
+    if (event.pointerId !== pointerId) {
+      return;
     }
+    const host = getHostFromNode(node);
+    const isGlobalEditing = host?.dataset?.pageAugmentorGlobalEditing === 'true';
+    // In editing mode, a simple click should open the editor bubble.
+    // Avoid running finalize logic (which can interfere with click dispatch)
+    // when no actual drag started.
+    if (isGlobalEditing && !dragStarted) {
+      pointerId = null;
+      dragging = false;
+      return;
+    }
+    finalizeDrag(dragStarted);
   });
   node.addEventListener('pointercancel', () => {
     finalizeDrag(false);
@@ -367,6 +380,14 @@ export function attachFloatingDragBehavior(node, element, deps) {
   node.addEventListener(
     'click',
     (event) => {
+      const host = getHostFromNode(node);
+      const isGlobalEditing = host?.dataset?.pageAugmentorGlobalEditing === 'true';
+      if (isGlobalEditing) {
+        // In editing mode, do not suppress clicks so the editor bubble
+        // can open via the document-level capture listener.
+        suppressNextClick = false;
+        return;
+      }
       if (suppressNextClick) {
         event.stopPropagation();
         event.preventDefault();
