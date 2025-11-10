@@ -1,0 +1,352 @@
+/* eslint-disable no-undef */
+import * as selectorModule from '../selector.js';
+import * as injectModule from '../inject.js';
+import { t } from '../../common/i18n.js';
+import { Z_INDEX_FLOATING_DEFAULT } from '../injection/core/constants.js';
+import { sendMessage, MessageType } from '../common/messaging.js';
+import { highlightPlacementTarget } from './highlight.js';
+import { state, runtime } from './context.js';
+import { cancelCreationDraft, closeEditorBubble } from './editor.js';
+import { stopPicker } from './picker.js';
+
+export function buildDraftElement(type) {
+  const normalized = type === 'link' || type === 'tooltip' || type === 'area' ? type : 'button';
+  const id = crypto.randomUUID();
+  const now = Date.now();
+  const viewportWidth = Math.max(window.innerWidth || 0, 320);
+  const viewportHeight = Math.max(window.innerHeight || 0, 240);
+  const baseLeft = window.scrollX + viewportWidth / 2 - 140;
+  const baseTop = window.scrollY + viewportHeight / 2 - 60;
+  const style = {
+    position: 'absolute',
+    left: `${Math.round(Math.max(window.scrollX + 40, baseLeft))}px`,
+    top: `${Math.round(Math.max(window.scrollY + 40, baseTop))}px`,
+    zIndex: Z_INDEX_FLOATING_DEFAULT,
+  };
+  if (normalized === 'area') {
+    style.minHeight = '180px';
+    style.width = '320px';
+  }
+  const defaultText =
+    normalized === 'tooltip'
+      ? t('editor.tooltipTextPlaceholder')
+      : normalized === 'area'
+        ? t('editor.areaTextPlaceholder')
+        : t('editor.textPlaceholder');
+  return {
+    id,
+    pageUrl: runtime.pageUrl,
+    type: normalized,
+    text: defaultText,
+    selector: 'body',
+    position: 'append',
+    style,
+    tooltipPosition: normalized === 'tooltip' ? 'top' : undefined,
+    tooltipPersistent: normalized === 'tooltip' ? false : undefined,
+    frameSelectors: Array.isArray(runtime.frameContext?.frameSelectors)
+      ? runtime.frameContext.frameSelectors.slice()
+      : [],
+    frameLabel: runtime.frameContext?.frameLabel,
+    frameUrl: runtime.frameContext?.frameUrl,
+    createdAt: now,
+    updatedAt: now,
+    floating: true,
+  };
+}
+
+export function resolvePlacementTargetFromRect(rect) {
+  if (!rect || typeof rect.left !== 'number' || typeof rect.top !== 'number') {
+    return null;
+  }
+  const clientX = Math.round(rect.left - window.scrollX + rect.width / 2);
+  const clientY = Math.round(rect.top - window.scrollY + rect.height / 2);
+  let candidate = document.elementFromPoint(clientX, clientY);
+  candidate = selectorModule.resolveTarget(candidate);
+  return candidate instanceof HTMLElement ? candidate : null;
+}
+
+export function applyDraftPlacementToTarget(draft, target) {
+  if (!draft || !(target instanceof HTMLElement)) {
+    return false;
+  }
+  let selector = '';
+  try {
+    selector = selectorModule.generateSelector(target);
+  } catch (_error) {
+    selector = '';
+  }
+  if (!selector) {
+    return false;
+  }
+  draft.selector = selector;
+  draft.position = 'append';
+  draft.floating = false;
+  draft.containerId = '';
+  const nextStyle = { ...(draft.style || {}) };
+  delete nextStyle.position;
+  delete nextStyle.left;
+  delete nextStyle.top;
+  delete nextStyle.zIndex;
+  delete nextStyle.width;
+  delete nextStyle.height;
+  draft.style = nextStyle;
+  return true;
+}
+
+export function beginTooltipPlacement() {
+  // Ensure clean state before starting tooltip placement
+  stopPicker();
+  const overlay = selectorModule.createOverlay();
+  document.body.appendChild(overlay.container);
+  document.body.style.cursor = 'crosshair';
+  let disposed = false;
+
+  const cleanup = (notifyCancel) => {
+    if (disposed) {
+      return;
+    }
+    disposed = true;
+    document.removeEventListener('mousemove', handleMove, true);
+    document.removeEventListener('click', handleClick, true);
+    document.removeEventListener('keydown', handleKeyDown, true);
+    overlay.dispose();
+    document.body.style.cursor = '';
+    state.pickerSession = null;
+    if (notifyCancel) {
+      try {
+        chrome.runtime.sendMessage({ type: MessageType.PICKER_CANCELLED, pageUrl: runtime.pageUrl });
+      } catch (_error) {
+        // ignore notification errors
+      }
+    }
+  };
+
+  const handleMove = (event) => {
+    const target = selectorModule.resolveTarget(event.target);
+    if (target instanceof Element) {
+      overlay.show(target);
+    } else {
+      overlay.hide();
+    }
+  };
+
+  const handleClick = (event) => {
+    const target = selectorModule.resolveTarget(event.target);
+    if (!(target instanceof HTMLElement)) {
+      return;
+    }
+    event.preventDefault();
+    event.stopPropagation();
+    cleanup(false);
+    const draft = buildDraftElement('tooltip');
+    const attached = applyDraftPlacementToTarget(draft, target);
+    if (!attached) {
+      try {
+        chrome.runtime.sendMessage({
+          type: MessageType.PICKER_CANCELLED,
+          pageUrl: runtime.pageUrl,
+          data: { error: 'Unable to resolve a selector for the chosen element.' },
+        });
+      } catch (_error) {
+        // ignore notification failures
+      }
+      return;
+    }
+    highlightPlacementTarget(target);
+    const ensured = injectModule.ensureElement(draft);
+    if (!ensured) {
+      try {
+        chrome.runtime.sendMessage({
+          type: MessageType.PICKER_CANCELLED,
+          pageUrl: runtime.pageUrl,
+          data: { error: 'Unable to insert the tooltip on this page.' },
+        });
+      } catch (_error) {
+        // ignore notification failures
+      }
+      return;
+    }
+    injectModule.setEditingElement(draft.id, true);
+    state.creationElementId = draft.id;
+    state.activeEditorElementId = draft.id;
+    const host = injectModule.getHost(draft.id);
+    if (!host) {
+      cancelCreationDraft();
+      return;
+    }
+    const session = selectorModule.openElementEditor({
+      mode: 'create',
+      target: host,
+      selector: draft.selector,
+      values: draft,
+      onPreview(updated) {
+        injectModule.previewElement(draft.id, updated || {});
+      },
+      onSubmit(updated) {
+        injectModule.previewElement(draft.id, updated || {});
+        injectModule.setEditingElement(draft.id, false);
+        state.creationElementId = null;
+        state.activeEditorElementId = null;
+        state.editorSession = null;
+        const payload = {
+          ...draft,
+          ...updated,
+          id: draft.id,
+          pageUrl: runtime.pageUrl,
+          selector: draft.selector,
+          position: draft.position,
+          frameSelectors: Array.isArray(runtime.frameContext?.frameSelectors)
+            ? runtime.frameContext.frameSelectors.slice()
+            : [],
+          frameLabel: runtime.frameContext?.frameLabel,
+          frameUrl: runtime.frameContext?.frameUrl,
+          createdAt: draft.createdAt,
+          updatedAt: Date.now(),
+        };
+        sendMessage(MessageType.CREATE, payload).catch((error) =>
+          console.error('[PageAugmentor] Failed to save new element', error),
+        );
+      },
+      onCancel() {
+        injectModule.setEditingElement(draft.id, false);
+        cancelCreationDraft();
+        state.editorSession = null;
+        try {
+          chrome.runtime.sendMessage({ type: MessageType.PICKER_CANCELLED, pageUrl: runtime.pageUrl });
+        } catch (_error) {
+          // ignore notification errors
+        }
+      },
+    });
+    state.editorSession = session;
+    injectModule.focusElement(draft.id);
+  };
+
+  const handleKeyDown = (event) => {
+    if (event.key === 'Escape') {
+      event.preventDefault();
+      cleanup(true);
+    }
+  };
+
+  document.addEventListener('mousemove', handleMove, true);
+  document.addEventListener('click', handleClick, true);
+  document.addEventListener('keydown', handleKeyDown, true);
+
+  state.pickerSession = { stop: () => cleanup(true) };
+}
+
+export function beginCreationSession(options = {}) {
+  // Reset any existing interactions before starting a new creation flow
+  stopPicker();
+  closeEditorBubble();
+  cancelCreationDraft();
+  const requestedType = typeof options.type === 'string' ? options.type : 'button';
+  if (requestedType === 'tooltip') {
+    beginTooltipPlacement();
+    return;
+  }
+  // Let the user drag a rectangle to define placement and size
+  const drawer = selectorModule.startRectDraw({
+    onComplete(rect) {
+      const draft = buildDraftElement(requestedType);
+      let placementTarget = null;
+      let attachedToTarget = false;
+      if (requestedType !== 'area') {
+        placementTarget = resolvePlacementTargetFromRect(rect);
+        attachedToTarget = applyDraftPlacementToTarget(draft, placementTarget);
+        if (attachedToTarget && placementTarget) {
+          highlightPlacementTarget(placementTarget);
+        }
+      }
+      if (!attachedToTarget || requestedType === 'area') {
+        draft.style = {
+          ...(draft.style || {}),
+          position: 'absolute',
+          left: `${Math.max(0, rect.left)}px`,
+          top: `${Math.max(0, rect.top)}px`,
+          width: `${Math.max(24, rect.width)}px`,
+          height: `${Math.max(24, rect.height)}px`,
+          zIndex: (draft.style?.zIndex && String(draft.style.zIndex).trim()) || Z_INDEX_FLOATING_DEFAULT,
+        };
+        draft.floating = true;
+      }
+      const ensured = injectModule.ensureElement(draft);
+      if (!ensured) {
+        try {
+          chrome.runtime.sendMessage({
+            type: MessageType.PICKER_CANCELLED,
+            pageUrl: runtime.pageUrl,
+            data: { error: 'Unable to insert the element on this page.' },
+          });
+        } catch (_error) {
+          // ignore notification failures
+        }
+        return;
+      }
+      injectModule.setEditingElement(draft.id, true);
+      state.creationElementId = draft.id;
+      state.activeEditorElementId = draft.id;
+      const host = injectModule.getHost(draft.id);
+      if (!host) {
+        cancelCreationDraft();
+        return;
+      }
+      const session = selectorModule.openElementEditor({
+        mode: 'create',
+        target: host,
+        selector: draft.selector,
+        values: draft,
+        onPreview(updated) {
+          injectModule.previewElement(draft.id, updated || {});
+        },
+        onSubmit(updated) {
+          injectModule.previewElement(draft.id, updated || {});
+          injectModule.setEditingElement(draft.id, false);
+          state.creationElementId = null;
+          state.activeEditorElementId = null;
+          state.editorSession = null;
+          const payload = {
+            ...draft,
+            ...updated,
+            id: draft.id,
+            pageUrl: runtime.pageUrl,
+            selector: draft.selector,
+            position: draft.position,
+            frameSelectors: Array.isArray(runtime.frameContext?.frameSelectors)
+              ? runtime.frameContext.frameSelectors.slice()
+              : [],
+            frameLabel: runtime.frameContext?.frameLabel,
+            frameUrl: runtime.frameContext?.frameUrl,
+            createdAt: draft.createdAt,
+            updatedAt: Date.now(),
+          };
+          sendMessage(MessageType.CREATE, payload).catch((error) =>
+            console.error('[PageAugmentor] Failed to save new element', error),
+          );
+        },
+        onCancel() {
+          injectModule.setEditingElement(draft.id, false);
+          cancelCreationDraft();
+          state.editorSession = null;
+          try {
+            chrome.runtime.sendMessage({ type: MessageType.PICKER_CANCELLED, pageUrl: runtime.pageUrl });
+          } catch (_error) {
+            // ignore notification errors
+          }
+        },
+      });
+      state.editorSession = session;
+      injectModule.focusElement(draft.id);
+    },
+    onCancel() {
+      try {
+        chrome.runtime.sendMessage({ type: MessageType.PICKER_CANCELLED, pageUrl: runtime.pageUrl });
+      } catch (_error) {
+        // ignore notification errors
+      }
+    },
+  });
+  // store to allow explicit cancellation if needed later
+  state.pickerSession = drawer;
+}
