@@ -64,3 +64,17 @@ Agents represent the automation flows that Page Augmentor can execute when a use
 - Use `log` steps during development and remove or demote them once the agent is stable.
 - Pair agents with mirrored selectors or URLs so the button remains useful if the flow exits early.
 
+## Developer Notes
+- Code locations
+  - Flow runtime: `content/injection/core/flow-runner.js`
+  - Editor controller: `content/bubble/editor/action-flow-controller.js`
+  - Builder UI and I/O: `content/bubble/actionflow/{builder,serializer,parser-bridge}.js`
+  - Types: `content/common/types.js`
+- Adding a new step type
+  - Extend the executor in `content/injection/core/flow-runner.js` to handle the new `type`.
+  - Update the builder palette and serializers under `content/bubble/actionflow/` to expose and persist the step.
+  - Document required fields and validation rules in this file and `README.md`.
+- Debugging tips
+  - Use the `log` step to print progress to the page console.
+  - Temporarily reduce flows to a minimal repro and re‑add steps incrementally.
+

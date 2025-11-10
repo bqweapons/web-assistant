@@ -409,11 +409,11 @@ function createElementBubble() {
   tooltipSection.content.append(tooltipPositionField.wrapper, tooltipPersistentField.wrapper);
   tooltipSection.setVisible(false);
 
-  const placementSection = sectionsTabs.addSection(
-    t('editor.sections.placement.title'),
-    t('editor.sections.placement.description'),
-  );
-  placementSection.content.append(positionField.wrapper);
+  // const placementSection = sectionsTabs.addSection(
+  //   t('editor.sections.placement.title'),
+  //   t('editor.sections.placement.description'),
+  // );
+  // placementSection.content.append(positionField.wrapper);
 
   const appearanceSection = sectionsTabs.addSection(
     t('editor.sections.appearance.title'),

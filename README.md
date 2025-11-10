@@ -66,55 +66,57 @@ See `AGENTS.md` for a deeper reference on agent authoring, available steps, guar
 
 ```
 .
-|-- manifest.json
-|-- service_worker.js
-|-- content/
-|   |-- content.js
-|   |-- inject.js
-|   |-- injection/
-|   |   |-- constants.js
-|   |   |-- dom.js
-|   |   |-- flow-runner.js
-|   |   |-- registry.js
-|   |   |-- style.js
-|   |   |-- tooltip.js
-|   |   -- utils.js
-|   |-- selector.js
-|   |-- bubble/
-|   |   |-- element-bubble.js
-|   |   |-- editor/
-|   |   |   -- action-flow-controller.js
-|   |   |-- layout/
-|   |   |-- styles/
-|   |   -- ui/
-|   |-- selector/
-|   |   |-- frame.js
-|   |   |-- overlay.js
-|   |   -- picker.js
-|   -- dist/
-|       -- content.js
-|-- sidepanel/
-|   |-- sidepanel.html
-|   -- src/
-|       |-- App.jsx
-|       |-- components/
-|       |-- hooks/
-|       -- utils/
--- common/
-    |-- compat.js
-    |-- flows.js
-    |-- i18n.js
-    |-- i18n/
-    |   |-- locales/
-    |   |   |-- en.js
-    |   |   |-- ja.js
-    |   |   -- zh-CN.js
-    |   -- utils.js
-    |-- messaging.js
-    |-- storage.js
-    -- types.js
+├─ manifest.json
+├─ service_worker.js
+├─ content/
+│  ├─ app/
+│  │  ├─ content.js              # content script entry (orchestrator)
+│  │  ├─ context.js              # shared runtime + state
+│  │  ├─ page-url.js             # URL normalization
+│  │  ├─ hydration.js            # fetch + render elements
+│  │  ├─ mutation-watcher.js     # DOM observer + reconcile
+│  │  ├─ autosave.js             # drag/placement autosave
+│  │  ├─ picker.js               # element picker wiring
+│  │  ├─ creation.js             # new element flows
+│  │  ├─ editor.js               # inline editor bubble
+│  │  ├─ editing-mode.js         # edit-mode toggle behavior
+│  │  ├─ frame.js                # frame matching helpers
+│  │  └─ highlight.js            # transient target highlight
+│  ├─ inject.js                  # injection facade
+│  ├─ injection/
+│  │  ├─ core/
+│  │  │  ├─ constants.js
+│  │  │  ├─ registry.js
+│  │  │  ├─ flow-runner.js
+│  │  │  └─ utils.js
+│  │  ├─ host/...
+│  │  ├─ interactions/{drag,drop,resize}/...
+│  │  ├─ orchestrator/...
+│  │  └─ ui/{style,tooltip}.js
+│  ├─ bubble/
+│  │  ├─ element-bubble.js
+│  │  ├─ editor/action-flow-controller.js
+│  │  ├─ actionflow/{builder,serializer,parser-bridge}.js
+│  │  └─ ...
+│  ├─ selector.js                # selector entry
+│  ├─ selector/                  # picker, overlay, frame utils
+│  └─ dist/content.js            # built content bundle
+├─ sidepanel/
+│  ├─ sidepanel.html
+│  └─ src/...
+└─ common/...
 ```
 
+### Content runtime modules
+- `content/app/content.js`: Initializes the runtime, then hydrates, wires messages, observers, and autosave.
+- `content/app/hydration.js`: Lists stored elements and syncs them to the DOM.
+- `content/app/editor.js`: Opens/closes the inline editor with live preview + autosave.
+- `content/app/creation.js`: New element flows (rect draw, tooltip attach) with draft building.
+- `content/app/picker.js`: Visual element picker integration and result reporting.
+- `content/app/autosave.js`: Persist drag/resize updates outside the editor.
+- `content/app/mutation-watcher.js`: Reconciles injected elements after DOM mutations.
+- `content/app/frame.js`: Frame-aware filtering/matching helpers.
+See `AGENTS.md` for details on action flows and how to extend them.
 ### Runtime architecture overview
 - **Messaging layer (`common/messaging.js`)**: Wraps `chrome.runtime.sendMessage` and port connections so every context exchanges `{ ok, data | error }` payloads. Async handlers are normalised to promises, letting the side panel, background service worker, and content scripts share identical request patterns.
 - **Persistent store (`common/storage.js`)**: Keeps all injected element metadata under a single `injectedElements` key. Update helpers clone payloads (including nested style/frame fields) to avoid shared references, while `observePage` fans out `chrome.storage.onChanged` events by URL.
