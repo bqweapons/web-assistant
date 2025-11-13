@@ -93,8 +93,8 @@ export function applyDraftPlacementToTarget(draft, target) {
   return true;
 }
 
-export function beginTooltipPlacement() {
-  // Ensure clean state before starting tooltip placement
+function beginClickPlacement(requestedType) {
+  // Ensure clean state before starting click-based placement
   stopPicker();
   const overlay = selectorModule.createOverlay();
   document.body.appendChild(overlay.container);
@@ -138,20 +138,51 @@ export function beginTooltipPlacement() {
     event.preventDefault();
     event.stopPropagation();
     cleanup(false);
-    const draft = buildDraftElement('tooltip');
-    const attached = applyDraftPlacementToTarget(draft, target);
-    if (!attached) {
-      try {
-        chrome.runtime.sendMessage({
-          type: MessageType.PICKER_CANCELLED,
-          pageUrl: runtime.pageUrl,
-          data: { error: 'Unable to resolve a selector for the chosen element.' },
-        });
-      } catch (_error) {
-        // ignore notification failures
-      }
-      return;
+    const draft = buildDraftElement(requestedType === 'tooltip' || requestedType === 'link' || requestedType === 'button' ? requestedType : 'button');
+    if (requestedType === 'button') {
+      // Provide sensible default size for buttons even when attached
+      draft.style = {
+        ...(draft.style || {}),
+        minWidth: draft.style?.minWidth || '120px',
+        minHeight: draft.style?.minHeight || '36px',
+      };
     }
+    // Special-case: if user clicked an Area host, insert into that Area instead
+    try {
+      const HOST_ATTRIBUTE = 'data-page-augmentor-id';
+      const hostEl = target.closest(`[${HOST_ATTRIBUTE}]`);
+      const containerId = hostEl instanceof HTMLElement ? hostEl.getAttribute(HOST_ATTRIBUTE) : '';
+      const containerMeta = containerId ? injectModule.getElement(containerId) : null;
+      if (containerMeta && containerMeta.type === 'area') {
+        // Attach into area container: clear absolute styles and mark as non-floating inside container
+        const nextStyle = { ...(draft.style || {}) };
+        delete nextStyle.position;
+        delete nextStyle.left;
+        delete nextStyle.top;
+        delete nextStyle.zIndex;
+        delete nextStyle.width;
+        delete nextStyle.height;
+        draft.style = nextStyle;
+        draft.floating = false;
+        draft.containerId = containerId;
+        // leave draft.selector as default; insertHost will use containerId branch
+      } else {
+        // Default: attach to clicked DOM target
+        const attachedToDom = applyDraftPlacementToTarget(draft, target);
+        if (!attachedToDom) {
+          try {
+            chrome.runtime.sendMessage({
+              type: MessageType.PICKER_CANCELLED,
+              pageUrl: runtime.pageUrl,
+              data: { error: 'Unable to resolve a selector for the chosen element.' },
+            });
+          } catch (_error) {}
+          return;
+        }
+      }
+    } catch (_e) {}
+    const attached = true; // at this point draft is prepared either for area container or DOM target
+    
     highlightPlacementTarget(target);
     const ensured = injectModule.ensureElement(draft);
     if (!ensured) {
@@ -159,7 +190,7 @@ export function beginTooltipPlacement() {
         chrome.runtime.sendMessage({
           type: MessageType.PICKER_CANCELLED,
           pageUrl: runtime.pageUrl,
-          data: { error: 'Unable to insert the tooltip on this page.' },
+          data: { error: requestedType === 'tooltip' ? 'Unable to insert the tooltip on this page.' : 'Unable to insert the element on this page.' },
         });
       } catch (_error) {
         // ignore notification failures
@@ -180,6 +211,7 @@ export function beginTooltipPlacement() {
       selector: draft.selector,
       values: draft,
       onPreview(updated) {
+        // Live preview on the host (reflects text, href, styles, etc.)
         injectModule.previewElement(draft.id, updated || {});
       },
       onSubmit(updated) {
@@ -236,17 +268,21 @@ export function beginTooltipPlacement() {
   state.pickerSession = { stop: () => cleanup(true) };
 }
 
+export function beginTooltipPlacement() {
+  beginClickPlacement('tooltip');
+}
+
 export function beginCreationSession(options = {}) {
   // Reset any existing interactions before starting a new creation flow
   stopPicker();
   closeEditorBubble();
   cancelCreationDraft();
   const requestedType = typeof options.type === 'string' ? options.type : 'button';
-  if (requestedType === 'tooltip') {
-    beginTooltipPlacement();
+  if (requestedType !== 'area') {
+    beginClickPlacement(requestedType);
     return;
   }
-  // Let the user drag a rectangle to define placement and size
+  // Area keeps rectangle draw to define placement and size
   const drawer = selectorModule.startRectDraw({
     onComplete(rect) {
       const draft = buildDraftElement(requestedType);
