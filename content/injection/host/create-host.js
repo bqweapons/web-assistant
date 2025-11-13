@@ -64,6 +64,10 @@ export function createHost(element) {
     :host([data-page-augmentor-editing='true']) .${NODE_CLASS} .page-augmentor-resize-handle {
       display: block !important;
     }
+    :host([data-page-augmentor-global-editing='true']) .${NODE_CLASS}[data-node-type='area'] ,
+    :host([data-page-augmentor-editing='true']) .${NODE_CLASS}[data-node-type='area'] {
+      cursor: move;
+    }
     .page-augmentor-resize-handle {
       position: absolute;
       width: 10px;
@@ -119,7 +123,6 @@ export function createHost(element) {
       cursor: pointer;
     }
     .${NODE_CLASS}[data-node-type='area'] {
-      cursor: move;
       touch-action: none;
       display: flex;
       flex-direction: column;
