@@ -9,8 +9,8 @@ export function setupAutosave() {
       const detail = (event && event.detail) || {};
       const elementId = typeof detail.elementId === 'string' ? detail.elementId : null;
       if (!elementId) return;
-      // Skip autosave for unsaved creation drafts; the Save action will persist
-      if (state.creationElementId && state.creationElementId === elementId) return;
+      // Skip autosave for creation drafts or when its editor is open
+      if (state.creationElementId === elementId || state.activeEditorElementId === elementId) return;
       // Only persist when there's a real change vs. current element
       const base = injectModule.getElement(elementId);
       if (!base) return;
@@ -71,4 +71,3 @@ export function setupAutosave() {
     }
   });
 }
-
