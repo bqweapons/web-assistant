@@ -255,6 +255,7 @@ function beginClickPlacement(requestedType) {
   };
 
   const handleKeyDown = (event) => {
+    console.log(event.key);
     if (event.key === 'Escape') {
       event.preventDefault();
       cleanup(true);

@@ -30,26 +30,8 @@ export function openEditorBubble(elementId) {
     selector: element.selector,
     values: element,
     onPreview(updated) {
-      // Live preview and autosave while editing existing elements
+      // Live preview only; autosave during edit preview is disabled
       injectModule.previewElement(elementId, updated || {});
-      try {
-        const baseLatest = injectModule.getElement(elementId) || element;
-        const autosavePayload = {
-          ...baseLatest,
-          ...(updated || {}),
-          style: {
-            ...((baseLatest && baseLatest.style) || {}),
-            ...(((updated || {}).style) || {}),
-          },
-          id: elementId,
-          pageUrl: runtime.pageUrl,
-          updatedAt: Date.now(),
-        };
-        sendMessage(MessageType.UPDATE, autosavePayload).catch(() => {});
-        try { dirtyIds.add(elementId); } catch (_e) {}
-      } catch (_error) {
-        // ignore autosave failures
-      }
     },
     onSubmit(updated) {
       injectModule.previewElement(elementId, updated || {});
@@ -74,7 +56,21 @@ export function openEditorBubble(elementId) {
       try { dirtyIds.add(elementId); } catch (_e) {}
     },
     onCancel() {
-      injectModule.setEditingElement(elementId, false);
+      // Exit editing state and revert any live preview back to the persisted base
+      try {
+        injectModule.setEditingElement(elementId, false);
+        // Revert shadow content/styles first
+        injectModule.previewElement(elementId, {});
+        // Force host re-hydration to undo any transient host-level changes (e.g., floating position)
+        const base = injectModule.getElement(elementId);
+        const host = injectModule.getHost(elementId);
+        if (host) {
+          try { host.remove(); } catch (_e) {}
+        }
+        if (base) {
+          try { injectModule.ensureElement(base); } catch (_e) {}
+        }
+      } catch (_e) {}
       closeEditorBubble();
     },
   });
@@ -126,4 +122,3 @@ export function cancelCreationDraft() {
     // ignore removal failures
   }
 }
-
