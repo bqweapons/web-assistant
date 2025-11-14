@@ -139,7 +139,6 @@ export function createHost(element) {
     .${NODE_CLASS}[data-node-type='area'] .page-augmentor-area-header {
       font-weight: 600;
       font-size: 0.95rem;
-      color: #1f2937;
     }
     .${NODE_CLASS}[data-node-type='area'] .page-augmentor-area-content {
       display: flex;
