@@ -68,8 +68,11 @@ async function main() {
   const zipName = `${baseName}-${version}.zip`;
   const zipPath = path.join(releaseDir, zipName);
 
-  // 1) Build bundles
-  await run('npm', ['run', 'build'], { cwd: repoRoot });
+  // 1) Build bundles (force production build for packaging)
+  await run('npm', ['run', 'build'], {
+    cwd: repoRoot,
+    env: { ...process.env, NODE_ENV: 'production' },
+  });
 
   // 2) Prepare staging directory
   await rm(stageDir, { recursive: true, force: true });
@@ -131,4 +134,3 @@ main().catch((err) => {
   console.error(err?.stack || String(err));
   process.exit(1);
 });
-

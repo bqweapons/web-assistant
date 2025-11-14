@@ -39,10 +39,13 @@ if (!config) {
 await mkdir(path.dirname(config.outfile), { recursive: true });
 
 // esbuild の共通設定。MV3 向けに最適化しつつ、必要なモジュールをバンドルする、E
+
+const isDev = process.env.NODE_ENV !== 'production';
+
 await build({
   bundle: true,
-  sourcemap: false,
-  minify: true,
+  sourcemap: isDev ? 'inline' : false,
+  minify: !isDev,
   platform: 'browser',
   target: 'chrome117',
   define: {
@@ -50,3 +53,4 @@ await build({
   },
   ...config,
 });
+
