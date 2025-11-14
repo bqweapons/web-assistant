@@ -10,8 +10,6 @@
     "default_path": "sidepanel/sidepanel.html"
   },
   "permissions": [
-    "activeTab",
-    "scripting",
     "storage",
     "tabs",
     "sidePanel",
