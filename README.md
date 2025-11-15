@@ -9,6 +9,10 @@
 ### Overview
 Page Augmentor is a Manifest V3 Chrome extension for layering custom buttons, links, tooltips, and rich callouts onto any web page. You manage everything from the side panel (Manage, Overview, Settings). Every injected element is scoped to its page URL and stored in `chrome.storage.local`, so your customisations reappear automatically whenever you revisit the site.
 
+## Demo Video
+[![Demo Video](https://img.youtube.com/vi/-iTlNX4J8FM/maxresdefault.jpg)](https://youtu.be/-iTlNX4J8FM)
+
+
 ### Feature highlights
 - **Unified side panel**: Switch between the per-page Manage view, cross-site Overview, and Settings (import/export, language) without leaving Chrome.
 - **Frame-aware visual picker**: Highlight DOM nodes in context, including same-origin iframes, auto-generate CSS selectors, and jump straight into the editor bubble.
@@ -65,6 +69,10 @@ Conditions can be composed from `exists`, `not`, `textContains`, and `attributeE
   ]
 }
 ```
+
+Example: a login button flow that fills the username and password and then clicks **Sign up**:
+
+![Login button action flow sample](docs/button%20sample.gif)
 
 See `AGENTS.md` for the full action-flow reference, including step fields, condition shapes, runtime limits, and authoring tips.
 
@@ -154,6 +162,7 @@ See `AGENTS.md` for the full action-flow reference, including step fields, condi
 ## 日本語
 
 ### 概要
+ボタン追加とアクションフロー設定の短いデモ動画: https://youtu.be/-iTlNX4J8FM
 Page Augmentor は Manifest V3 対応の Chrome 拡張機能で、任意の Web ページにカスタムボタン、リンク、ツールチップ、エリアコールアウトを重ねて表示できます。サイドパネルの Manage / Overview / Settings から一元管理され、挿入した要素はページ URL ごとに `chrome.storage.local` に保存されるため、同じサイトへ再訪すると自動で復元されます。
 
 ### 主な機能
@@ -230,6 +239,7 @@ npm run package
 ## 简体中文
 
 ### 概述
+按钮与动作流程配置演示视频: https://youtu.be/-iTlNX4J8FM
 Page Augmentor 是一款基于 Manifest V3 的 Chrome 扩展，可以在任意网页上叠加自定义按钮、链接、提示气泡和区域标注。所有元素都通过侧边栏的 Manage / Overview / Settings 视图集中管理，并按页面 URL 存储在 `chrome.storage.local` 中，在你再次访问同一站点时会自动恢复。
 
 ### 功能亮点
