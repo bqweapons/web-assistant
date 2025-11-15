@@ -186,6 +186,18 @@ export default function App() {
   }, [pageUrl, refreshItems]);
 
   useEffect(() => {
+    const handleKeyDown = (event) => {
+      if (event.key === 'Escape' && tabId && pageUrl) {
+        sendMessage(MessageType.CANCEL_PICKER, { tabId, pageUrl }).catch(() => {});
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [tabId, pageUrl]);
+
+  useEffect(() => {
     const listener = (message) => {
       if (!message?.type) {
         return;
