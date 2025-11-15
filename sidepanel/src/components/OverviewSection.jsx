@@ -14,6 +14,7 @@ export function OverviewSection({
   const [store, setStore] = useState({});
   const [loading, setLoading] = useState(false);
   const [status, setStatus] = useState(null);
+  const [expandedPages, setExpandedPages] = useState(() => new Set());
 
   const entries = useMemo(() => Object.entries(store).sort(([a], [b]) => a.localeCompare(b)), [store]);
   const totalElements = entries.reduce((total, [, items]) => total + (items?.length || 0), 0);
@@ -122,6 +123,21 @@ export function OverviewSection({
   );
 
   const statusMessage = status ? t(status.key, status.values) : '';
+  const isPageCollapsed = useCallback(
+    (pageUrl) => !expandedPages.has(pageUrl),
+    [expandedPages],
+  );
+  const togglePageCollapsed = useCallback((pageUrl) => {
+    setExpandedPages((prev) => {
+      const next = new Set(prev);
+      if (next.has(pageUrl)) {
+        next.delete(pageUrl);
+      } else {
+        next.add(pageUrl);
+      }
+      return next;
+    });
+  }, []);
 
   return (
     <section className="flex flex-col gap-6 rounded-2xl border border-slate-200 bg-white p-5 shadow-brand">
@@ -155,96 +171,113 @@ export function OverviewSection({
             {t('overview.empty')}
           </p>
         ) : (
-          entries.map(([pageUrl, items]) => (
-            <article key={pageUrl} className="rounded-2xl border border-slate-200 bg-white p-5 shadow-brand">
-              <header className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
-                <div className="space-y-1">
-                  <h3 className="break-all text-base font-semibold text-slate-900">{pageUrl}</h3>
-                  <p className="text-xs text-slate-500">{t('overview.pageSummary', { count: items.length })}</p>
-                </div>
-                <div className="flex flex-wrap gap-3">
-                  <button
-                    type="button"
-                    className="rounded-lg bg-blue-50 px-3 py-2 text-sm font-semibold text-blue-700 transition hover:bg-blue-100"
-                    onClick={() => handleOpenPage(pageUrl)}
-                  >
-                    {t('overview.openPage')}
-                  </button>
-                  <button
-                    type="button"
-                    className="rounded-lg bg-rose-100 px-3 py-2 text-sm font-semibold text-rose-700 transition hover:bg-rose-200"
-                    onClick={() => handleClearPage(pageUrl)}
-                  >
-                    {t('overview.clearPage')}
-                  </button>
-                </div>
-              </header>
-              <ul className="mt-4 grid gap-4">
-                {items
-                  .slice()
-                  .sort((a, b) => b.createdAt - a.createdAt)
-                  .map((item) => {
-                    const frameInfo = formatFrameSummary(item);
-                    const flowSummary = summarizeFlow(item.actionFlow);
-                    return (
-                      <li key={item.id} className="rounded-xl border border-slate-200 bg-slate-50 p-4">
-                        <div className="flex flex-wrap items-start justify-between gap-3">
-                          <span className="inline-flex items-center rounded-full bg-indigo-100 px-3 py-1 text-xs font-semibold uppercase tracking-wide text-indigo-700">
-                            {typeLabels[item.type] || item.type}
-                          </span>
-                          <span className="text-xs text-slate-500">{formatDateTime(item.createdAt)}</span>
-                        </div>
-                        <p className="mt-3 text-sm font-semibold text-slate-900">{item.text || t('manage.item.noText')}</p>
-                        <p className="mt-1 break-all text-xs text-slate-500">{item.selector}</p>
-                        {item.href && <p className="mt-1 break-all text-xs text-blue-600">{item.href}</p>}
-                        {item.actionSelector && (
-                          <p className="mt-1 break-all text-xs text-emerald-600">
-                            {t('manage.item.actionSelector', { selector: item.actionSelector })}
-                          </p>
-                        )}
-                        {flowSummary?.steps ? (
-                          <p className="mt-1 break-all text-xs text-emerald-600">
-                            {t('manage.item.actionFlow', { steps: flowSummary.steps })}
-                          </p>
-                        ) : null}
-                        {frameInfo && <p className="mt-1 break-all text-xs text-purple-600">{frameInfo}</p>}
-                        {item.type === 'tooltip' && (
-                          <p className="mt-1 break-all text-xs text-amber-600">
-                            {t('manage.item.tooltipDetails', {
-                              position: formatTooltipPosition(item.tooltipPosition),
-                              mode: formatTooltipMode(item.tooltipPersistent),
-                            })}
-                          </p>
-                        )}
-                        <div className="mt-3 flex flex-wrap gap-3">
-                          <button
-                            type="button"
-                            className="rounded-lg bg-blue-50 px-3 py-2 text-sm font-semibold text-blue-700 transition hover:bg-blue-100"
-                            onClick={() => handleFocusItem(pageUrl, item.id)}
-                          >
-                            {t('manage.item.focus')}
-                          </button>
-                          <button
-                            type="button"
-                            className="rounded-lg bg-slate-100 px-3 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-200"
-                            onClick={() => handleEditItem(pageUrl, item.id)}
-                          >
-                            {t('manage.item.openBubble')}
-                          </button>
-                          <button
-                            type="button"
-                            className="rounded-lg bg-rose-100 px-3 py-2 text-sm font-semibold text-rose-700 transition hover:bg-rose-200"
-                            onClick={() => handleDeleteItem(pageUrl, item.id)}
-                          >
-                            {t('manage.item.delete')}
-                          </button>
-                        </div>
-                      </li>
-                    );
-                  })}
-              </ul>
-            </article>
-          ))
+          entries.map(([pageUrl, items]) => {
+            const collapsed = isPageCollapsed(pageUrl);
+            return (
+              <article key={pageUrl} className="rounded-2xl border border-slate-200 bg-white p-5 shadow-brand">
+                <header className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+                  <div className="flex flex-1 items-start gap-3 md:items-center">
+                    <button
+                      type="button"
+                      className="flex h-7 w-7 items-center justify-center rounded-full border border-slate-300 bg-slate-50 text-xs font-semibold text-slate-700 transition hover:bg-slate-100"
+                      onClick={() => togglePageCollapsed(pageUrl)}
+                      aria-label={collapsed ? t('overview.expandPage') : t('overview.collapsePage')}
+                    >
+                      <span className="text-base leading-none">{collapsed ? '▸' : '▾'}</span>
+                    </button>
+                    <div className="space-y-1 min-w-0">
+                      <h3 className="break-all text-base font-semibold text-slate-900">{pageUrl}</h3>
+                      <p className="text-xs text-slate-500">{t('overview.pageSummary', { count: items.length })}</p>
+                    </div>
+                  </div>
+                  <div className="mt-2 flex flex-wrap gap-3 md:mt-0">
+                    <button
+                      type="button"
+                      className="rounded-lg bg-blue-50 px-3 py-2 text-sm font-semibold text-blue-700 transition hover:bg-blue-100"
+                      onClick={() => handleOpenPage(pageUrl)}
+                    >
+                      {t('overview.openPage')}
+                    </button>
+                    <button
+                      type="button"
+                      className="rounded-lg bg-rose-100 px-3 py-2 text-sm font-semibold text-rose-700 transition hover:bg-rose-200"
+                      onClick={() => handleClearPage(pageUrl)}
+                    >
+                      {t('overview.clearPage')}
+                    </button>
+                  </div>
+                </header>
+                {!collapsed && (
+                  <ul className="mt-4 grid gap-4">
+                    {items
+                      .slice()
+                      .sort((a, b) => b.createdAt - a.createdAt)
+                      .map((item) => {
+                        const frameInfo = formatFrameSummary(item);
+                        const flowSummary = summarizeFlow(item.actionFlow);
+                        return (
+                          <li key={item.id} className="rounded-xl border border-slate-200 bg-slate-50 p-4">
+                            <div className="flex flex-wrap items-start justify-between gap-3">
+                              <span className="inline-flex items-center rounded-full bg-indigo-100 px-3 py-1 text-xs font-semibold uppercase tracking-wide text-indigo-700">
+                                {typeLabels[item.type] || item.type}
+                              </span>
+                              <span className="text-xs text-slate-500">{formatDateTime(item.createdAt)}</span>
+                            </div>
+                            <p className="mt-3 text-sm font-semibold text-slate-900">
+                              {item.text || t('manage.item.noText')}
+                            </p>
+                            <p className="mt-1 break-all text-xs text-slate-500">{item.selector}</p>
+                            {item.href && <p className="mt-1 break-all text-xs text-blue-600">{item.href}</p>}
+                            {item.actionSelector && (
+                              <p className="mt-1 break-all text-xs text-emerald-600">
+                                {t('manage.item.actionSelector', { selector: item.actionSelector })}
+                              </p>
+                            )}
+                            {flowSummary?.steps ? (
+                              <p className="mt-1 break-all text-xs text-emerald-600">
+                                {t('manage.item.actionFlow', { steps: flowSummary.steps })}
+                              </p>
+                            ) : null}
+                            {frameInfo && <p className="mt-1 break-all text-xs text-purple-600">{frameInfo}</p>}
+                            {item.type === 'tooltip' && (
+                              <p className="mt-1 break-all text-xs text-amber-600">
+                                {t('manage.item.tooltipDetails', {
+                                  position: formatTooltipPosition(item.tooltipPosition),
+                                  mode: formatTooltipMode(item.tooltipPersistent),
+                                })}
+                              </p>
+                            )}
+                            <div className="mt-3 flex flex-wrap gap-3">
+                              <button
+                                type="button"
+                                className="rounded-lg bg-blue-50 px-3 py-2 text-sm font-semibold text-blue-700 transition hover:bg-blue-100"
+                                onClick={() => handleFocusItem(pageUrl, item.id)}
+                              >
+                                {t('manage.item.focus')}
+                              </button>
+                              <button
+                                type="button"
+                                className="rounded-lg bg-slate-100 px-3 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-200"
+                                onClick={() => handleEditItem(pageUrl, item.id)}
+                              >
+                                {t('manage.item.openBubble')}
+                              </button>
+                              <button
+                                type="button"
+                                className="rounded-lg bg-rose-100 px-3 py-2 text-sm font-semibold text-rose-700 transition hover:bg-rose-200"
+                                onClick={() => handleDeleteItem(pageUrl, item.id)}
+                              >
+                                {t('manage.item.delete')}
+                              </button>
+                            </div>
+                          </li>
+                        );
+                      })}
+                  </ul>
+                )}
+              </article>
+            );
+          })
         )}
       </section>
     </section>
