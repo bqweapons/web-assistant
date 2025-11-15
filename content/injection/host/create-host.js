@@ -165,6 +165,22 @@ export function createHost(element) {
     .${NODE_CLASS}.tooltip:focus {
       outline: none;
     }
+    .${NODE_CLASS}.flash-outline {
+      animation: page-augmentor-flash-outline 0.9s ease-out;
+    }
+    @keyframes page-augmentor-flash-outline {
+      0% {
+        outline-offset: 3px;
+        box-shadow:
+          0 0 0 2px rgba(56, 189, 248, 0.8),
+          0 0 0 20px rgba(125, 211, 252, 0.6);
+      }
+      100% {
+        outline: none;
+        outline-offset: 0;
+        box-shadow: none;
+      }
+    }
   `;
   shadowRoot.appendChild(style);
   const node = createNodeForType(element.type);
