@@ -1,0 +1,157 @@
+﻿# Page Augmentor
+
+[English](README.md) / [日本語](README.ja.md) / [简体中文](README.zh-CN.md)
+
+---
+
+### 概要
+Page Augmentor は Manifest V3 対応の Chrome 拡張機能で、任意の Web ページにカスタムボタン、リンク、ツールチップ、リッチなコールアウトを重ねて表示できます。管理はすべてサイドパネル（Manage / Overview / Settings）から行います。挿入した要素はページ URL ごとに `chrome.storage.local` に保存されるため、同じサイトを再訪すると自動的に復元されます。
+
+## デモ動画
+[![Demo Video](https://img.youtube.com/vi/-iTlNX4J8FM/maxresdefault.jpg)](https://youtu.be/-iTlNX4J8FM)
+
+### 主な機能
+- **統合サイドパネル**: Manage・Overview・Settings（インポート / エクスポート、言語切り替え）を 1 つのサイドパネルから操作できます。
+- **iframe 対応のビジュアルピッカー**: 同一オリジンの iframe を含めて DOM ノードをハイライトし、CSS セレクターを自動生成して、そのままエディターバブルにジャンプできます。
+- **多彩な要素タイプ**: ボタン・リンク・ツールチップ・エリアコールアウトを配置でき、`append` / `prepend` / `before` / `after` の挿入位置、オプションのミラークリックセレクター、細かなスタイルを柔軟に設定できます。
+- **アクションフロービルダー**: `click` / `wait` / `input` / `navigate` / `log` / `if` / `while` などのステップを組み合わせて、ボタンがリンクやセレクターにフォールバックする前に自動実行されるマルチステップオートメーションを構築できます。
+- **ドラッグしやすいエリア要素**: エリア要素をページ上でドラッグ & ドロップして配置すると座標が自動保存され、他の要素を中に入れてコンテナとして利用できます。
+- **Shadow DOM による見た目の分離**: レンダリングされたコントロールは Shadow DOM 上に配置されるため、ホストページ側の重い CSS の影響を受けにくくなります。
+- **堅牢な同期と永続化**: データは `chrome.storage.local` に保存され、`MutationObserver` が DOM 変化を監視してホストを再挿入し、タブやサイドパネル間で更新をブロードキャストします。
+
+### インストール
+
+```bash
+npm install
+npm run build
+```
+
+1. `chrome://extensions/` を開き、**デベロッパーモード** をオンにします。
+2. **パッケージ化されていない拡張機能を読み込む** をクリックし、リポジトリのルートディレクトリを選択します。
+3. 必要に応じて拡張機能をピン留めし、ツールバーからサイドパネルを開きます。
+
+`release/` 以下に配布用 ZIP を作成するには:
+
+```bash
+npm run package
+```
+
+### 使い方
+1. Page Augmentor アイコンをクリックして、アクティブなタブにサイドパネルを開きます。
+2. **Manage** で **Pick target** を押し、拡張したい要素（同一オリジンの iframe を含む）を選択します。
+3. エディターバブルでタイプ（ボタン / リンク / ツールチップ / エリア）を選び、テキスト・配置・スタイルを調整し、必要に応じて URL、ミラークリックセレクター、アクションフローを設定して保存します。エリア要素はページ上で直接ドラッグして位置を微調整したり、他の要素のコンテナとして使ったりできます。
+4. Manage のフィルターを使って要素を検索し、フォーカス・再編集・削除を行います。
+5. **Overview** に切り替えると、保存されたすべてのエントリを一覧表示し、新規タブでページを開いたり、URL 単位でまとめて削除したりできます。
+6. **Settings** では JSON バックアップのインポート / エクスポートや UI 言語の切り替えが行えます。
+
+### アクションフロー（任意）
+挿入したボタンは、リンクやミラーセレクターにフォールバックする前にスクリプト化されたフローを実行できます。フローは `steps` 配列を持つ JSON で定義され、保存時に検証されます。構文エラーのある JSON、無効なセレクター、未対応のステップタイプは保存されません。
+
+サポートされるステップ:
+- `click`: 単一要素、または `all: true` を指定して全マッチ要素をクリックします。
+- `wait`: `ms` で指定したミリ秒だけ待機します（ステップごとに安全な上限あり）。
+- `input`: input / textarea / contenteditable 要素に文字列を書き込み、`input` / `change` イベントを発火します。
+- `navigate`: サニタイズ済み URL を `_blank` もしくは任意のターゲットで開きます。
+- `log`: デバッグ用途でページコンソールにメッセージを出力します。
+- `if`: 条件を 1 度だけ評価し、`thenSteps` または `elseSteps` のどちらかを実行します。
+- `while`: 条件が真の間 `bodySteps` を繰り返します（ループ回数には上限があります）。
+
+条件は `exists` / `not` / `textContains` / `attributeEquals` を組み合わせて定義できます。フローはアクティブなフレーム（同一オリジンの iframe を含む）でのみ実行され、合計 200 ステップ、ループ 50 回、実行時間は約 10 秒程度に制限されています。ボタン自身を操作したい場合は、特別なセレクター `:self` を使用します。
+
+```json
+{
+  "steps": [
+    { "type": "click", "selector": "#login" },
+    { "type": "wait", "ms": 500 },
+    { "type": "input", "selector": "#otp", "value": "123456" }
+  ]
+}
+```
+
+ユーザー名とパスワードを自動入力してから **Sign up** ボタンを押すログインフローの一例です:
+
+![Login button action flow sample](docs/button%20sample.gif)
+
+アクションフローのステップ定義、条件式、制限値、ベストプラクティスの詳細については `AGENTS.md` を参照してください。
+
+### パーミッション
+- `tabs`: アクティブタブの情報の読み取り、サイドパネルからのタブのオープン / フォーカス、および UI の同期に使用します。
+- `storage`: ページごとの拡張メタデータを単一のストレージキーの下に保存します。
+- `sidePanel`: Chrome のサイドパネル内に React ベースの管理 UI を表示します（API が使えない環境ではタブ表示にフォールバック）。
+- `webNavigation`: 同一オリジンのフレームを列挙し、ピッカーと再注入がネストされたドキュメントにも届くようにします。
+- `host_permissions`（`<all_urls>`）: ユーザーが任意のサイト上で要素を挿入できるようにします。
+
+### プロジェクト構成（抜粋）
+
+```text
+.
+├─ manifest.json
+├─ service_worker.js
+├─ content/
+│  ├─ app/
+│  │  ├─ content.js              # content script entry
+│  │  ├─ context.js              # shared runtime + state
+│  │  ├─ page-url.js             # URL normalisation for this frame
+│  │  ├─ hydration.js            # fetch + render elements per frame
+│  │  ├─ mutation-watcher.js     # DOM observer + registry reconcile
+│  │  ├─ autosave.js             # drag/placement autosave
+│  │  ├─ picker.js               # element picker wiring
+│  │  ├─ creation.js             # new element flows & area drops
+│  │  ├─ editor.js               # inline editor bubble & preview
+│  │  ├─ editing-mode.js         # edit-mode toggle behaviour
+│  │  ├─ frame.js                # frame matching helpers
+│  │  └─ highlight.js            # transient placement highlight
+│  ├─ inject.js                  # injection facade (registry wrappers)
+│  ├─ injection/
+│  │  ├─ core/
+│  │  │  ├─ constants.js         # host attributes, flow limits, z-indices
+│  │  │  ├─ registry.js          # in-page registry of elements + hosts
+│  │  │  ├─ flow-runner.js       # runtime executor for parsed flows
+│  │  │  └─ utils.js             # click forwarding, URL sanitisation
+│  │  ├─ host/                   # host node + Shadow DOM creation
+│  │  ├─ interactions/
+│  │  │  ├─ drag/                # drag behaviour + floating placement
+│  │  │  ├─ drop/                # DOM vs. area drop targets & previews
+│  │  │  └─ resize/              # resizable areas
+│  │  ├─ orchestrator/           # applyMetadata, insertion strategies
+│  │  └─ ui/                     # style application & tooltip helpers
+│  ├─ bubble/
+│  │  ├─ element-bubble.js       # lightweight in-page editor bubble
+│  │  ├─ editor/action-flow-controller.js
+│  │  ├─ actionflow/{builder,serializer,parser-bridge}.js
+│  │  └─ ...
+│  ├─ selector.js                # picker entry
+│  ├─ selector/                  # overlay + frame utilities
+│  └─ dist/content.js            # built content bundle
+├─ sidepanel/
+│  ├─ sidepanel.html
+│  ├─ dist/index.{js,css}        # built React side panel
+│  └─ src/                       # React app (App.jsx, hooks, components)
+├─ common/
+│  ├─ messaging.js               # shared messaging helpers
+│  ├─ storage.js                 # storage helpers for injected elements
+│  ├─ url.js                     # normalised page keys
+│  ├─ flows.js                   # flow parsing + normalisation
+│  └─ i18n/*.js                  # shared locale store & messages
+└─ docs/PRIVACY-POLICY.md        # standalone privacy policy text
+```
+
+### ランタイム構成の概要
+- **メッセージングレイヤー（`common/messaging.js`）**: `chrome.runtime.sendMessage` とポート接続をラップし、すべてのコンテキストが `{ ok, data | error }` 形式のペイロードで通信できるようにします。非同期ハンドラーは Promise ベースに正規化され、サイドパネル / バックグラウンド Service Worker / コンテントスクリプトのリクエストパターンを揃えます。
+- **永続ストア（`common/storage.js`）**: すべての挿入要素メタデータを単一の `injectedElements` キーに集約します。更新ヘルパーはスタイルやフレーム情報を含むペイロードをコピーし、`observePage` が `chrome.storage.onChanged` を URL ごとにファンアウトします。
+- **URL 正規化（`common/url.js`）**: クエリ文字列とハッシュを取り除いて安定したページキーを生成し、URL コンストラクターが利用できない環境では手動トリミングにフォールバックします。
+- **フロー解析（`common/flows.js`）**: アクションフロー JSON を検証し、省略記法を正規化し、ステップ数 / ループ回数 / 待機時間の上限を強制しつつ、エディターと Service Worker に人間が読めるエラーメッセージを返します。
+- **インジェクションレジストリ（`content/injection/core/registry.js`）**: 要素ディスクリプタと実際のホストノードを同時に追跡し、ホストの再利用・編集状態の切り替え（`data-*` 属性）・メタデータ変更時のホスト再構築を行います。
+- **ホスト & Shadow DOM（`content/injection/host/create-host.js`）**: ラッパー要素と Shadow DOM スキャフォールドを作成し、ボタン / リンク / ツールチップ / エリアの基本的な見た目とリサイズハンドル（エリア用）を適用します。
+- **インタラクション（`content/injection/interactions/*`）**: ドラッグ・ドロップ・リサイズなどの操作を提供し、ドラフト更新を自動保存レイヤーへ反映します。
+- **コンテンツランタイム（`content/app/*.js`）**: フレームごとに要素を復元し、ストレージ変更を監視し、ピッカーとエディターセッションを調整し、ドラッグ / リサイズ済みの位置を適用します。
+
+### プライバシーとストア掲載
+- `docs/PRIVACY-POLICY.md`: Chrome ウェブストアの「プライバシーポリシー URL」フィールドからリンクできるプライバシーポリシー本文です。
+
+### 既知の制限
+- 厳しい CSP を設定しているサイトでは、スクリプトやスタイルの挿入がブロックされる場合があります。
+- 拡張は同一オリジンの iframe のみを対象とします。
+- 非常に動的なページでは、一時的に挿入要素が上書きされることがありますが、オブザーバーにより再挿入されます。
+- アクションフローは最大 200 ステップ、50 回のループ、およそ 10 秒の実行時間に制限されており、制限を超えると強制的に停止します。
+
