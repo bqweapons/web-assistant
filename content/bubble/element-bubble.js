@@ -394,20 +394,19 @@ function createElementBubble() {
     t('editor.sections.basics.title'),
     t('editor.sections.basics.description'),
   );
-  basicSection.content.append(typeField.wrapper, textField.wrapper, hrefField.wrapper);
+  basicSection.content.append(
+    typeField.wrapper,
+    textField.wrapper,
+    hrefField.wrapper,
+    tooltipPositionField.wrapper,
+    tooltipPersistentField.wrapper,
+  );
 
   const behaviorSection = sectionsTabs.addSection(
     t('editor.sections.behavior.title'),
     t('editor.sections.behavior.description'),
   );
   behaviorSection.content.append(actionFlowSummaryField.wrapper);
-
-  const tooltipSection = sectionsTabs.addSection(
-    t('editor.sections.tooltip.title'),
-    t('editor.sections.tooltip.description'),
-  );
-  tooltipSection.content.append(tooltipPositionField.wrapper, tooltipPersistentField.wrapper);
-  tooltipSection.setVisible(false);
 
   // const placementSection = sectionsTabs.addSection(
   //   t('editor.sections.placement.title'),
@@ -575,7 +574,6 @@ function createElementBubble() {
     tooltipPositionSelect.disabled = !isTooltip;
     tooltipPersistentField.wrapper.style.display = isTooltip ? 'flex' : 'none';
     tooltipPersistentCheckbox.disabled = !isTooltip;
-    tooltipSection.setVisible(isTooltip);
 
     textInput.placeholder = isTooltip
       ? t('editor.tooltipTextPlaceholder')

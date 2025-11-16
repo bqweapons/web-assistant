@@ -25,10 +25,11 @@ export const VALID_TOOLTIP_POSITIONS = new Set(['top', 'right', 'bottom', 'left'
 
 export const DEFAULT_TOOLTIP_STYLE = {
   color: '#f8fafc',
-  backgroundColor: '#111827',
+  backgroundColor: 'rgba(17, 24, 39, 0.5)',
   fontSize: '14px',
   padding: '8px 12px',
   borderRadius: '12px',
+  width: 'max-content',
 };
 
 /**
@@ -42,4 +43,3 @@ export function getTooltipPositionOptions(t) {
     label: t(`tooltip.position.${value}`),
   }));
 }
-

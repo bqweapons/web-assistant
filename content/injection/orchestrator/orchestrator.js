@@ -420,11 +420,6 @@ function hydrateNode(node, element) {
       bubble.id = bubbleId;
       node.setAttribute('aria-describedby', bubbleId);
     }
-    const trigger = node.querySelector('.tooltip-trigger');
-    if (trigger instanceof HTMLElement) {
-      trigger.textContent = 'i';
-      trigger.setAttribute('aria-hidden', 'true');
-    }
     const normalizedPosition = normalizeTooltipPosition(element.tooltipPosition);
     configureTooltipPosition(node, bubble, normalizedPosition);
     const persistent = element.tooltipPersistent ? 'true' : 'false';
@@ -434,7 +429,6 @@ function hydrateNode(node, element) {
     node.tabIndex = 0;
     node.setAttribute('aria-label', element.text || 'tooltip');
     bindTooltipViewportGuards(node);
-    attachDragBehavior(node, element, getFloatingDragDeps());
     bindEditingEnhancements(node, element);
   } else if (element.type === 'area') {
     applyBaseAppearance(node, 'area');

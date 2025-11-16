@@ -7,11 +7,16 @@ export function applyStyle(node, style) {
   const whitelist = style || {};
   const nodeType = node.dataset?.nodeType || '';
   ALLOWED_STYLE_KEYS.forEach((key) => {
-    if (
-      nodeType === 'area' &&
-      (key === 'position' || key === 'top' || key === 'right' || key === 'bottom' || key === 'left' || key === 'zIndex')
-    ) {
+    const isPositionKey = key === 'position' || key === 'top' || key === 'right' || key === 'bottom' || key === 'left' || key === 'zIndex';
+    // Area/tooltip nodes never receive direct absolute positioning styles;
+    // their placement is handled by the host and tooltip layout helpers.
+    if ((nodeType === 'area' || nodeType === 'tooltip') && isPositionKey) {
       node.style.removeProperty(kebabCase(key));
+      return;
+    }
+    if (!Object.prototype.hasOwnProperty.call(whitelist, key)) {
+      // Leave existing/baseline styles intact when the style map does not
+      // declare an override for this key.
       return;
     }
     const value = whitelist[key];
