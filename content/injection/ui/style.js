@@ -37,7 +37,6 @@ export function applyBaseAppearance(node, type) {
     node.style.padding = '16px';
     node.style.borderRadius = '14px';
     node.style.backgroundColor = 'rgba(37, 99, 235, 0.12)';
-    node.style.border = '1px dashed rgba(37, 99, 235, 0.4)';
     node.style.position = 'relative';
     node.style.color = '#0f172a';
     node.style.lineHeight = '1.5';

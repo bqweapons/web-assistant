@@ -1,12 +1,12 @@
 import { getLocale, ready as i18nReady, subscribe as subscribeToLocale, t } from '../../common/i18n.js';
 import { parseActionFlowDefinition, MAX_FLOW_SOURCE_LENGTH } from '../../common/flows.js';
-import { DEFAULT_BUTTON_STYLE } from '../selector/types/button.js';
-import { DEFAULT_LINK_STYLE } from '../selector/types/link.js';
 import {
+  DEFAULT_BUTTON_STYLE,
+  DEFAULT_LINK_STYLE,
   DEFAULT_TOOLTIP_STYLE,
+  DEFAULT_AREA_STYLE,
   getTooltipPositionOptions as buildTooltipPositionOptions,
-} from '../selector/types/tooltip.js';
-import { DEFAULT_AREA_STYLE } from '../selector/types/area.js';
+} from './styles/style-presets.js';
 import { createField, styleInput, createSection } from './ui/field.js';
 import { createTabGroup } from './ui/tab-group.js';
 import { stepsToJSON } from './actionflow/serializer.js';
