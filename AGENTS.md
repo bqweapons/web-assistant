@@ -67,6 +67,7 @@ Agents represent the automation flows that Page Augmentor can execute when a use
 ## Developer Notes
 - Code locations
   - Flow runtime: `content/injection/core/flow-runner.js`
+  - Flow parser and limits: `common/flows.js`
   - Editor controller: `content/bubble/editor/action-flow-controller.js`
   - Builder UI and I/O: `content/bubble/actionflow/{builder,serializer,parser-bridge}.js`
   - Types: `content/common/types.js`

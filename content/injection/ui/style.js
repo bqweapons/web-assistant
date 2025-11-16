@@ -7,11 +7,16 @@ export function applyStyle(node, style) {
   const whitelist = style || {};
   const nodeType = node.dataset?.nodeType || '';
   ALLOWED_STYLE_KEYS.forEach((key) => {
-    if (
-      nodeType === 'area' &&
-      (key === 'position' || key === 'top' || key === 'right' || key === 'bottom' || key === 'left' || key === 'zIndex')
-    ) {
+    const isPositionKey = key === 'position' || key === 'top' || key === 'right' || key === 'bottom' || key === 'left' || key === 'zIndex';
+    // Area/tooltip nodes never receive direct absolute positioning styles;
+    // their placement is handled by the host and tooltip layout helpers.
+    if ((nodeType === 'area' || nodeType === 'tooltip') && isPositionKey) {
       node.style.removeProperty(kebabCase(key));
+      return;
+    }
+    if (!Object.prototype.hasOwnProperty.call(whitelist, key)) {
+      // Leave existing/baseline styles intact when the style map does not
+      // declare an override for this key.
       return;
     }
     const value = whitelist[key];
@@ -37,7 +42,6 @@ export function applyBaseAppearance(node, type) {
     node.style.padding = '16px';
     node.style.borderRadius = '14px';
     node.style.backgroundColor = 'rgba(37, 99, 235, 0.12)';
-    node.style.border = '1px dashed rgba(37, 99, 235, 0.4)';
     node.style.position = 'relative';
     node.style.color = '#0f172a';
     node.style.lineHeight = '1.5';

@@ -1,29 +1,44 @@
 import { NODE_CLASS, TOOLTIP_POSITIONS } from '../core/constants.js';
 import { normalizeTooltipPosition } from '../ui/style.js';
 
+/**
+ * Creates a fresh tooltip container element and applies base appearance.
+ * @returns {HTMLDivElement}
+ */
 export function createTooltipNode() {
   const container = document.createElement('div');
   applyTooltipAppearance(container);
   return container;
 }
 
+/**
+ * Applies base tooltip appearance to the given node.
+ * Ensures structural children (bubble) exist and data attributes are normalised.
+ * @param {HTMLElement} node
+ */
 export function applyTooltipAppearance(node) {
   if (!(node instanceof HTMLElement)) {
     return;
   }
   node.className = `${NODE_CLASS} tooltip`;
   node.dataset.nodeType = 'tooltip';
-  if (!TOOLTIP_POSITIONS.has(node.dataset.position || '')) {
+
+  const position = node.dataset.position || '';
+  if (!TOOLTIP_POSITIONS.has(position)) {
     node.dataset.position = 'top';
   }
-  if (node.dataset.persistent !== 'true' && node.dataset.persistent !== 'false') {
+
+  const persistent = node.dataset.persistent;
+  if (persistent !== 'true' && persistent !== 'false') {
     node.dataset.persistent = 'false';
   }
+
   node.setAttribute('data-position', node.dataset.position);
   node.setAttribute('data-persistent', node.dataset.persistent);
   node.setAttribute('role', 'group');
   node.tabIndex = 0;
 
+  // Ensure trigger icon exists for hover/focus target
   let trigger = node.querySelector('.tooltip-trigger');
   if (!(trigger instanceof HTMLElement)) {
     trigger = document.createElement('span');
@@ -42,6 +57,16 @@ export function applyTooltipAppearance(node) {
   bubble.setAttribute('role', 'tooltip');
 }
 
+// Active tooltip containers participating in viewport guards.
+const activeTooltipContainers = new Set();
+let tooltipGuardsBound = false;
+
+/**
+ * Updates container/bubble position attributes and clears inline offsets.
+ * @param {HTMLElement} container
+ * @param {HTMLElement | null} bubble
+ * @param {string | undefined} position
+ */
 export function configureTooltipPosition(container, bubble, position) {
   const normalized = normalizeTooltipPosition(position);
   container.dataset.position = normalized;
@@ -56,6 +81,10 @@ export function configureTooltipPosition(container, bubble, position) {
   }
 }
 
+/**
+ * Binds viewport guards for a tooltip container (scroll/resize + hover).
+ * @param {HTMLElement} container
+ */
 export function bindTooltipViewportGuards(container) {
   if (!(container instanceof HTMLElement)) {
     return;
@@ -65,29 +94,62 @@ export function bindTooltipViewportGuards(container) {
   }
   container.dataset.tooltipGuard = 'true';
 
-  const handler = () => adjustTooltipViewport(container);
-  const schedule = () => window.requestAnimationFrame(handler);
+  activeTooltipContainers.add(container);
+  ensureGlobalTooltipGuards();
+
+  const schedule = () => queueTooltipForAdjustment(container);
   container.addEventListener('mouseenter', schedule);
   container.addEventListener('focus', schedule);
   container.addEventListener('pointerdown', schedule);
-  window.addEventListener('scroll', schedule, { passive: true });
-  window.addEventListener('resize', schedule);
+}
+
+function ensureGlobalTooltipGuards() {
+  if (tooltipGuardsBound) {
+    return;
+  }
+  tooltipGuardsBound = true;
+
+  const scheduleAll = () => {
+    window.requestAnimationFrame(() => {
+      activeTooltipContainers.forEach((container) => {
+        adjustTooltipViewport(container);
+      });
+    });
+  };
+
+  window.addEventListener('scroll', scheduleAll, { passive: true });
+  window.addEventListener('resize', scheduleAll);
+}
+
+function queueTooltipForAdjustment(container) {
+  if (!(container instanceof HTMLElement)) {
+    return;
+  }
+  activeTooltipContainers.add(container);
+  window.requestAnimationFrame(() => adjustTooltipViewport(container));
 }
 
 function adjustTooltipViewport(container) {
   if (!(container instanceof HTMLElement)) {
     return;
   }
+  if (!container.isConnected) {
+    activeTooltipContainers.delete(container);
+    return;
+  }
+
   const bubble = container.querySelector('.tooltip-bubble');
   if (!(bubble instanceof HTMLElement)) {
     return;
   }
+
   const maxWidth = Math.min(320, Math.max(180, window.innerWidth - 32));
   bubble.style.maxWidth = `${maxWidth}px`;
 
   const margin = 16;
   const current = container.dataset.position || 'top';
   let desired = current;
+
   const rect = bubble.getBoundingClientRect();
 
   if (desired === 'right' && rect.right > window.innerWidth - margin) {
@@ -106,8 +168,3 @@ function adjustTooltipViewport(container) {
     configureTooltipPosition(container, bubble, desired);
   }
 }
-
-
-
-
-

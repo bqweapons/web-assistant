@@ -1,12 +1,12 @@
 import { getLocale, ready as i18nReady, subscribe as subscribeToLocale, t } from '../../common/i18n.js';
 import { parseActionFlowDefinition, MAX_FLOW_SOURCE_LENGTH } from '../../common/flows.js';
-import { DEFAULT_BUTTON_STYLE } from '../selector/types/button.js';
-import { DEFAULT_LINK_STYLE } from '../selector/types/link.js';
 import {
+  DEFAULT_BUTTON_STYLE,
+  DEFAULT_LINK_STYLE,
   DEFAULT_TOOLTIP_STYLE,
+  DEFAULT_AREA_STYLE,
   getTooltipPositionOptions as buildTooltipPositionOptions,
-} from '../selector/types/tooltip.js';
-import { DEFAULT_AREA_STYLE } from '../selector/types/area.js';
+} from './styles/style-presets.js';
 import { createField, styleInput, createSection } from './ui/field.js';
 import { createTabGroup } from './ui/tab-group.js';
 import { stepsToJSON } from './actionflow/serializer.js';
@@ -394,20 +394,19 @@ function createElementBubble() {
     t('editor.sections.basics.title'),
     t('editor.sections.basics.description'),
   );
-  basicSection.content.append(typeField.wrapper, textField.wrapper, hrefField.wrapper);
+  basicSection.content.append(
+    typeField.wrapper,
+    textField.wrapper,
+    hrefField.wrapper,
+    tooltipPositionField.wrapper,
+    tooltipPersistentField.wrapper,
+  );
 
   const behaviorSection = sectionsTabs.addSection(
     t('editor.sections.behavior.title'),
     t('editor.sections.behavior.description'),
   );
   behaviorSection.content.append(actionFlowSummaryField.wrapper);
-
-  const tooltipSection = sectionsTabs.addSection(
-    t('editor.sections.tooltip.title'),
-    t('editor.sections.tooltip.description'),
-  );
-  tooltipSection.content.append(tooltipPositionField.wrapper, tooltipPersistentField.wrapper);
-  tooltipSection.setVisible(false);
 
   // const placementSection = sectionsTabs.addSection(
   //   t('editor.sections.placement.title'),
@@ -575,7 +574,6 @@ function createElementBubble() {
     tooltipPositionSelect.disabled = !isTooltip;
     tooltipPersistentField.wrapper.style.display = isTooltip ? 'flex' : 'none';
     tooltipPersistentCheckbox.disabled = !isTooltip;
-    tooltipSection.setVisible(isTooltip);
 
     textInput.placeholder = isTooltip
       ? t('editor.tooltipTextPlaceholder')

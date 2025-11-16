@@ -11,6 +11,7 @@ import {
   dispatchUiUpdateFromHost,
 } from './core.js';
 import { NODE_CLASS } from '../../core/constants.js';
+import { registerThrottledPointerMove } from '../scheduler.js';
 
 /**
  * エリア要素に対してドラッグでの位置変更と浮動化を提供する。
@@ -39,7 +40,6 @@ export function attachAreaDragBehavior(node, element) {
   let movedSincePointerDown = false;
   let lastBubbleSide = 'right';
 
-  // ドラッグ中のポインタ移動に応じてホスト位置を更新する。
   const handleMove = (event) => {
     if (!dragging || pointerId !== event.pointerId) {
       return;
@@ -60,15 +60,16 @@ export function attachAreaDragBehavior(node, element) {
             if (h) dispatchUiUpdateFromHost(h, { bubbleSide: desired });
             lastBubbleSide = desired;
           }
-        } catch (_e) { }
+        } catch (_e) {}
       }
     }
-  const nextLeft = originLeft + (event.clientX - startX);
-  const nextTop = originTop + (event.clientY - startY);
-  setHostPosition(host, nextLeft, nextTop);
-};
+    const nextLeft = originLeft + (event.clientX - startX);
+    const nextTop = originTop + (event.clientY - startY);
+    setHostPosition(host, nextLeft, nextTop);
+  };
 
-  // ドラッグ終了後に浮動モードへ切り替え、ドラフト更新を送信する。
+  registerThrottledPointerMove(node, handleMove);
+
   const finalizeDrag = async () => {
     if (!dragging) {
       return;
@@ -106,8 +107,6 @@ export function attachAreaDragBehavior(node, element) {
     if (event.button !== 0 && event.button !== -1) {
       return;
     }
-    // If the pointerdown originated from a child injected node inside this area,
-    // let the child's own drag handler take over and do not start area dragging.
     try {
       const path = typeof event.composedPath === 'function' ? event.composedPath() : [];
       const interactedChildNode = Array.isArray(path)
@@ -118,9 +117,7 @@ export function attachAreaDragBehavior(node, element) {
       if (interactedChildNode) {
         return;
       }
-    } catch (_err) {
-      // Ignore composedPath issues; fall back to default behaviour.
-    }
+    } catch (_err) {}
     const host = getHostFromNode(node);
     if (!host || !isEditingAllowed(host)) {
       return;
@@ -141,7 +138,6 @@ export function attachAreaDragBehavior(node, element) {
     event.stopPropagation();
   });
 
-  node.addEventListener('pointermove', handleMove);
   node.addEventListener('pointerup', (event) => {
     if (event.pointerId === pointerId) {
       releasePointerCaptureSafe(node, pointerId);
@@ -154,7 +150,6 @@ export function attachAreaDragBehavior(node, element) {
     finalizeDrag();
   });
 
-  // Suppress click that follows a drag to avoid re-triggering the editor click handler
   node.addEventListener(
     'click',
     (event) => {
@@ -167,7 +162,4 @@ export function attachAreaDragBehavior(node, element) {
     true,
   );
 }
-
-
-
 

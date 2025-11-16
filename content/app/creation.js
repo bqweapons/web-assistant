@@ -255,7 +255,6 @@ function beginClickPlacement(requestedType) {
   };
 
   const handleKeyDown = (event) => {
-    console.log(event.key);
     if (event.key === 'Escape') {
       event.preventDefault();
       cleanup(true);
@@ -287,27 +286,16 @@ export function beginCreationSession(options = {}) {
   const drawer = selectorModule.startRectDraw({
     onComplete(rect) {
       const draft = buildDraftElement(requestedType);
-      let placementTarget = null;
-      let attachedToTarget = false;
-      if (requestedType !== 'area') {
-        placementTarget = resolvePlacementTargetFromRect(rect);
-        attachedToTarget = applyDraftPlacementToTarget(draft, placementTarget);
-        if (attachedToTarget && placementTarget) {
-          highlightPlacementTarget(placementTarget);
-        }
-      }
-      if (!attachedToTarget || requestedType === 'area') {
-        draft.style = {
-          ...(draft.style || {}),
-          position: 'absolute',
-          left: `${Math.max(0, rect.left)}px`,
-          top: `${Math.max(0, rect.top)}px`,
-          width: `${Math.max(24, rect.width)}px`,
-          height: `${Math.max(24, rect.height)}px`,
-          zIndex: (draft.style?.zIndex && String(draft.style.zIndex).trim()) || Z_INDEX_FLOATING_DEFAULT,
-        };
-        draft.floating = true;
-      }
+      draft.style = {
+        ...(draft.style || {}),
+        position: 'absolute',
+        left: `${Math.max(0, rect.left)}px`,
+        top: `${Math.max(0, rect.top)}px`,
+        width: `${Math.max(24, rect.width)}px`,
+        height: `${Math.max(24, rect.height)}px`,
+        zIndex: (draft.style?.zIndex && String(draft.style.zIndex).trim()) || Z_INDEX_FLOATING_DEFAULT,
+      };
+      draft.floating = true;
       const ensured = injectModule.ensureElement(draft);
       if (!ensured) {
         try {

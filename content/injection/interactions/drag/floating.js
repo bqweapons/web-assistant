@@ -9,6 +9,7 @@ import {
   dispatchDraftUpdateFromHost,
   dispatchUiUpdateFromHost,
 } from '../drag/core.js';
+import { registerThrottledPointerMove } from '../scheduler.js';
 
 /**
  * フローティング要素にドラッグ移動とドロップ先判定を付与する。
@@ -313,6 +314,8 @@ export function attachFloatingDragBehavior(node, element, deps) {
     deps.removeDropPreviewHost();
   };
 
+  registerThrottledPointerMove(node, handleMove);
+
   node.addEventListener('pointerdown', (event) => {
     if (event.button !== 0 && event.button !== -1) {
       return;
@@ -353,7 +356,6 @@ export function attachFloatingDragBehavior(node, element, deps) {
     }
   });
 
-  node.addEventListener('pointermove', handleMove);
   node.addEventListener('pointerup', (event) => {
     if (event.pointerId !== pointerId) {
       return;

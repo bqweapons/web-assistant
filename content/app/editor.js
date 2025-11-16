@@ -50,6 +50,11 @@ export function openEditorBubble(elementId) {
         pageUrl: runtime.pageUrl,
         updatedAt: Date.now(),
       };
+      // Reflect the latest payload into the local registry immediately so that
+      // subsequent editor openings see the saved state (e.g., tooltipPosition).
+      try {
+        injectModule.updateElement(payload);
+      } catch (_e) {}
       sendMessage(MessageType.UPDATE, payload).catch((error) =>
         console.error('[PageAugmentor] Failed to update element', error),
       );

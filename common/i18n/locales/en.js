@@ -186,7 +186,7 @@ const messages = {
     actionFlowLabel: 'Action flow (optional)',
     actionFlowPlaceholder: '[\n  {"type":"click","selector":"#target"}\n]',
     actionFlowHintDefault:
-      'Optional JSON array describing sequential steps (max {limit} chars). Supports click, wait, input, if, while, navigate.',
+      'Optional JSON array describing sequential steps (max {limit} chars, total runtime about 10 seconds). Supports click, wait, input, if, while, navigate.',
     actionFlowHintConfigured: 'Flow configured with {count} step(s).',
     actionFlowHintError: 'Flow error: {error}',
     actionFlowConfigure: 'Configure flow',

@@ -10,6 +10,40 @@ import { normalizePageUrl } from './common/url.js';
 
 const TOOLTIP_POSITIONS = new Set(['top', 'right', 'bottom', 'left']);
 const ELEMENT_TYPES = new Set(['button', 'link', 'tooltip', 'area']);
+/** @type {Map<string, Set<number>>} */
+const pageUrlTabIds = new Map();
+
+/**
+ * Tracks that a given tab is associated with a normalized page URL key.
+ * @param {number | undefined} tabId
+ * @param {string | undefined} pageUrl
+ */
+function trackTabForPageUrl(tabId, pageUrl) {
+  if (typeof tabId !== 'number' || !pageUrl) {
+    return;
+  }
+  const normalized = normalizePageUrl(pageUrl);
+  if (!normalized) {
+    return;
+  }
+  let tabSet = pageUrlTabIds.get(normalized);
+  if (!tabSet) {
+    tabSet = new Set();
+    pageUrlTabIds.set(normalized, tabSet);
+  }
+  tabSet.add(tabId);
+}
+
+// Clean up tab tracking when tabs are closed.
+if (chrome.tabs?.onRemoved) {
+  chrome.tabs.onRemoved.addListener((tabId) => {
+    for (const [pageUrl, tabSet] of pageUrlTabIds) {
+      if (tabSet.delete(tabId) && tabSet.size === 0) {
+        pageUrlTabIds.delete(pageUrl);
+      }
+    }
+  });
+}
 
 chrome.runtime.onInstalled.addListener(async () => {
   if (chrome.sidePanel?.setPanelBehavior) {
@@ -37,6 +71,9 @@ addAsyncMessageListener(async (message, sender) => {
       if (!pageUrl) {
         throw new Error('Missing pageUrl.');
       }
+      if (sender.tab?.id && pageUrl) {
+        trackTabForPageUrl(sender.tab.id, pageUrl);
+      }
       return getElementsByUrl(pageUrl);
     }
     case MessageType.LIST_ALL: {
@@ -56,7 +93,9 @@ addAsyncMessageListener(async (message, sender) => {
         element.updatedAt = Date.now();
       }
       const list = await upsertElement(element);
-      await broadcastState(element.pageUrl, list);
+      if (message.type === MessageType.CREATE) {
+        await broadcastState(element.pageUrl, list);
+      }
       return list;
     }
     case MessageType.DELETE: {
@@ -65,7 +104,7 @@ addAsyncMessageListener(async (message, sender) => {
         throw new Error('Missing element id or pageUrl.');
       }
       const list = await deleteElement(pageUrl, id);
-      await broadcastState(pageUrl, list);
+      await broadcastDelete(pageUrl, id);
       return list;
     }
     case MessageType.CLEAR_PAGE: {
@@ -314,14 +353,93 @@ function validateElementPayload(payload) {
  * @returns {Promise<void>}
  */
 async function broadcastState(pageUrl, elements) {
-  const tabs = await chrome.tabs.query({});
-  await Promise.allSettled(
-    tabs
-      .filter((tab) => tab.id && tab.url && normalizePageUrl(tab.url) === pageUrl)
-      .map((tab) => sendMessageToFrames(tab.id, { type: MessageType.REHYDRATE, pageUrl, data: elements })),
-  );
+  const normalized = normalizePageUrl(pageUrl);
+  if (!normalized) {
+    return;
+  }
+
+  /** @type {number[]} */
+  let targetTabIds = [];
+  const cached = pageUrlTabIds.get(normalized);
+  if (cached && cached.size > 0) {
+    targetTabIds = Array.from(cached);
+  } else {
+    const tabs = await chrome.tabs.query({});
+    const collected = [];
+    for (const tab of tabs) {
+      if (typeof tab.id !== 'number' || !tab.url) {
+        continue;
+      }
+      if (normalizePageUrl(tab.url) === normalized) {
+        collected.push(tab.id);
+      }
+    }
+    if (collected.length > 0) {
+      pageUrlTabIds.set(normalized, new Set(collected));
+      targetTabIds = collected;
+    }
+  }
+
+  if (targetTabIds.length > 0) {
+    await Promise.allSettled(
+      targetTabIds.map((tabId) =>
+        sendMessageToFrames(tabId, { type: MessageType.REHYDRATE, pageUrl: normalized, data: elements }),
+      ),
+    );
+  }
   try {
-    await chrome.runtime.sendMessage({ type: MessageType.REHYDRATE, pageUrl, data: elements });
+    await chrome.runtime.sendMessage({ type: MessageType.REHYDRATE, pageUrl: normalized, data: elements });
+  } catch (error) {
+    // ignore when no listeners are ready
+  }
+}
+
+/**
+ * Broadcasts a delete event to side panels and matching tabs.
+ * @param {string} pageUrl
+ * @param {string} elementId
+ * @returns {Promise<void>}
+ */
+async function broadcastDelete(pageUrl, elementId) {
+  const normalized = normalizePageUrl(pageUrl);
+  if (!normalized || !elementId) {
+    return;
+  }
+
+  const payload = { id: elementId, pageUrl: normalized };
+
+  /** @type {number[]} */
+  let targetTabIds = [];
+  const cached = pageUrlTabIds.get(normalized);
+  if (cached && cached.size > 0) {
+    targetTabIds = Array.from(cached);
+  } else {
+    const tabs = await chrome.tabs.query({});
+    const collected = [];
+    for (const tab of tabs) {
+      if (typeof tab.id !== 'number' || !tab.url) {
+        continue;
+      }
+      if (normalizePageUrl(tab.url) === normalized) {
+        collected.push(tab.id);
+      }
+    }
+    if (collected.length > 0) {
+      pageUrlTabIds.set(normalized, new Set(collected));
+      targetTabIds = collected;
+    }
+  }
+
+  if (targetTabIds.length > 0) {
+    await Promise.allSettled(
+      targetTabIds.map((tabId) =>
+        sendMessageToFrames(tabId, { type: MessageType.DELETE, pageUrl: normalized, data: payload }),
+      ),
+    );
+  }
+
+  try {
+    await chrome.runtime.sendMessage({ type: MessageType.DELETE, pageUrl: normalized, data: payload });
   } catch (error) {
     // ignore when no listeners are ready
   }

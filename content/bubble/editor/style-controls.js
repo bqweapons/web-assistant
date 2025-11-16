@@ -1,9 +1,11 @@
 import { createField, styleInput } from '../ui/field.js';
 import { getStyleFieldConfigs as buildStyleFieldConfigs } from '../styles/style-config.js';
 import { normalizeStyleState } from '../styles/style-normalize.js';
-import { DEFAULT_BUTTON_STYLE } from '../../selector/types/button.js';
-import { DEFAULT_LINK_STYLE } from '../../selector/types/link.js';
-import { DEFAULT_AREA_STYLE } from '../../selector/types/area.js';
+import {
+  DEFAULT_BUTTON_STYLE,
+  DEFAULT_LINK_STYLE,
+  DEFAULT_AREA_STYLE,
+} from '../styles/style-presets.js';
 
 const HEX_COLOR_PATTERN = /^#(?:[0-9a-fA-F]{3}|[0-9a-fA-F]{6})$/i;
 const ADVANCED_FIELDS = new Set(['position', 'top', 'right', 'bottom', 'left', 'zIndex', 'boxShadow']);
