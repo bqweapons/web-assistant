@@ -6,6 +6,7 @@ import {
   dispatchDraftUpdateFromHost,
   dispatchUiUpdateFromHost,
 } from '../drag/core.js';
+import { registerThrottledWindowPointerMove } from '../scheduler.js';
 
 export function attachResizeBehavior(node, element, host) {
   if (!(node instanceof HTMLElement) || !(host instanceof HTMLElement)) {
@@ -39,6 +40,7 @@ export function attachResizeBehavior(node, element, host) {
   let originWidth = 0;
   let originHeight = 0;
   const MIN_SIZE = 24;
+  let disposeMove = null;
 
   const startResize = (event, edge) => {
     if (!(event instanceof PointerEvent)) return;
@@ -55,7 +57,7 @@ export function attachResizeBehavior(node, element, host) {
     startY = event.clientY;
     setPointerCaptureSafe(node, pointerId);
     dispatchUiUpdateFromHost(host, { bubbleSide: 'left' });
-    window.addEventListener('pointermove', handleResizeMove, true);
+    disposeMove = registerThrottledWindowPointerMove(handleResizeMove);
     window.addEventListener('pointerup', handleResizeUp, true);
     event.preventDefault();
     event.stopPropagation();
@@ -105,7 +107,10 @@ export function attachResizeBehavior(node, element, host) {
   const handleResizeUp = (event) => {
     if (!resizing || event.pointerId !== pointerId) return;
     releasePointerCaptureSafe(node, pointerId);
-    window.removeEventListener('pointermove', handleResizeMove, true);
+    if (typeof disposeMove === 'function') {
+      disposeMove();
+      disposeMove = null;
+    }
     window.removeEventListener('pointerup', handleResizeUp, true);
     resizing = false;
     pointerId = null;

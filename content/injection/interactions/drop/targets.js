@@ -1,5 +1,6 @@
 import { HOST_ATTRIBUTE, NODE_CLASS } from '../../core/constants.js';
 import { generateSelector } from '../../../selector/utils.js';
+import { shouldAllowDomDrop } from '../scheduler.js';
 
 const VOID_ELEMENT_TAGS = new Set([
   'AREA',
@@ -118,6 +119,9 @@ export function resolveDomDropPlacement(target, clientX, clientY) {
     return null;
   }
   if (target.closest(`[${HOST_ATTRIBUTE}]`)) {
+    return null;
+  }
+  if (!shouldAllowDomDrop(target)) {
     return null;
   }
   if (target === document.documentElement) {
