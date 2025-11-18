@@ -2,7 +2,7 @@
 const messages = {
   app: {
     title: 'Page Augmentor',
-    subtitle: 'Create custom UI for this page and review saved elements everywhere.',
+    subtitle: 'Create no-code buttons, links, and tooltips for any page and manage every call-to-action from a unified side panel.',
     language: {
       label: 'Language',
     },
