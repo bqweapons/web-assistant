@@ -75,9 +75,9 @@ mergeMessages(messages, {
     actions: {
       addElement: '要素を追加',
       cancel: 'キャンセル',
-      export: 'データをエクスポート',
+      export: 'エクスポート',
       exporting: 'エクスポート中…',
-      import: 'データをインポート',
+      import: 'インポート',
       importing: 'インポート中…',
       editModeEnable: '編集モードを開始',
       editModeDisable: '編集モードを終了',
@@ -157,6 +157,18 @@ mergeMessages(messages, {
         title: '環境設定',
         description: 'サイドパネルで使用する言語を選択します。',
       },
+      share: {
+        title: 'Page Augmentor を共有',
+        description: 'Chrome ウェブストアのリンクを共有して、チームメンバーや友人にも拡張機能をインストールしてもらいましょう。',
+      },
+    },
+    actions: {
+      share: 'Page Augmentor を共有',
+      shareCopy: 'ストアのリンクをコピー',
+      shareOpen: 'Chrome ウェブストアを開く',
+    },
+    share: {
+      copied: 'ウェブストアのリンクをクリップボードにコピーしました。',
     },
   },
   editor: {

@@ -109,6 +109,10 @@ export function removeElement(elementId) {
 export function reconcileElements() {
   // キャッシュ済みの全要素について ensureElement を呼び出し、DOM 上の齟齬を解消する。
   for (const element of elements.values()) {
+    const host = getHost(element.id);
+    if (host && host.isConnected) {
+      continue;
+    }
     ensureElement(element);
   }
 }

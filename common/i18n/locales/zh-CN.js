@@ -157,6 +157,18 @@ mergeMessages(messages, {
         title: '偏好',
         description: '选择侧边栏使用的语言。',
       },
+      share: {
+        title: '分享 Page Augmentor',
+        description: '把 Chrome 网上应用店的链接发给同事或朋友，让他们也能安装这个扩展。',
+      },
+    },
+    actions: {
+      share: '分享 Page Augmentor',
+      shareCopy: '复制商店链接',
+      shareOpen: '打开 Chrome 网上应用店页面',
+    },
+    share: {
+      copied: '已将商店链接复制到剪贴板。',
     },
   },
   editor: {

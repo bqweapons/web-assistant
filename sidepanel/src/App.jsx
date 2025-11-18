@@ -281,6 +281,21 @@ export default function App() {
       .sort((a, b) => b.createdAt - a.createdAt);
   }, [filterText, filterType, items]);
 
+  const groupedByPageUrl = useMemo(() => {
+    const groups = new Map();
+    filteredItems.forEach((item) => {
+      const key = (item && item.pageUrl) || pageUrl || '';
+      if (!key) {
+        return;
+      }
+      if (!groups.has(key)) {
+        groups.set(key, []);
+      }
+      groups.get(key).push(item);
+    });
+    return Array.from(groups.entries()).sort(([a], [b]) => a.localeCompare(b));
+  }, [filteredItems, pageUrl]);
+
   const handleExport = useCallback(async () => {
     setExporting(true);
     try {
@@ -416,6 +431,17 @@ export default function App() {
     [pageUrl, tabId],
   );
 
+  const openPageUrl = useCallback((targetUrl) => {
+    if (!targetUrl) {
+      return;
+    }
+    try {
+      chrome.tabs.create({ url: targetUrl, active: true });
+    } catch (_error) {
+      // ignore
+    }
+  }, []);
+
   const toggleEditingMode = useCallback(async () => {
     if (!tabId) {
       setCreationMessage(createMessage('context.tabUnavailable'));
@@ -436,18 +462,35 @@ export default function App() {
     }
   }, [editingMode, pageUrl, tabId]);
 
+  const storeUrl =
+    'https://chromewebstore.google.com/detail/page-augmentor/nefpepdpcjejamkgpndlfehkffkfgbpe';
+
+  const handleShareCopy = useCallback(async () => {
+    try {
+      if (navigator.clipboard && typeof navigator.clipboard.writeText === 'function') {
+        await navigator.clipboard.writeText(storeUrl);
+        setCreationMessage(createMessage('settings.share.copied', { url: storeUrl }));
+      } else {
+        chrome.tabs.create({ url: storeUrl, active: true });
+      }
+    } catch (_error) {
+      chrome.tabs.create({ url: storeUrl, active: true });
+    }
+  }, []);
+
+  const handleShareOpen = useCallback(() => {
+    try {
+      chrome.tabs.create({ url: storeUrl, active: true });
+    } catch (_error) {
+      // ignore
+    }
+  }, []);
+
   const contextLabelText = contextInfo?.kind === 'url' ? contextInfo.value : t(contextInfo.key, contextInfo.values);
   const statusMessageText = creationMessage ? t(creationMessage.key, creationMessage.values) : '';
 
   return (
     <main className="flex min-h-screen flex-col gap-6 bg-slate-50 p-6">
-      <header className="rounded-2xl border border-slate-200 bg-white p-5 shadow-brand">
-        <div className="space-y-1">
-          <h1 className="text-2xl font-semibold text-slate-900">{t('app.title')}</h1>
-          <p className="text-sm text-slate-500">{t('app.subtitle')}</p>
-          <p className="text-xs text-slate-400">{contextLabelText}</p>
-        </div>
-      </header>
 
       <nav className="flex gap-2 rounded-2xl border border-slate-200 bg-white p-1 shadow-brand">
         {tabs.map((tab) => {
@@ -553,18 +596,54 @@ export default function App() {
           </section>
 
           <section className="grid gap-4">
-            <ItemList
-              items={filteredItems}
-              t={t}
-              typeLabels={typeLabels}
-              formatTimestamp={formatTimestamp}
-              formatFrameSummary={formatFrameSummary}
-              formatTooltipPosition={formatTooltipPosition}
-              formatTooltipMode={formatTooltipMode}
-              onFocus={focusElement}
-              onOpenEditor={openEditorBubble}
-              onDelete={deleteElement}
-            />
+            {groupedByPageUrl.length === 0 ? (
+              <ItemList
+                items={[]}
+                t={t}
+                typeLabels={typeLabels}
+                formatTimestamp={formatTimestamp}
+                formatFrameSummary={formatFrameSummary}
+                formatTooltipPosition={formatTooltipPosition}
+                formatTooltipMode={formatTooltipMode}
+                onFocus={focusElement}
+                onOpenEditor={openEditorBubble}
+                onDelete={deleteElement}
+                showActions
+              />
+            ) : (
+              groupedByPageUrl.map(([groupPageUrl, groupItems]) => (
+                <article key={groupPageUrl} className="space-y-3 rounded-2xl border border-slate-200 bg-white p-4 shadow-brand">
+                  <header className="flex items-center justify-between gap-2">
+                    <div className="min-w-0 space-y-1">
+                      <h3 className="break-all text-sm font-semibold text-slate-900">{groupPageUrl}</h3>
+                      <p className="text-xs text-slate-500">
+                        {t('overview.pageSummary', { count: groupItems.length })}
+                      </p>
+                    </div>
+                    <button
+                      type="button"
+                      className="mt-1 rounded-lg bg-blue-50 px-3 py-1.5 text-xs font-semibold text-blue-700 transition hover:bg-blue-100 md:mt-0"
+                      onClick={() => openPageUrl(groupPageUrl)}
+                    >
+                      {t('overview.openPage')}
+                    </button>
+                  </header>
+                  <ItemList
+                    items={groupItems}
+                    t={t}
+                    typeLabels={typeLabels}
+                    formatTimestamp={formatTimestamp}
+                    formatFrameSummary={formatFrameSummary}
+                    formatTooltipPosition={formatTooltipPosition}
+                    formatTooltipMode={formatTooltipMode}
+                    onFocus={focusElement}
+                    onOpenEditor={openEditorBubble}
+                    onDelete={deleteElement}
+                    showActions
+                  />
+                </article>
+              ))
+            )}
           </section>
         </>
       )}
@@ -638,6 +717,33 @@ export default function App() {
                 ))}
               </select>
             </label>
+          </section>
+          
+          <section className="rounded-2xl border border-slate-200 bg-gradient-to-r from-slate-900 via-slate-800 to-slate-900 p-5 shadow-brand">
+            <header className="space-y-2 text-white">
+              <h3 className="text-base font-semibold">
+                {t('settings.sections.share.title')}
+              </h3>
+              <p className="text-sm text-slate-200">
+                {t('settings.sections.share.description')}
+              </p>
+            </header>
+            <div className="mt-4 flex flex-wrap gap-3">
+              <button
+                type="button"
+                className="rounded-xl bg-white px-4 py-2 text-sm font-semibold text-slate-900 shadow-sm transition hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-60"
+                onClick={handleShareCopy}
+              >
+                {t('settings.actions.shareCopy')}
+              </button>
+              <button
+                type="button"
+                className="rounded-xl border border-slate-400 bg-transparent px-4 py-2 text-sm font-semibold text-slate-100 shadow-sm transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-60"
+                onClick={handleShareOpen}
+              >
+                {t('settings.actions.shareOpen')}
+              </button>
+            </div>
           </section>
         </section>
       )}

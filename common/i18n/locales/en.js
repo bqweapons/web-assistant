@@ -122,6 +122,7 @@ const messages = {
   },
   overview: {
     heading: 'All saved elements',
+    description: 'Review saved elements grouped by site and page.',
     pageCount: {
       label: 'Pages',
     },
@@ -157,6 +158,18 @@ const messages = {
         title: 'Preferences',
         description: 'Choose your preferred language for the side panel.',
       },
+      share: {
+        title: 'Share Page Augmentor',
+        description: 'Send the Chrome Web Store link to teammates or friends so they can install the extension.',
+      },
+    },
+    actions: {
+      share: 'Share Page Augmentor',
+      shareCopy: 'Copy Web Store link',
+      shareOpen: 'Open Chrome Web Store page',
+    },
+    share: {
+      copied: 'Copied the Web Store link to your clipboard.',
     },
   },
   editor: {
