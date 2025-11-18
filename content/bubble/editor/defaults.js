@@ -13,6 +13,8 @@ export function getDefaultElementValues(values = {}, suggestedStyle = {}, t) {
     values.type === 'link' ? 'link' : values.type === 'tooltip' ? 'tooltip' : values.type === 'area' ? 'area' : 'button';
   const text = typeof values.text === 'string' ? values.text : '';
   const href = typeof values.href === 'string' ? values.href : '';
+  const layout = values.layout === 'column' ? 'column' : 'row';
+  const linkTarget = values.linkTarget === 'same-tab' || values.linkTarget === 'new-tab' ? values.linkTarget : 'new-tab';
   const actionFlow = typeof values.actionFlow === 'string' ? values.actionFlow : '';
   const position = resolvePosition(values.position);
   const tooltipPosition = resolveTooltipPosition(values.tooltipPosition);
@@ -53,6 +55,8 @@ export function getDefaultElementValues(values = {}, suggestedStyle = {}, t) {
     type,
     text,
     href,
+    layout,
+    linkTarget,
     actionFlow,
     position,
     tooltipPosition,

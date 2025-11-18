@@ -37,12 +37,35 @@ export function setupMutationWatcher() {
     if (isInsideAugmentorUi(el)) return false;
     try {
       if (el.matches(HOST_SELECTOR)) return true;
-    } catch (_e) {}
+    } catch (_e) {
+      // ignore selector errors
+    }
     try {
       return Boolean(el.querySelector(HOST_SELECTOR));
     } catch (_e) {
+      // ignore selector errors
       return false;
     }
+  }
+
+  /**
+   * Determines whether a mutation involving the given element is relevant
+   * for host reconciliation. Any DOM changes outside the augmentor UI are
+   * treated as relevant so that SPA-style view updates can restore hosts
+   * even when the original host subtree was removed earlier.
+   * @param {Element} el
+   * @returns {boolean}
+   */
+  function isRelevantMutationElement(el) {
+    if (!(el instanceof Element)) {
+      return false;
+    }
+    if (isInsideAugmentorUi(el)) {
+      return false;
+    }
+    // Always treat non-UI DOM additions/removals as relevant to support SPA
+    // routers that replace view containers without our hosts present yet.
+    return true;
   }
 
   const observer = new MutationObserver((records) => {
@@ -52,7 +75,7 @@ export function setupMutationWatcher() {
       if (record.type !== 'childList') continue;
       // Added nodes
       for (const node of record.addedNodes || []) {
-        if (isElement(node) && elementContainsHost(node)) {
+        if (isElement(node) && (elementContainsHost(node) || isRelevantMutationElement(node))) {
           relevant = true;
           break;
         }
@@ -60,7 +83,7 @@ export function setupMutationWatcher() {
       if (relevant) break;
       // Removed nodes (disconnected subtree)
       for (const node of record.removedNodes || []) {
-        if (isElement(node) && elementContainsHost(node)) {
+        if (isElement(node) && (elementContainsHost(node) || isRelevantMutationElement(node))) {
           relevant = true;
           break;
         }

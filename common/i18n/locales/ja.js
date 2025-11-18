@@ -1,14 +1,15 @@
 import enMessages from './en.js';
 import { cloneMessages, mergeMessages } from '../utils.js';
 
-// 英語辞書をベースに日本語の差分をマージしたロケール定義。
-// 英語と同じキー構造を保ちながら、文言だけを日本語向けに上書きしている。
+// 英語メッセージをベースにした日本語ロケール定義。
+// enMessages と同じキー構造を維持しつつ、文言だけを日本語向けに上書きします。
 const messages = cloneMessages(enMessages);
 
 mergeMessages(messages, {
   app: {
     title: 'Page Augmentor',
-    subtitle: 'このページ向けのカスタム UI を作成し、保存した要素をどこからでも確認できます。',
+    subtitle:
+      'あらゆるページにノーコードでボタン・リンク・ツールチップを追加し、すべての CTA をサイドパネルから一元管理できます。',
     language: {
       label: '言語',
     },
@@ -32,7 +33,7 @@ mergeMessages(messages, {
       selectedWithPreview: '{preview} を選択しました。',
       selected: 'ターゲットを選択しました。',
       cancelled: '選択をキャンセルしました。',
-      instructions: 'ページ上の要素をクリックして選択します。',
+      instructions: 'ページ上の任意の要素をクリックして選択します。',
       startError: 'ピッカーを開始できませんでした: {error}',
     },
     delete: {
@@ -45,7 +46,7 @@ mergeMessages(messages, {
       error: 'データをエクスポートできませんでした: {error}',
     },
     import: {
-      success: '{pages} ページ分の {elements} 個の要素を取り込みました。',
+      success: '{pages} ページから {elements} 個の要素をインポートしました。',
       error: 'データをインポートできませんでした: {error}',
     },
     focusError: '要素にフォーカスできませんでした: {error}',
@@ -56,7 +57,7 @@ mergeMessages(messages, {
     sections: {
       add: {
         title: '要素を追加',
-        description: '追加したい種類を選んで、ページ上の好きな場所に配置できます。',
+        description: '要素タイプを選択して、ページ上の好きな位置に配置します。',
         typeLabel: '要素タイプ',
       },
       filters: {
@@ -75,15 +76,15 @@ mergeMessages(messages, {
     actions: {
       addElement: '要素を追加',
       cancel: 'キャンセル',
-      export: 'データをエクスポート',
+      export: 'エクスポート',
       exporting: 'エクスポート中…',
-      import: 'データをインポート',
+      import: 'インポート',
       importing: 'インポート中…',
-      editModeEnable: '編集モードを開始',
+      editModeEnable: '編集モードに入る',
       editModeDisable: '編集モードを終了',
     },
     editMode: {
-      hint: 'すべての注入要素をハイライトし、ドラッグやクリックで直接編集できます。',
+      hint: '注入されたすべての要素をハイライトし、ドラッグやクリックで直接編集できます。',
       enabled: '編集モードを有効にしました。ページ上の要素をクリックすると編集バブルが開きます。',
       disabled: '編集モードを終了しました。',
       error: '編集モードを切り替えられませんでした: {error}',
@@ -92,18 +93,24 @@ mergeMessages(messages, {
       started: 'ページ上に配置できる状態になりました。',
       error: '要素の準備に失敗しました: {error}',
     },
-    empty: '条件に一致する要素がありません。',
+    empty: '現在の条件に一致する要素はありません。',
     item: {
       noText: '（テキストなし）',
-      actionSelector: 'クリック先: {selector}',
+      actionSelector: 'クリックを転送: {selector}',
       actionFlow: 'フローを設定済み（{steps} ステップ）',
       frameContext: 'フレーム: {frame}',
-      frameFallback: '名称未設定のフレーム',
+      frameFallback: '名称未設定フレーム',
       tooltipDetails: '配置: {position} / {mode}',
       focus: 'フォーカス',
       openBubble: 'バブルを開く',
       delete: '削除',
     },
+  },
+  type: {
+    button: 'ボタン',
+    link: 'リンク',
+    tooltip: 'ツールチップ',
+    area: 'エリア',
   },
   tooltip: {
     position: {
@@ -121,7 +128,8 @@ mergeMessages(messages, {
     previewTarget: 'ターゲット要素',
   },
   overview: {
-    heading: '保存済みの要素一覧',
+    heading: '保存済み要素一覧',
+    description: 'サイトとページごとにグループ化された保存要素を確認できます。',
     pageCount: {
       label: 'ページ',
     },
@@ -135,28 +143,41 @@ mergeMessages(messages, {
     openPage: 'ページを開く',
     clearPage: 'ページをクリア',
     clearConfirm: 'このページに保存されたすべての要素を削除しますか？',
-    clearSuccess: 'ページ内の要素をすべて削除しました。',
+    clearSuccess: 'このページの要素をすべて削除しました。',
     clearError: 'ページをクリアできませんでした: {error}',
     deleteConfirm: 'この要素を削除しますか？',
     deleteSuccess: '要素を削除しました。',
     deleteError: '要素を削除できませんでした: {error}',
     focusError: '要素にフォーカスできませんでした: {error}',
-    openBubbleError: 'バブルを開けませんでした: {error}',
-    openedNewTab: '新しいタブを開きました。サイドパネルを手動で開いてから再度お試しください。',
+    openBubbleError: '編集バブルを開けませんでした: {error}',
+    openedNewTab: '新しいタブを開きました。サイドパネルを手動で開いてから、もう一度お試しください。',
     statusLoadError: 'データを読み込めませんでした: {error}',
   },
   settings: {
     heading: '設定',
-    description: '環境設定と保存済み要素を管理します。',
+    description: '環境設定を管理し、保存済み要素を整理します。',
     sections: {
       data: {
         title: 'データ管理',
-        description: '保存した要素を JSON としてインポート／エクスポートします。',
+        description: '保存した要素を JSON ファイルとしてインポート/エクスポートします。',
       },
       preferences: {
         title: '環境設定',
         description: 'サイドパネルで使用する言語を選択します。',
       },
+      share: {
+        title: 'Page Augmentor を共有',
+        description:
+          'Chrome ウェブストアのリンクを共有して、チームメンバーや友人にもこの拡張機能をインストールしてもらいましょう。',
+      },
+    },
+    actions: {
+      share: 'Page Augmentor を共有',
+      shareCopy: 'ストアリンクをコピー',
+      shareOpen: 'Chrome ウェブストアを開く',
+    },
+    share: {
+      copied: 'ウェブストアのリンクをクリップボードにコピーしました。',
     },
   },
   editor: {
@@ -167,35 +188,45 @@ mergeMessages(messages, {
     previewLabel: 'ライブプレビュー',
     typeLabel: '要素タイプ',
     textLabel: 'テキスト',
-    textPlaceholder: '表示するテキスト',
+    textPlaceholder: '訪問者に表示するテキスト',
     tooltipTextPlaceholder: 'ツールチップのテキスト',
     areaTextPlaceholder: 'このエリアに表示するメモ（任意）',
+    areaLayoutLabel: 'レイアウト',
+    areaLayout: {
+      horizontal: '左から右',
+      vertical: '上から下',
+    },
     hrefLabel: 'リンク URL',
     hrefOptionalLabel: '任意の URL',
     hrefTooltipLabel: 'リンク URL',
     hrefPlaceholder: 'https://example.com',
     hrefOptionalPlaceholder: 'https://example.com（任意）',
-    hrefTooltipPlaceholder: 'ツールチップには URL は不要です',
+    hrefTooltipPlaceholder: 'この要素には URL は不要です',
+    linkTargetLabel: 'リンクの開き方',
+    linkTarget: {
+      newTab: '新しいタブで開く',
+      sameTab: '現在のタブで開く',
+    },
     actionLabel: 'クリック先（任意）',
     actionPlaceholder: '例: #submit-button',
     actionPick: 'ページから取得',
     actionCancel: '選択をキャンセル',
-    actionHintDefault: '既存のボタンを選択すると、そのクリック動作を再利用できます。',
+    actionHintDefault: '既存のボタンを選択して、そのクリック動作を再利用できます。',
     actionHintSelected: 'クリックは「{selector}」へ転送されます。',
     actionHintPicking: 'コピーしたいボタンをクリックしてください（Esc でキャンセル）。',
     actionFlowLabel: 'アクションフロー（任意）',
     actionFlowPlaceholder: '[\n  {"type":"click","selector":"#target"}\n]',
     actionFlowHintDefault:
-      'JSON 配列で連続する手順を記述します（最大 {limit} 文字）。click / wait / input / if / while / navigate に対応します。',
-    actionFlowHintConfigured: '{count} ステップで構成されたフローです。',
-    actionFlowHintError: 'フローのエラー: {error}',
+      '連続する手順を JSON 配列として記述します（最大 {limit} 文字、合計実行時間はおよそ 10 秒）。click / wait / input / if / while / navigate に対応します。',
+    actionFlowHintConfigured: '{count} ステップのフローが設定されています。',
+    actionFlowHintError: 'フローエラー: {error}',
     actionFlowConfigure: 'フローを設定',
-    actionFlowSummaryUnavailable: 'アクションフローはボタンでのみ利用できます。',
-    actionFlowSummaryError: 'フローのエラー: {error}',
-    actionFlowSummaryConfigured: 'フローを設定済み（{count} ステップ）',
+    actionFlowSummaryUnavailable: 'アクションフローはボタンにのみ設定できます。',
+    actionFlowSummaryError: 'フローエラー: {error}',
+    actionFlowSummaryConfigured: 'アクションフローを設定済み（{count} ステップ）',
     actionFlowSummaryEmpty: 'アクションフローはまだ設定されていません。',
     actionFlowTitle: 'アクションフローを設定',
-    actionFlowDescription: '訪問者がボタンをクリックしたときに実行される処理を定義します。',
+    actionFlowDescription: '訪問者がこのボタンをクリックしたときに実行する一連の処理を定義します。',
     tooltipPositionLabel: 'ツールチップの配置',
     tooltipPersistenceLabel: '表示方法',
     tooltipPersistenceCheckbox: '常に表示する',
@@ -204,12 +235,12 @@ mergeMessages(messages, {
     actionBuilder: {
       add: 'ステップを追加',
       empty: 'まだステップがありません。「ステップを追加」をクリックしてフローを組み立てましょう。',
-      advancedNotice: 'このフローは高度な設定を含みます。下の JSON を直接編集してください。',
-      typeLabel: 'ステップの種類',
+      advancedNotice: 'このフローには高度な設定が含まれます。下の JSON を直接編集してください。',
+      typeLabel: 'ステップ種類',
       selectorLabel: 'ターゲットセレクター',
       selectorPlaceholder: '対象要素の CSS セレクター',
-      valueLabel: '入力する内容',
-      valuePlaceholder: '入力テキスト',
+      valueLabel: '入力内容',
+      valuePlaceholder: '入力するテキスト',
       delayLabel: '待機時間（ミリ秒）',
       pick: '要素を選択',
       remove: '削除',
@@ -227,15 +258,15 @@ mergeMessages(messages, {
     sections: {
       basics: {
         title: '基本情報',
-        description: '要素タイプと表示テキストを選択します。',
+        description: '要素タイプと、訪問者に表示するテキストを設定します。',
       },
       behavior: {
         title: '動作とアクション',
-        description: 'リンク先、クリック転送、任意のフローを設定します。',
+        description: 'リンク先・クリック転送・任意のフローを設定します。',
       },
       tooltip: {
         title: 'ツールチップ設定',
-        description: '訪問者へどのように表示するかを決めます。',
+        description: '訪問者にどのように表示するかを決めます。',
       },
       placement: {
         title: '配置',
@@ -243,21 +274,40 @@ mergeMessages(messages, {
       },
       appearance: {
         title: '外観',
-        description: '色や余白などのスタイルを調整します。',
+        description: '色・余白などのスタイルを調整します。',
       },
     },
     stylesLegend: 'スタイル設定',
-    stylesHint: '空欄の項目は既定値が使用されます。',
-    stylesAdvancedToggle: '詳細設定',
-    stylesAdvancedHint: '位置や重なり順などを調整できます。',
+    stylesHint: 'プリセットを選ぶか、個別に調整します。空欄の項目は既定値が使われます。',
+    stylesAdvancedToggle: '詳細スタイルオプション',
+    stylesAdvancedHint: '位置・シャドウなどのレイアウト詳細を調整できます。',
     styles: {
       color: '文字色',
       backgroundColor: '背景色',
+      customCss: 'カスタム CSS',
+      position: 'CSS の position',
+      top: '上オフセット',
+      right: '右オフセット',
+      bottom: '下オフセット',
+      left: '左オフセット',
+      zIndex: 'Z-index',
+      width: '幅',
+      height: '高さ',
+      boxShadow: 'シャドウ',
       fontSize: 'フォントサイズ',
       fontWeight: 'フォントの太さ',
       padding: 'パディング',
-      borderRadius: '角丸',
-      textDecoration: '文字装飾',
+      border: 'ボーダー',
+      borderRadius: '角の丸み',
+      presetsLabel: 'プリセットスタイル',
+      presets: {
+        custom: 'カスタム',
+        primary: 'プライマリーボタン',
+        outline: 'アウトラインボタン',
+        floating: 'フローティングカード',
+        link: 'リンク',
+        area: 'エリアパネル',
+      },
     },
     cancel: 'キャンセル',
     save: '保存',
@@ -265,10 +315,12 @@ mergeMessages(messages, {
     saveUpdate: '変更を保存',
     errorTextRequired: '要素に表示するテキストを入力してください。',
     errorUrlRequired: 'リンクタイプには URL が必要です。',
+    errorActionRequiredForUrl: 'URL 付きのボタンにはアクションフローが必要です。',
     errorFlowInvalid: 'アクションフローが無効です: {error}',
     previewButton: 'ボタンのプレビュー',
     previewLink: 'リンクのプレビュー',
     previewTooltip: 'ツールチップのプレビュー',
+    previewArea: 'エリアのプレビュー',
   },
   position: {
     append: '末尾に追加',
@@ -279,3 +331,4 @@ mergeMessages(messages, {
 });
 
 export default messages;
+

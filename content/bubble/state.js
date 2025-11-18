@@ -5,6 +5,8 @@ const DEFAULT_STATE = {
   position: 'append',
   selector: '',
   style: {},
+   layout: 'row',
+   linkTarget: 'new-tab',
   containerId: '',
   floating: true,
   bubbleSide: 'right',
@@ -81,6 +83,8 @@ function mergeState(base, patch) {
   next.floating = typeof patch.floating === 'boolean' ? patch.floating : base.floating;
   next.bubbleSide = typeof patch.bubbleSide === 'string' ? patch.bubbleSide : base.bubbleSide;
   next.selector = typeof patch.selector === 'string' ? patch.selector : base.selector;
+  next.layout = typeof patch.layout === 'string' ? patch.layout : base.layout;
+  next.linkTarget = typeof patch.linkTarget === 'string' ? patch.linkTarget : base.linkTarget;
   return next;
 }
 
@@ -116,5 +120,7 @@ function cloneState(value) {
     actionSteps: cloneArray(value.actionSteps),
     tooltipPosition: value.tooltipPosition,
     tooltipPersistent: Boolean(value.tooltipPersistent),
+    layout: value.layout === 'column' ? 'column' : 'row',
+    linkTarget: value.linkTarget === 'same-tab' || value.linkTarget === 'new-tab' ? value.linkTarget : 'new-tab',
   };
 }

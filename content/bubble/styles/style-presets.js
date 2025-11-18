@@ -13,7 +13,7 @@ export const DEFAULT_LINK_STYLE = {
 };
 
 export const DEFAULT_AREA_STYLE = {
-  backgroundColor: 'rgba(37, 99, 235, 0.12)',
+  backgroundColor: 'transparent',
   color: '#0f172a',
   padding: '16px',
   borderRadius: '14px',

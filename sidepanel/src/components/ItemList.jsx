@@ -1,5 +1,6 @@
 import React from 'react';
 import { summarizeFlow } from '../utils/messages.js';
+import { FocusIcon, TrashIcon } from './Icons.jsx';
 
 export function ItemList({
   items,
@@ -12,6 +13,7 @@ export function ItemList({
   onFocus,
   onOpenEditor,
   onDelete,
+  showActions = true,
 }) {
   if (items.length === 0) {
     return (
@@ -21,77 +23,82 @@ export function ItemList({
     );
   }
 
-  return items.map((item) => {
-    const frameInfo = formatFrameSummary(item);
-    const flowSummary = summarizeFlow(item.actionFlow);
+  return (
+    <div className="grid auto-rows-fr grid-cols-[repeat(auto-fill,minmax(180px,1fr))] gap-4">
+      {items.map((item) => {
+        const frameInfo = formatFrameSummary(item);
+        const flowSummary = summarizeFlow(item.actionFlow);
 
-    return (
-      <article
-        key={item.id}
-        className="rounded-2xl border border-slate-200 bg-white p-5 shadow-brand transition hover:cursor-pointer hover:border-blue-200 hover:shadow-xl"
-        onClick={() => onOpenEditor(item.id)}
-      >
-        <header className="flex flex-wrap items-center justify-between gap-3">
-          <span className="inline-flex items-center rounded-full bg-indigo-100 px-3 py-1 text-xs font-semibold uppercase tracking-wide text-indigo-700">
-            {typeLabels[item.type] || item.type}
-          </span>
-          <time className="text-xs text-slate-500">{formatTimestamp(item.createdAt)}</time>
-        </header>
-        <p className="mt-3 text-base font-medium text-slate-900">{item.text || t('manage.item.noText')}</p>
-        <p className="mt-2 break-all text-xs text-slate-500">{item.selector}</p>
-        {item.href && <p className="mt-1 break-all text-xs text-blue-600">{item.href}</p>}
-        {item.actionSelector && (
-          <p className="mt-1 break-all text-xs text-emerald-600">
-            {t('manage.item.actionSelector', { selector: item.actionSelector })}
-          </p>
-        )}
-        {flowSummary?.steps ? (
-          <p className="mt-1 break-all text-xs text-emerald-600">
-            {t('manage.item.actionFlow', { steps: flowSummary.steps })}
-          </p>
-        ) : null}
-        {frameInfo && <p className="mt-1 break-all text-xs text-purple-600">{frameInfo}</p>}
-        {item.type === 'tooltip' && (
-          <p className="mt-1 break-all text-xs text-amber-600">
-            {t('manage.item.tooltipDetails', {
-              position: formatTooltipPosition(item.tooltipPosition),
-              mode: formatTooltipMode(item.tooltipPersistent),
-            })}
-          </p>
-        )}
-        <footer className="mt-4 flex flex-wrap gap-3">
-          <button
-            type="button"
-            className="rounded-lg bg-blue-50 px-3 py-2 text-sm font-semibold text-blue-700 transition hover:bg-blue-100"
-            onClick={(event) => {
-              event.stopPropagation();
-              onFocus(item.id);
-            }}
+        return (
+          <article
+            key={item.id}
+            className="flex h-full flex-col justify-between rounded-2xl border border-slate-200 bg-white p-4 shadow-brand transition hover:cursor-pointer hover:border-blue-200 hover:shadow-xl"
+            onClick={() => onOpenEditor(item.id)}
           >
-            {t('manage.item.focus')}
-          </button>
-          <button
-            type="button"
-            className="rounded-lg bg-slate-100 px-3 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-200"
-            onClick={(event) => {
-              event.stopPropagation();
-              onOpenEditor(item.id);
-            }}
-          >
-            {t('manage.item.openBubble')}
-          </button>
-          <button
-            type="button"
-            className="rounded-lg bg-rose-100 px-3 py-2 text-sm font-semibold text-rose-700 transition hover:bg-rose-200"
-            onClick={(event) => {
-              event.stopPropagation();
-              onDelete(item.id);
-            }}
-          >
-            {t('manage.item.delete')}
-          </button>
-        </footer>
-      </article>
-    );
-  });
+            <header className="flex items-center justify-between gap-2">
+              <span className="inline-flex items-center rounded-full bg-indigo-100 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-indigo-700">
+                {typeLabels[item.type] || item.type}
+              </span>
+              {showActions && onFocus && onDelete && (
+                <div className="flex gap-1.5">
+                  <button
+                    type="button"
+                    className="inline-flex h-7 w-7 items-center justify-center rounded-full text-blue-600 transition hover:bg-slate-100 hover:text-blue-700"
+                    aria-label={t('manage.item.focus')}
+                    onClick={(event) => {
+                      event.stopPropagation();
+                      onFocus(item.id);
+                    }}
+                  >
+                    <FocusIcon className="h-4 w-4" />
+                    <span className="sr-only">{t('manage.item.focus')}</span>
+                  </button>
+                  <button
+                    type="button"
+                    className="inline-flex h-7 w-7 items-center justify-center rounded-full text-rose-500 transition hover:bg-slate-100 hover:text-rose-600"
+                    aria-label={t('manage.item.delete')}
+                    onClick={(event) => {
+                      event.stopPropagation();
+                      onDelete(item.id);
+                    }}
+                  >
+                    <TrashIcon className="h-4 w-4" />
+                    <span className="sr-only">{t('manage.item.delete')}</span>
+                  </button>
+                </div>
+              )}
+            </header>
+            <div className="mt-2 flex-1 space-y-1 overflow-hidden text-xs">
+              <p className="line-clamp-2 text-sm font-medium text-slate-900">
+                {item.text || t('manage.item.noText')}
+              </p>
+              {item.href && <p className="line-clamp-1 break-all text-[11px] text-blue-600">{item.href}</p>}
+              {item.actionSelector && (
+                <p className="line-clamp-1 break-all text-[11px] text-emerald-600">
+                  {t('manage.item.actionSelector', { selector: item.actionSelector })}
+                </p>
+              )}
+              {flowSummary?.steps ? (
+                <p className="line-clamp-1 break-all text-[11px] text-emerald-600">
+                  {t('manage.item.actionFlow', { steps: flowSummary.steps })}
+                </p>
+              ) : null}
+              {frameInfo && <p className="line-clamp-1 break-all text-[11px] text-purple-600">{frameInfo}</p>}
+              {item.type === 'tooltip' && (
+                <p className="line-clamp-1 break-all text-[11px] text-amber-600">
+                  {t('manage.item.tooltipDetails', {
+                    position: formatTooltipPosition(item.tooltipPosition),
+                    mode: formatTooltipMode(item.tooltipPersistent),
+                  })}
+                </p>
+              )}
+            </div>
+            <footer className="mt-3 flex items-center justify-start text-[11px] text-slate-500">
+              <time>{formatTimestamp(item.createdAt)}</time>
+            </footer>
+          </article>
+        );
+      })}
+    </div>
+  );
 }

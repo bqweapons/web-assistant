@@ -324,6 +324,16 @@ function validateElementPayload(payload) {
     delete element.actionSelector;
     delete element.actionFlow;
   }
+  if (element.type === 'area') {
+    element.layout = element.layout === 'column' ? 'column' : 'row';
+  } else {
+    delete element.layout;
+  }
+  if (element.type === 'link' && element.href) {
+    element.linkTarget = element.linkTarget === 'same-tab' ? 'same-tab' : 'new-tab';
+  } else {
+    delete element.linkTarget;
+  }
   if (element.containerId) {
     element.floating = false;
   }

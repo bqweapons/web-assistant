@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
-  "name": "Page Augmentor",
-  "version": "1.0.0",
-  "description": "Add custom buttons and links to any webpage and manage them from a side panel.",
+  "name": "Page Augmentor: no-code buttons, links and tooltips",
+  "version": "1.0.1",
+  "description": "Create no-code buttons, links and tooltips on any page, personalize calls-to-action, and manage everything from a unified side panel.",
   "action": {
     "default_title": "Open Page Augmentor"
   },
@@ -34,3 +34,4 @@
     "128": "assets/icon128.png"
   }
 }
+

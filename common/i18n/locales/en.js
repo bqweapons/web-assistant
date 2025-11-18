@@ -2,7 +2,7 @@
 const messages = {
   app: {
     title: 'Page Augmentor',
-    subtitle: 'Create custom UI for this page and review saved elements everywhere.',
+    subtitle: 'Create no-code buttons, links, and tooltips for any page and manage every call-to-action from a unified side panel.',
     language: {
       label: 'Language',
     },
@@ -122,6 +122,7 @@ const messages = {
   },
   overview: {
     heading: 'All saved elements',
+    description: 'Review saved elements grouped by site and page.',
     pageCount: {
       label: 'Pages',
     },
@@ -157,6 +158,18 @@ const messages = {
         title: 'Preferences',
         description: 'Choose your preferred language for the side panel.',
       },
+      share: {
+        title: 'Share Page Augmentor',
+        description: 'Send the Chrome Web Store link to teammates or friends so they can install the extension.',
+      },
+    },
+    actions: {
+      share: 'Share Page Augmentor',
+      shareCopy: 'Copy Web Store link',
+      shareOpen: 'Open Chrome Web Store page',
+    },
+    share: {
+      copied: 'Copied the Web Store link to your clipboard.',
     },
   },
   editor: {
@@ -170,12 +183,22 @@ const messages = {
     textPlaceholder: 'Element text',
     tooltipTextPlaceholder: 'Tooltip text',
     areaTextPlaceholder: 'Optional notes for this area',
+    areaLayoutLabel: 'Layout',
+    areaLayout: {
+      horizontal: 'Left to right',
+      vertical: 'Top to bottom',
+    },
     hrefLabel: 'Link URL',
     hrefOptionalLabel: 'Optional URL',
     hrefTooltipLabel: 'Link URL',
     hrefPlaceholder: 'https://example.com',
     hrefOptionalPlaceholder: 'https://example.com (optional)',
     hrefTooltipPlaceholder: 'This element does not use a URL',
+    linkTargetLabel: 'Open link in',
+    linkTarget: {
+      newTab: 'New tab',
+      sameTab: 'Current tab',
+    },
     actionLabel: 'Click action (optional)',
     actionPlaceholder: 'e.g. #submit-button',
     actionPick: 'Capture from page',

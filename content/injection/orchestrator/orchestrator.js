@@ -343,11 +343,9 @@ function createNodeForType(type) {
   }
   if (type === 'area') {
     const wrapper = document.createElement('div');
-    const header = document.createElement('div');
-    header.className = 'page-augmentor-area-header';
     const content = document.createElement('div');
     content.className = 'page-augmentor-area-content';
-    wrapper.append(header, content);
+    wrapper.append(content);
     return wrapper;
   }
   const button = document.createElement('button');
@@ -392,13 +390,30 @@ function hydrateNode(node, element) {
     if (sanitized) {
       node.setAttribute('href', sanitized);
       node.setAttribute('rel', 'noopener noreferrer');
-      node.setAttribute('target', '_blank');
+      const targetMode = element.linkTarget === 'same-tab' ? 'same-tab' : 'new-tab';
+      const domTarget = targetMode === 'same-tab' ? '_self' : '_blank';
+      node.setAttribute('target', domTarget);
     } else {
       node.removeAttribute('href');
+      node.removeAttribute('target');
     }
     delete node.dataset.href;
     delete node.dataset.actionSelector;
-    node.onclick = null;
+    if (sanitized && element.linkTarget === 'same-tab') {
+      node.onclick = (event) => {
+        event.preventDefault();
+        event.stopPropagation();
+        try {
+          window.location.replace(element.href);
+        } catch (_e) {
+          try {
+            window.location.assign(sanitized);
+          } catch (__e) {}
+        }
+      };
+    } else {
+      node.onclick = null;
+    }
     node.removeAttribute('aria-describedby');
     attachDragBehavior(node, element, getFloatingDragDeps());
     bindEditingEnhancements(node, element);
@@ -439,15 +454,14 @@ function hydrateNode(node, element) {
     node.style.touchAction = 'none';
     attachDragBehavior(node, element, getFloatingDragDeps());
     node.dataset.areaId = element.id;
-    const header = node.querySelector('.page-augmentor-area-header');
-    if (header instanceof HTMLElement) {
-      const textValue = element.text || '';
-      header.textContent = textValue;
-      header.style.display = textValue ? 'block' : 'none';
-    }
     const content = node.querySelector('.page-augmentor-area-content');
     if (content instanceof HTMLElement) {
       content.dataset.areaContent = element.id;
+      const layout = element.layout === 'column' ? 'column' : 'row';
+      content.style.display = 'flex';
+      content.style.flexDirection = layout;
+      content.style.flexWrap = layout === 'row' ? 'wrap' : 'nowrap';
+      content.style.alignItems = 'flex-start';
     }
     const hostElement = getHostFromNode(node);
     if (hostElement) {
@@ -481,8 +495,7 @@ function bindEditingEnhancements(node, element) {
   // Inline text editing for simple types
   const resolveEditableNode = () => {
     if (element.type === 'area') {
-      const header = node.querySelector('.page-augmentor-area-header');
-      return header instanceof HTMLElement ? header : null;
+      return null;
     }
     return node;
   };

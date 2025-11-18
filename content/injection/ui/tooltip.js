@@ -146,25 +146,5 @@ function adjustTooltipViewport(container) {
   const maxWidth = Math.min(320, Math.max(180, window.innerWidth - 32));
   bubble.style.maxWidth = `${maxWidth}px`;
 
-  const margin = 16;
-  const current = container.dataset.position || 'top';
-  let desired = current;
-
-  const rect = bubble.getBoundingClientRect();
-
-  if (desired === 'right' && rect.right > window.innerWidth - margin) {
-    desired = 'left';
-  } else if (desired === 'left' && rect.left < margin) {
-    desired = 'right';
-  }
-
-  if (desired === 'top' && rect.top < margin) {
-    desired = 'bottom';
-  } else if (desired === 'bottom' && rect.bottom > window.innerHeight - margin) {
-    desired = 'top';
-  }
-
-  if (desired !== current) {
-    configureTooltipPosition(container, bubble, desired);
-  }
+  // Keep tooltip placement fixed to the configured position.
 }

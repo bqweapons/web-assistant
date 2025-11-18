@@ -10,17 +10,15 @@ import { applyStyle, getStyleTarget, createTooltipNode, applyBaseAppearance } fr
 function createNodeForType(type) {
   if (type === 'link') {
     return document.createElement('a');
-  }
+ }
   if (type === 'tooltip') {
     return createTooltipNode();
   }
   if (type === 'area') {
     const wrapper = document.createElement('div');
-    const header = document.createElement('div');
-    header.className = 'page-augmentor-area-header';
     const content = document.createElement('div');
     content.className = 'page-augmentor-area-content';
-    wrapper.append(header, content);
+    wrapper.append(content);
     return wrapper;
   }
   const button = document.createElement('button');
@@ -138,13 +136,10 @@ export function createHost(element) {
       cursor: grabbing;
       opacity: 0.96;
     }
-    .${NODE_CLASS}[data-node-type='area'] .page-augmentor-area-header {
-      font-weight: 600;
-      font-size: 0.95rem;
-    }
     .${NODE_CLASS}[data-node-type='area'] .page-augmentor-area-content {
       display: flex;
-      flex-direction: column;
+      flex-direction: row;
+      flex-wrap: wrap;
       gap: 0.5rem;
       /* Prevent children from stretching to full width */
       align-items: flex-start;

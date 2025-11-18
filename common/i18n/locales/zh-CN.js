@@ -1,14 +1,14 @@
 import enMessages from './en.js';
 import { cloneMessages, mergeMessages } from '../utils.js';
 
-// 英語辞書を基に簡体字中国語へ翻訳したロケール定義。
-// clone + merge でキー構造を共有しつつ、表現のみをローカライズしている。
+// 简体中文本地化，基于英文消息结构进行克隆再覆盖。
+// 保持与 enMessages 相同的键结构，只替换为更适合中文用户的表述。
 const messages = cloneMessages(enMessages);
 
 mergeMessages(messages, {
   app: {
     title: '页面增强器',
-    subtitle: '为此页面定制界面，并在任意位置查看已保存的元素。',
+    subtitle: '为任意网页添加自定义按钮、链接和提示，并在侧边栏集中管理所有增强元素。',
     language: {
       label: '语言',
     },
@@ -27,16 +27,16 @@ mergeMessages(messages, {
     focusRequiresActivation: '请先激活该标签页，然后再定位元素。',
   },
   manage: {
-    loadError: '加载元素失败：{error}',
+    loadError: '无法加载元素：{error}',
     picker: {
       selectedWithPreview: '已选择 {preview}。',
       selected: '已选择目标。',
       cancelled: '已取消选择。',
-      instructions: '点击页面上的任意元素以完成选择。',
+      instructions: '点击页面上的任意元素即可完成选择。',
       startError: '无法启动取数器：{error}',
     },
     delete: {
-      confirm: '确认删除该元素？',
+      confirm: '确定删除该元素？',
       success: '元素已删除。',
       error: '删除元素失败：{error}',
     },
@@ -45,7 +45,7 @@ mergeMessages(messages, {
       error: '导出数据失败：{error}',
     },
     import: {
-      success: '已导入 {pages} 个页面的 {elements} 个元素。',
+      success: '已在 {pages} 个页面中导入 {elements} 个元素。',
       error: '导入数据失败：{error}',
     },
     focusError: '无法定位到该元素：{error}',
@@ -62,7 +62,7 @@ mergeMessages(messages, {
       filters: {
         searchLabel: '搜索',
         searchPlaceholder: '可按文本、选择器或 URL 过滤',
-        filterLabel: '过滤',
+        filterLabel: '过滤条件',
         options: {
           all: '全部',
           button: '按钮',
@@ -79,17 +79,17 @@ mergeMessages(messages, {
       exporting: '正在导出…',
       import: '导入数据',
       importing: '正在导入…',
-      editModeEnable: '编辑模式',
+      editModeEnable: '进入编辑模式',
       editModeDisable: '退出编辑模式',
     },
     editMode: {
-      hint: '高亮所有已注入的元素，可直接拖动并点击进入编辑。',
+      hint: '高亮所有已注入的元素，可直接拖动并点击进行编辑。',
       enabled: '已开启编辑模式。在页面上点击任意元素即可打开编辑气泡。',
       disabled: '已退出编辑模式。',
       error: '无法切换编辑模式：{error}',
     },
     creation: {
-      started: '元素已准备好，请在页面上摆放。',
+      started: '元素已就绪，请在页面上摆放位置。',
       error: '无法准备元素：{error}',
     },
     empty: '当前筛选条件下没有匹配的元素。',
@@ -105,6 +105,12 @@ mergeMessages(messages, {
       delete: '删除',
     },
   },
+  type: {
+    button: '按钮',
+    link: '链接',
+    tooltip: '提示',
+    area: '区域',
+  },
   tooltip: {
     position: {
       top: '上方',
@@ -114,14 +120,15 @@ mergeMessages(messages, {
     },
     mode: {
       persistent: '始终显示',
-      hover: '悬停或聚焦时显示',
+      hover: '悬停/聚焦时显示',
     },
   },
   picker: {
-    previewTarget: '选取的目标',
+    previewTarget: '目标元素',
   },
   overview: {
     heading: '全部已保存元素',
+    description: '按站点和页面分组查看所有已保存的元素。',
     pageCount: {
       label: '页面',
     },
@@ -133,78 +140,100 @@ mergeMessages(messages, {
     empty: '尚未保存任何元素。',
     pageSummary: '{count} 个元素',
     openPage: '打开页面',
-    clearPage: '清空页面',
+    clearPage: '清除页面',
     clearConfirm: '确定删除该页面下保存的所有元素？',
-    clearSuccess: '已清空该页面的全部元素。',
-    clearError: '清空页面失败：{error}',
-    deleteConfirm: '确认删除该元素？',
+    clearSuccess: '已清除该页面的全部元素。',
+    clearError: '清除页面失败：{error}',
+    deleteConfirm: '确定删除该元素？',
     deleteSuccess: '元素已删除。',
     deleteError: '删除元素失败：{error}',
     focusError: '定位元素失败：{error}',
     openBubbleError: '打开编辑气泡失败：{error}',
-    openedNewTab: '已打开新标签页。请手动打开侧边栏后再试。',
+    openedNewTab: '已打开新标签页。请先手动打开侧边栏后再试一次。',
     statusLoadError: '数据加载失败：{error}',
   },
   settings: {
     heading: '设置',
-    description: '管理偏好并整理已保存的元素。',
+    description: '管理偏好设置并整理已保存的元素。',
     sections: {
       data: {
         title: '数据管理',
-        description: '以 JSON 文件导入或导出保存的元素。',
+        description: '以 JSON 文件形式导入或导出保存的元素。',
       },
       preferences: {
         title: '偏好',
-        description: '选择侧边栏使用的语言。',
+        description: '选择侧边栏使用的界面语言。',
       },
+      share: {
+        title: '分享 Page Augmentor',
+        description: '把 Chrome 应用商店链接发给同事或朋友，让他们也能安装这个扩展。',
+      },
+    },
+    actions: {
+      share: '分享 Page Augmentor',
+      shareCopy: '复制商店链接',
+      shareOpen: '打开 Chrome 应用商店页面',
+    },
+    share: {
+      copied: '已将商店链接复制到剪贴板。',
     },
   },
   editor: {
     title: '配置元素',
-    titleCreate: '新增元素',
+    titleCreate: '添加元素',
     titleEdit: '编辑元素',
     selectorLabel: '目标选择器',
     previewLabel: '实时预览',
     typeLabel: '元素类型',
     textLabel: '文本',
-    textPlaceholder: '显示给访客的文本',
+    textPlaceholder: '展示给访客的文本',
     tooltipTextPlaceholder: '提示文本',
-    areaTextPlaceholder: '可在区域中展示的备注（可选）',
+    areaTextPlaceholder: '可在区域中展示的备注内容（可选）',
+    areaLayoutLabel: '布局',
+    areaLayout: {
+      horizontal: '从左到右',
+      vertical: '从上到下',
+    },
     hrefLabel: '链接地址',
     hrefOptionalLabel: '可选链接地址',
     hrefTooltipLabel: '链接地址',
     hrefPlaceholder: 'https://example.com',
     hrefOptionalPlaceholder: 'https://example.com（可选）',
-    hrefTooltipPlaceholder: '提示无需填写链接地址',
-    actionLabel: '点击后转发（可选）',
-    actionPlaceholder: '示例：#submit-button',
+    hrefTooltipPlaceholder: '此元素不使用链接地址',
+    linkTargetLabel: '链接打开方式',
+    linkTarget: {
+      newTab: '在新标签页中打开',
+      sameTab: '在当前标签页中打开',
+    },
+    actionLabel: '点击动作（可选）',
+    actionPlaceholder: '例如：#submit-button',
     actionPick: '从页面捕获',
     actionCancel: '取消选取',
-    actionHintDefault: '选取已有按钮即可复用其点击逻辑。',
-    actionHintSelected: '点击事件将转发到 “{selector}”。',
+    actionHintDefault: '选取已有按钮即可复用其点击行为。',
+    actionHintSelected: '点击将会转发到 “{selector}”。',
     actionHintPicking: '点击要复用的按钮（按 Esc 取消）。',
     actionFlowLabel: '动作流程（可选）',
     actionFlowPlaceholder: '[\n  {"type":"click","selector":"#target"}\n]',
     actionFlowHintDefault:
-      '使用 JSON 数组描述连续步骤（最多 {limit} 个字符）。支持 click、wait、input、if、while、navigate。',
+      '可选：使用 JSON 数组描述连续步骤（最多 {limit} 个字符，总执行时间约 10 秒）。支持 click、wait、input、if、while、navigate。',
     actionFlowHintConfigured: '已配置 {count} 个步骤的流程。',
     actionFlowHintError: '流程错误：{error}',
     actionFlowConfigure: '配置流程',
-    actionFlowSummaryUnavailable: '仅按钮支持动作流程。',
+    actionFlowSummaryUnavailable: '仅按钮类型支持配置动作流程。',
     actionFlowSummaryError: '流程错误：{error}',
-    actionFlowSummaryConfigured: '已配置流程（{count} 个步骤）',
+    actionFlowSummaryConfigured: '已配置动作流程（{count} 个步骤）',
     actionFlowSummaryEmpty: '尚未配置动作流程。',
     actionFlowTitle: '配置动作流程',
     actionFlowDescription: '定义访客点击按钮后要执行的一系列操作。',
     tooltipPositionLabel: '提示位置',
     tooltipPersistenceLabel: '显示方式',
     tooltipPersistenceCheckbox: '始终显示提示',
-    tooltipPersistenceHint: '关闭后仅在悬停或聚焦时显示提示。',
+    tooltipPersistenceHint: '关闭后，仅在悬停或聚焦时显示提示。',
     positionLabel: '插入位置',
     actionBuilder: {
       add: '新增步骤',
       empty: '暂未添加任何步骤。点击“新增步骤”开始构建流程。',
-      advancedNotice: '该流程包含高级特性，请直接编辑下方 JSON。',
+      advancedNotice: '该流程包含高级特性，请在下方直接编辑 JSON。',
       typeLabel: '步骤类型',
       selectorLabel: '目标选择器',
       selectorPlaceholder: '请输入目标元素的 CSS 选择器',
@@ -215,13 +244,13 @@ mergeMessages(messages, {
       remove: '移除',
       type: {
         click: '点击元素',
-        input: '填写输入框',
+        input: '填写输入',
         wait: '等待',
       },
       error: {
         selector: '第 {index} 步需要提供选择器。',
         value: '第 {index} 步需要提供输入文本。',
-        delay: '第 {index} 步的等待时长需为非负数。',
+        delay: '第 {index} 步的等待时长必须为非负数。',
       },
     },
     sections: {
@@ -231,7 +260,7 @@ mergeMessages(messages, {
       },
       behavior: {
         title: '行为与动作',
-        description: '配置跳转链接、点击转发以及可选流程。',
+        description: '配置跳转链接、点击转发以及可选的动作流程。',
       },
       tooltip: {
         title: '提示选项',
@@ -243,21 +272,40 @@ mergeMessages(messages, {
       },
       appearance: {
         title: '外观样式',
-        description: '调整颜色、间距与其他视觉参数。',
+        description: '微调颜色、间距和其他视觉样式。',
       },
     },
     stylesLegend: '样式设置',
-    stylesHint: '留空则使用默认样式。',
-    stylesAdvancedToggle: '高级样式选项',
-    stylesAdvancedHint: '在这里微调位置、阴影等布局细节。',
+    stylesHint: '可选择预设或单独调整各项字段；留空则使用默认样式。',
+    stylesAdvancedToggle: '高级 CSS 选项',
+    stylesAdvancedHint: '在这里微调定位、阴影等布局细节。',
     styles: {
       color: '文字颜色',
       backgroundColor: '背景颜色',
+      customCss: '自定义 CSS',
+      position: 'CSS 定位方式',
+      top: '上边距偏移',
+      right: '右边距偏移',
+      bottom: '下边距偏移',
+      left: '左边距偏移',
+      zIndex: '层级（z-index）',
+      width: '宽度',
+      height: '高度',
+      boxShadow: '阴影',
       fontSize: '字体大小',
       fontWeight: '字体粗细',
       padding: '内边距',
+      border: '边框',
       borderRadius: '圆角',
-      textDecoration: '文字修饰',
+      presetsLabel: '预设样式',
+      presets: {
+        custom: '自定义',
+        primary: '主要按钮',
+        outline: '描边按钮',
+        floating: '浮动卡片',
+        link: '链接样式',
+        area: '区域面板',
+      },
     },
     cancel: '取消',
     save: '保存',
@@ -265,10 +313,12 @@ mergeMessages(messages, {
     saveUpdate: '保存修改',
     errorTextRequired: '请输入元素文本。',
     errorUrlRequired: '链接类型需要填写 URL。',
+    errorActionRequiredForUrl: '带 URL 的按钮需要配置动作流程。',
     errorFlowInvalid: '动作流程无效：{error}',
     previewButton: '按钮预览',
     previewLink: '链接预览',
     previewTooltip: '提示预览',
+    previewArea: '区域预览',
   },
   position: {
     append: '追加到末尾',
@@ -279,3 +329,4 @@ mergeMessages(messages, {
 });
 
 export default messages;
+

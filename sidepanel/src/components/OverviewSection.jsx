@@ -1,7 +1,9 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { MessageType, sendMessage } from '../../../common/messaging.js';
-import { createMessage, summarizeFlow } from '../utils/messages.js';
+import { createMessage } from '../utils/messages.js';
 import { ensureTab, findTabByPageUrl } from '../utils/tabs.js';
+import { ItemList } from './ItemList.jsx';
+import { RefreshIcon, ClearPageIcon } from './Icons.jsx';
 
 export function OverviewSection({
   t,
@@ -14,10 +16,45 @@ export function OverviewSection({
   const [store, setStore] = useState({});
   const [loading, setLoading] = useState(false);
   const [status, setStatus] = useState(null);
-  const [expandedPages, setExpandedPages] = useState(() => new Set());
+  const [expandedSites, setExpandedSites] = useState(() => new Set());
 
-  const entries = useMemo(() => Object.entries(store).sort(([a], [b]) => a.localeCompare(b)), [store]);
-  const totalElements = entries.reduce((total, [, items]) => total + (items?.length || 0), 0);
+  const siteGroups = useMemo(() => {
+    /** @type {Array<{ siteKey: string; pages: Array<{ pageUrl: string; items: any[] }> }>} */
+    const result = [];
+    const siteMap = new Map();
+    Object.entries(store || {}).forEach(([siteKey, items]) => {
+      const pageMap = siteMap.get(siteKey) || new Map();
+      if (!siteMap.has(siteKey)) {
+        siteMap.set(siteKey, pageMap);
+      }
+      (items || []).forEach((item) => {
+        if (!item) return;
+        const pageUrl = item.pageUrl || siteKey;
+        if (!pageMap.has(pageUrl)) {
+          pageMap.set(pageUrl, []);
+        }
+        pageMap.get(pageUrl).push(item);
+      });
+    });
+    Array.from(siteMap.entries())
+      .sort(([a], [b]) => a.localeCompare(b))
+      .forEach(([siteKey, pageMap]) => {
+        const pages = Array.from(pageMap.entries())
+          .map(([pageUrl, items]) => ({
+            pageUrl,
+            items: items.slice().sort((a, b) => b.createdAt - a.createdAt),
+          }))
+          .sort((a, b) => a.pageUrl.localeCompare(b.pageUrl));
+        result.push({ siteKey, pages });
+      });
+    return result;
+  }, [store]);
+
+  const totalElements = siteGroups.reduce(
+    (total, site) => total + site.pages.reduce((inner, page) => inner + page.items.length, 0),
+    0,
+  );
+  const totalPages = siteGroups.reduce((total, site) => total + site.pages.length, 0);
 
   const refresh = useCallback(async () => {
     setLoading(true);
@@ -123,163 +160,141 @@ export function OverviewSection({
   );
 
   const statusMessage = status ? t(status.key, status.values) : '';
-  const isPageCollapsed = useCallback(
-    (pageUrl) => !expandedPages.has(pageUrl),
-    [expandedPages],
+  const isSiteCollapsed = useCallback(
+    (siteKey) => !expandedSites.has(siteKey),
+    [expandedSites],
   );
-  const togglePageCollapsed = useCallback((pageUrl) => {
-    setExpandedPages((prev) => {
+  const toggleSiteCollapsed = useCallback((siteKey) => {
+    setExpandedSites((prev) => {
       const next = new Set(prev);
-      if (next.has(pageUrl)) {
-        next.delete(pageUrl);
+      if (next.has(siteKey)) {
+        next.delete(siteKey);
       } else {
-        next.add(pageUrl);
+        next.add(siteKey);
       }
       return next;
     });
   }, []);
 
   return (
-    <section className="flex flex-col gap-6 rounded-2xl border border-slate-200 bg-white p-5 shadow-brand">
-      <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-        <h2 className="text-lg font-semibold text-slate-900">{t('overview.heading')}</h2>
+    <>
+      <section className="flex items-center justify-between rounded-2xl border border-slate-200 bg-white p-5 shadow-brand">
+        <div className="space-y-1">
+          <h2 className="text-lg font-semibold text-slate-900">{t('overview.heading')}</h2>
+          <p className="text-xs text-slate-500">{t('overview.description')}</p>
+        </div>
         <button
           type="button"
-          className="inline-flex items-center justify-center rounded-xl bg-gradient-to-r from-brand-start to-brand-end px-4 py-2 text-sm font-semibold text-white shadow-lg transition hover:shadow-xl disabled:cursor-not-allowed disabled:opacity-60"
+          className="inline-flex h-8 w-8 items-center justify-center rounded-full text-slate-600 shadow-sm transition hover:bg-slate-100 hover:text-slate-900 disabled:cursor-not-allowed disabled:opacity-60"
           onClick={refresh}
           disabled={loading}
+          aria-label={loading ? t('overview.refreshing') : t('overview.refresh')}
         >
-          {loading ? t('overview.refreshing') : t('overview.refresh')}
+          <RefreshIcon className="h-4 w-4" />
         </button>
-      </div>
-      {statusMessage && (
-        <p className="rounded-xl border border-slate-200 bg-amber-50 px-4 py-2 text-sm text-amber-700 shadow-brand">{statusMessage}</p>
-      )}
-      <section className="flex gap-4">
-        <article className="flex-1 rounded-2xl border border-slate-200 bg-slate-50 p-5 shadow-brand">
-          <span className="text-sm font-medium text-slate-500">{t('overview.pageCount.label')}</span>
-          <p className="mt-2 text-3xl font-semibold text-slate-900">{entries.length}</p>
-        </article>
-        <article className="flex-1 rounded-2xl border border-slate-200 bg-slate-50 p-5 shadow-brand">
-          <span className="text-sm font-medium text-slate-500">{t('overview.elementCount.label')}</span>
-          <p className="mt-2 text-3xl font-semibold text-slate-900">{totalElements}</p>
-        </article>
       </section>
-      <section className="grid gap-6">
-        {entries.length === 0 ? (
-          <p className="rounded-xl border border-dashed border-slate-200 bg-white p-8 text-center text-sm text-slate-500 shadow-brand">
-            {t('overview.empty')}
+
+      <section className="mt-4 flex flex-col gap-6">
+        {statusMessage && (
+          <p className="rounded-xl border border-slate-200 bg-amber-50 px-4 py-2 text-sm text-amber-700 shadow-brand">
+            {statusMessage}
           </p>
-        ) : (
-          entries.map(([pageUrl, items]) => {
-            const collapsed = isPageCollapsed(pageUrl);
+        )}
+        <section className="flex gap-4">
+          <article className="flex-1 rounded-2xl border border-slate-200 bg-slate-50 p-5 shadow-brand">
+            <span className="text-sm font-medium text-slate-500">{t('overview.pageCount.label')}</span>
+            <p className="mt-2 text-3xl font-semibold text-slate-900">{totalPages}</p>
+          </article>
+          <article className="flex-1 rounded-2xl border border-slate-200 bg-slate-50 p-5 shadow-brand">
+            <span className="text-sm font-medium text-slate-500">{t('overview.elementCount.label')}</span>
+            <p className="mt-2 text-3xl font-semibold text-slate-900">{totalElements}</p>
+          </article>
+        </section>
+        <section className="grid gap-6">
+          {siteGroups.length === 0 ? (
+            <p className="rounded-xl border border-dashed border-slate-200 bg-white p-8 text-center text-sm text-slate-500 shadow-brand">
+              {t('overview.empty')}
+            </p>
+          ) : (
+          siteGroups.map(({ siteKey, pages }) => {
+            const collapsed = isSiteCollapsed(siteKey);
+            const siteElementCount = pages.reduce((sum, page) => sum + page.items.length, 0);
             return (
-              <article key={pageUrl} className="rounded-2xl border border-slate-200 bg-white p-5 shadow-brand">
-                <header className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-                  <div className="flex flex-1 items-start gap-3 md:items-center">
+              <article key={siteKey} className="rounded-2xl border border-slate-200 bg-white p-5 shadow-brand">
+                <header className="flex items-start justify-between gap-3">
+                  <div className="flex flex-1 items-start gap-3">
                     <button
                       type="button"
                       className="flex h-7 w-7 items-center justify-center rounded-full border border-slate-300 bg-slate-50 text-xs font-semibold text-slate-700 transition hover:bg-slate-100"
-                      onClick={() => togglePageCollapsed(pageUrl)}
+                      onClick={() => toggleSiteCollapsed(siteKey)}
                       aria-label={collapsed ? t('overview.expandPage') : t('overview.collapsePage')}
                     >
                       <span className="text-base leading-none">{collapsed ? '▸' : '▾'}</span>
                     </button>
-                    <div className="space-y-1 min-w-0">
-                      <h3 className="break-all text-base font-semibold text-slate-900">{pageUrl}</h3>
-                      <p className="text-xs text-slate-500">{t('overview.pageSummary', { count: items.length })}</p>
+                    <div className="min-w-0 space-y-1">
+                      <h3
+                        className="break-all text-base font-semibold text-slate-900 cursor-pointer hover:underline"
+                        onClick={() => handleOpenPage(siteKey)}
+                      >
+                        {siteKey}
+                      </h3>
+                      <p className="text-xs text-slate-500">
+                        {t('overview.pageSummary', { count: siteElementCount })}
+                      </p>
                     </div>
                   </div>
-                  <div className="mt-2 flex flex-wrap gap-3 md:mt-0">
+                  <div className="mt-1 flex flex-shrink-0 items-center gap-2 md:mt-0">
                     <button
                       type="button"
-                      className="rounded-lg bg-blue-50 px-3 py-2 text-sm font-semibold text-blue-700 transition hover:bg-blue-100"
-                      onClick={() => handleOpenPage(pageUrl)}
+                      className="inline-flex h-7 w-7 items-center justify-center rounded-full text-rose-500 transition hover:bg-slate-100 hover:text-rose-600"
+                      onClick={() => handleClearPage(siteKey)}
+                      aria-label={t('overview.clearPage')}
+                      title={t('overview.clearPage')}
                     >
-                      {t('overview.openPage')}
-                    </button>
-                    <button
-                      type="button"
-                      className="rounded-lg bg-rose-100 px-3 py-2 text-sm font-semibold text-rose-700 transition hover:bg-rose-200"
-                      onClick={() => handleClearPage(pageUrl)}
-                    >
-                      {t('overview.clearPage')}
+                      <ClearPageIcon className="h-4 w-4" />
                     </button>
                   </div>
                 </header>
                 {!collapsed && (
-                  <ul className="mt-4 grid gap-4">
-                    {items
-                      .slice()
-                      .sort((a, b) => b.createdAt - a.createdAt)
-                      .map((item) => {
-                        const frameInfo = formatFrameSummary(item);
-                        const flowSummary = summarizeFlow(item.actionFlow);
-                        return (
-                          <li key={item.id} className="rounded-xl border border-slate-200 bg-slate-50 p-4">
-                            <div className="flex flex-wrap items-start justify-between gap-3">
-                              <span className="inline-flex items-center rounded-full bg-indigo-100 px-3 py-1 text-xs font-semibold uppercase tracking-wide text-indigo-700">
-                                {typeLabels[item.type] || item.type}
-                              </span>
-                              <span className="text-xs text-slate-500">{formatDateTime(item.createdAt)}</span>
-                            </div>
-                            <p className="mt-3 text-sm font-semibold text-slate-900">
-                              {item.text || t('manage.item.noText')}
+                  <div className="mt-4 grid gap-4">
+                    {pages.map(({ pageUrl, items }) => (
+                      <section key={pageUrl} className="space-y-3 rounded-xl border border-slate-200 bg-slate-50 p-4">
+                        <header className="flex items-center justify-between gap-2">
+                          <div className="min-w-0 space-y-1">
+                            <h4
+                              className="break-all text-sm font-semibold text-slate-900 cursor-pointer hover:underline"
+                              onClick={() => handleOpenPage(pageUrl)}
+                            >
+                              {pageUrl}
+                            </h4>
+                            <p className="text-xs text-slate-500">
+                              {t('overview.pageSummary', { count: items.length })}
                             </p>
-                            <p className="mt-1 break-all text-xs text-slate-500">{item.selector}</p>
-                            {item.href && <p className="mt-1 break-all text-xs text-blue-600">{item.href}</p>}
-                            {item.actionSelector && (
-                              <p className="mt-1 break-all text-xs text-emerald-600">
-                                {t('manage.item.actionSelector', { selector: item.actionSelector })}
-                              </p>
-                            )}
-                            {flowSummary?.steps ? (
-                              <p className="mt-1 break-all text-xs text-emerald-600">
-                                {t('manage.item.actionFlow', { steps: flowSummary.steps })}
-                              </p>
-                            ) : null}
-                            {frameInfo && <p className="mt-1 break-all text-xs text-purple-600">{frameInfo}</p>}
-                            {item.type === 'tooltip' && (
-                              <p className="mt-1 break-all text-xs text-amber-600">
-                                {t('manage.item.tooltipDetails', {
-                                  position: formatTooltipPosition(item.tooltipPosition),
-                                  mode: formatTooltipMode(item.tooltipPersistent),
-                                })}
-                              </p>
-                            )}
-                            <div className="mt-3 flex flex-wrap gap-3">
-                              <button
-                                type="button"
-                                className="rounded-lg bg-blue-50 px-3 py-2 text-sm font-semibold text-blue-700 transition hover:bg-blue-100"
-                                onClick={() => handleFocusItem(pageUrl, item.id)}
-                              >
-                                {t('manage.item.focus')}
-                              </button>
-                              <button
-                                type="button"
-                                className="rounded-lg bg-slate-100 px-3 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-200"
-                                onClick={() => handleEditItem(pageUrl, item.id)}
-                              >
-                                {t('manage.item.openBubble')}
-                              </button>
-                              <button
-                                type="button"
-                                className="rounded-lg bg-rose-100 px-3 py-2 text-sm font-semibold text-rose-700 transition hover:bg-rose-200"
-                                onClick={() => handleDeleteItem(pageUrl, item.id)}
-                              >
-                                {t('manage.item.delete')}
-                              </button>
-                            </div>
-                          </li>
-                        );
-                      })}
-                  </ul>
+                          </div>
+                        </header>
+                        <ItemList
+                          items={items}
+                          t={t}
+                          typeLabels={typeLabels}
+                          formatTimestamp={formatDateTime}
+                          formatFrameSummary={formatFrameSummary}
+                          formatTooltipPosition={formatTooltipPosition}
+                          formatTooltipMode={formatTooltipMode}
+                          onFocus={(id) => handleFocusItem(siteKey, id)}
+                          onOpenEditor={(id) => handleEditItem(siteKey, id)}
+                          onDelete={(id) => handleDeleteItem(siteKey, id)}
+                          showActions={false}
+                        />
+                      </section>
+                    ))}
+                  </div>
                 )}
               </article>
             );
           })
-        )}
+          )}
+        </section>
       </section>
-    </section>
+    </>
   );
 }
