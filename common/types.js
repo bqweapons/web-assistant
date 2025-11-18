@@ -7,6 +7,7 @@
  * @property {'button' | 'link' | 'tooltip' | 'area'} type
  * @property {string} text
  * @property {string | undefined} href
+ * @property {'same-tab' | 'new-tab' | undefined} [linkTarget]
  * @property {string | undefined} actionSelector
  * @property {string | undefined} actionFlow
  * @property {string} selector
@@ -14,6 +15,7 @@
  * @property {string | undefined} [frameLabel]
  * @property {string | undefined} [frameUrl]
  * @property {'append' | 'prepend' | 'before' | 'after'} position
+ * @property {'row' | 'column' | undefined} [layout]
  * @property {InjectedElementStyle | undefined} style
  * @property {'top' | 'right' | 'bottom' | 'left' | undefined} [tooltipPosition]
  * @property {boolean | undefined} [tooltipPersistent]

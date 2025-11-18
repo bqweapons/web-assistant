@@ -242,9 +242,33 @@ function createElementBubble() {
   styleInput(textInput);
 
   const hrefInput = document.createElement('input');
-  hrefInput.type = 'url';
+  hrefInput.type = 'text';
   hrefInput.placeholder = t('editor.hrefPlaceholder');
   styleInput(hrefInput);
+
+  const areaLayoutSelect = document.createElement('select');
+  [
+    { value: 'row', label: t('editor.areaLayout.horizontal') },
+    { value: 'column', label: t('editor.areaLayout.vertical') },
+  ].forEach(({ value, label }) => {
+    const option = document.createElement('option');
+    option.value = value;
+    option.textContent = label;
+    areaLayoutSelect.appendChild(option);
+  });
+  styleInput(areaLayoutSelect);
+
+  const linkTargetSelect = document.createElement('select');
+  [
+    { value: 'new-tab', label: t('editor.linkTarget.newTab') },
+    { value: 'same-tab', label: t('editor.linkTarget.sameTab') },
+  ].forEach(({ value, label }) => {
+    const option = document.createElement('option');
+    option.value = value;
+    option.textContent = label;
+    linkTargetSelect.appendChild(option);
+  });
+  styleInput(linkTargetSelect);
 
   const positionSelect = document.createElement('select');
   const positionLabels = getPositionLabels();
@@ -303,10 +327,12 @@ function createElementBubble() {
   const typeField = createField(t('editor.typeLabel'), typeSelect);
   const textField = createField(t('editor.textLabel'), textInput);
   const hrefField = createField(t('editor.hrefLabel'), hrefInput);
+  const linkTargetField = createField(t('editor.linkTargetLabel'), linkTargetSelect);
   const positionField = createField(t('editor.positionLabel'), positionSelect);
   const tooltipPositionField = createField(t('editor.tooltipPositionLabel'), tooltipPositionSelect);
   const tooltipPersistentField = createField(t('editor.tooltipPersistenceLabel'));
   tooltipPersistentField.wrapper.append(tooltipPersistentRow, tooltipPersistentHint);
+  const areaLayoutField = createField(t('editor.areaLayoutLabel'), areaLayoutSelect);
 
   const editorState = createEditorState();
   let state = editorState.get();
@@ -398,8 +424,10 @@ function createElementBubble() {
     typeField.wrapper,
     textField.wrapper,
     hrefField.wrapper,
+    linkTargetField.wrapper,
     tooltipPositionField.wrapper,
     tooltipPersistentField.wrapper,
+    areaLayoutField.wrapper,
   );
 
   const behaviorSection = sectionsTabs.addSection(
@@ -430,9 +458,9 @@ function createElementBubble() {
   let currentTarget = null;
   /** @type {() => void} */
   let cancelHandler = () => {};
-  /** @type {(payload: { type: 'button' | 'link' | 'tooltip' | 'area'; text: string; href?: string; actionSelector?: string; tooltipPosition?: 'top' | 'right' | 'bottom' | 'left'; tooltipPersistent?: boolean; position: 'append' | 'prepend' | 'before' | 'after'; style?: import('../../common/types.js').InjectedElementStyle }) => void} */
+  /** @type {(payload: { type: 'button' | 'link' | 'tooltip' | 'area'; text: string; href?: string; linkTarget?: 'same-tab' | 'new-tab'; actionSelector?: string; tooltipPosition?: 'top' | 'right' | 'bottom' | 'left'; tooltipPersistent?: boolean; position: 'append' | 'prepend' | 'before' | 'after'; layout?: 'row' | 'column'; style?: import('../../common/types.js').InjectedElementStyle }) => void} */
   let submitHandler = () => {};
-  /** @type {null | ((payload: { type: 'button' | 'link' | 'tooltip' | 'area'; text: string; href?: string; actionSelector?: string; tooltipPosition?: 'top' | 'right' | 'bottom' | 'left'; tooltipPersistent?: boolean; position: 'append' | 'prepend' | 'before' | 'after'; style?: import('../../common/types.js').InjectedElementStyle }) => void)} */
+  /** @type {null | ((payload: { type: 'button' | 'link' | 'tooltip' | 'area'; text: string; href?: string; linkTarget?: 'same-tab' | 'new-tab'; actionSelector?: string; tooltipPosition?: 'top' | 'right' | 'bottom' | 'left'; tooltipPersistent?: boolean; position: 'append' | 'prepend' | 'before' | 'after'; layout?: 'row' | 'column'; style?: import('../../common/types.js').InjectedElementStyle }) => void)} */
   let previewHandler = null;
   /** @type {null | ((reason?: 'cancel' | 'select') => void)} */
   let actionPickerCleanup = null;
@@ -453,6 +481,8 @@ function createElementBubble() {
     positionSelect,
     tooltipPositionSelect,
     tooltipPersistentCheckbox,
+    areaLayoutSelect,
+    linkTargetSelect,
   ].forEach((input) => {
     input.addEventListener('input', clearError);
     input.addEventListener('change', clearError);
@@ -469,6 +499,8 @@ function createElementBubble() {
     const style = styleControls.getNormalizedStyle();
     const type =
       state.type === 'link' || state.type === 'tooltip' || state.type === 'area' ? state.type : 'button';
+    const layout = state.layout === 'column' ? 'column' : 'row';
+    const linkTarget = state.linkTarget === 'same-tab' ? 'same-tab' : 'new-tab';
     const payload = {
       type,
       text: textValue,
@@ -489,6 +521,7 @@ function createElementBubble() {
       if (hrefValue) {
         payload.href = hrefValue;
       }
+      payload.linkTarget = linkTarget;
     } else if (type === 'button') {
       if (hrefValue) {
         payload.href = hrefValue;
@@ -525,6 +558,7 @@ function createElementBubble() {
     } else if (type === 'area') {
       delete payload.href;
       delete payload.actionFlow;
+      payload.layout = layout;
     }
     return payload;
   };
@@ -562,6 +596,9 @@ function createElementBubble() {
         : t('editor.hrefOptionalLabel');
     hrefField.wrapper.style.display = isTooltip || isArea ? 'none' : 'flex';
 
+    linkTargetField.wrapper.style.display = isLink ? 'flex' : 'none';
+    linkTargetSelect.disabled = !isLink;
+
     actionFlowSummaryField.wrapper.style.display = isButton ? 'flex' : 'none';
     actionFlowField.wrapper.style.display = isButton ? 'flex' : 'none';
     actionFlowInput.disabled = !isButton;
@@ -575,11 +612,11 @@ function createElementBubble() {
     tooltipPersistentField.wrapper.style.display = isTooltip ? 'flex' : 'none';
     tooltipPersistentCheckbox.disabled = !isTooltip;
 
-    textInput.placeholder = isTooltip
-      ? t('editor.tooltipTextPlaceholder')
-      : isArea
-        ? t('editor.areaTextPlaceholder')
-        : t('editor.textPlaceholder');
+    textField.wrapper.style.display = isArea ? 'none' : 'flex';
+    textInput.placeholder = isTooltip ? t('editor.tooltipTextPlaceholder') : t('editor.textPlaceholder');
+
+    areaLayoutField.wrapper.style.display = isArea ? 'flex' : 'none';
+    areaLayoutSelect.disabled = !isArea;
 
     actionFlowController.validateInput();
     actionFlowController.updateSummary();
@@ -605,6 +642,11 @@ function createElementBubble() {
         state.actionFlowMode = 'builder';
         tooltipPositionSelect.value = 'top';
         tooltipPersistentCheckbox.checked = false;
+        state.layout = 'row';
+        areaLayoutSelect.value = 'row';
+      } else if (isLink) {
+        state.linkTarget = 'new-tab';
+        linkTargetSelect.value = 'new-tab';
       }
     }
     actionFlowController.syncUI();
@@ -728,6 +770,18 @@ function createElementBubble() {
   tooltipPersistentCheckbox.addEventListener('change', (event) => {
     clearError();
     state.tooltipPersistent = Boolean(event.target.checked);
+    updatePreview();
+  });
+
+  areaLayoutSelect.addEventListener('change', (event) => {
+    const value = event.target.value === 'column' ? 'column' : 'row';
+    state.layout = value;
+    updatePreview();
+  });
+
+  linkTargetSelect.addEventListener('change', (event) => {
+    const value = event.target.value === 'same-tab' ? 'same-tab' : 'new-tab';
+    state.linkTarget = value;
     updatePreview();
   });
 
@@ -873,7 +927,8 @@ function createElementBubble() {
       bubble.style.opacity = '1';
       bubble.style.transform = 'translateY(0)';
       updateFixedPlacement();
-      textInput.focus({ preventScroll: true });
+      const initialFocus = state.type === 'area' ? typeSelect : textInput;
+      initialFocus.focus({ preventScroll: true });
     });
     draftUpdateListener = (event) => handleDraftUpdate(event);
     window.addEventListener('page-augmentor-draft-update', draftUpdateListener);
@@ -936,12 +991,16 @@ function createElementBubble() {
       state.position = initial.position;
       state.tooltipPosition = initial.tooltipPosition;
       state.tooltipPersistent = initial.tooltipPersistent;
+      state.layout = initial.layout || 'row';
+      state.linkTarget = initial.linkTarget || 'new-tab';
       state.containerId = typeof initial.containerId === 'string' ? initial.containerId : '';
       state.floating = initial.floating !== false;
       state.bubbleSide = 'right';
       typeSelect.value = state.type;
       textInput.value = state.text;
       hrefInput.value = state.href;
+      areaLayoutSelect.value = state.layout === 'column' ? 'column' : 'row';
+      linkTargetSelect.value = state.linkTarget === 'same-tab' ? 'same-tab' : 'new-tab';
       let initialFlowSource = state.actionFlow;
       if (state.type === 'button' && (!initialFlowSource || !initialFlowSource.trim())) {
         const inheritedSelector = typeof values.actionSelector === 'string' ? values.actionSelector.trim() : '';

@@ -31,7 +31,7 @@ export function buildDraftElement(type) {
     normalized === 'tooltip'
       ? t('editor.tooltipTextPlaceholder')
       : normalized === 'area'
-        ? t('editor.areaTextPlaceholder')
+        ? ''
         : t('editor.textPlaceholder');
   return {
     id,
@@ -41,6 +41,8 @@ export function buildDraftElement(type) {
     selector: 'body',
     position: 'append',
     style,
+    layout: normalized === 'area' ? 'row' : undefined,
+    linkTarget: normalized === 'link' ? 'new-tab' : undefined,
     tooltipPosition: normalized === 'tooltip' ? 'top' : undefined,
     tooltipPersistent: normalized === 'tooltip' ? false : undefined,
     frameSelectors: Array.isArray(runtime.frameContext?.frameSelectors)
