@@ -1,5 +1,6 @@
 import { createField, styleInput } from '../ui/field.js';
 import { applyCardStyle } from '../ui/card.js';
+import { createSectionShell } from '../ui/section.js';
 import {
   DEFAULT_STYLE_ITEM_MIN_WIDTH,
   getStyleFieldConfigs as buildStyleFieldConfigs,
@@ -30,25 +31,7 @@ const ADVANCED_FIELDS = new Set(['position', 'top', 'right', 'bottom', 'left', '
  * }}
  */
 export function createStyleControls({ t }) {
-  const styleFieldset = document.createElement('fieldset');
-  Object.assign(styleFieldset.style, {
-    border: '1px solid rgba(148, 163, 184, 0.35)',
-    borderRadius: '10px',
-    padding: '12px',
-    display: 'flex',
-    flexDirection: 'column',
-    gap: '10px',
-  });
-
-  const styleLegend = document.createElement('legend');
-  styleLegend.textContent = t('editor.stylesLegend');
-  Object.assign(styleLegend.style, {
-    fontSize: '12px',
-    fontWeight: '600',
-    color: '#64748b',
-    padding: '0 6px',
-  });
-  styleFieldset.appendChild(styleLegend);
+  const { fieldset: styleFieldset } = createSectionShell({ legendText: t('editor.stylesLegend') });
 
   const styleInputs = new Map();
   const styleState = {};

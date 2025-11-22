@@ -1,4 +1,5 @@
 import { applyCardStyle } from '../ui/card.js';
+import { createSectionShell } from '../ui/section.js';
 import { DEFAULT_BASE_INFO_ITEM_MIN_WIDTH, getBaseInfoFieldConfigs } from './base-info-config.js';
 
 /**
@@ -9,34 +10,7 @@ import { DEFAULT_BASE_INFO_ITEM_MIN_WIDTH, getBaseInfoFieldConfigs } from './bas
  }} options
  */
 export function createBaseInfoSection({ t, nodes, getState }) {
-  const fieldset = document.createElement('fieldset');
-  Object.assign(fieldset.style, {
-    display: 'flex',
-    flexDirection: 'column',
-    gap: '12px',
-    padding: '14px',
-    border: '1px solid rgba(148, 163, 184, 0.35)',
-    borderRadius: '16px',
-    backgroundColor: 'rgba(248, 250, 252, 0.85)',
-  });
-
-  const legend = document.createElement('legend');
-  legend.textContent = t('editor.sections.basics.title');
-  Object.assign(legend.style, {
-    fontSize: '13px',
-    fontWeight: '700',
-    color: '#6b7280',
-    padding: '0 6px',
-  });
-  fieldset.appendChild(legend);
-
-  const container = document.createElement('div');
-  Object.assign(container.style, {
-    display: 'flex',
-    flexWrap: 'wrap',
-    gap: '10px',
-    alignItems: 'stretch',
-  });
+  const { fieldset, container } = createSectionShell({ legendText: t('editor.sections.basics.title') });
 
   const configs = getBaseInfoFieldConfigs();
 

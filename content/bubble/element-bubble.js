@@ -9,7 +9,8 @@ import {
 } from './styles/style-presets.js';
 import { createField, styleInput } from './ui/field.js';
 import { applyCardStyle } from './ui/card.js';
-import { createBaseInfoSection } from './editor/base-info-controls.js';
+import { buildFormSections } from './editor/form-controls.js';
+import { getFormSections } from './editor/form-config.js';
 import { stepsToJSON } from './actionflow/serializer.js';
 import { createEditorState } from './state.js';
 import { parseFlowForBuilder } from './actionflow/parser-bridge.js';
@@ -474,13 +475,32 @@ function createElementBubble() {
     areaLayout: areaLayoutField.wrapper,
   };
 
-  const baseInfoSection = createBaseInfoSection({
+  const sectionsConfig = getFormSections(t);
+  const baseSection = sectionsConfig.find((section) => section.key === 'base') || {
+    key: 'base',
+    legend: t('editor.sections.basics.title'),
+    fields: [],
+  };
+  const sections = [
+    { ...baseSection },
+    {
+      key: 'style',
+      legend: t('editor.stylesLegend'),
+      prebuilt: styleFieldset,
+    },
+  ];
+
+  const fieldsets = buildFormSections({
     t,
+    sections,
     nodes: baseInfoNodes,
     getState: () => state,
   });
 
-  panel.append(baseInfoSection.fieldset, styleFieldset);
+  const visibilityUpdaters = fieldsets.filter((fs) => typeof fs.applyVisibility === 'function');
+  const updateVisibility = () => visibilityUpdaters.forEach((fs) => fs.applyVisibility());
+
+  fieldsets.forEach((fieldset) => panel.appendChild(fieldset));
   formBody.append(panel);
 
   const updateActiveTabTitle = () => {
@@ -690,7 +710,7 @@ function createElementBubble() {
       }
     }
     actionFlowController.syncUI();
-    baseInfoSection.updateVisibility?.();
+    updateVisibility();
     updatePreview();
     updateActiveTabTitle();
   };
@@ -1076,7 +1096,7 @@ function createElementBubble() {
       saveButton.textContent = mode === 'edit' ? t('editor.saveUpdate') : t('editor.saveCreate');
       actionFlowController.validateInput();
       updatePreview({ propagate: false });
-      baseInfoSection.updateVisibility?.();
+      updateVisibility();
       submitHandler = (payload) => {
         actionFlowController.closeFlowEditor({ reopen: false });
         detach();
