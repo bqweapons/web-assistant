@@ -5,10 +5,7 @@ import {
   DEFAULT_LINK_STYLE,
   DEFAULT_TOOLTIP_STYLE,
   DEFAULT_AREA_STYLE,
-  getTooltipPositionOptions as buildTooltipPositionOptions,
 } from './styles/style-presets.js';
-import { createField, styleInput } from './ui/field.js';
-import { applyCardStyle } from './ui/card.js';
 import { buildFormSections } from './editor/form-controls.js';
 import { getFormSections } from './editor/form-config.js';
 import { stepsToJSON } from './actionflow/serializer.js';
@@ -16,7 +13,6 @@ import { createEditorState } from './state.js';
 import { parseFlowForBuilder } from './actionflow/parser-bridge.js';
 import { startPicker } from './actionflow/picker.js';
 import { attach as attachBubble, detach as detachBubble } from './layout/placement.js';
-import { createStyleControls } from './editor/style-controls.js';
 import { createActionFlowController } from './editor/action-flow-controller.js';
 import {
   getDefaultElementValues,
@@ -49,19 +45,6 @@ function getTypeOptions() {
     { value: 'tooltip', label: t('type.tooltip') },
     { value: 'area', label: t('type.area') },
   ];
-}
-
-function getPositionLabels() {
-  return {
-    append: t('position.append'),
-    prepend: t('position.prepend'),
-    before: t('position.before'),
-    after: t('position.after'),
-  };
-}
-
-function getTooltipPositionOptions() {
-  return buildTooltipPositionOptions(t);
 }
 
 /**
@@ -277,115 +260,7 @@ function createElementBubble() {
     padding: '10px 2px 6px',
   });
 
-  const typeSelect = document.createElement('select');
-  getTypeOptions().forEach(({ value, label }) => {
-    const option = document.createElement('option');
-    option.value = value;
-    option.textContent = label;
-    typeSelect.appendChild(option);
-  });
-  styleInput(typeSelect);
-  typeSelect.disabled = true;
-  typeSelect.style.display = 'none';
-
-  const textInput = document.createElement('input');
-  textInput.type = 'text';
-  textInput.placeholder = t('editor.textPlaceholder');
-  textInput.maxLength = 160;
-  styleInput(textInput);
-
-  const hrefInput = document.createElement('input');
-  hrefInput.type = 'text';
-  hrefInput.placeholder = t('editor.hrefPlaceholder');
-  styleInput(hrefInput);
-
-  const areaLayoutSelect = document.createElement('select');
-  [
-    { value: 'row', label: t('editor.areaLayout.horizontal') },
-    { value: 'column', label: t('editor.areaLayout.vertical') },
-  ].forEach(({ value, label }) => {
-    const option = document.createElement('option');
-    option.value = value;
-    option.textContent = label;
-    areaLayoutSelect.appendChild(option);
-  });
-  styleInput(areaLayoutSelect);
-
-  const linkTargetSelect = document.createElement('select');
-  [
-    { value: 'new-tab', label: t('editor.linkTarget.newTab') },
-    { value: 'same-tab', label: t('editor.linkTarget.sameTab') },
-  ].forEach(({ value, label }) => {
-    const option = document.createElement('option');
-    option.value = value;
-    option.textContent = label;
-    linkTargetSelect.appendChild(option);
-  });
-  styleInput(linkTargetSelect);
-
-  const positionSelect = document.createElement('select');
-  const positionLabels = getPositionLabels();
-  ['append', 'prepend', 'before', 'after'].forEach((value) => {
-    const option = document.createElement('option');
-    option.value = value;
-    option.textContent = positionLabels[value] || value;
-    positionSelect.appendChild(option);
-  });
-  styleInput(positionSelect);
-
-  const tooltipPositionSelect = document.createElement('select');
-  getTooltipPositionOptions().forEach(({ value, label }) => {
-    const option = document.createElement('option');
-    option.value = value;
-    option.textContent = label;
-    tooltipPositionSelect.appendChild(option);
-  });
-  styleInput(tooltipPositionSelect);
-
-  const tooltipPersistentCheckbox = document.createElement('input');
-  tooltipPersistentCheckbox.type = 'checkbox';
-  tooltipPersistentCheckbox.style.width = '16px';
-  tooltipPersistentCheckbox.style.height = '16px';
-  tooltipPersistentCheckbox.style.margin = '0';
-  tooltipPersistentCheckbox.style.cursor = 'pointer';
-  tooltipPersistentCheckbox.style.borderRadius = '4px';
-  tooltipPersistentCheckbox.style.border = '1px solid rgba(148, 163, 184, 0.6)';
-  tooltipPersistentCheckbox.style.accentColor = '#2563eb';
-
-  const tooltipPersistentLabel = document.createElement('span');
-  tooltipPersistentLabel.textContent = t('editor.tooltipPersistenceCheckbox');
-  Object.assign(tooltipPersistentLabel.style, {
-    fontSize: '13px',
-    color: '#0f172a',
-  });
-
-  const tooltipPersistentRow = document.createElement('label');
-  Object.assign(tooltipPersistentRow.style, {
-    display: 'inline-flex',
-    alignItems: 'center',
-    gap: '8px',
-    cursor: 'pointer',
-    fontWeight: '500',
-  });
-  tooltipPersistentRow.append(tooltipPersistentCheckbox, tooltipPersistentLabel);
-
-  const tooltipPersistentHint = document.createElement('p');
-  tooltipPersistentHint.textContent = t('editor.tooltipPersistenceHint');
-  Object.assign(tooltipPersistentHint.style, {
-    margin: '4px 0 0 0',
-    fontSize: '11px',
-    color: '#94a3b8',
-  });
-
-  const typeField = createField(t('editor.typeLabel'), typeSelect);
-  const textField = createField(t('editor.textLabel'), textInput);
-  const hrefField = createField(t('editor.hrefLabel'), hrefInput);
-  const linkTargetField = createField(t('editor.linkTargetLabel'), linkTargetSelect);
-  const positionField = createField(t('editor.positionLabel'), positionSelect);
-  const tooltipPositionField = createField(t('editor.tooltipPositionLabel'), tooltipPositionSelect);
-  const tooltipPersistentField = createField(t('editor.tooltipPersistenceLabel'));
-  tooltipPersistentField.wrapper.append(tooltipPersistentRow, tooltipPersistentHint);
-  const areaLayoutField = createField(t('editor.areaLayoutLabel'), areaLayoutSelect);
+  let refreshUI = () => {};
 
   const editorState = createEditorState();
   let state = editorState.get();
@@ -409,14 +284,8 @@ function createElementBubble() {
     },
   });
 
-  const actionFlowField = actionFlowController.field;
-  const actionFlowSummaryField = actionFlowController.summaryField;
   const actionFlowInput = actionFlowController.input;
-  const actionFlowHint = actionFlowController.hint;
   const openActionFlowButton = actionFlowController.openButton;
-  const actionFlowEditorHost = actionFlowController.editorHost;
-  const styleControls = createStyleControls({ t });
-  const styleFieldset = styleControls.fieldset;
 
   const cancelButton = document.createElement('button');
   cancelButton.type = 'button';
@@ -465,42 +334,22 @@ function createElementBubble() {
     gap: '12px',
   });
 
-  const baseInfoNodes = {
-    text: textField.wrapper,
-    href: hrefField.wrapper,
-    linkTarget: linkTargetField.wrapper,
-    actionFlow: actionFlowSummaryField.wrapper,
-    tooltipPosition: tooltipPositionField.wrapper,
-    tooltipPersistent: tooltipPersistentField.wrapper,
-    areaLayout: areaLayoutField.wrapper,
-  };
-
-  const sectionsConfig = getFormSections(t);
-  const baseSection = sectionsConfig.find((section) => section.key === 'base') || {
-    key: 'base',
-    legend: t('editor.sections.basics.title'),
-    fields: [],
-  };
-  const sections = [
-    { ...baseSection },
-    {
-      key: 'style',
-      legend: t('editor.stylesLegend'),
-      prebuilt: styleFieldset,
-    },
-  ];
-
-  const fieldsets = buildFormSections({
+  const formSections = buildFormSections({
     t,
-    sections,
-    nodes: baseInfoNodes,
+    sections: getFormSections(t),
     getState: () => state,
+    setState,
+    actionFlowController,
+    clearError: () => {
+      errorLabel.textContent = '';
+    },
+    onChange: () => refreshUI(),
   });
+  const focusTargets = formSections.focusTargets || {};
+  const refreshFields = () => formSections.refreshFields();
+  const updateVisibility = () => formSections.refreshVisibility();
 
-  const visibilityUpdaters = fieldsets.filter((fs) => typeof fs.applyVisibility === 'function');
-  const updateVisibility = () => visibilityUpdaters.forEach((fs) => fs.applyVisibility());
-
-  fieldsets.forEach((fieldset) => panel.appendChild(fieldset));
+  formSections.fieldsets.forEach((fieldset) => panel.appendChild(fieldset));
   formBody.append(panel);
 
   const updateActiveTabTitle = () => {
@@ -535,30 +384,15 @@ function createElementBubble() {
     errorLabel.textContent = '';
   };
 
-  [
-    textInput,
-    hrefInput,
-    actionFlowInput,
-    typeSelect,
-    positionSelect,
-    tooltipPositionSelect,
-    tooltipPersistentCheckbox,
-    areaLayoutSelect,
-    linkTargetSelect,
-  ].forEach((input) => {
-    input.addEventListener('input', clearError);
-    input.addEventListener('change', clearError);
-  });
-
   const resetStyleState = (source, suggestions) => {
-    styleControls.reset(source, suggestions);
+    formSections.resetStyle(source, suggestions);
   };
 
   const buildPayload = () => {
     const textValue = state.text.trim();
     const hrefValue = state.href.trim();
     const position = resolvePosition(state.position);
-    const style = styleControls.getNormalizedStyle();
+    const style = formSections.getNormalizedStyle();
     const type =
       state.type === 'link' || state.type === 'tooltip' || state.type === 'area' ? state.type : 'button';
     const layout = state.layout === 'column' ? 'column' : 'row';
@@ -637,70 +471,39 @@ function createElementBubble() {
     actionFlowController.updateSummary();
   };
 
-  const handleTypeChange = (applyDefaults = false) => {
-    actionFlowController.hideMenu();
-    const isLink = state.type === 'link';
-    const isButton = state.type === 'button';
-    const isTooltip = state.type === 'tooltip';
-    const isArea = state.type === 'area';
-
-    hrefInput.required = isLink;
-    hrefInput.disabled = isTooltip || isArea;
-    hrefInput.placeholder = isLink
-      ? t('editor.hrefPlaceholder')
-      : isTooltip || isArea
-        ? t('editor.hrefTooltipPlaceholder')
-        : t('editor.hrefOptionalPlaceholder');
-    hrefField.label.textContent = isLink
-      ? t('editor.hrefLabel')
-      : isTooltip
-        ? t('editor.hrefTooltipLabel')
-        : t('editor.hrefOptionalLabel');
-    linkTargetSelect.disabled = !isLink;
-    actionFlowInput.disabled = !isButton;
-    if (!isButton) {
-      stopActionPicker('cancel');
-    }
-    tooltipPositionSelect.disabled = !isTooltip;
-    tooltipPersistentCheckbox.disabled = !isTooltip;
-    textInput.placeholder = isTooltip ? t('editor.tooltipTextPlaceholder') : t('editor.textPlaceholder');
-    areaLayoutSelect.disabled = !isArea;
-
+  refreshUI = (options = {}) => {
+    refreshFields();
+    updateVisibility();
+    actionFlowController.syncUI();
     actionFlowController.validateInput();
     actionFlowController.updateSummary();
-    if (applyDefaults) {
-      const defaults = isLink
+    updateActiveTabTitle();
+    if (!options.skipPreview) {
+      updatePreview();
+    }
+  };
+
+  const handleTypeChange = (applyDefaults = false) => {
+    actionFlowController.hideMenu();
+    const styleDefaults =
+      state.type === 'link'
         ? DEFAULT_LINK_STYLE
-        : isTooltip
+        : state.type === 'tooltip'
           ? DEFAULT_TOOLTIP_STYLE
-          : isArea
+          : state.type === 'area'
             ? DEFAULT_AREA_STYLE
             : DEFAULT_BUTTON_STYLE;
-      resetStyleState(defaults);
-      if (isTooltip) {
-        state.tooltipPosition = 'top';
-        tooltipPositionSelect.value = 'top';
-        state.tooltipPersistent = false;
-        tooltipPersistentCheckbox.checked = false;
-      } else if (isArea) {
-        state.href = '';
-        hrefInput.value = '';
-        state.actionFlow = '';
-        state.actionSteps = [];
-        state.actionFlowMode = 'builder';
-        tooltipPositionSelect.value = 'top';
-        tooltipPersistentCheckbox.checked = false;
-        state.layout = 'row';
-        areaLayoutSelect.value = 'row';
-      } else if (isLink) {
-        state.linkTarget = 'new-tab';
-        linkTargetSelect.value = 'new-tab';
-      }
+
+    if (state.type !== 'button') {
+      stopActionPicker('cancel');
     }
-    actionFlowController.syncUI();
-    updateVisibility();
-    updatePreview();
-    updateActiveTabTitle();
+    clearError();
+
+    formSections.applyTypeChange({
+      applyDefaults,
+      styleDefaults: applyDefaults ? styleDefaults : null,
+    });
+    refreshUI();
   };
 
   const handleDraftUpdate = (event) => {
@@ -750,90 +553,19 @@ function createElementBubble() {
     }
     setState(nextPatch);
     if (stylePatch) {
-      styleControls.merge(stylePatch);
+      formSections.mergeStyle(stylePatch);
     }
     if (hasBubbleSideUpdate) {
       bubble.dataset.pageAugmentorPlacement = 'bottom';
     }
-    if (hasTextUpdate) {
-      textInput.value = state.text;
-    }
     if (hasSelectorUpdate) {
       selectorValue.textContent = state.selector;
-    }
-    if (hasPositionUpdate) {
-      positionSelect.value = state.position;
     }
     if (hasContainerUpdate || hasFloatingUpdate || hasBubbleSideUpdate || hasSelectorUpdate || hasPositionUpdate) {
       placementControls?.update();
     }
-    updatePreview();
+    refreshUI();
   };
-
-  typeSelect.addEventListener('change', (event) => {
-    const selected = event.target.value;
-    state.type = selected === 'link' ? 'link' : selected === 'tooltip' ? 'tooltip' : selected === 'area' ? 'area' : 'button';
-    handleTypeChange(true);
-  });
-
-  textInput.addEventListener('input', (event) => {
-    state.text = event.target.value;
-    updatePreview();
-  });
-
-  hrefInput.addEventListener('input', (event) => {
-    state.href = event.target.value;
-    updatePreview();
-  });
-
-  actionFlowInput.addEventListener('input', (event) => {
-    if (state.actionFlowMode === 'builder') {
-      event.target.value = state.actionFlow;
-      return;
-    }
-    state.actionFlow = event.target.value;
-    actionFlowController.validateInput();
-    actionFlowController.updateSummary();
-  });
-
-  actionFlowInput.addEventListener('change', (event) => {
-    if (state.actionFlowMode === 'builder') {
-      event.target.value = state.actionFlow;
-      return;
-    }
-    state.actionFlow = event.target.value;
-    actionFlowController.validateInput();
-    actionFlowController.updateSummary();
-  });
-
-  positionSelect.addEventListener('change', (event) => {
-    state.position = event.target.value;
-    updatePreview();
-  });
-
-  tooltipPositionSelect.addEventListener('change', (event) => {
-    clearError();
-    state.tooltipPosition = event.target.value;
-    updatePreview();
-  });
-
-  tooltipPersistentCheckbox.addEventListener('change', (event) => {
-    clearError();
-    state.tooltipPersistent = Boolean(event.target.checked);
-    updatePreview();
-  });
-
-  areaLayoutSelect.addEventListener('change', (event) => {
-    const value = event.target.value === 'column' ? 'column' : 'row';
-    state.layout = value;
-    updatePreview();
-  });
-
-  linkTargetSelect.addEventListener('change', (event) => {
-    const value = event.target.value === 'same-tab' ? 'same-tab' : 'new-tab';
-    state.linkTarget = value;
-    updatePreview();
-  });
 
   function startActionPicker(options = {}) {
     if (actionPickerCleanup) {
@@ -869,11 +601,6 @@ function createElementBubble() {
     }
   }
 
-  styleControls.attachInteractions({
-    clearError,
-    updatePreview,
-  });
-
   form.addEventListener('submit', (event) => {
     event.preventDefault();
     const payload = buildPayload();
@@ -882,12 +609,18 @@ function createElementBubble() {
     }
     if (payload.type !== 'area' && !payload.text) {
       errorLabel.textContent = t('editor.errorTextRequired');
-      textInput.focus({ preventScroll: true });
+      const textField = focusTargets.text;
+      if (textField instanceof HTMLElement && typeof textField.focus === 'function') {
+        textField.focus({ preventScroll: true });
+      }
       return;
     }
     if (payload.type === 'link' && !state.href.trim()) {
       errorLabel.textContent = t('editor.errorUrlRequired');
-      hrefInput.focus({ preventScroll: true });
+      const hrefField = focusTargets.href;
+      if (hrefField instanceof HTMLElement && typeof hrefField.focus === 'function') {
+        hrefField.focus({ preventScroll: true });
+      }
       return;
     }
     if (payload.type === 'button' && payload.href && !payload.actionFlow) {
@@ -975,7 +708,13 @@ function createElementBubble() {
       bubble.style.opacity = '1';
       bubble.style.transform = 'translateY(0)';
       updateFixedPlacement();
-      textInput.focus({ preventScroll: true });
+      const initialFocus =
+        focusTargets.text ||
+        focusTargets.actionFlow ||
+        bubble.querySelector('input, textarea, select');
+      if (initialFocus instanceof HTMLElement && typeof initialFocus.focus === 'function') {
+        initialFocus.focus({ preventScroll: true });
+      }
     });
     draftUpdateListener = (event) => handleDraftUpdate(event);
     window.addEventListener('page-augmentor-draft-update', draftUpdateListener);
@@ -1027,64 +766,65 @@ function createElementBubble() {
       previewHandler = typeof onPreview === 'function' ? onPreview : null;
       currentElementId = typeof values?.id === 'string' ? values.id : null;
       const initial = getDefaultElementValues(values, suggestedStyle, t);
-      state.type = initial.type;
-      state.text = initial.text;
-      state.href = initial.href;
-      state.actionFlow = initial.actionFlow || '';
-      state.actionFlowError = '';
-      state.actionFlowSteps = 0;
-      state.actionFlowMode = 'builder';
-      state.actionSteps = [];
-      state.position = initial.position;
-      state.tooltipPosition = initial.tooltipPosition;
-      state.tooltipPersistent = initial.tooltipPersistent;
-      state.layout = initial.layout || 'row';
-      state.linkTarget = initial.linkTarget || 'new-tab';
-      state.containerId = typeof initial.containerId === 'string' ? initial.containerId : '';
-      state.floating = initial.floating !== false;
-      state.bubbleSide = 'bottom';
-      typeSelect.value = state.type;
-      textInput.value = state.text;
-      hrefInput.value = state.href;
-      areaLayoutSelect.value = state.layout === 'column' ? 'column' : 'row';
-      linkTargetSelect.value = state.linkTarget === 'same-tab' ? 'same-tab' : 'new-tab';
+      const initialPatch = {
+        type: initial.type,
+        text: initial.text,
+        href: initial.href,
+        actionFlow: initial.actionFlow || '',
+        actionFlowError: '',
+        actionFlowSteps: 0,
+        actionFlowMode: 'builder',
+        actionSteps: [],
+        position: initial.position,
+        tooltipPosition: initial.tooltipPosition,
+        tooltipPersistent: initial.tooltipPersistent,
+        layout: initial.layout || 'row',
+        linkTarget: initial.linkTarget || 'new-tab',
+        containerId: typeof initial.containerId === 'string' ? initial.containerId : '',
+        floating: initial.floating !== false,
+        bubbleSide: 'bottom',
+        style: initial.style || {},
+      };
+      setState(initialPatch);
+      state = editorState.get();
       let initialFlowSource = state.actionFlow;
       if (state.type === 'button' && (!initialFlowSource || !initialFlowSource.trim())) {
         const inheritedSelector = typeof values.actionSelector === 'string' ? values.actionSelector.trim() : '';
         if (inheritedSelector) {
           initialFlowSource = JSON.stringify({ steps: [{ type: 'click', selector: inheritedSelector }] }, null, 2);
-          state.actionFlow = initialFlowSource;
+          setState({ actionFlow: initialFlowSource });
+          state = editorState.get();
         }
       }
       const parsedFlow =
         state.type === 'button' ? parseFlowForBuilder(initialFlowSource) : { mode: 'builder', steps: [], error: '' };
       if (state.type === 'button' && parsedFlow.mode === 'builder') {
-        state.actionFlowMode = 'builder';
-        state.actionSteps = parsedFlow.steps;
-        state.actionFlow = state.actionSteps.length ? stepsToJSON(state.actionSteps) : '';
+        setState({
+          actionFlowMode: 'builder',
+          actionSteps: parsedFlow.steps,
+          actionFlow: parsedFlow.steps.length ? stepsToJSON(parsedFlow.steps) : '',
+        });
+        state = editorState.get();
         actionFlowInput.value = state.actionFlow;
       } else if (state.type === 'button' && parsedFlow.mode === 'advanced') {
-        state.actionFlowMode = 'advanced';
-        state.actionFlow = initial.actionFlow || '';
-        state.actionFlowError = parsedFlow.error || '';
+        setState({
+          actionFlowMode: 'advanced',
+          actionFlow: initial.actionFlow || '',
+          actionFlowError: parsedFlow.error || '',
+        });
+        state = editorState.get();
         actionFlowInput.value = state.actionFlow;
       } else {
         actionFlowInput.value = state.actionFlow;
       }
-      positionSelect.value = state.position;
-      tooltipPositionSelect.value = state.tooltipPosition;
-      tooltipPersistentCheckbox.checked = state.tooltipPersistent;
       resetStyleState(initial.style, initial.styleSuggestions);
       stopActionPicker('cancel');
       actionFlowController.refreshBuilder();
       handleTypeChange();
-      actionFlowController.syncUI();
-      errorLabel.textContent = '';
-      updateActiveTabTitle();
+      refreshUI({ skipPreview: true });
       saveButton.textContent = mode === 'edit' ? t('editor.saveUpdate') : t('editor.saveCreate');
       actionFlowController.validateInput();
       updatePreview({ propagate: false });
-      updateVisibility();
       submitHandler = (payload) => {
         actionFlowController.closeFlowEditor({ reopen: false });
         detach();
