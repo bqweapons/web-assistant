@@ -9,7 +9,7 @@ const DEFAULT_STATE = {
    linkTarget: 'new-tab',
   containerId: '',
   floating: true,
-  bubbleSide: 'right',
+  bubbleSide: 'bottom',
   actionFlowMode: 'builder',
   actionFlow: '',
   actionFlowError: '',
@@ -112,7 +112,9 @@ function cloneState(value) {
     style: cloneRecord(value.style),
     containerId: typeof value.containerId === 'string' ? value.containerId : '',
     floating: Boolean(value.floating),
-    bubbleSide: value.bubbleSide === 'left' ? 'left' : 'right',
+    bubbleSide: typeof value.bubbleSide === 'string' && value.bubbleSide.trim()
+      ? value.bubbleSide.trim()
+      : 'bottom',
     actionFlowMode: value.actionFlowMode,
     actionFlow: value.actionFlow,
     actionFlowError: value.actionFlowError,

@@ -7,8 +7,9 @@ import {
   DEFAULT_AREA_STYLE,
   getTooltipPositionOptions as buildTooltipPositionOptions,
 } from './styles/style-presets.js';
-import { createField, styleInput, createSection } from './ui/field.js';
-import { createTabGroup } from './ui/tab-group.js';
+import { createField, styleInput } from './ui/field.js';
+import { applyCardStyle } from './ui/card.js';
+import { createBaseInfoSection } from './editor/base-info-controls.js';
 import { stepsToJSON } from './actionflow/serializer.js';
 import { createEditorState } from './state.js';
 import { parseFlowForBuilder } from './actionflow/parser-bridge.js';
@@ -136,13 +137,15 @@ function createElementBubble() {
   Object.assign(bubble.style, {
     position: 'fixed',
     zIndex: '2147483647',
-    maxWidth: '340px',
-    minWidth: '260px',
-    maxHeight: '85vh',
-    padding: '18px',
-    borderRadius: '16px',
+    width: '100%',
+    maxWidth: '100vw',
+    minWidth: '0',
+    minHeight: '300px',
+    maxHeight: '40vh',
+    padding: '12px 16px',
+    borderRadius: '18px 18px 0 0',
     backgroundColor: '#ffffff',
-    boxShadow: '0 18px 48px rgba(15, 23, 42, 0.18)',
+    boxShadow: '0 -6px 24px rgba(15, 23, 42, 0.14)',
     border: '1px solid rgba(148, 163, 184, 0.45)',
     fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
     fontSize: '13px',
@@ -156,53 +159,100 @@ function createElementBubble() {
     display: 'flex',
     flexDirection: 'column',
     gap: '16px',
+    boxSizing: 'border-box',
   });
 
   bubble.addEventListener('click', (event) => event.stopPropagation());
   bubble.addEventListener('mousedown', (event) => event.stopPropagation());
 
-  const title = document.createElement('h3');
-  title.textContent = t('editor.title');
-  Object.assign(title.style, {
-    margin: '0 0 10px 0',
-    fontSize: '14px',
-    fontWeight: '600',
-    color: '#0f172a',
+  const selectorWrapper = document.createElement('div');
+  selectorWrapper.style.display = 'none';
+  const selectorTitle = document.createElement('span');
+  selectorTitle.textContent = t('editor.selectorLabel');
+  const selectorValue = document.createElement('code');
+  selectorWrapper.append(selectorTitle, selectorValue);
+
+  const headerBar = document.createElement('div');
+  Object.assign(headerBar.style, {
+    display: 'grid',
+    gridTemplateColumns: 'minmax(220px, 1.4fr) 1.2fr auto',
+    alignItems: 'center',
+    gap: '12px',
+    padding: '8px 10px 10px',
+    borderBottom: '1px solid rgba(148, 163, 184, 0.25)',
+    backgroundColor: '#f9fafb',
+    position: 'sticky',
+    top: '0',
+    zIndex: '1',
   });
 
-  const selectorWrapper = document.createElement('div');
-  Object.assign(selectorWrapper.style, {
+  const headerContext = document.createElement('div');
+  Object.assign(headerContext.style, {
+    display: 'flex',
+    alignItems: 'center',
+    gap: '10px',
+    minWidth: '0',
+  });
+
+  const headerTitleStack = document.createElement('div');
+  Object.assign(headerTitleStack.style, {
     display: 'flex',
     flexDirection: 'column',
     gap: '4px',
-    margin: '0',
+    minWidth: '0',
   });
 
-  const selectorTitle = document.createElement('span');
-  selectorTitle.textContent = t('editor.selectorLabel');
-  Object.assign(selectorTitle.style, {
-    fontSize: '12px',
-    fontWeight: '600',
-    textTransform: 'uppercase',
-    color: '#64748b',
-    letterSpacing: '0.03em',
+  const headerTitle = document.createElement('div');
+  headerTitle.textContent = t('editor.title');
+  Object.assign(headerTitle.style, {
+    fontSize: '14px',
+    fontWeight: '700',
+    color: '#0f172a',
+    lineHeight: '1.2',
   });
 
-  const selectorValue = document.createElement('code');
-  Object.assign(selectorValue.style, {
+  const headerTypeBadge = document.createElement('span');
+  Object.assign(headerTypeBadge.style, {
     display: 'inline-flex',
     alignItems: 'center',
-    padding: '6px 8px',
-    borderRadius: '8px',
-    backgroundColor: 'rgba(241, 245, 249, 0.9)',
-    border: '1px solid rgba(148, 163, 184, 0.45)',
+    padding: '4px 10px',
+    borderRadius: '999px',
+    backgroundColor: '#e0e7ff',
+    color: '#312e81',
     fontSize: '12px',
-    color: '#0f172a',
-    lineHeight: '1.4',
-    wordBreak: 'break-all',
+    fontWeight: '700',
+    letterSpacing: '0.01em',
+    whiteSpace: 'nowrap',
   });
 
-  selectorWrapper.append(selectorTitle, selectorValue);
+  const headerSubtitle = document.createElement('div');
+  headerSubtitle.textContent = '';
+  Object.assign(headerSubtitle.style, {
+    fontSize: '11px',
+    color: '#94a3b8',
+    lineHeight: '1.3',
+    minHeight: '14px',
+  });
+
+  const headerTitleRow = document.createElement('div');
+  Object.assign(headerTitleRow.style, {
+    display: 'flex',
+    alignItems: 'center',
+    gap: '8px',
+    minWidth: '0',
+  });
+  headerTitleRow.append(headerTitle, headerTypeBadge);
+
+  headerTitleStack.append(headerTitleRow, headerSubtitle);
+  headerContext.append(headerTitleStack);
+
+  const headerActions = document.createElement('div');
+  Object.assign(headerActions.style, {
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'flex-end',
+    gap: '10px',
+  });
 
   // Preview UI removed
 
@@ -210,7 +260,7 @@ function createElementBubble() {
   Object.assign(form.style, {
     display: 'flex',
     flexDirection: 'column',
-    gap: '16px',
+    gap: '0',
     flex: '1 1 auto',
     minHeight: '0',
   });
@@ -219,11 +269,11 @@ function createElementBubble() {
   Object.assign(formBody.style, {
     display: 'flex',
     flexDirection: 'column',
-    gap: '14px',
+    gap: '12px',
     flex: '1 1 auto',
     minHeight: '0',
     overflowY: 'auto',
-    paddingTop: '6px',
+    padding: '10px 2px 6px',
   });
 
   const typeSelect = document.createElement('select');
@@ -234,6 +284,8 @@ function createElementBubble() {
     typeSelect.appendChild(option);
   });
   styleInput(typeSelect);
+  typeSelect.disabled = true;
+  typeSelect.style.display = 'none';
 
   const textInput = document.createElement('input');
   textInput.type = 'text';
@@ -365,25 +417,16 @@ function createElementBubble() {
   const styleControls = createStyleControls({ t });
   const styleFieldset = styleControls.fieldset;
 
-  const actions = document.createElement('div');
-  Object.assign(actions.style, {
-    display: 'flex',
-    justifyContent: 'flex-end',
-    gap: '10px',
-    paddingTop: '12px',
-    borderTop: '1px solid rgba(148, 163, 184, 0.2)',
-  });
-
   const cancelButton = document.createElement('button');
   cancelButton.type = 'button';
   cancelButton.textContent = t('editor.cancel');
   Object.assign(cancelButton.style, {
-    padding: '8px 14px',
+    padding: '8px 12px',
     borderRadius: '10px',
     border: '1px solid rgba(148, 163, 184, 0.6)',
     backgroundColor: '#ffffff',
     color: '#0f172a',
-    fontSize: '13px',
+    fontSize: '12px',
     fontWeight: '600',
     cursor: 'pointer',
   });
@@ -397,13 +440,13 @@ function createElementBubble() {
     border: 'none',
     background: 'linear-gradient(135deg, #2563eb, #1d4ed8)',
     color: '#ffffff',
-    fontSize: '13px',
+    fontSize: '12px',
     fontWeight: '600',
     cursor: 'pointer',
     boxShadow: '0 8px 18px rgba(37, 99, 235, 0.25)',
   });
 
-  actions.append(cancelButton, saveButton);
+  headerActions.append(cancelButton, saveButton);
 
   const errorLabel = document.createElement('p');
   errorLabel.textContent = '';
@@ -414,45 +457,44 @@ function createElementBubble() {
     color: '#dc2626',
   });
 
-  const sectionsTabs = createTabGroup();
+  const panel = document.createElement('section');
+  Object.assign(panel.style, {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: '12px',
+  });
 
-  const basicSection = sectionsTabs.addSection(
-    t('editor.sections.basics.title'),
-    t('editor.sections.basics.description'),
-  );
-  basicSection.content.append(
-    typeField.wrapper,
-    textField.wrapper,
-    hrefField.wrapper,
-    linkTargetField.wrapper,
-    tooltipPositionField.wrapper,
-    tooltipPersistentField.wrapper,
-    areaLayoutField.wrapper,
-  );
+  const baseInfoNodes = {
+    text: textField.wrapper,
+    href: hrefField.wrapper,
+    linkTarget: linkTargetField.wrapper,
+    actionFlow: actionFlowSummaryField.wrapper,
+    tooltipPosition: tooltipPositionField.wrapper,
+    tooltipPersistent: tooltipPersistentField.wrapper,
+    areaLayout: areaLayoutField.wrapper,
+  };
 
-  const behaviorSection = sectionsTabs.addSection(
-    t('editor.sections.behavior.title'),
-    t('editor.sections.behavior.description'),
-  );
-  behaviorSection.content.append(actionFlowSummaryField.wrapper);
+  const baseInfoSection = createBaseInfoSection({
+    t,
+    nodes: baseInfoNodes,
+    getState: () => state,
+  });
 
-  // const placementSection = sectionsTabs.addSection(
-  //   t('editor.sections.placement.title'),
-  //   t('editor.sections.placement.description'),
-  // );
-  // placementSection.content.append(positionField.wrapper);
+  panel.append(baseInfoSection.fieldset, styleFieldset);
+  formBody.append(panel);
 
-  const appearanceSection = sectionsTabs.addSection(
-    t('editor.sections.appearance.title'),
-    t('editor.sections.appearance.description'),
-  );
-  appearanceSection.content.append(styleFieldset);
+  const updateActiveTabTitle = () => {
+    headerTitle.textContent = t('editor.sections.basics.title');
+    headerSubtitle.textContent = t('editor.sections.basics.description');
+    const typeLabel = getTypeOptions().find(({ value }) => value === state.type)?.label || '';
+    headerTypeBadge.textContent = typeLabel;
+  };
+  updateActiveTabTitle();
 
-  formBody.append(sectionsTabs.container);
+  headerBar.append(headerContext, headerActions);
+  form.append(headerBar, formBody);
 
-  form.append(formBody, actions);
-
-  bubble.append(title, selectorWrapper, form, errorLabel);
+  bubble.append(form, errorLabel);
 
   /** @type {Element | null} */
   let currentTarget = null;
@@ -605,8 +647,6 @@ function createElementBubble() {
     if (!isButton) {
       stopActionPicker('cancel');
     }
-    behaviorSection.setVisible(isButton);
-
     tooltipPositionField.wrapper.style.display = isTooltip ? 'flex' : 'none';
     tooltipPositionSelect.disabled = !isTooltip;
     tooltipPersistentField.wrapper.style.display = isTooltip ? 'flex' : 'none';
@@ -650,7 +690,9 @@ function createElementBubble() {
       }
     }
     actionFlowController.syncUI();
+    baseInfoSection.updateVisibility?.();
     updatePreview();
+    updateActiveTabTitle();
   };
 
   const handleDraftUpdate = (event) => {
@@ -680,7 +722,7 @@ function createElementBubble() {
       nextPatch.floating = Boolean(detail.floating);
     }
     if (hasBubbleSideUpdate) {
-      nextPatch.bubbleSide = detail.bubbleSide === 'left' ? 'left' : 'right';
+      nextPatch.bubbleSide = 'bottom';
     }
     if (hasSelectorUpdate) {
       const selectorValue =
@@ -703,7 +745,7 @@ function createElementBubble() {
       styleControls.merge(stylePatch);
     }
     if (hasBubbleSideUpdate) {
-      bubble.dataset.pageAugmentorPlacement = state.bubbleSide === 'left' ? 'left' : 'right';
+      bubble.dataset.pageAugmentorPlacement = 'bottom';
     }
     if (hasTextUpdate) {
       textInput.value = state.text;
@@ -887,25 +929,23 @@ function createElementBubble() {
       return;
     }
     isAttached = true;
-    bubble.dataset.pageAugmentorPlacement = 'right';
+    bubble.dataset.pageAugmentorPlacement = 'bottom';
     attachBubble(bubble);
-    const margin = 32;
-    const desiredTop = 96;
+    const edgeGap = 0;
     const updateFixedPlacement = () => {
-      const bubbleHeight = bubble.offsetHeight || 0;
-      const maxTop = Math.max(margin, window.innerHeight - bubbleHeight - margin);
-      const top = Math.min(maxTop, Math.max(margin, desiredTop));
-      const side = state.bubbleSide === 'left' ? 'left' : 'right';
-      bubble.dataset.pageAugmentorPlacement = side;
-      if (side === 'left') {
-        bubble.style.left = `${margin}px`;
-        bubble.style.right = 'auto';
-      } else {
-        bubble.style.left = 'auto';
-        bubble.style.right = `${margin}px`;
-      }
-      bubble.style.bottom = 'auto';
-      bubble.style.top = `${Math.round(top)}px`;
+      const viewportHeight = window.innerHeight || 0;
+      const targetHeight = Math.max(260, Math.floor(viewportHeight * 0.7));
+      const availableHeight = Math.max(viewportHeight - 12, 0);
+      const cappedHeight = availableHeight ? Math.min(targetHeight, availableHeight) : targetHeight;
+      const maxHeight = availableHeight
+        ? Math.min(Math.max(200, cappedHeight), availableHeight)
+        : Math.max(200, cappedHeight);
+      bubble.dataset.pageAugmentorPlacement = 'bottom';
+      bubble.style.left = `${edgeGap}px`;
+      bubble.style.right = `${edgeGap}px`;
+      bubble.style.bottom = `${edgeGap}px`;
+      bubble.style.top = 'auto';
+      bubble.style.maxHeight = `${maxHeight}px`;
     };
     const handleKeydown = (event) => {
       if (event.key === 'Escape') {
@@ -927,8 +967,7 @@ function createElementBubble() {
       bubble.style.opacity = '1';
       bubble.style.transform = 'translateY(0)';
       updateFixedPlacement();
-      const initialFocus = state.type === 'area' ? typeSelect : textInput;
-      initialFocus.focus({ preventScroll: true });
+      textInput.focus({ preventScroll: true });
     });
     draftUpdateListener = (event) => handleDraftUpdate(event);
     window.addEventListener('page-augmentor-draft-update', draftUpdateListener);
@@ -936,7 +975,7 @@ function createElementBubble() {
       const detail = (event && event.detail) || {};
       if (!detail || (currentElementId && detail.elementId && detail.elementId !== currentElementId)) return;
       if (Object.prototype.hasOwnProperty.call(detail || {}, 'bubbleSide')) {
-        state.bubbleSide = detail.bubbleSide === 'left' ? 'left' : 'right';
+        state.bubbleSide = 'bottom';
         placementControls?.update();
       }
     };
@@ -995,7 +1034,7 @@ function createElementBubble() {
       state.linkTarget = initial.linkTarget || 'new-tab';
       state.containerId = typeof initial.containerId === 'string' ? initial.containerId : '';
       state.floating = initial.floating !== false;
-      state.bubbleSide = 'right';
+      state.bubbleSide = 'bottom';
       typeSelect.value = state.type;
       textInput.value = state.text;
       hrefInput.value = state.href;
@@ -1033,10 +1072,11 @@ function createElementBubble() {
       handleTypeChange();
       actionFlowController.syncUI();
       errorLabel.textContent = '';
-      title.textContent = mode === 'edit' ? t('editor.titleEdit') : t('editor.titleCreate');
+      updateActiveTabTitle();
       saveButton.textContent = mode === 'edit' ? t('editor.saveUpdate') : t('editor.saveCreate');
       actionFlowController.validateInput();
       updatePreview({ propagate: false });
+      baseInfoSection.updateVisibility?.();
       submitHandler = (payload) => {
         actionFlowController.closeFlowEditor({ reopen: false });
         detach();

@@ -59,7 +59,7 @@ export function createActionFlowController(options) {
 
   const openActionFlowButton = document.createElement('button');
   openActionFlowButton.type = 'button';
-  openActionFlowButton.textContent = t('editor.actionFlowConfigure');
+  openActionFlowButton.textContent = t('editor.actionBuilder.add');
   Object.assign(openActionFlowButton.style, {
     padding: '7px 12px',
     borderRadius: '8px',
@@ -290,6 +290,17 @@ export function createActionFlowController(options) {
     lineHeight: '1.5',
   });
 
+  const flowBubbleHeader = document.createElement('div');
+  Object.assign(flowBubbleHeader.style, {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: '4px',
+    cursor: 'grab',
+    userSelect: 'none',
+    touchAction: 'none',
+  });
+  flowBubbleHeader.append(flowBubbleTitle, flowBubbleDescription);
+
   const flowBubbleBody = document.createElement('div');
   Object.assign(flowBubbleBody.style, {
     display: 'flex',
@@ -341,7 +352,7 @@ export function createActionFlowController(options) {
   });
 
   flowBubbleActions.append(flowCancelButton, flowSaveButton);
-  flowBubble.append(flowBubbleTitle, flowBubbleDescription, flowBubbleBody, flowBubbleActions);
+  flowBubble.append(flowBubbleHeader, flowBubbleBody, flowBubbleActions);
 
   let actionMenuVisible = false;
   let actionBuilderInvalidIndex = -1;
@@ -349,6 +360,93 @@ export function createActionFlowController(options) {
   let flowSnapshot = null;
   let attachMainBubble = () => {};
   let detachMainBubble = () => {};
+  let dragPointerId = null;
+  let dragOffsetX = 0;
+  let dragOffsetY = 0;
+
+  const clampFlowBubblePosition = (left, top) => {
+    const rect = flowBubble.getBoundingClientRect();
+    const bubbleWidth = rect.width || 420;
+    const bubbleHeight = rect.height || 420;
+    const margin = 12;
+    const maxLeft = Math.max(margin, window.innerWidth - bubbleWidth - margin);
+    const maxTop = Math.max(margin, window.innerHeight - bubbleHeight - margin);
+    return {
+      left: Math.min(Math.max(margin, left), maxLeft),
+      top: Math.min(Math.max(margin, top), maxTop),
+    };
+  };
+
+  const setFlowBubblePosition = (left, top) => {
+    flowBubble.style.left = `${Math.round(left)}px`;
+    flowBubble.style.top = `${Math.round(top)}px`;
+    flowBubble.style.right = 'auto';
+  };
+
+  const resetFlowBubblePosition = () => {
+    const defaultMargin = 24;
+    const rect = flowBubble.getBoundingClientRect();
+    const bubbleWidth = rect.width || 420;
+    const bubbleLeft = window.innerWidth - bubbleWidth - defaultMargin;
+    const bubbleTop = defaultMargin;
+    const { left, top } = clampFlowBubblePosition(bubbleLeft, bubbleTop);
+    setFlowBubblePosition(left, top);
+  };
+
+  const stopFlowBubbleDrag = (event) => {
+    if (dragPointerId === null) {
+      flowBubbleHeader.style.cursor = 'grab';
+      return;
+    }
+    if (event && event.pointerId !== undefined && event.pointerId !== dragPointerId) {
+      return;
+    }
+    if (typeof flowBubble.releasePointerCapture === 'function') {
+      try {
+        flowBubble.releasePointerCapture(dragPointerId);
+      } catch (error) {
+        // capture may already be released
+      }
+    }
+    dragPointerId = null;
+    flowBubbleHeader.style.cursor = 'grab';
+  };
+
+  const handleFlowBubblePointerDown = (event) => {
+    if (event.button !== undefined && event.button !== 0) {
+      return;
+    }
+    dragPointerId = event.pointerId;
+    const rect = flowBubble.getBoundingClientRect();
+    dragOffsetX = event.clientX - rect.left;
+    dragOffsetY = event.clientY - rect.top;
+    flowBubbleHeader.style.cursor = 'grabbing';
+    if (typeof flowBubble.setPointerCapture === 'function') {
+      flowBubble.setPointerCapture(event.pointerId);
+    }
+    event.preventDefault();
+  };
+
+  const handleFlowBubblePointerMove = (event) => {
+    if (dragPointerId === null || event.pointerId !== dragPointerId) {
+      return;
+    }
+    const nextLeft = event.clientX - dragOffsetX;
+    const nextTop = event.clientY - dragOffsetY;
+    const clamped = clampFlowBubblePosition(nextLeft, nextTop);
+    setFlowBubblePosition(clamped.left, clamped.top);
+  };
+
+  const constrainFlowBubbleToViewport = () => {
+    const rect = flowBubble.getBoundingClientRect();
+    const { left, top } = clampFlowBubblePosition(rect.left, rect.top);
+    setFlowBubblePosition(left, top);
+  };
+
+  flowBubbleHeader.addEventListener('pointerdown', handleFlowBubblePointerDown);
+  flowBubble.addEventListener('pointermove', handleFlowBubblePointerMove);
+  flowBubble.addEventListener('pointerup', stopFlowBubbleDrag);
+  flowBubble.addEventListener('pointercancel', stopFlowBubbleDrag);
 
   const handleMenuOutsideClick = (event) => {
     if (!addActionContainer.contains(event.target)) {
@@ -904,6 +1002,7 @@ export function createActionFlowController(options) {
   };
 
   const closeFlowEditor = ({ reopen = true } = {}) => {
+    stopFlowBubbleDrag({ pointerId: dragPointerId });
     if (flowBubbleAttached) {
       flowBubbleAttached = false;
       flowBubble.style.opacity = '0';
@@ -915,6 +1014,7 @@ export function createActionFlowController(options) {
       }, 200);
     }
 
+    window.removeEventListener('resize', constrainFlowBubbleToViewport, true);
     document.removeEventListener('keydown', handleFlowKeydown, true);
     flowSnapshot = null;
     actionFlowEditorHost.appendChild(actionFlowField.wrapper);
@@ -944,10 +1044,14 @@ export function createActionFlowController(options) {
     flowBubble.style.transform = 'translateY(12px)';
     document.body.appendChild(flowBubble);
     flowBubbleAttached = true;
+    window.addEventListener('resize', constrainFlowBubbleToViewport, true);
+    resetFlowBubblePosition();
+    constrainFlowBubbleToViewport();
     document.addEventListener('keydown', handleFlowKeydown, true);
     requestAnimationFrame(() => {
       flowBubble.style.opacity = '1';
       flowBubble.style.transform = 'translateY(0)';
+      constrainFlowBubbleToViewport();
     });
     refreshActionBuilderState();
     updateActionFlowFromSteps({ updateHint: false });

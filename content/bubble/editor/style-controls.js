@@ -1,5 +1,9 @@
 import { createField, styleInput } from '../ui/field.js';
-import { getStyleFieldConfigs as buildStyleFieldConfigs } from '../styles/style-config.js';
+import { applyCardStyle } from '../ui/card.js';
+import {
+  DEFAULT_STYLE_ITEM_MIN_WIDTH,
+  getStyleFieldConfigs as buildStyleFieldConfigs,
+} from '../styles/style-config.js';
 import { normalizeStyleState } from '../styles/style-normalize.js';
 import {
   DEFAULT_BUTTON_STYLE,
@@ -8,6 +12,7 @@ import {
 } from '../styles/style-presets.js';
 
 const HEX_COLOR_PATTERN = /^#(?:[0-9a-fA-F]{3}|[0-9a-fA-F]{6})$/i;
+const BASIC_FIELDS = new Set(['color', 'backgroundColor', 'fontSize']);
 const ADVANCED_FIELDS = new Set(['position', 'top', 'right', 'bottom', 'left', 'zIndex', 'boxShadow']);
 
 /**
@@ -27,7 +32,7 @@ const ADVANCED_FIELDS = new Set(['position', 'top', 'right', 'bottom', 'left', '
 export function createStyleControls({ t }) {
   const styleFieldset = document.createElement('fieldset');
   Object.assign(styleFieldset.style, {
-    border: '1px dashed rgba(148, 163, 184, 0.6)',
+    border: '1px solid rgba(148, 163, 184, 0.35)',
     borderRadius: '10px',
     padding: '12px',
     display: 'flex',
@@ -48,6 +53,20 @@ export function createStyleControls({ t }) {
   const styleInputs = new Map();
   const styleState = {};
   const styleFieldConfigs = buildStyleFieldConfigs(t);
+  const adjustableFields = new Set([
+    'fontSize',
+    'paddingTop',
+    'paddingRight',
+    'paddingBottom',
+    'paddingLeft',
+    'width',
+    'height',
+    'fontWeight',
+    'top',
+    'right',
+    'bottom',
+    'left',
+  ]);
   const stylePresets = [
     { value: '', label: t('editor.styles.presets.custom'), styles: null },
     { value: 'button-default', label: t('editor.styles.presets.primary'), styles: DEFAULT_BUTTON_STYLE },
@@ -79,6 +98,8 @@ export function createStyleControls({ t }) {
     { value: 'area-default', label: t('editor.styles.presets.area'), styles: DEFAULT_AREA_STYLE },
   ];
 
+  let externalUpdatePreview = null;
+
   styleFieldConfigs.forEach(({ name }) => {
     styleState[name] = '';
   });
@@ -93,15 +114,18 @@ export function createStyleControls({ t }) {
   styleInput(presetSelect);
 
   const presetField = createField(t('editor.styles.presetsLabel'), presetSelect);
-  styleFieldset.appendChild(presetField.wrapper);
 
   const basicContainer = document.createElement('div');
   Object.assign(basicContainer.style, {
-    display: 'grid',
-    gap: '12px',
-    gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))',
+    display: 'flex',
+    flexWrap: 'wrap',
+    gap: '10px',
+    alignItems: 'stretch',
   });
   styleFieldset.appendChild(basicContainer);
+  const styleItemMinWidth = DEFAULT_STYLE_ITEM_MIN_WIDTH;
+  applyCardStyle(presetField.wrapper, styleItemMinWidth);
+  basicContainer.appendChild(presetField.wrapper);
 
   const advancedDetails = document.createElement('details');
   advancedDetails.open = false;
@@ -121,9 +145,10 @@ export function createStyleControls({ t }) {
   advancedDetails.appendChild(advancedSummary);
   const advancedContainer = document.createElement('div');
   Object.assign(advancedContainer.style, {
-    display: 'grid',
+    display: 'flex',
+    flexWrap: 'wrap',
     gap: '12px',
-    gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))',
+    alignItems: 'stretch',
   });
   advancedDetails.appendChild(advancedContainer);
 
@@ -176,15 +201,40 @@ export function createStyleControls({ t }) {
       gap: '8px',
       alignItems: 'center',
     });
+
+    if (config.name === 'position') {
+      const positionSelect = document.createElement('select');
+      ['relative', 'absolute', 'fixed', 'static', 'sticky'].forEach((value) => {
+        const option = document.createElement('option');
+        option.value = value;
+        option.textContent = value;
+        positionSelect.appendChild(option);
+      });
+      styleInput(positionSelect);
+      const syncPosition = (event) => {
+        styleState[config.name] = event.target.value;
+        textInput.value = event.target.value;
+        externalUpdatePreview?.();
+      };
+      positionSelect.addEventListener('change', syncPosition);
+      positionSelect.addEventListener('input', syncPosition);
+      positionSelect.value = textInput.value || 'relative';
+      inputRow.appendChild(positionSelect);
+      textInput.style.display = 'none';
+      textInput.dataset.linkedSelect = 'true';
+      textInput.value = positionSelect.value;
+      textInput.dataset.defaultPlaceholder = positionSelect.value;
+    }
+
     inputRow.appendChild(textInput);
     if (colorInput) {
       inputRow.appendChild(colorInput);
     }
 
-    // Font size quick adjust buttons
+    // Quick adjust buttons for numeric fields
     let incBtn = null;
     let decBtn = null;
-    if (config.name === 'fontSize') {
+    if (adjustableFields.has(config.name)) {
       const makeBtn = (label) => {
         const btn = document.createElement('button');
         btn.type = 'button';
@@ -204,11 +254,10 @@ export function createStyleControls({ t }) {
       incBtn = makeBtn('+');
       inputRow.append(decBtn, incBtn);
     }
-
     // Color palette swatches for color fields
     let palette = null;
     if (config.colorPicker) {
-      const colors = ['#2563eb', '#ef4444', '#10b981', '#f59e0b', '#8b5cf6', '#64748b', '#000000', '#ffffff'];
+      const colors = ['#2563eb', '#ef4444', '#10b981', '#f59e0b', '#8b5cf6', '#64748b', '#000000', '#ffffff', 'transparent'];
       palette = document.createElement('div');
       Object.assign(palette.style, {
         display: 'flex',
@@ -224,7 +273,10 @@ export function createStyleControls({ t }) {
           height: '18px',
           borderRadius: '6px',
           border: '1px solid rgba(148, 163, 184, 0.6)',
-          background: hex,
+          background:
+            hex === 'transparent'
+              ? 'repeating-conic-gradient(#cbd5e1 0% 25%, #f1f5f9 0% 50%) 0 0/8px 8px'
+              : hex,
           cursor: 'pointer',
         });
         swatch.dataset.value = hex;
@@ -235,12 +287,19 @@ export function createStyleControls({ t }) {
     if (palette) {
       field.wrapper.appendChild(palette);
     }
-    if (ADVANCED_FIELDS.has(config.name)) {
-      advancedContainer.appendChild(field.wrapper);
-    } else {
-      basicContainer.appendChild(field.wrapper);
-    }
-    styleInputs.set(config.name, { text: textInput, color: colorInput, inc: incBtn, dec: decBtn, palette });
+    const targetContainer =
+      ADVANCED_FIELDS.has(config.name) || !BASIC_FIELDS.has(config.name) ? advancedContainer : basicContainer;
+    const minWidth = config.minWidth || styleItemMinWidth;
+    applyCardStyle(field.wrapper, minWidth);
+    targetContainer.appendChild(field.wrapper);
+    styleInputs.set(config.name, {
+      text: textInput,
+      color: colorInput,
+      inc: incBtn,
+      dec: decBtn,
+      palette,
+      select: textInput.dataset.linkedSelect ? inputRow.querySelector('select') : null,
+    });
   });
 
   // Custom CSS textarea in Advanced
@@ -258,6 +317,7 @@ export function createStyleControls({ t }) {
     boxSizing: 'border-box',
   });
   const customCssField = createField(t('editor.styles.customCss'), customCss);
+  applyCardStyle(customCssField.wrapper, styleItemMinWidth);
   advancedContainer.appendChild(customCssField.wrapper);
 
   const styleHint = document.createElement('p');
@@ -281,6 +341,9 @@ export function createStyleControls({ t }) {
       const value = rawValue;
       styleState[name] = value;
       record.text.value = value;
+      if (record.select) {
+        record.select.value = value || record.select.value;
+      }
       if (record.color) {
         const trimmed = value.trim();
         const fallback = record.color.dataset.defaultValue || '#ffffff';
@@ -303,6 +366,9 @@ export function createStyleControls({ t }) {
         return;
       }
       record.text.value = value || '';
+      if (record.select) {
+        record.select.value = value || record.select.value;
+      }
       const basePlaceholder =
         record.text.dataset.defaultPlaceholder || record.text.placeholder || '';
       if (suggestions && typeof suggestions[name] === 'string') {
@@ -330,6 +396,7 @@ export function createStyleControls({ t }) {
   }
 
   function attachInteractions({ clearError, updatePreview }) {
+    externalUpdatePreview = typeof updatePreview === 'function' ? updatePreview : null;
     styleFieldConfigs.forEach(({ name }) => {
       const record = styleInputs.get(name);
       if (!record) {
@@ -344,12 +411,12 @@ export function createStyleControls({ t }) {
           record.color.value = hex;
           record.color.dataset.defaultValue = hex;
         }
-        updatePreview();
+        externalUpdatePreview?.();
       });
       record.text.addEventListener('change', (event) => {
         clearError();
         styleState[name] = event.target.value;
-        updatePreview();
+        externalUpdatePreview?.();
       });
       if (record.color) {
         record.color.addEventListener('input', (event) => {
@@ -357,14 +424,14 @@ export function createStyleControls({ t }) {
           styleState[name] = event.target.value;
           record.text.value = event.target.value;
           record.color.dataset.defaultValue = event.target.value;
-          updatePreview();
+          externalUpdatePreview?.();
         });
         record.color.addEventListener('change', (event) => {
           clearError();
           styleState[name] = event.target.value;
           record.text.value = event.target.value;
           record.color.dataset.defaultValue = event.target.value;
-          updatePreview();
+          externalUpdatePreview?.();
         });
         if (record.palette) {
           record.palette.querySelectorAll('button').forEach((btn) => {
@@ -373,26 +440,31 @@ export function createStyleControls({ t }) {
               const value = btn.dataset.value || '';
               styleState[name] = value;
               record.text.value = value;
-              if (record.color) {
+              if (record.color && HEX_COLOR_PATTERN.test(value)) {
                 record.color.value = value;
                 record.color.dataset.defaultValue = value;
               }
-              updatePreview();
+              externalUpdatePreview?.();
             });
           });
         }
       }
 
-      if (name === 'fontSize' && (record.inc || record.dec)) {
+      if (adjustableFields.has(name) && (record.inc || record.dec)) {
         const adjust = (delta) => {
           clearError();
           const current = parseInt((record.text.value || '').replace(/[^0-9-]/g, ''), 10);
-          const base = Number.isFinite(current) ? current : 16;
-          const next = Math.max(8, base + delta);
-          const value = `${next}px`;
+          let fallback = 0;
+          if (name === 'fontSize') fallback = 12;
+          else if (name === 'fontWeight') fallback = 400;
+          else if (name.startsWith('padding')) fallback = 12;
+          const base = Number.isFinite(current) ? current : fallback;
+          const next = Math.max(0, base + delta);
+          const unit = name === 'fontWeight' ? '' : 'px';
+          const value = `${next}${unit}`;
           styleState[name] = value;
           record.text.value = value;
-          updatePreview();
+          externalUpdatePreview?.();
         };
         record.inc?.addEventListener('click', () => adjust(+1));
         record.dec?.addEventListener('click', () => adjust(-1));
