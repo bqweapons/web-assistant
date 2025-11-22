@@ -12,7 +12,7 @@ import { DEFAULT_BASE_INFO_ITEM_MIN_WIDTH, getBaseInfoFieldConfigs } from './bas
 export function createBaseInfoSection({ t, nodes, getState }) {
   const { fieldset, container } = createSectionShell({ legendText: t('editor.sections.basics.title') });
 
-  const configs = getBaseInfoFieldConfigs();
+  const configs = getBaseInfoFieldConfigs(t);
 
   const applyVisibility = () => {
     const state = typeof getState === 'function' ? getState() : {};

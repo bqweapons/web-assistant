@@ -6,7 +6,7 @@ export function getFormSections(t) {
     {
       key: 'base',
       legend: t('editor.sections.basics.title'),
-      fields: getBaseInfoFieldConfigs(),
+      fields: getBaseInfoFieldConfigs(t),
     },
     {
       key: 'style',
@@ -16,4 +16,3 @@ export function getFormSections(t) {
     },
   ];
 }
-

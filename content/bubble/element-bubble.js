@@ -656,26 +656,14 @@ function createElementBubble() {
       : isTooltip
         ? t('editor.hrefTooltipLabel')
         : t('editor.hrefOptionalLabel');
-    hrefField.wrapper.style.display = isTooltip || isArea ? 'none' : 'flex';
-
-    linkTargetField.wrapper.style.display = isLink ? 'flex' : 'none';
     linkTargetSelect.disabled = !isLink;
-
-    actionFlowSummaryField.wrapper.style.display = isButton ? 'flex' : 'none';
-    actionFlowField.wrapper.style.display = isButton ? 'flex' : 'none';
     actionFlowInput.disabled = !isButton;
     if (!isButton) {
       stopActionPicker('cancel');
     }
-    tooltipPositionField.wrapper.style.display = isTooltip ? 'flex' : 'none';
     tooltipPositionSelect.disabled = !isTooltip;
-    tooltipPersistentField.wrapper.style.display = isTooltip ? 'flex' : 'none';
     tooltipPersistentCheckbox.disabled = !isTooltip;
-
-    textField.wrapper.style.display = isArea ? 'none' : 'flex';
     textInput.placeholder = isTooltip ? t('editor.tooltipTextPlaceholder') : t('editor.textPlaceholder');
-
-    areaLayoutField.wrapper.style.display = isArea ? 'flex' : 'none';
     areaLayoutSelect.disabled = !isArea;
 
     actionFlowController.validateInput();
