@@ -27,6 +27,7 @@ const POSITION_OPTIONS = ['relative', 'absolute', 'fixed', 'static', 'sticky'];
  *   actionFlowController: ReturnType<typeof import('./action-flow-controller.js').createActionFlowController>;
  *   clearError?: () => void;
  *   onChange?: () => void;
+ *   onFieldChange?: (key: string, value?: unknown) => void;
  * }} options
  */
 export function buildFormSections({
@@ -45,6 +46,7 @@ export function buildFormSections({
   const visibilityHandlers = [];
   const refreshHandlers = [];
   const typeChangeHandlers = [];
+  const resetHandlers = [];
   const styleApi = createStyleApi({ t, clearError, onChange });
 
   const stateGetter = typeof getState === 'function' ? getState : () => ({});
@@ -52,7 +54,7 @@ export function buildFormSections({
   const notifyChange = typeof onChange === 'function' ? onChange : () => {};
 
   sections.forEach((section) => {
-    const { fieldset, applyVisibility, refreshFields, onTypeChange } = buildSection({
+    const { fieldset, applyVisibility, refreshFields, onTypeChange, resetFields } = buildSection({
       section,
       nodes,
       focusTargets,
@@ -71,6 +73,9 @@ export function buildFormSections({
     if (onTypeChange) {
       typeChangeHandlers.push(onTypeChange);
     }
+    if (resetFields) {
+      resetHandlers.push(resetFields);
+    }
   });
 
   return {
@@ -80,6 +85,7 @@ export function buildFormSections({
     refreshVisibility: () => visibilityHandlers.forEach((fn) => fn()),
     refreshFields: () => refreshHandlers.forEach((fn) => fn()),
     applyTypeChange: (options = {}) => typeChangeHandlers.forEach((fn) => fn(options)),
+    resetFields: (options = {}) => resetHandlers.forEach((fn) => fn(options)),
     resetStyle: styleApi.reset,
     mergeStyle: styleApi.merge,
     getStyle: styleApi.getStyle,
@@ -152,6 +158,7 @@ function buildSection({
       visibleWhen: field.visibleWhen,
       applyState: record.applyState,
       onTypeChange: record.onTypeChange,
+      onReset: record.onReset,
     });
   });
 
@@ -180,7 +187,10 @@ function buildSection({
 
   const onTypeChange = (options = {}) => {
     const state = stateGetter() || {};
-    handlers.forEach(({ onTypeChange }) => {
+    handlers.forEach(({ onReset, onTypeChange }) => {
+      if (options.applyDefaults && typeof onReset === 'function') {
+        onReset({ ...options, state, setState: stateSetter });
+      }
       if (typeof onTypeChange === 'function') {
         onTypeChange({ ...options, state, setState: stateSetter });
       }
@@ -190,10 +200,22 @@ function buildSection({
     }
   };
 
+  const resetFields = (options = {}) => {
+    const state = stateGetter() || {};
+    handlers.forEach(({ onReset }) => {
+      if (typeof onReset === 'function') {
+        onReset({ ...options, state, setState: stateSetter });
+      }
+    });
+    if (isStyleSection && styleApi) {
+      styleApi.applyTypeChange({ ...options, applyDefaults: true });
+    }
+  };
+
   applyVisibility();
   refreshFields();
 
-  return { fieldset: shell.fieldset, applyVisibility, refreshFields, onTypeChange };
+  return { fieldset: shell.fieldset, applyVisibility, refreshFields, onTypeChange, resetFields };
 }
 
 function pickFieldBuilder(type, { styleApi, actionFlowController }) {
@@ -287,7 +309,13 @@ function buildInputField({ field, defaultWidth, clearError, getState, setState, 
     }
   };
 
-  return { wrapper: created.wrapper, applyState, onTypeChange, focusable: input };
+  const onReset = (options) => {
+    if (typeof field.onReset === 'function') {
+      field.onReset(options);
+    }
+  };
+
+  return { wrapper: created.wrapper, applyState, onTypeChange, onReset, focusable: input };
 }
 
 function buildSelectField({ field, defaultWidth, clearError, getState, setState, onChange, emitFieldChange }) {
@@ -349,7 +377,13 @@ function buildSelectField({ field, defaultWidth, clearError, getState, setState,
     }
   };
 
-  return { wrapper: created.wrapper, applyState, onTypeChange, focusable: select };
+  const onReset = (options) => {
+    if (typeof field.onReset === 'function') {
+      field.onReset(options);
+    }
+  };
+
+  return { wrapper: created.wrapper, applyState, onTypeChange, onReset, focusable: select };
 }
 
 function buildToggleField({ field, defaultWidth, clearError, getState, setState, onChange, emitFieldChange }) {
@@ -433,7 +467,13 @@ function buildToggleField({ field, defaultWidth, clearError, getState, setState,
     }
   };
 
-  return { wrapper: fieldWrapper.wrapper, applyState, onTypeChange, focusable: checkbox };
+  const onReset = (options) => {
+    if (typeof field.onReset === 'function') {
+      field.onReset(options);
+    }
+  };
+
+  return { wrapper: fieldWrapper.wrapper, applyState, onTypeChange, onReset, focusable: checkbox };
 }
 
 function buildFlowField({ field, defaultWidth, actionFlowController, getState }) {
@@ -448,6 +488,12 @@ function buildFlowField({ field, defaultWidth, actionFlowController, getState })
   const onTypeChange = (options) => {
     if (typeof field.onTypeChange === 'function') {
       field.onTypeChange(options);
+    }
+  };
+
+  const onReset = (options) => {
+    if (typeof field.onReset === 'function') {
+      field.onReset(options);
     }
   };
 
@@ -481,7 +527,7 @@ function buildFlowField({ field, defaultWidth, actionFlowController, getState })
     }
   };
 
-  return { wrapper, onTypeChange, focusable: actionFlowController.openButton, applyState };
+  return { wrapper, onTypeChange, onReset, focusable: actionFlowController.openButton, applyState };
 }
 
 function buildNoteField({ field }) {

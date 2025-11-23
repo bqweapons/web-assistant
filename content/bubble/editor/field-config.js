@@ -3,22 +3,28 @@ import { getTooltipPositionOptions } from '../styles/style-presets.js';
 export const DEFAULT_BASE_INFO_ITEM_MIN_WIDTH = 240;
 export const DEFAULT_STYLE_ITEM_MIN_WIDTH = 260;
 
+export function getTypeOptions(t) {
+  return [
+    { value: 'button', label: t('type.button') },
+    { value: 'link', label: t('type.link') },
+    { value: 'tooltip', label: t('type.tooltip') },
+    { value: 'area', label: t('type.area') },
+  ];
+}
+
 export function getBaseInfoFieldConfigs(t) {
   return [
     {
+      name: 'type',
       key: 'type',
       type: 'select',
       label: t('editor.typeLabel'),
       minWidth: 200,
       stateKey: 'type',
-      options: () => [
-        { value: 'button', label: t('type.button') },
-        { value: 'link', label: t('type.link') },
-        { value: 'tooltip', label: t('type.tooltip') },
-        { value: 'area', label: t('type.area') },
-      ],
+      options: () => getTypeOptions(t),
     },
     {
+      name: 'text',
       key: 'text',
       type: 'input',
       label: t('editor.textLabel'),
@@ -26,8 +32,10 @@ export function getBaseInfoFieldConfigs(t) {
       stateKey: 'text',
       placeholder: (state) =>
         state.type === 'tooltip' ? t('editor.tooltipTextPlaceholder') : t('editor.textPlaceholder'),
+      onChange: ({ value, setState }) => setState({ text: typeof value === 'string' ? value.trim() : '' }),
     },
     {
+      name: 'href',
       key: 'href',
       type: 'input',
       minWidth: 240,
@@ -50,8 +58,13 @@ export function getBaseInfoFieldConfigs(t) {
           setState({ href: '' });
         }
       },
+      onChange: ({ value, setState }) => {
+        const next = typeof value === 'string' ? value.trim() : '';
+        setState({ href: next });
+      },
     },
     {
+      name: 'linkTarget',
       key: 'linkTarget',
       type: 'select',
       label: t('editor.linkTargetLabel'),
@@ -69,6 +82,7 @@ export function getBaseInfoFieldConfigs(t) {
       },
     },
     {
+      name: 'actionFlow',
       key: 'actionFlow',
       type: 'flow',
       label: t('editor.actionFlowLabel'),
@@ -103,6 +117,7 @@ export function getBaseInfoFieldConfigs(t) {
       },
     },
     {
+      name: 'tooltipPosition',
       key: 'tooltipPosition',
       type: 'select',
       label: t('editor.tooltipPositionLabel'),
@@ -117,6 +132,7 @@ export function getBaseInfoFieldConfigs(t) {
       },
     },
     {
+      name: 'tooltipPersistent',
       key: 'tooltipPersistent',
       type: 'toggle',
       label: t('editor.tooltipPersistenceLabel'),
@@ -131,6 +147,7 @@ export function getBaseInfoFieldConfigs(t) {
       },
     },
     {
+      name: 'areaLayout',
       key: 'areaLayout',
       type: 'select',
       label: t('editor.areaLayoutLabel'),

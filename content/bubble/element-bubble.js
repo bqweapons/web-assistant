@@ -8,6 +8,7 @@ import {
 } from './styles/style-presets.js';
 import { buildFormSections } from './editor/form-controls.js';
 import { getFormSections } from './editor/form-config.js';
+import { getTypeOptions } from './editor/field-config.js';
 import { stepsToJSON } from './actionflow/serializer.js';
 import { createEditorState } from './state.js';
 import { parseFlowForBuilder } from './actionflow/parser-bridge.js';
@@ -37,15 +38,6 @@ export { getSuggestedStyles } from './editor/defaults.js';
  *
  * @typedef {ActionClickStep | ActionInputStep | ActionWaitStep} ActionBuilderStep
  */
-
-function getTypeOptions() {
-  return [
-    { value: 'button', label: t('type.button') },
-    { value: 'link', label: t('type.link') },
-    { value: 'tooltip', label: t('type.tooltip') },
-    { value: 'area', label: t('type.area') },
-  ];
-}
 
 /**
  *
@@ -367,7 +359,7 @@ function createElementBubble() {
   const updateActiveTabTitle = () => {
     headerTitle.textContent = t('editor.sections.basics.title');
     headerSubtitle.textContent = t('editor.sections.basics.description');
-    const typeLabel = getTypeOptions().find(({ value }) => value === state.type)?.label || '';
+    const typeLabel = getTypeOptions(t).find(({ value }) => value === state.type)?.label || '';
     headerTypeBadge.textContent = typeLabel;
   };
 
@@ -816,10 +808,8 @@ function createElementBubble() {
       }
       resetStyleState(initial.style, initial.styleSuggestions);
       stopActionPicker('cancel');
-      actionFlowController.refreshBuilder();
       handleTypeChange({ skipPreview: true });
       saveButton.textContent = mode === 'edit' ? t('editor.saveUpdate') : t('editor.saveCreate');
-      actionFlowController.validateInput();
       updatePreview({ propagate: false });
       submitHandler = (payload) => {
         actionFlowController.closeFlowEditor({ reopen: false });
