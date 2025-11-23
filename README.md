@@ -19,6 +19,10 @@ Page Augmentor is a Manifest V3 Chrome extension for layering custom buttons, li
 - **Shadow DOM isolation**: Rendered controls live in a Shadow DOM host so they keep their appearance even when the page ships heavy CSS.
 - **Resilient sync and persistence**: Data lives in `chrome.storage.local`; a `MutationObserver` restores hosts after DOM changes and broadcasts updates across tabs and the side panel.
 
+### What's new (1.0.2)
+- Action flow: drag the step number chip to reorder steps; added clearer hints and kept the add menu visible by moving it above the list.
+- UI polish: step type now shows as a chip beside the index to reduce accidental changes, while preserving the existing builder layout.
+
 ### Installation
 
 ```bash
@@ -84,55 +88,27 @@ See `AGENTS.md` for the full action-flow reference, including step fields, condi
 
 ```text
 .
-├─ manifest.json
-├─ service_worker.js
-├─ content/
-│  ├─ app/
-│  │  ├─ content.js              # content script entry
-│  │  ├─ context.js              # shared runtime + state
-│  │  ├─ page-url.js             # URL normalisation for this frame
-│  │  ├─ hydration.js            # fetch + render elements per frame
-│  │  ├─ mutation-watcher.js     # DOM observer + registry reconcile
-│  │  ├─ autosave.js             # drag/placement autosave
-│  │  ├─ picker.js               # element picker wiring
-│  │  ├─ creation.js             # new element flows & area drops
-│  │  ├─ editor.js               # inline editor bubble & preview
-│  │  ├─ editing-mode.js         # edit-mode toggle behaviour
-│  │  ├─ frame.js                # frame matching helpers
-│  │  └─ highlight.js            # transient placement highlight
-│  ├─ inject.js                  # injection facade (registry wrappers)
-│  ├─ injection/
-│  │  ├─ core/
-│  │  │  ├─ constants.js         # host attributes, flow limits, z-indices
-│  │  │  ├─ registry.js          # in-page registry of elements + hosts
-│  │  │  ├─ flow-runner.js       # runtime executor for parsed flows
-│  │  │  └─ utils.js             # click forwarding, URL sanitisation
-│  │  ├─ host/                   # host node + Shadow DOM creation
-│  │  ├─ interactions/
-│  │  │  ├─ drag/                # drag behaviour + floating placement
-│  │  │  ├─ drop/                # DOM vs. area drop targets & previews
-│  │  │  └─ resize/              # resizable areas
-│  │  ├─ orchestrator/           # applyMetadata, insertion strategies
-│  │  └─ ui/                     # style application & tooltip helpers
-│  ├─ bubble/
-│  │  ├─ element-bubble.js       # lightweight in-page editor bubble
-│  │  ├─ editor/action-flow-controller.js
-│  │  ├─ actionflow/{builder,serializer,parser-bridge}.js
-│  │  └─ ...
-│  ├─ selector.js                # picker entry
-│  ├─ selector/                  # overlay + frame utilities
-│  └─ dist/content.js            # built content bundle
-├─ sidepanel/
-│  ├─ sidepanel.html
-│  ├─ dist/index.{js,css}        # built React side panel
-│  └─ src/                       # React app (App.jsx, hooks, components)
-├─ common/
-│  ├─ messaging.js               # shared messaging helpers
-│  ├─ storage.js                 # storage helpers for injected elements
-│  ├─ url.js                     # normalised page keys
-│  ├─ flows.js                   # flow parsing + normalisation
-│  └─ i18n/*.js                  # shared locale store & messages
-└─ docs/PRIVACY-POLICY.md        # standalone privacy policy text
+?? manifest.json
+?? service_worker.js
+?? content/
+?  ?? app/                       # content script entry, state, picker
+?  ?? bubble/
+?  ?  ?? element-bubble.js       # editor bubble shell + lifecycle
+?  ?  ?? editor/
+?  ?  ?  ?? form-config.js       # sections/fields entry
+?  ?  ?  ?? field-config.js      # base + style field definitions
+?  ?  ?  ?? form-controls.js     # config-driven form builder
+?  ?  ?  ?? action-flow-controller.js # flow builder UI/logic
+?  ?  ?? ui/                     # shared UI primitives (card/section/field)
+?  ?  ?? styles/                 # style presets + normalizer
+?  ?  ?? actionflow/             # builder, serializer, parser bridge
+?  ?? injection/                 # host registry, flow runner, drag/drop
+?  ?? inject.js                  # injection facade
+?  ?? selector/                  # overlay + frame utilities
+?  ?? dist/content.js            # built content bundle
+?? sidepanel/                    # side panel app (React)
+?? common/                       # shared i18n, messaging, flows, types
+?? docs/PRIVACY-POLICY.md        # standalone privacy policy text
 ```
 
 ### Runtime architecture overview
@@ -153,4 +129,3 @@ See `AGENTS.md` for the full action-flow reference, including step fields, condi
 - Only same-origin iframe documents can be augmented.
 - Highly dynamic pages may briefly override inserted elements before the observer reinstates them.
 - Action flows are capped at 200 steps, 50 loop iterations, and roughly 10 seconds of runtime; longer automations will abort early.
-

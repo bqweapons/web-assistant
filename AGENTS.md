@@ -63,6 +63,7 @@ Agents represent the automation flows that Page Augmentor can execute when a use
 - Keep waits short; combine `wait` with `exists`/`textContains` checks for robustness.
 - Use `log` steps during development and remove or demote them once the agent is stable.
 - Pair agents with mirrored selectors or URLs so the button remains useful if the flow exits early.
+- Reorder flow steps by dragging the `#` badge in the builder instead of deleting and re-adding.
 
 ## Developer Notes
 - Code locations
