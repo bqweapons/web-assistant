@@ -91,6 +91,7 @@ export function attachAreaDragBehavior(node, element) {
     host.style.zIndex = nextStyle.zIndex || '';
     dispatchDraftUpdateFromHost(host, {
       elementId: element.id,
+      draftSource: 'drag',
       style: {
         position: nextStyle.position,
         left: nextStyle.left,
@@ -162,4 +163,3 @@ export function attachAreaDragBehavior(node, element) {
     true,
   );
 }
-

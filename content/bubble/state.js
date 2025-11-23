@@ -15,6 +15,7 @@ const DEFAULT_STATE = {
   actionFlowError: '',
   actionFlowSteps: 0,
   actionSteps: [],
+  actionFlowLocked: false,
   tooltipPosition: 'top',
   tooltipPersistent: false,
 };
@@ -85,6 +86,8 @@ function mergeState(base, patch) {
   next.selector = typeof patch.selector === 'string' ? patch.selector : base.selector;
   next.layout = typeof patch.layout === 'string' ? patch.layout : base.layout;
   next.linkTarget = typeof patch.linkTarget === 'string' ? patch.linkTarget : base.linkTarget;
+  next.actionFlowLocked =
+    typeof patch.actionFlowLocked === 'boolean' ? patch.actionFlowLocked : base.actionFlowLocked;
   return next;
 }
 
@@ -124,5 +127,6 @@ function cloneState(value) {
     tooltipPersistent: Boolean(value.tooltipPersistent),
     layout: value.layout === 'column' ? 'column' : 'row',
     linkTarget: value.linkTarget === 'same-tab' || value.linkTarget === 'new-tab' ? value.linkTarget : 'new-tab',
+    actionFlowLocked: Boolean(value.actionFlowLocked),
   };
 }

@@ -6,6 +6,7 @@ export function setupAutosave() {
   // Persist drag/placement changes even when the editor bubble isn't open
   window.addEventListener('page-augmentor-draft-update', (event) => {
     try {
+      debugger
       const detail = (event && event.detail) || {};
       const elementId = typeof detail.elementId === 'string' ? detail.elementId : null;
       if (!elementId) return;

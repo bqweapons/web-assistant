@@ -403,6 +403,7 @@ export function createActionFlowController(options) {
   let flowSnapshot = null;
   let flowDisabled = false;
   let flowButtonPlacement = 'row';
+  let summaryHintMessage = null;
   let attachMainBubble = () => {};
   let detachMainBubble = () => {};
   let dragPointerId = null;
@@ -576,6 +577,11 @@ export function createActionFlowController(options) {
 
   const updateActionFlowSummary = () => {
     const state = getState();
+    const baseHint =
+      typeof summaryHintMessage === 'string' && summaryHintMessage
+        ? summaryHintMessage
+        : t('editor.actionFlowHintDefault', { limit: MAX_FLOW_SOURCE_LENGTH });
+
     if (state.type !== 'button') {
       actionFlowSummaryText.textContent = t('editor.actionFlowSummaryUnavailable');
       actionFlowSummaryText.style.color = '#64748b';
@@ -624,16 +630,16 @@ export function createActionFlowController(options) {
     } else {
       actionFlowSummaryText.textContent = t('editor.actionFlowSummaryEmpty');
       actionFlowSummaryText.style.color = '#64748b';
-      actionFlowSummaryHint.textContent = t('editor.actionFlowHintDefault', { limit: MAX_FLOW_SOURCE_LENGTH });
+      actionFlowSummaryHint.textContent = baseHint;
       actionFlowSummaryHint.style.color = actionFlowSummaryHint.dataset.defaultColor || '#94a3b8';
-      actionFlowHint.textContent = t('editor.actionFlowHintDefault', { limit: MAX_FLOW_SOURCE_LENGTH });
+      actionFlowHint.textContent = baseHint;
       actionFlowHint.style.color = actionFlowHint.dataset.defaultColor || '#94a3b8';
     }
 
     if (state.actionFlowMode !== 'builder') {
       const flowValue = state.actionFlow.trim();
       if (!flowValue) {
-        actionFlowHint.textContent = t('editor.actionFlowHintDefault', { limit: MAX_FLOW_SOURCE_LENGTH });
+        actionFlowHint.textContent = baseHint;
         actionFlowHint.style.color = actionFlowHint.dataset.defaultColor || '#94a3b8';
       } else if (state.actionFlowError) {
         actionFlowHint.textContent = t('editor.actionFlowHintError', { error: state.actionFlowError });
@@ -1298,17 +1304,8 @@ export function createActionFlowController(options) {
       updateActionFlowSummary();
     },
     setSummaryHint(message) {
-      if (typeof message === 'string') {
-        actionFlowSummaryHint.textContent = message;
-        actionFlowHint.textContent = message;
-        actionFlowSummaryHint.style.color = actionFlowSummaryHint.dataset.defaultColor || '#94a3b8';
-        actionFlowHint.style.color = actionFlowHint.dataset.defaultColor || '#94a3b8';
-      } else {
-        actionFlowSummaryHint.textContent = t('editor.actionFlowHintDefault', { limit: MAX_FLOW_SOURCE_LENGTH });
-        actionFlowHint.textContent = actionFlowSummaryHint.textContent;
-        actionFlowSummaryHint.style.color = actionFlowSummaryHint.dataset.defaultColor || '#94a3b8';
-        actionFlowHint.style.color = actionFlowHint.dataset.defaultColor || '#94a3b8';
-      }
+      summaryHintMessage = typeof message === 'string' ? message : null;
+      updateActionFlowSummary();
     },
     setMainBubbleControls({ attach, detach }) {
       if (typeof attach === 'function') {

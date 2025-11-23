@@ -134,6 +134,7 @@ export function attachResizeBehavior(node, element, host) {
     // Do not mutate element; persist via draft update only
     dispatchDraftUpdateFromHost(host, {
       elementId: element.id,
+      draftSource: 'resize',
       style: {
         position: nextStyle.position,
         left: nextStyle.left,

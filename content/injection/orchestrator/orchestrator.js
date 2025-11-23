@@ -516,7 +516,7 @@ function bindEditingEnhancements(node, element) {
     const text = (editable.textContent || '').trim();
     // UI-only hint to move the editor bubble to the left while typing
     dispatchUiUpdateFromHost(host, { elementId: element.id, bubbleSide: 'left' });
-    dispatchDraftUpdateFromHost(host, { elementId: element.id, style: {} });
+    dispatchDraftUpdateFromHost(host, { elementId: element.id });
     // Update text via preview patch; the bubble listens and merges style via merge(), text is handled via preview
     try {
       // Persist text via draft; keep bubble-side as a separate UI update
@@ -550,6 +550,17 @@ function bindEditingEnhancements(node, element) {
     editable.addEventListener('input', handleInlineInput);
     editable.addEventListener('blur', handleInlineInput);
   }
+
+  // Debug: log element click events while editing to trace unexpected state changes.
+  node.addEventListener('click', (event) => {
+    try {
+      console.log('[PageAugmentor][debug] element click', {
+        id: element.id,
+        type: element.type,
+        target: event.target,
+      });
+    } catch (_e) {}
+  });
 }
 
 

@@ -74,17 +74,21 @@ export function getBaseInfoFieldConfigs(t) {
       label: t('editor.actionFlowLabel'),
       minWidth: 240,
       buttonPlacement: 'stacked',
-      builderConfig: {
-        allowAdd: true,
-        allowDelete: true,
-        emptyHint: t('editor.actionBuilder.empty'),
-        disallowAddWhenHref: (state) => Boolean(state.href && state.href.trim()),
-      },
-      summaryHint: (state) =>
-        state.type === 'button'
+      builderConfig: (state) => ({
+        allowAdd: !state.actionFlowLocked,
+        allowDelete: !state.actionFlowLocked,
+        emptyHint: state.actionFlowLocked ? t('editor.actionFlowSummaryUnavailable') : t('editor.actionBuilder.empty'),
+        disallowAddWhenHref: (snapshot) => Boolean(snapshot.href && snapshot.href.trim()),
+      }),
+      summaryHint: (state) => {
+        if (state.actionFlowLocked) {
+          return t('editor.actionFlowSummaryUnavailable');
+        }
+        return state.type === 'button'
           ? t('editor.actionFlowHintDefault', { limit: 4000 })
-          : t('editor.actionFlowSummaryUnavailable'),
-      disabledWhen: (state) => state.type !== 'button',
+          : t('editor.actionFlowSummaryUnavailable');
+      },
+      disabledWhen: (state) => state.type !== 'button' || state.actionFlowLocked,
       visibleWhen: (state) => state.type === 'button',
       onTypeChange: ({ state, setState }) => {
         if (state.type !== 'button') {

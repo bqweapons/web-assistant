@@ -16,6 +16,7 @@ export function getDefaultElementValues(values = {}, suggestedStyle = {}, t) {
   const layout = values.layout === 'column' ? 'column' : 'row';
   const linkTarget = values.linkTarget === 'same-tab' || values.linkTarget === 'new-tab' ? values.linkTarget : 'new-tab';
   const actionFlow = typeof values.actionFlow === 'string' ? values.actionFlow : '';
+  const actionFlowLocked = Boolean(values.actionFlowLocked);
   const position = resolvePosition(values.position);
   const tooltipPosition = resolveTooltipPosition(values.tooltipPosition);
   const tooltipPersistent = Boolean(values.tooltipPersistent);
@@ -60,6 +61,7 @@ export function getDefaultElementValues(values = {}, suggestedStyle = {}, t) {
     layout,
     linkTarget,
     actionFlow,
+    actionFlowLocked,
     position,
     tooltipPosition,
     tooltipPersistent,

@@ -219,7 +219,7 @@ mergeMessages(messages, {
     actionFlowHintConfigured: '已配置 {count} 个步骤的流程。',
     actionFlowHintError: '流程错误：{error}',
     actionFlowConfigure: '配置流程',
-    actionFlowSummaryUnavailable: '仅按钮类型支持配置动作流程。',
+    actionFlowSummaryUnavailable: '当前类型不支持动作流程，请切换为按钮类型后再配置。',
     actionFlowSummaryError: '流程错误：{error}',
     actionFlowSummaryConfigured: '已配置动作流程（{count} 个步骤）',
     actionFlowSummaryEmpty: '尚未配置动作流程。',
@@ -329,4 +329,3 @@ mergeMessages(messages, {
 });
 
 export default messages;
-

@@ -442,16 +442,22 @@ function createElementBubble() {
       position,
       style,
     };
+    if (type === 'button' && typeof state.actionFlowLocked === 'boolean') {
+      payload.actionFlowLocked = state.actionFlowLocked;
+    }
     const selectorText = typeof state.selector === 'string' ? state.selector.trim() : '';
     if (selectorText) {
       payload.selector = selectorText;
     }
-    if (state.containerId && typeof state.containerId === 'string' && state.containerId.trim()) {
-      payload.containerId = state.containerId.trim();
+    const containerId =
+      typeof state.containerId === 'string' ? state.containerId.trim() : '';
+    if (containerId) {
+      payload.containerId = containerId;
+      payload.floating = false;
     } else {
       delete payload.containerId;
+      payload.floating = Boolean(state.floating);
     }
-    payload.floating = Boolean(state.floating);
     if (type === 'link') {
       if (hrefValue) {
         payload.href = hrefValue;
@@ -541,6 +547,7 @@ function createElementBubble() {
       return;
     }
     const stylePatch = detail && typeof detail.style === 'object' ? detail.style : null;
+    const styleSource = detail?.draftSource;
     const hasTextUpdate = Object.prototype.hasOwnProperty.call(detail || {}, 'text');
     const hasTypeUpdate = Object.prototype.hasOwnProperty.call(detail || {}, 'type');
     const hasContainerUpdate = Object.prototype.hasOwnProperty.call(detail || {}, 'containerId');
@@ -549,7 +556,8 @@ function createElementBubble() {
     const hasSelectorUpdate = Object.prototype.hasOwnProperty.call(detail || {}, 'selector');
     const hasPositionUpdate = Object.prototype.hasOwnProperty.call(detail || {}, 'position');
     const nextPatch = {};
-    if (stylePatch) {
+    const allowStyleMerge = stylePatch && Object.keys(stylePatch).length > 0 && (styleSource === 'drag' || styleSource === 'resize');
+    if (allowStyleMerge) {
       nextPatch.style = { ...state.style, ...stylePatch };
     }
     if (hasContainerUpdate) {
@@ -584,7 +592,7 @@ function createElementBubble() {
       return;
     }
     setState(nextPatch);
-    if (stylePatch) {
+    if (allowStyleMerge) {
       formSections.mergeStyle(stylePatch);
     }
     const refreshedByTypeChange = hasTypeUpdate ? handleTypeChange({ applyDefaults: true }) || true : false;
@@ -638,6 +646,9 @@ function createElementBubble() {
 
   form.addEventListener('submit', (event) => {
     event.preventDefault();
+    try {
+      console.log('[PageAugmentor][debug] save submit', { state });
+    } catch (_e) {}
     const payload = buildPayload();
     if (!payload) {
       return;
@@ -763,6 +774,7 @@ function createElementBubble() {
         actionFlowSteps: 0,
         actionFlowMode: 'builder',
         actionSteps: [],
+        actionFlowLocked: initial.actionFlowLocked,
         position: initial.position,
         tooltipPosition: initial.tooltipPosition,
         tooltipPersistent: initial.tooltipPersistent,
@@ -839,4 +851,3 @@ function createElementBubble() {
     },
   };
 }
-

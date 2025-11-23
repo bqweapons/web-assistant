@@ -275,6 +275,13 @@ function validateElementPayload(payload) {
     delete element.tooltipPersistent;
   }
   if (element.type === 'button') {
+    if (typeof element.actionFlowLocked === 'boolean') {
+      element.actionFlowLocked = element.actionFlowLocked;
+    } else if (typeof payload.actionFlowLocked === 'boolean') {
+      element.actionFlowLocked = payload.actionFlowLocked;
+    } else {
+      delete element.actionFlowLocked;
+    }
     if (typeof element.actionSelector === 'string') {
       const trimmedSelector = element.actionSelector.trim();
       if (trimmedSelector) {
@@ -315,12 +322,14 @@ function validateElementPayload(payload) {
       throw new Error('Buttons with a URL need an action flow.');
     }
   } else if (element.type === 'area') {
+    delete element.actionFlowLocked;
     delete element.actionSelector;
     delete element.actionFlow;
     delete element.href;
     element.floating = true;
     delete element.containerId;
   } else {
+    delete element.actionFlowLocked;
     delete element.actionSelector;
     delete element.actionFlow;
   }
