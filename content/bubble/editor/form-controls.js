@@ -1,8 +1,11 @@
 import { createField, styleInput } from '../ui/field.js';
 import { applyCardStyle } from '../ui/card.js';
 import { createSectionShell } from '../ui/section.js';
-import { DEFAULT_BASE_INFO_ITEM_MIN_WIDTH } from './base-info-config.js';
-import { DEFAULT_STYLE_ITEM_MIN_WIDTH, getStyleFieldConfigs as buildStyleFieldConfigs } from '../styles/style-config.js';
+import {
+  DEFAULT_BASE_INFO_ITEM_MIN_WIDTH,
+  DEFAULT_STYLE_ITEM_MIN_WIDTH,
+  getStyleFieldConfigs as buildStyleFieldConfigs,
+} from './field-config.js';
 import { normalizeStyleState } from '../styles/style-normalize.js';
 import { DEFAULT_AREA_STYLE, DEFAULT_BUTTON_STYLE, DEFAULT_LINK_STYLE } from '../styles/style-presets.js';
 
@@ -34,6 +37,7 @@ export function buildFormSections({
   actionFlowController,
   clearError,
   onChange,
+  onFieldChange,
 }) {
   const nodes = {};
   const focusTargets = {};
@@ -48,26 +52,7 @@ export function buildFormSections({
   const notifyChange = typeof onChange === 'function' ? onChange : () => {};
 
   sections.forEach((section) => {
-    if (section.isStyle) {
-      const { fieldset, applyVisibility, refreshFields, onTypeChange } = buildStyleSection({
-        section,
-        nodes,
-        focusTargets,
-        styleApi,
-        t,
-        clearError,
-        onChange: notifyChange,
-      });
-      fieldsets.push(fieldset);
-      visibilityHandlers.push(applyVisibility);
-      refreshHandlers.push(refreshFields);
-      if (onTypeChange) {
-        typeChangeHandlers.push(onTypeChange);
-      }
-      return;
-    }
-
-    const { fieldset, applyVisibility, refreshFields, onTypeChange } = buildBaseSection({
+    const { fieldset, applyVisibility, refreshFields, onTypeChange } = buildSection({
       section,
       nodes,
       focusTargets,
@@ -76,6 +61,9 @@ export function buildFormSections({
       clearError,
       onChange: notifyChange,
       actionFlowController,
+      emitFieldChange: typeof onFieldChange === 'function' ? onFieldChange : null,
+      styleApi,
+      t,
     });
     fieldsets.push(fieldset);
     visibilityHandlers.push(applyVisibility);
@@ -99,16 +87,40 @@ export function buildFormSections({
   };
 }
 
-function buildBaseSection({ section, nodes, focusTargets, getState, setState, clearError, onChange, actionFlowController }) {
-  const { fieldset, container } = createSectionShell({ legendText: section.legend });
-  const defaultWidth = DEFAULT_BASE_INFO_ITEM_MIN_WIDTH;
+function buildSection({
+  section,
+  nodes,
+  focusTargets,
+  getState,
+  setState,
+  clearError,
+  onChange,
+  actionFlowController,
+  emitFieldChange,
+  styleApi,
+  t,
+}) {
+  const isStyleSection = Boolean(section.isStyle);
+  const defaultWidth = isStyleSection ? DEFAULT_STYLE_ITEM_MIN_WIDTH : DEFAULT_BASE_INFO_ITEM_MIN_WIDTH;
+  const shell = isStyleSection
+    ? createStyleSectionShell(
+        section.legend,
+        typeof t === 'function' ? t('editor.stylesAdvancedToggle') : 'Advanced',
+      )
+    : createSectionShell({ legendText: section.legend });
+  const container = shell.container;
+  const advancedContainer = isStyleSection ? shell.advancedContainer : null;
   const handlers = [];
   const stateGetter = typeof getState === 'function' ? getState : () => ({});
   const stateSetter = typeof setState === 'function' ? setState : () => {};
   const notifyChange = typeof onChange === 'function' ? onChange : () => {};
 
+  if (isStyleSection && shell.advancedHint) {
+    shell.advancedHint.textContent = typeof t === 'function' ? t('editor.stylesAdvancedHint') : '';
+  }
+
   (section.fields || []).forEach((field) => {
-    const builder = pickBaseFieldBuilder(field.type);
+    const builder = pickFieldBuilder(field.type, { styleApi, actionFlowController });
     if (!builder) {
       return;
     }
@@ -120,6 +132,7 @@ function buildBaseSection({ section, nodes, focusTargets, getState, setState, cl
       setState: stateSetter,
       onChange: notifyChange,
       actionFlowController,
+      emitFieldChange,
     });
     if (!record || !(record.wrapper instanceof HTMLElement)) {
       return;
@@ -131,7 +144,9 @@ function buildBaseSection({ section, nodes, focusTargets, getState, setState, cl
         focusTargets[key] = record.focusable;
       }
     }
-    container.appendChild(record.wrapper);
+    const target =
+      isStyleSection && field.group === 'advanced' && advancedContainer ? advancedContainer : container;
+    target.appendChild(record.wrapper);
     handlers.push({
       wrapper: record.wrapper,
       visibleWhen: field.visibleWhen,
@@ -140,7 +155,10 @@ function buildBaseSection({ section, nodes, focusTargets, getState, setState, cl
     });
   });
 
-  fieldset.appendChild(container);
+  shell.fieldset.appendChild(container);
+  if (isStyleSection && shell.advancedDetails) {
+    shell.fieldset.appendChild(shell.advancedDetails);
+  }
 
   const applyVisibility = () => {
     const state = stateGetter() || {};
@@ -167,18 +185,25 @@ function buildBaseSection({ section, nodes, focusTargets, getState, setState, cl
         onTypeChange({ ...options, state, setState: stateSetter });
       }
     });
+    if (isStyleSection && styleApi) {
+      styleApi.applyTypeChange(options);
+    }
   };
 
   applyVisibility();
   refreshFields();
 
-  return { fieldset, applyVisibility, refreshFields, onTypeChange };
+  return { fieldset: shell.fieldset, applyVisibility, refreshFields, onTypeChange };
 }
 
-function pickBaseFieldBuilder(type) {
+function pickFieldBuilder(type, { styleApi, actionFlowController }) {
   if (type === 'select') return buildSelectField;
   if (type === 'toggle') return buildToggleField;
   if (type === 'flow') return buildFlowField;
+  if (type === 'stylePreset') return styleApi ? (options) => styleApi.buildPresetField(options) : null;
+  if (type === 'styleInput') return styleApi ? (options) => styleApi.buildStyleInputField(options) : null;
+  if (type === 'customStyle') return styleApi ? (options) => styleApi.buildCustomStyleField(options) : null;
+  if (type === 'note') return buildNoteField;
   return buildInputField;
 }
 
@@ -210,7 +235,7 @@ function resolveOptions(field, state) {
   return [];
 }
 
-function buildInputField({ field, defaultWidth, clearError, getState, setState, onChange }) {
+function buildInputField({ field, defaultWidth, clearError, getState, setState, onChange, emitFieldChange }) {
   const input = document.createElement('input');
   input.type = 'text';
   if (typeof field.maxLength === 'number') {
@@ -224,6 +249,7 @@ function buildInputField({ field, defaultWidth, clearError, getState, setState, 
   const notifyChange = typeof onChange === 'function' ? onChange : () => {};
   const stateGetter = typeof getState === 'function' ? getState : () => ({});
   const stateSetter = typeof setState === 'function' ? setState : () => {};
+  const notifyField = typeof emitFieldChange === 'function' ? emitFieldChange : () => {};
 
   const applyState = (state) => {
     const labelText = resolveLabel(field, state);
@@ -246,6 +272,9 @@ function buildInputField({ field, defaultWidth, clearError, getState, setState, 
     if (typeof field.onChange === 'function') {
       field.onChange({ value, state: stateGetter(), setState: stateSetter });
     }
+    if (stateKey) {
+      notifyField(stateKey, value);
+    }
     notifyChange();
   };
 
@@ -261,7 +290,7 @@ function buildInputField({ field, defaultWidth, clearError, getState, setState, 
   return { wrapper: created.wrapper, applyState, onTypeChange, focusable: input };
 }
 
-function buildSelectField({ field, defaultWidth, clearError, getState, setState, onChange }) {
+function buildSelectField({ field, defaultWidth, clearError, getState, setState, onChange, emitFieldChange }) {
   const select = document.createElement('select');
   styleInput(select);
   const created = createField(field.label || '', select);
@@ -271,6 +300,7 @@ function buildSelectField({ field, defaultWidth, clearError, getState, setState,
   const notifyChange = typeof onChange === 'function' ? onChange : () => {};
   const stateGetter = typeof getState === 'function' ? getState : () => ({});
   const stateSetter = typeof setState === 'function' ? setState : () => {};
+  const notifyField = typeof emitFieldChange === 'function' ? emitFieldChange : () => {};
 
   const syncOptions = (state) => {
     const options = resolveOptions(field, state);
@@ -304,6 +334,9 @@ function buildSelectField({ field, defaultWidth, clearError, getState, setState,
     if (typeof field.onChange === 'function') {
       field.onChange({ value, state: stateGetter(), setState: stateSetter });
     }
+    if (stateKey) {
+      notifyField(stateKey, value);
+    }
     notifyChange();
   };
 
@@ -319,7 +352,7 @@ function buildSelectField({ field, defaultWidth, clearError, getState, setState,
   return { wrapper: created.wrapper, applyState, onTypeChange, focusable: select };
 }
 
-function buildToggleField({ field, defaultWidth, clearError, getState, setState, onChange }) {
+function buildToggleField({ field, defaultWidth, clearError, getState, setState, onChange, emitFieldChange }) {
   const checkbox = document.createElement('input');
   checkbox.type = 'checkbox';
   Object.assign(checkbox.style, {
@@ -363,6 +396,7 @@ function buildToggleField({ field, defaultWidth, clearError, getState, setState,
   const notifyChange = typeof onChange === 'function' ? onChange : () => {};
   const stateGetter = typeof getState === 'function' ? getState : () => ({});
   const stateSetter = typeof setState === 'function' ? setState : () => {};
+  const notifyField = typeof emitFieldChange === 'function' ? emitFieldChange : () => {};
 
   const applyState = (state) => {
     const labelContent = resolveLabel(field, state);
@@ -384,6 +418,9 @@ function buildToggleField({ field, defaultWidth, clearError, getState, setState,
     if (typeof field.onChange === 'function') {
       field.onChange({ value: checked, state: stateGetter(), setState: stateSetter });
     }
+    if (stateKey) {
+      notifyField(stateKey, checked);
+    }
     notifyChange();
   };
 
@@ -399,13 +436,14 @@ function buildToggleField({ field, defaultWidth, clearError, getState, setState,
   return { wrapper: fieldWrapper.wrapper, applyState, onTypeChange, focusable: checkbox };
 }
 
-function buildFlowField({ field, defaultWidth, actionFlowController }) {
+function buildFlowField({ field, defaultWidth, actionFlowController, getState }) {
   if (!actionFlowController) {
     return null;
   }
   const wrapper = actionFlowController.summaryField.wrapper;
   const minWidth = typeof field.minWidth === 'number' ? field.minWidth : defaultWidth;
   applyCardStyle(wrapper, minWidth);
+  const stateGetter = typeof getState === 'function' ? getState : () => ({});
 
   const onTypeChange = (options) => {
     if (typeof field.onTypeChange === 'function') {
@@ -413,122 +451,48 @@ function buildFlowField({ field, defaultWidth, actionFlowController }) {
     }
   };
 
-  return { wrapper, onTypeChange, focusable: actionFlowController.openButton };
+  const applyState = (state) => {
+    const snapshot = state || stateGetter() || {};
+    if (typeof field.disabledWhen === 'function' && typeof actionFlowController.setDisabled === 'function') {
+      actionFlowController.setDisabled(!!field.disabledWhen(snapshot));
+    }
+    if (typeof actionFlowController.setSummaryHint === 'function') {
+      if (typeof field.summaryHint === 'function') {
+        actionFlowController.setSummaryHint(field.summaryHint(snapshot));
+      } else if (typeof field.summaryHint === 'string') {
+        actionFlowController.setSummaryHint(field.summaryHint);
+      } else {
+        actionFlowController.setSummaryHint();
+      }
+    }
+    if (typeof actionFlowController.setButtonPlacement === 'function') {
+      if (typeof field.buttonPlacement === 'function') {
+        actionFlowController.setButtonPlacement(field.buttonPlacement(snapshot));
+      } else if (typeof field.buttonPlacement === 'string') {
+        actionFlowController.setButtonPlacement(field.buttonPlacement);
+      } else {
+        actionFlowController.setButtonPlacement('row');
+      }
+    }
+    if (field.builderConfig && typeof actionFlowController.setBuilderConfig === 'function') {
+      const config =
+        typeof field.builderConfig === 'function' ? field.builderConfig(snapshot) : { ...field.builderConfig };
+      actionFlowController.setBuilderConfig(config);
+    }
+  };
+
+  return { wrapper, onTypeChange, focusable: actionFlowController.openButton, applyState };
 }
 
-function buildStyleSection({ section, nodes, focusTargets, styleApi, t, clearError, onChange }) {
-  const { fieldset, container, advancedDetails, advancedContainer, advancedHint } = createStyleSectionShell(
-    section.legend,
-    typeof t === 'function' ? t('editor.stylesAdvancedToggle') : 'Advanced',
-  );
-  const defaultWidth = DEFAULT_STYLE_ITEM_MIN_WIDTH;
-  const handlers = [];
-  const notifyChange = typeof onChange === 'function' ? onChange : () => {};
-  if (advancedHint) {
-    advancedHint.textContent = typeof t === 'function' ? t('editor.stylesAdvancedHint') : '';
-  }
-
-  (section.fields || []).forEach((field) => {
-    if (field.type === 'note') {
-      const note = document.createElement('p');
-      note.textContent = field.message || '';
-      Object.assign(note.style, {
-        margin: '0',
-        fontSize: '11px',
-        color: '#94a3b8',
-      });
-      container.appendChild(note);
-      nodes[field.key] = note;
-      handlers.push({
-        wrapper: note,
-        visibleWhen: field.visibleWhen,
-      });
-      return;
-    }
-
-    if (field.type === 'customStyle') {
-      const { wrapper, textarea, applyState } = styleApi.buildCustomStyleField({
-        field,
-        defaultWidth,
-        clearError,
-        onChange: notifyChange,
-      });
-      const target = field.group === 'basic' ? container : advancedContainer;
-      target.appendChild(wrapper);
-      nodes[field.key] = wrapper;
-      focusTargets[field.key] = textarea;
-      handlers.push({
-        wrapper,
-        visibleWhen: field.visibleWhen,
-        applyState,
-      });
-      return;
-    }
-
-    if (field.type === 'stylePreset') {
-      const { wrapper, select } = styleApi.buildPresetField({
-        field,
-        defaultWidth,
-        clearError,
-        onChange: notifyChange,
-      });
-      container.appendChild(wrapper);
-      nodes[field.key] = wrapper;
-      focusTargets[field.key] = select;
-      handlers.push({
-        wrapper,
-        visibleWhen: field.visibleWhen,
-      });
-      return;
-    }
-
-    if (field.type === 'styleInput') {
-      const record = styleApi.buildStyleInputField({
-        field,
-        defaultWidth,
-        clearError,
-        onChange: notifyChange,
-      });
-      if (!record) return;
-      const target = field.group === 'basic' ? container : advancedContainer;
-      target.appendChild(record.wrapper);
-      nodes[field.key || field.name] = record.wrapper;
-      focusTargets[field.key || field.name] = record.focusable;
-      handlers.push({
-        wrapper: record.wrapper,
-        visibleWhen: field.visibleWhen,
-      });
-    }
+function buildNoteField({ field }) {
+  const note = document.createElement('p');
+  note.textContent = field.message || '';
+  Object.assign(note.style, {
+    margin: '0',
+    fontSize: '11px',
+    color: '#94a3b8',
   });
-
-  fieldset.appendChild(container);
-  fieldset.appendChild(advancedDetails);
-
-  const applyVisibility = () => {
-    const state = {};
-    handlers.forEach(({ wrapper, visibleWhen }) => {
-      if (!(wrapper instanceof HTMLElement)) return;
-      const visible = typeof visibleWhen === 'function' ? !!visibleWhen(state) : true;
-      wrapper.style.display = visible ? 'flex' : 'none';
-    });
-  };
-
-  const refreshFields = () => {
-    handlers.forEach(({ applyState }) => {
-      if (typeof applyState === 'function') {
-        applyState();
-      }
-    });
-  };
-
-  const onTypeChange = (options = {}) => {
-    styleApi.applyTypeChange(options);
-  };
-
-  applyVisibility();
-  refreshFields();
-
-  return { fieldset, applyVisibility, refreshFields, onTypeChange };
+  return { wrapper: note };
 }
 
 function createStyleSectionShell(legendText, summaryText = 'Advanced') {
@@ -601,14 +565,21 @@ function createStyleApi({ t, clearError, onChange }) {
     { value: 'area-default', label: t('editor.styles.presets.area'), styles: DEFAULT_AREA_STYLE },
   ];
 
-  styleFieldConfigs.forEach(({ name }) => {
+  styleFieldConfigs.forEach((field) => {
+    const name = field.key || field.name;
+    if (!name) return;
     styleState[name] = '';
   });
 
   let presetSelect = null;
   let customCss = null;
 
-  const adjustableFields = new Set(styleFieldConfigs.filter((field) => field.adjustable).map((field) => field.name));
+  const adjustableFields = new Set(
+    styleFieldConfigs
+      .filter((field) => field.adjustable)
+      .map((field) => field.key || field.name)
+      .filter(Boolean),
+  );
 
   const applyStylesToInputs = (styles = {}) => {
     Object.entries(styles).forEach(([name, rawValue]) => {
@@ -639,7 +610,9 @@ function createStyleApi({ t, clearError, onChange }) {
   };
 
   const resetStyleState = (source = {}, suggestions = {}) => {
-    styleFieldConfigs.forEach(({ name }) => {
+    styleFieldConfigs.forEach((field) => {
+      const name = field.key || field.name;
+      if (!name) return;
       const value = source && typeof source[name] === 'string' ? source[name] : '';
       styleState[name] = value;
       const record = styleInputs.get(name);
@@ -705,7 +678,9 @@ function createStyleApi({ t, clearError, onChange }) {
         notify();
         return;
       }
-      styleFieldConfigs.forEach(({ name }) => {
+      styleFieldConfigs.forEach((field) => {
+        const name = field.key || field.name;
+        if (!name) return;
         const record = styleInputs.get(name);
         styleState[name] = '';
         if (!record) {
@@ -725,6 +700,10 @@ function createStyleApi({ t, clearError, onChange }) {
   };
 
   const buildStyleInputField = ({ field, defaultWidth, clearError, onChange }) => {
+    const name = field.key || field.name;
+    if (!name) {
+      return null;
+    }
     const textInput = document.createElement('input');
     textInput.type = 'text';
     textInput.placeholder = field.placeholder || '';
@@ -763,7 +742,7 @@ function createStyleApi({ t, clearError, onChange }) {
       alignItems: 'center',
     });
 
-    if (field.name === 'position') {
+    if (name === 'position') {
       const positionSelect = document.createElement('select');
       POSITION_OPTIONS.forEach((value) => {
         const option = document.createElement('option');
@@ -773,7 +752,7 @@ function createStyleApi({ t, clearError, onChange }) {
       });
       styleInput(positionSelect);
       const syncPosition = (event) => {
-        styleState[field.name] = event.target.value;
+        styleState[name] = event.target.value;
         textInput.value = event.target.value;
         notifyChange();
       };
@@ -794,7 +773,7 @@ function createStyleApi({ t, clearError, onChange }) {
 
     let incBtn = null;
     let decBtn = null;
-    if (adjustableFields.has(field.name)) {
+    if (adjustableFields.has(name)) {
       const makeBtn = (label) => {
         const btn = document.createElement('button');
         btn.type = 'button';
@@ -851,7 +830,7 @@ function createStyleApi({ t, clearError, onChange }) {
     const minWidth = typeof field.minWidth === 'number' ? field.minWidth : defaultWidth;
     applyCardStyle(fieldNode.wrapper, minWidth);
 
-    styleInputs.set(field.name, {
+    styleInputs.set(name, {
       text: textInput,
       color: colorInput,
       inc: incBtn,
@@ -862,13 +841,13 @@ function createStyleApi({ t, clearError, onChange }) {
 
     const handleChange = (value) => {
       clearError?.();
-      styleState[field.name] = value;
+      styleState[name] = value;
       notifyChange();
     };
 
     const handleTextInput = (event) => {
       const value = event.target.value;
-      styleState[field.name] = value;
+      styleState[name] = value;
       if (colorInput && HEX_COLOR_PATTERN.test(value.trim())) {
         const hex = value.trim();
         colorInput.value = hex;
@@ -883,7 +862,7 @@ function createStyleApi({ t, clearError, onChange }) {
     if (colorInput) {
       const syncColor = (event) => {
         const value = event.target.value;
-        styleState[field.name] = value;
+        styleState[name] = value;
         textInput.value = value;
         colorInput.dataset.defaultValue = value;
         handleChange(value);
@@ -894,7 +873,7 @@ function createStyleApi({ t, clearError, onChange }) {
         palette.querySelectorAll('button').forEach((btn) => {
           btn.addEventListener('click', () => {
             const value = btn.dataset.value || '';
-            styleState[field.name] = value;
+            styleState[name] = value;
             textInput.value = value;
             if (colorInput && HEX_COLOR_PATTERN.test(value)) {
               colorInput.value = value;
@@ -906,19 +885,19 @@ function createStyleApi({ t, clearError, onChange }) {
       }
     }
 
-    if (adjustableFields.has(field.name) && (incBtn || decBtn)) {
+    if (adjustableFields.has(name) && (incBtn || decBtn)) {
       const adjust = (delta) => {
         clearError?.();
         const current = parseInt((textInput.value || '').replace(/[^0-9-]/g, ''), 10);
         let fallback = 0;
-        if (field.name === 'fontSize') fallback = 12;
-        else if (field.name === 'fontWeight') fallback = 400;
-        else if (field.name.startsWith('padding')) fallback = 12;
+        if (name === 'fontSize') fallback = 12;
+        else if (name === 'fontWeight') fallback = 400;
+        else if (name.startsWith('padding')) fallback = 12;
         const base = Number.isFinite(current) ? current : fallback;
         const next = Math.max(0, base + delta);
-        const unit = field.name === 'fontWeight' ? '' : 'px';
+        const unit = name === 'fontWeight' ? '' : 'px';
         const value = `${next}${unit}`;
-        styleState[field.name] = value;
+        styleState[name] = value;
         textInput.value = value;
         notifyChange();
       };

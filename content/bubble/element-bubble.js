@@ -334,6 +334,8 @@ function createElementBubble() {
     gap: '12px',
   });
 
+  let suppressAutoRefresh = false;
+
   const formSections = buildFormSections({
     t,
     sections: getFormSections(t),
@@ -343,7 +345,17 @@ function createElementBubble() {
     clearError: () => {
       errorLabel.textContent = '';
     },
-    onChange: () => refreshUI(),
+    onFieldChange: (key) => {
+      if (key === 'type') {
+        suppressAutoRefresh = true;
+        handleTypeChange({ applyDefaults: true });
+        suppressAutoRefresh = false;
+      }
+    },
+    onChange: () => {
+      if (suppressAutoRefresh) return;
+      refreshUI();
+    },
   });
   const focusTargets = formSections.focusTargets || {};
   const refreshFields = () => formSections.refreshFields();
@@ -358,7 +370,6 @@ function createElementBubble() {
     const typeLabel = getTypeOptions().find(({ value }) => value === state.type)?.label || '';
     headerTypeBadge.textContent = typeLabel;
   };
-  updateActiveTabTitle();
 
   headerBar.append(headerContext, headerActions);
   form.append(headerBar, formBody);
@@ -386,6 +397,34 @@ function createElementBubble() {
 
   const resetStyleState = (source, suggestions) => {
     formSections.resetStyle(source, suggestions);
+  };
+
+  const focusField = (key) => {
+    const target = focusTargets[key];
+    if (target instanceof HTMLElement && typeof target.focus === 'function') {
+      target.focus({ preventScroll: true });
+    }
+  };
+
+  const validateSubmission = (payload) => {
+    if (payload.type !== 'area' && !payload.text) {
+      errorLabel.textContent = t('editor.errorTextRequired');
+      focusField('text');
+      return false;
+    }
+    if (payload.type === 'link' && !state.href.trim()) {
+      errorLabel.textContent = t('editor.errorUrlRequired');
+      focusField('href');
+      return false;
+    }
+    if (payload.type === 'button' && payload.href && !payload.actionFlow) {
+      errorLabel.textContent = t('editor.errorActionRequiredForUrl');
+      if (openActionFlowButton && typeof openActionFlowButton.focus === 'function') {
+        openActionFlowButton.focus({ preventScroll: true });
+      }
+      return false;
+    }
+    return true;
   };
 
   const buildPayload = () => {
@@ -422,30 +461,17 @@ function createElementBubble() {
       if (hrefValue) {
         payload.href = hrefValue;
       }
-      if (state.actionFlowMode === 'builder') {
-        const actionSteps = Array.isArray(state.actionSteps) ? state.actionSteps : [];
-        if (actionSteps.length === 0) {
-          setState({ actionFlow: '' });
-          errorLabel.textContent = '';
-          delete payload.actionFlow;
-        } else {
-          const serialized = stepsToJSON(actionSteps);
-          setState({ actionFlow: serialized });
-          const { definition, error } = parseActionFlowDefinition(serialized.trim());
-          if (error || !definition) {
-            errorLabel.textContent = t('editor.errorFlowInvalid', { error: error || '' });
-            return null;
-          }
-          errorLabel.textContent = '';
-          payload.actionFlow = serialized;
+      const flowValue = (state.actionFlow || '').trim();
+      if (flowValue) {
+        const { definition, error } = parseActionFlowDefinition(flowValue);
+        if (error || !definition) {
+          errorLabel.textContent = t('editor.errorFlowInvalid', { error: error || '' });
+          return null;
         }
+        errorLabel.textContent = '';
+        payload.actionFlow = flowValue;
       } else {
-        const flowValue = state.actionFlow.trim();
-        if (flowValue) {
-          payload.actionFlow = flowValue;
-        } else {
-          delete payload.actionFlow;
-        }
+        delete payload.actionFlow;
       }
     } else if (type === 'tooltip') {
       const tooltipPosition = resolveTooltipPosition(state.tooltipPosition);
@@ -462,13 +488,12 @@ function createElementBubble() {
   const updatePreview = (options = { propagate: true }) => {
     const payload = buildPayload();
     if (!payload) {
-      actionFlowController.updateSummary();
+      actionFlowController.validateInput();
       return;
     }
     if (options.propagate && typeof previewHandler === 'function') {
       previewHandler(payload);
     }
-    actionFlowController.updateSummary();
   };
 
   refreshUI = (options = {}) => {
@@ -483,7 +508,7 @@ function createElementBubble() {
     }
   };
 
-  const handleTypeChange = (applyDefaults = false) => {
+  const handleTypeChange = ({ applyDefaults = false, skipPreview = false } = {}) => {
     actionFlowController.hideMenu();
     const styleDefaults =
       state.type === 'link'
@@ -503,7 +528,8 @@ function createElementBubble() {
       applyDefaults,
       styleDefaults: applyDefaults ? styleDefaults : null,
     });
-    refreshUI();
+    refreshUI({ skipPreview });
+    return true;
   };
 
   const handleDraftUpdate = (event) => {
@@ -516,6 +542,7 @@ function createElementBubble() {
     }
     const stylePatch = detail && typeof detail.style === 'object' ? detail.style : null;
     const hasTextUpdate = Object.prototype.hasOwnProperty.call(detail || {}, 'text');
+    const hasTypeUpdate = Object.prototype.hasOwnProperty.call(detail || {}, 'type');
     const hasContainerUpdate = Object.prototype.hasOwnProperty.call(detail || {}, 'containerId');
     const hasFloatingUpdate = Object.prototype.hasOwnProperty.call(detail || {}, 'floating');
     const hasBubbleSideUpdate = Object.prototype.hasOwnProperty.call(detail || {}, 'bubbleSide');
@@ -548,6 +575,11 @@ function createElementBubble() {
       const textValue = typeof detail.text === 'string' ? detail.text : '';
       nextPatch.text = textValue;
     }
+    if (hasTypeUpdate) {
+      const nextType =
+        detail.type === 'link' || detail.type === 'tooltip' || detail.type === 'area' ? detail.type : 'button';
+      nextPatch.type = nextType;
+    }
     if (Object.keys(nextPatch).length === 0) {
       return;
     }
@@ -555,6 +587,7 @@ function createElementBubble() {
     if (stylePatch) {
       formSections.mergeStyle(stylePatch);
     }
+    const refreshedByTypeChange = hasTypeUpdate ? handleTypeChange({ applyDefaults: true }) || true : false;
     if (hasBubbleSideUpdate) {
       bubble.dataset.pageAugmentorPlacement = 'bottom';
     }
@@ -564,7 +597,9 @@ function createElementBubble() {
     if (hasContainerUpdate || hasFloatingUpdate || hasBubbleSideUpdate || hasSelectorUpdate || hasPositionUpdate) {
       placementControls?.update();
     }
-    refreshUI();
+    if (!refreshedByTypeChange) {
+      refreshUI();
+    }
   };
 
   function startActionPicker(options = {}) {
@@ -607,55 +642,8 @@ function createElementBubble() {
     if (!payload) {
       return;
     }
-    if (payload.type !== 'area' && !payload.text) {
-      errorLabel.textContent = t('editor.errorTextRequired');
-      const textField = focusTargets.text;
-      if (textField instanceof HTMLElement && typeof textField.focus === 'function') {
-        textField.focus({ preventScroll: true });
-      }
+    if (!validateSubmission(payload)) {
       return;
-    }
-    if (payload.type === 'link' && !state.href.trim()) {
-      errorLabel.textContent = t('editor.errorUrlRequired');
-      const hrefField = focusTargets.href;
-      if (hrefField instanceof HTMLElement && typeof hrefField.focus === 'function') {
-        hrefField.focus({ preventScroll: true });
-      }
-      return;
-    }
-    if (payload.type === 'button' && payload.href && !payload.actionFlow) {
-      errorLabel.textContent = t('editor.errorActionRequiredForUrl');
-      openActionFlowButton.focus({ preventScroll: true });
-      return;
-    }
-    if (payload.type === 'button') {
-      if (state.actionFlowMode === 'builder') {
-        const serialized = stepsToJSON(Array.isArray(state.actionSteps) ? state.actionSteps : []);
-        setState({ actionFlow: serialized });
-        const { definition, error } = parseActionFlowDefinition(serialized.trim());
-        if (error || !definition) {
-          errorLabel.textContent = t('editor.errorFlowInvalid', { error: error || '' });
-          return;
-        }
-        if (definition.stepCount > 0) {
-          payload.actionFlow = serialized;
-        } else {
-          delete payload.actionFlow;
-        }
-      } else {
-        const flowValue = state.actionFlow.trim();
-        if (flowValue) {
-          const { definition, error } = parseActionFlowDefinition(flowValue);
-          if (error || !definition) {
-            errorLabel.textContent = t('editor.errorFlowInvalid', { error: error || '' });
-            actionFlowInput.focus({ preventScroll: true });
-            return;
-          }
-          payload.actionFlow = flowValue;
-        } else {
-          delete payload.actionFlow;
-        }
-      }
     }
     submitHandler(payload);
   });
@@ -820,8 +808,7 @@ function createElementBubble() {
       resetStyleState(initial.style, initial.styleSuggestions);
       stopActionPicker('cancel');
       actionFlowController.refreshBuilder();
-      handleTypeChange();
-      refreshUI({ skipPreview: true });
+      handleTypeChange({ skipPreview: true });
       saveButton.textContent = mode === 'edit' ? t('editor.saveUpdate') : t('editor.saveCreate');
       actionFlowController.validateInput();
       updatePreview({ propagate: false });

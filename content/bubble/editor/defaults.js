@@ -5,7 +5,7 @@ import {
   DEFAULT_AREA_STYLE,
   VALID_TOOLTIP_POSITIONS,
 } from '../styles/style-presets.js';
-import { getStyleFieldConfigs as buildStyleFieldConfigs } from '../styles/style-config.js';
+import { getStyleFieldConfigs as buildStyleFieldConfigs } from './field-config.js';
 
 export function getDefaultElementValues(values = {}, suggestedStyle = {}, t) {
   const configs = buildStyleFieldConfigs(t);
@@ -32,7 +32,9 @@ export function getDefaultElementValues(values = {}, suggestedStyle = {}, t) {
   const style = {};
   const styleSuggestions = {};
 
-  configs.forEach(({ name }) => {
+  configs.forEach((field) => {
+    const name = field.key || field.name;
+    if (!name) return;
     const providedRaw = values.style && typeof values.style[name] === 'string' ? values.style[name] : '';
     const provided = typeof providedRaw === 'string' ? providedRaw.trim() : '';
     if (provided) {

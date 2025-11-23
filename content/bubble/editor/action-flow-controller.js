@@ -236,6 +236,49 @@ export function createActionFlowController(options) {
   actionFlowBuilder.append(actionStepsContainer, actionBuilderEmpty, addActionContainer, actionBuilderAdvancedNote);
   actionFlowField.wrapper.appendChild(actionFlowBuilder);
 
+  const builderConfig = {
+    allowAdd: true,
+    allowDelete: true,
+    emptyHint: t('editor.actionBuilder.empty'),
+    disallowAddWhenHref: null,
+  };
+
+  const applyBuilderConfig = (config = {}) => {
+    if (config && typeof config === 'object') {
+      if (Object.prototype.hasOwnProperty.call(config, 'allowAdd')) {
+        builderConfig.allowAdd = Boolean(config.allowAdd);
+      }
+      if (Object.prototype.hasOwnProperty.call(config, 'allowDelete')) {
+        builderConfig.allowDelete = Boolean(config.allowDelete);
+      }
+      if (typeof config.emptyHint === 'string') {
+        builderConfig.emptyHint = config.emptyHint;
+      } else if (!config.emptyHint) {
+        builderConfig.emptyHint = t('editor.actionBuilder.empty');
+      }
+      if (typeof config.disallowAddWhenHref === 'function') {
+        builderConfig.disallowAddWhenHref = config.disallowAddWhenHref;
+      } else if (config.disallowAddWhenHref === null) {
+        builderConfig.disallowAddWhenHref = null;
+      }
+    }
+    const state = getState();
+    const computedDisallow =
+      typeof builderConfig.disallowAddWhenHref === 'function'
+        ? builderConfig.disallowAddWhenHref(state)
+        : false;
+    const canAdd = builderConfig.allowAdd && !computedDisallow;
+
+    addActionContainer.style.display = canAdd ? 'inline-flex' : 'none';
+    addActionButton.disabled = !canAdd;
+    if (!canAdd) {
+      hideActionMenu();
+    }
+    actionBuilderEmpty.textContent = builderConfig.emptyHint;
+  };
+
+  applyBuilderConfig();
+
   const actionFlowHint = document.createElement('p');
   actionFlowHint.textContent = t('editor.actionFlowHintDefault', { limit: MAX_FLOW_SOURCE_LENGTH });
   Object.assign(actionFlowHint.style, {
@@ -358,6 +401,8 @@ export function createActionFlowController(options) {
   let actionBuilderInvalidIndex = -1;
   let flowBubbleAttached = false;
   let flowSnapshot = null;
+  let flowDisabled = false;
+  let flowButtonPlacement = 'row';
   let attachMainBubble = () => {};
   let detachMainBubble = () => {};
   let dragPointerId = null;
@@ -513,9 +558,37 @@ export function createActionFlowController(options) {
     return { type: 'click', selector: previous.selector || '' };
   };
 
+  const applyButtonPlacement = (placement) => {
+    const normalized = placement === 'stacked' ? 'stacked' : 'row';
+    flowButtonPlacement = normalized;
+    if (normalized === 'stacked') {
+      actionFlowSummaryRow.style.flexDirection = 'column';
+      actionFlowSummaryRow.style.alignItems = 'flex-start';
+      actionFlowSummaryRow.style.justifyContent = 'flex-start';
+      openActionFlowButton.style.alignSelf = 'flex-start';
+    } else {
+      actionFlowSummaryRow.style.flexDirection = 'row';
+      actionFlowSummaryRow.style.alignItems = 'center';
+      actionFlowSummaryRow.style.justifyContent = 'space-between';
+      openActionFlowButton.style.alignSelf = 'auto';
+    }
+  };
+
   const updateActionFlowSummary = () => {
     const state = getState();
     if (state.type !== 'button') {
+      actionFlowSummaryText.textContent = t('editor.actionFlowSummaryUnavailable');
+      actionFlowSummaryText.style.color = '#64748b';
+      actionFlowSummaryHint.textContent = '';
+      openActionFlowButton.disabled = true;
+      openActionFlowButton.style.opacity = '0.6';
+      openActionFlowButton.style.cursor = 'not-allowed';
+      actionFlowHint.textContent = '';
+      actionFlowHint.style.color = actionFlowHint.dataset.defaultColor || '#94a3b8';
+      return;
+    }
+
+    if (flowDisabled) {
       actionFlowSummaryText.textContent = t('editor.actionFlowSummaryUnavailable');
       actionFlowSummaryText.style.color = '#64748b';
       actionFlowSummaryHint.textContent = '';
@@ -657,6 +730,7 @@ export function createActionFlowController(options) {
 
     actionStepsContainer.innerHTML = '';
     if (state.actionSteps.length === 0) {
+      actionBuilderEmpty.textContent = builderConfig.emptyHint;
       actionBuilderEmpty.style.display = 'block';
     } else {
       actionBuilderEmpty.style.display = 'none';
@@ -668,7 +742,11 @@ export function createActionFlowController(options) {
 
   const addActionStep = (type = 'click') => {
     const state = getState();
-    if (state.actionFlowMode !== 'builder') {
+    const computedDisallow =
+      typeof builderConfig.disallowAddWhenHref === 'function'
+        ? builderConfig.disallowAddWhenHref(state)
+        : false;
+    if (state.actionFlowMode !== 'builder' || !builderConfig.allowAdd || computedDisallow) {
       return;
     }
     hideActionMenu();
@@ -679,7 +757,7 @@ export function createActionFlowController(options) {
 
   const removeActionStep = (index) => {
     const state = getState();
-    if (state.actionFlowMode !== 'builder') {
+    if (state.actionFlowMode !== 'builder' || !builderConfig.allowDelete) {
       return;
     }
     state.actionSteps = state.actionSteps.filter((_, idx) => idx !== index);
@@ -767,6 +845,10 @@ export function createActionFlowController(options) {
       event.preventDefault();
       removeActionStep(index);
     });
+    if (!builderConfig.allowDelete) {
+      removeButton.style.display = 'none';
+      removeButton.disabled = true;
+    }
 
     header.append(badge, removeButton);
     row.appendChild(header);
@@ -792,11 +874,11 @@ export function createActionFlowController(options) {
     typeSelect.value = step.type;
     styleInput(typeSelect);
     typeSelect.addEventListener('change', (event) => {
-      convertActionStepType(index, event.target.value);
-    });
+    convertActionStepType(index, event.target.value);
+  });
 
-    typeLabel.appendChild(typeSelect);
-    row.appendChild(typeLabel);
+  typeLabel.appendChild(typeSelect);
+  row.appendChild(typeLabel);
 
     const body = document.createElement('div');
     Object.assign(body.style, {
@@ -1026,7 +1108,7 @@ export function createActionFlowController(options) {
 
   const openFlowEditor = () => {
     const state = getState();
-    if (flowBubbleAttached || state.type !== 'button') {
+    if (flowBubbleAttached || state.type !== 'button' || flowDisabled) {
       return;
     }
 
@@ -1063,7 +1145,7 @@ export function createActionFlowController(options) {
     event.preventDefault();
     event.stopPropagation();
     const state = getState();
-    if (state.type !== 'button') {
+    if (flowDisabled || state.type !== 'button') {
       return;
     }
     openFlowEditor();
@@ -1199,6 +1281,35 @@ export function createActionFlowController(options) {
     closeFlowEditor,
     openFlowEditor,
     restoreFlowState,
+    setButtonPlacement(placement = 'row') {
+      applyButtonPlacement(placement);
+      updateActionFlowSummary();
+    },
+    setDisabled(disabled) {
+      flowDisabled = Boolean(disabled);
+      if (flowDisabled && flowBubbleAttached) {
+        closeFlowEditor({ reopen: false });
+      }
+      updateActionFlowSummary();
+    },
+    setBuilderConfig(config) {
+      applyBuilderConfig(config);
+      refreshActionBuilderState();
+      updateActionFlowSummary();
+    },
+    setSummaryHint(message) {
+      if (typeof message === 'string') {
+        actionFlowSummaryHint.textContent = message;
+        actionFlowHint.textContent = message;
+        actionFlowSummaryHint.style.color = actionFlowSummaryHint.dataset.defaultColor || '#94a3b8';
+        actionFlowHint.style.color = actionFlowHint.dataset.defaultColor || '#94a3b8';
+      } else {
+        actionFlowSummaryHint.textContent = t('editor.actionFlowHintDefault', { limit: MAX_FLOW_SOURCE_LENGTH });
+        actionFlowHint.textContent = actionFlowSummaryHint.textContent;
+        actionFlowSummaryHint.style.color = actionFlowSummaryHint.dataset.defaultColor || '#94a3b8';
+        actionFlowHint.style.color = actionFlowHint.dataset.defaultColor || '#94a3b8';
+      }
+    },
     setMainBubbleControls({ attach, detach }) {
       if (typeof attach === 'function') {
         attachMainBubble = attach;

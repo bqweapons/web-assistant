@@ -1,0 +1,227 @@
+import { getTooltipPositionOptions } from '../styles/style-presets.js';
+
+export const DEFAULT_BASE_INFO_ITEM_MIN_WIDTH = 240;
+export const DEFAULT_STYLE_ITEM_MIN_WIDTH = 260;
+
+export function getBaseInfoFieldConfigs(t) {
+  return [
+    {
+      key: 'type',
+      type: 'select',
+      label: t('editor.typeLabel'),
+      minWidth: 200,
+      stateKey: 'type',
+      options: () => [
+        { value: 'button', label: t('type.button') },
+        { value: 'link', label: t('type.link') },
+        { value: 'tooltip', label: t('type.tooltip') },
+        { value: 'area', label: t('type.area') },
+      ],
+    },
+    {
+      key: 'text',
+      type: 'input',
+      label: t('editor.textLabel'),
+      minWidth: 240,
+      stateKey: 'text',
+      placeholder: (state) =>
+        state.type === 'tooltip' ? t('editor.tooltipTextPlaceholder') : t('editor.textPlaceholder'),
+    },
+    {
+      key: 'href',
+      type: 'input',
+      minWidth: 240,
+      stateKey: 'href',
+      visibleWhen: (state) => state.type !== 'tooltip' && state.type !== 'area',
+      labelForState: (state) =>
+        state.type === 'tooltip'
+          ? t('editor.hrefTooltipLabel')
+          : state.type === 'link'
+            ? t('editor.hrefLabel')
+            : t('editor.hrefOptionalLabel'),
+      placeholder: (state) =>
+        state.type === 'tooltip' || state.type === 'area'
+          ? t('editor.hrefTooltipPlaceholder')
+          : state.type === 'link'
+            ? t('editor.hrefPlaceholder')
+            : t('editor.hrefOptionalPlaceholder'),
+      onTypeChange: ({ state, applyDefaults, setState }) => {
+        if ((state.type === 'tooltip' || state.type === 'area') && applyDefaults) {
+          setState({ href: '' });
+        }
+      },
+    },
+    {
+      key: 'linkTarget',
+      type: 'select',
+      label: t('editor.linkTargetLabel'),
+      minWidth: 200,
+      stateKey: 'linkTarget',
+      options: () => [
+        { value: 'new-tab', label: t('editor.linkTarget.newTab') },
+        { value: 'same-tab', label: t('editor.linkTarget.sameTab') },
+      ],
+      visibleWhen: (state) => state.type === 'link',
+      onTypeChange: ({ state, applyDefaults, setState }) => {
+        if (state.type === 'link' && applyDefaults) {
+          setState({ linkTarget: 'new-tab' });
+        }
+      },
+    },
+    {
+      key: 'actionFlow',
+      type: 'flow',
+      label: t('editor.actionFlowLabel'),
+      minWidth: 240,
+      buttonPlacement: 'stacked',
+      builderConfig: {
+        allowAdd: true,
+        allowDelete: true,
+        emptyHint: t('editor.actionBuilder.empty'),
+        disallowAddWhenHref: (state) => Boolean(state.href && state.href.trim()),
+      },
+      summaryHint: (state) =>
+        state.type === 'button'
+          ? t('editor.actionFlowHintDefault', { limit: 4000 })
+          : t('editor.actionFlowSummaryUnavailable'),
+      disabledWhen: (state) => state.type !== 'button',
+      visibleWhen: (state) => state.type === 'button',
+      onTypeChange: ({ state, setState }) => {
+        if (state.type !== 'button') {
+          setState({
+            actionFlow: '',
+            actionFlowError: '',
+            actionFlowSteps: 0,
+            actionFlowMode: 'builder',
+            actionSteps: [],
+          });
+        }
+      },
+    },
+    {
+      key: 'tooltipPosition',
+      type: 'select',
+      label: t('editor.tooltipPositionLabel'),
+      minWidth: 220,
+      stateKey: 'tooltipPosition',
+      options: () => getTooltipPositionOptions(t),
+      visibleWhen: (state) => state.type === 'tooltip',
+      onTypeChange: ({ state, applyDefaults, setState }) => {
+        if (state.type === 'tooltip' && applyDefaults) {
+          setState({ tooltipPosition: 'top', tooltipPersistent: false });
+        }
+      },
+    },
+    {
+      key: 'tooltipPersistent',
+      type: 'toggle',
+      label: t('editor.tooltipPersistenceLabel'),
+      hint: t('editor.tooltipPersistenceHint'),
+      minWidth: 220,
+      stateKey: 'tooltipPersistent',
+      visibleWhen: (state) => state.type === 'tooltip',
+      onTypeChange: ({ state, applyDefaults, setState }) => {
+        if (state.type === 'tooltip' && applyDefaults) {
+          setState({ tooltipPersistent: false });
+        }
+      },
+    },
+    {
+      key: 'areaLayout',
+      type: 'select',
+      label: t('editor.areaLayoutLabel'),
+      minWidth: 220,
+      stateKey: 'layout',
+      options: () => [
+        { value: 'row', label: t('editor.areaLayout.horizontal') },
+        { value: 'column', label: t('editor.areaLayout.vertical') },
+      ],
+      visibleWhen: (state) => state.type === 'area',
+      onTypeChange: ({ state, applyDefaults, setState }) => {
+        if (state.type === 'area' && applyDefaults) {
+          setState({
+            layout: 'row',
+            href: '',
+            actionFlow: '',
+            actionFlowSteps: 0,
+            actionSteps: [],
+            actionFlowMode: 'builder',
+          });
+        }
+      },
+    },
+  ];
+}
+
+export function getStyleFieldConfigs(t) {
+  return [
+    { key: 'color', name: 'color', type: 'styleInput', label: t('editor.styles.color'), placeholder: '#2563eb', colorPicker: true, group: 'basic' },
+    {
+      key: 'backgroundColor',
+      name: 'backgroundColor',
+      type: 'styleInput',
+      label: t('editor.styles.backgroundColor'),
+      placeholder: '#1b84ff',
+      colorPicker: true,
+      group: 'basic',
+    },
+    { key: 'position', name: 'position', type: 'styleInput', label: t('editor.styles.position'), placeholder: 'relative', minWidth: 200, group: 'advanced' },
+    { key: 'top', name: 'top', type: 'styleInput', label: t('editor.styles.top'), placeholder: '12px', minWidth: 220, group: 'advanced', adjustable: true },
+    { key: 'left', name: 'left', type: 'styleInput', label: t('editor.styles.left'), placeholder: '12px', minWidth: 220, group: 'advanced', adjustable: true },
+    { key: 'right', name: 'right', type: 'styleInput', label: t('editor.styles.right'), placeholder: '', minWidth: 220, group: 'advanced', adjustable: true },
+    { key: 'bottom', name: 'bottom', type: 'styleInput', label: t('editor.styles.bottom'), placeholder: '', minWidth: 220, group: 'advanced', adjustable: true },
+    { key: 'zIndex', name: 'zIndex', type: 'styleInput', label: t('editor.styles.zIndex'), placeholder: '1000', minWidth: 220, group: 'advanced' },
+    { key: 'width', name: 'width', type: 'styleInput', label: t('editor.styles.width'), placeholder: '260px', minWidth: 220, group: 'advanced', adjustable: true },
+    { key: 'height', name: 'height', type: 'styleInput', label: t('editor.styles.height'), placeholder: '120px', minWidth: 220, group: 'advanced', adjustable: true },
+    { key: 'fontWeight', name: 'fontWeight', type: 'styleInput', label: t('editor.styles.fontWeight'), placeholder: '600', minWidth: 220, group: 'advanced', adjustable: true },
+    { key: 'paddingTop', name: 'paddingTop', type: 'styleInput', label: t('editor.styles.paddingTop'), placeholder: '12px', minWidth: 220, group: 'advanced', adjustable: true },
+    { key: 'paddingRight', name: 'paddingRight', type: 'styleInput', label: t('editor.styles.paddingRight'), placeholder: '12px', minWidth: 220, group: 'advanced', adjustable: true },
+    { key: 'paddingBottom', name: 'paddingBottom', type: 'styleInput', label: t('editor.styles.paddingBottom'), placeholder: '12px', minWidth: 220, group: 'advanced', adjustable: true },
+    { key: 'paddingLeft', name: 'paddingLeft', type: 'styleInput', label: t('editor.styles.paddingLeft'), placeholder: '12px', minWidth: 220, group: 'advanced', adjustable: true },
+    { key: 'fontSize', name: 'fontSize', type: 'styleInput', label: t('editor.styles.fontSize'), placeholder: '12px', minWidth: 220, group: 'basic', adjustable: true },
+    { key: 'boxShadow', name: 'boxShadow', type: 'styleInput', label: t('editor.styles.boxShadow'), placeholder: '0 12px 32px rgba(15, 23, 42, 0.18)', minWidth: 220, group: 'advanced' },
+    { key: 'border', name: 'border', type: 'styleInput', label: t('editor.styles.border'), placeholder: '1px solid rgba(148, 163, 184, 0.4)', minWidth: 220, group: 'advanced' },
+    { key: 'borderRadius', name: 'borderRadius', type: 'styleInput', label: t('editor.styles.borderRadius'), placeholder: '8px', minWidth: 220, group: 'advanced' },
+  ];
+}
+
+export function getStyleSectionFields(t) {
+  return [
+    {
+      key: 'stylePreset',
+      type: 'stylePreset',
+      label: t('editor.styles.presetsLabel'),
+      minWidth: DEFAULT_STYLE_ITEM_MIN_WIDTH,
+    },
+    ...getStyleFieldConfigs(t),
+    {
+      key: 'customCss',
+      type: 'customStyle',
+      label: t('editor.styles.customCss'),
+      minWidth: DEFAULT_STYLE_ITEM_MIN_WIDTH,
+      group: 'advanced',
+    },
+    {
+      key: 'styleHint',
+      type: 'note',
+      label: '',
+      message: t('editor.stylesHint'),
+    },
+  ];
+}
+
+export function getEditorSections(t) {
+  return [
+    {
+      key: 'base',
+      legend: t('editor.sections.basics.title'),
+      fields: getBaseInfoFieldConfigs(t),
+    },
+    {
+      key: 'style',
+      legend: t('editor.stylesLegend'),
+      fields: getStyleSectionFields(t),
+      isStyle: true,
+    },
+  ];
+}
