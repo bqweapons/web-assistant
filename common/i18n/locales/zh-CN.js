@@ -219,7 +219,7 @@ mergeMessages(messages, {
     actionFlowHintConfigured: '已配置 {count} 个步骤的流程。',
     actionFlowHintError: '流程错误：{error}',
     actionFlowConfigure: '配置流程',
-    actionFlowSummaryUnavailable: '仅按钮类型支持配置动作流程。',
+    actionFlowSummaryUnavailable: '当前类型不支持动作流程，请切换为按钮类型后再配置。',
     actionFlowSummaryError: '流程错误：{error}',
     actionFlowSummaryConfigured: '已配置动作流程（{count} 个步骤）',
     actionFlowSummaryEmpty: '尚未配置动作流程。',
@@ -232,6 +232,7 @@ mergeMessages(messages, {
     positionLabel: '插入位置',
     actionBuilder: {
       add: '新增步骤',
+      modify: '编辑步骤',
       empty: '暂未添加任何步骤。点击“新增步骤”开始构建流程。',
       advancedNotice: '该流程包含高级特性，请在下方直接编辑 JSON。',
       typeLabel: '步骤类型',
@@ -242,6 +243,7 @@ mergeMessages(messages, {
       delayLabel: '等待时长（毫秒）',
       pick: '选取元素',
       remove: '移除',
+      reorderHint: '拖动序号可调整顺序。',
       type: {
         click: '点击元素',
         input: '填写输入',
@@ -329,4 +331,3 @@ mergeMessages(messages, {
 });
 
 export default messages;
-

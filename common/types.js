@@ -10,6 +10,7 @@
  * @property {'same-tab' | 'new-tab' | undefined} [linkTarget]
  * @property {string | undefined} actionSelector
  * @property {string | undefined} actionFlow
+ * @property {boolean | undefined} [actionFlowLocked]
  * @property {string} selector
  * @property {string[] | undefined} [frameSelectors]
  * @property {string | undefined} [frameLabel]

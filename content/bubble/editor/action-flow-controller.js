@@ -59,7 +59,7 @@ export function createActionFlowController(options) {
 
   const openActionFlowButton = document.createElement('button');
   openActionFlowButton.type = 'button';
-  openActionFlowButton.textContent = t('editor.actionFlowConfigure');
+  openActionFlowButton.textContent = t('editor.actionBuilder.modify');
   Object.assign(openActionFlowButton.style, {
     padding: '7px 12px',
     borderRadius: '8px',
@@ -83,8 +83,8 @@ export function createActionFlowController(options) {
   });
   actionFlowSummaryHint.dataset.defaultColor = '#94a3b8';
   actionFlowSummaryText.textContent = t('editor.actionFlowSummaryEmpty');
-  actionFlowSummaryHint.textContent = t('editor.actionFlowHintDefault', { limit: MAX_FLOW_SOURCE_LENGTH });
-  actionFlowSummaryField.wrapper.append(actionFlowSummaryRow, actionFlowSummaryHint);
+  actionFlowSummaryHint.textContent = `${t('editor.actionFlowHintDefault', { limit: MAX_FLOW_SOURCE_LENGTH })} · ${t('editor.actionBuilder.reorderHint')}`;
+  actionFlowSummaryField.wrapper.append(actionFlowSummaryRow);
 
   const actionFlowEditorHost = document.createElement('div');
   actionFlowEditorHost.style.display = 'none';
@@ -95,6 +95,10 @@ export function createActionFlowController(options) {
     { value: 'input', label: t('editor.actionBuilder.type.input') },
     { value: 'wait', label: t('editor.actionBuilder.type.wait') },
   ];
+  const ACTION_TYPE_LABEL_MAP = ACTION_TYPE_OPTIONS.reduce((map, item) => {
+    map[item.value] = item.label;
+    return map;
+  }, {});
 
   const actionFlowBuilder = document.createElement('div');
   Object.assign(actionFlowBuilder.style, {
@@ -221,6 +225,15 @@ export function createActionFlowController(options) {
   });
 
   addActionContainer.append(addActionButton, addActionMenu);
+  
+  const reorderHint = document.createElement('p');
+  reorderHint.textContent = t('editor.actionBuilder.reorderHint');
+  Object.assign(reorderHint.style, {
+    margin: '6px 0 0 0',
+    fontSize: '11px',
+    color: '#94a3b8',
+  });
+  addActionContainer.appendChild(reorderHint);
 
   const actionBuilderAdvancedNote = document.createElement('div');
   actionBuilderAdvancedNote.textContent = t('editor.actionBuilder.advancedNotice');
@@ -233,8 +246,62 @@ export function createActionFlowController(options) {
     display: 'none',
   });
 
-  actionFlowBuilder.append(actionStepsContainer, actionBuilderEmpty, addActionContainer, actionBuilderAdvancedNote);
+  // 将新增按钮放在列表上方，避免长列表时下拉溢出视窗
+  actionFlowBuilder.append(addActionContainer, actionStepsContainer, actionBuilderEmpty, actionBuilderAdvancedNote);
   actionFlowField.wrapper.appendChild(actionFlowBuilder);
+
+  const builderConfig = {
+    allowAdd: true,
+    allowDelete: true,
+    emptyHint: t('editor.actionBuilder.empty'),
+    disallowAddWhenHref: null,
+    readonlyAfterAdd: false,
+    pickButtonPlacement: 'row',
+  };
+
+  const applyBuilderConfig = (config = {}) => {
+    if (config && typeof config === 'object') {
+      if (Object.prototype.hasOwnProperty.call(config, 'allowAdd')) {
+        builderConfig.allowAdd = Boolean(config.allowAdd);
+      }
+      if (Object.prototype.hasOwnProperty.call(config, 'allowDelete')) {
+        builderConfig.allowDelete = Boolean(config.allowDelete);
+      }
+      if (typeof config.emptyHint === 'string') {
+        builderConfig.emptyHint = config.emptyHint;
+      } else if (!config.emptyHint) {
+        builderConfig.emptyHint = t('editor.actionBuilder.empty');
+      }
+      if (typeof config.disallowAddWhenHref === 'function') {
+        builderConfig.disallowAddWhenHref = config.disallowAddWhenHref;
+      } else if (config.disallowAddWhenHref === null) {
+        builderConfig.disallowAddWhenHref = null;
+      }
+      if (Object.prototype.hasOwnProperty.call(config, 'readonlyAfterAdd')) {
+        builderConfig.readonlyAfterAdd = Boolean(config.readonlyAfterAdd);
+      }
+      if (typeof config.pickButtonPlacement === 'string') {
+        builderConfig.pickButtonPlacement = config.pickButtonPlacement === 'secondRow' ? 'secondRow' : 'row';
+      }
+    }
+    const state = getState();
+    const computedDisallow =
+      typeof builderConfig.disallowAddWhenHref === 'function'
+        ? builderConfig.disallowAddWhenHref(state)
+        : false;
+    const readonlyActive =
+      builderConfig.readonlyAfterAdd && Array.isArray(state.actionSteps) && state.actionSteps.length > 0;
+    const canAdd = builderConfig.allowAdd && !computedDisallow && !readonlyActive;
+
+    addActionContainer.style.display = canAdd ? 'inline-flex' : 'none';
+    addActionButton.disabled = !canAdd;
+    if (!canAdd) {
+      hideActionMenu();
+    }
+    actionBuilderEmpty.textContent = builderConfig.emptyHint;
+  };
+
+  applyBuilderConfig();
 
   const actionFlowHint = document.createElement('p');
   actionFlowHint.textContent = t('editor.actionFlowHintDefault', { limit: MAX_FLOW_SOURCE_LENGTH });
@@ -290,6 +357,17 @@ export function createActionFlowController(options) {
     lineHeight: '1.5',
   });
 
+  const flowBubbleHeader = document.createElement('div');
+  Object.assign(flowBubbleHeader.style, {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: '4px',
+    cursor: 'grab',
+    userSelect: 'none',
+    touchAction: 'none',
+  });
+  flowBubbleHeader.append(flowBubbleTitle, flowBubbleDescription);
+
   const flowBubbleBody = document.createElement('div');
   Object.assign(flowBubbleBody.style, {
     display: 'flex',
@@ -341,14 +419,104 @@ export function createActionFlowController(options) {
   });
 
   flowBubbleActions.append(flowCancelButton, flowSaveButton);
-  flowBubble.append(flowBubbleTitle, flowBubbleDescription, flowBubbleBody, flowBubbleActions);
+  flowBubble.append(flowBubbleHeader, flowBubbleBody, flowBubbleActions);
 
   let actionMenuVisible = false;
   let actionBuilderInvalidIndex = -1;
   let flowBubbleAttached = false;
   let flowSnapshot = null;
+  let flowDisabled = false;
+  let flowButtonPlacement = 'row';
+  let summaryHintMessage = null;
   let attachMainBubble = () => {};
   let detachMainBubble = () => {};
+  let dragPointerId = null;
+  let dragOffsetX = 0;
+  let dragOffsetY = 0;
+
+  const clampFlowBubblePosition = (left, top) => {
+    const rect = flowBubble.getBoundingClientRect();
+    const bubbleWidth = rect.width || 420;
+    const bubbleHeight = rect.height || 420;
+    const margin = 12;
+    const maxLeft = Math.max(margin, window.innerWidth - bubbleWidth - margin);
+    const maxTop = Math.max(margin, window.innerHeight - bubbleHeight - margin);
+    return {
+      left: Math.min(Math.max(margin, left), maxLeft),
+      top: Math.min(Math.max(margin, top), maxTop),
+    };
+  };
+
+  const setFlowBubblePosition = (left, top) => {
+    flowBubble.style.left = `${Math.round(left)}px`;
+    flowBubble.style.top = `${Math.round(top)}px`;
+    flowBubble.style.right = 'auto';
+  };
+
+  const resetFlowBubblePosition = () => {
+    const defaultMargin = 24;
+    const rect = flowBubble.getBoundingClientRect();
+    const bubbleWidth = rect.width || 420;
+    const bubbleLeft = window.innerWidth - bubbleWidth - defaultMargin;
+    const bubbleTop = defaultMargin;
+    const { left, top } = clampFlowBubblePosition(bubbleLeft, bubbleTop);
+    setFlowBubblePosition(left, top);
+  };
+
+  const stopFlowBubbleDrag = (event) => {
+    if (dragPointerId === null) {
+      flowBubbleHeader.style.cursor = 'grab';
+      return;
+    }
+    if (event && event.pointerId !== undefined && event.pointerId !== dragPointerId) {
+      return;
+    }
+    if (typeof flowBubble.releasePointerCapture === 'function') {
+      try {
+        flowBubble.releasePointerCapture(dragPointerId);
+      } catch (error) {
+        // capture may already be released
+      }
+    }
+    dragPointerId = null;
+    flowBubbleHeader.style.cursor = 'grab';
+  };
+
+  const handleFlowBubblePointerDown = (event) => {
+    if (event.button !== undefined && event.button !== 0) {
+      return;
+    }
+    dragPointerId = event.pointerId;
+    const rect = flowBubble.getBoundingClientRect();
+    dragOffsetX = event.clientX - rect.left;
+    dragOffsetY = event.clientY - rect.top;
+    flowBubbleHeader.style.cursor = 'grabbing';
+    if (typeof flowBubble.setPointerCapture === 'function') {
+      flowBubble.setPointerCapture(event.pointerId);
+    }
+    event.preventDefault();
+  };
+
+  const handleFlowBubblePointerMove = (event) => {
+    if (dragPointerId === null || event.pointerId !== dragPointerId) {
+      return;
+    }
+    const nextLeft = event.clientX - dragOffsetX;
+    const nextTop = event.clientY - dragOffsetY;
+    const clamped = clampFlowBubblePosition(nextLeft, nextTop);
+    setFlowBubblePosition(clamped.left, clamped.top);
+  };
+
+  const constrainFlowBubbleToViewport = () => {
+    const rect = flowBubble.getBoundingClientRect();
+    const { left, top } = clampFlowBubblePosition(rect.left, rect.top);
+    setFlowBubblePosition(left, top);
+  };
+
+  flowBubbleHeader.addEventListener('pointerdown', handleFlowBubblePointerDown);
+  flowBubble.addEventListener('pointermove', handleFlowBubblePointerMove);
+  flowBubble.addEventListener('pointerup', stopFlowBubbleDrag);
+  flowBubble.addEventListener('pointercancel', stopFlowBubbleDrag);
 
   const handleMenuOutsideClick = (event) => {
     if (!addActionContainer.contains(event.target)) {
@@ -415,9 +583,42 @@ export function createActionFlowController(options) {
     return { type: 'click', selector: previous.selector || '' };
   };
 
+  const applyButtonPlacement = (placement) => {
+    const normalized = placement === 'stacked' ? 'stacked' : 'row';
+    flowButtonPlacement = normalized;
+    if (normalized === 'stacked') {
+      actionFlowSummaryRow.style.flexDirection = 'column';
+      actionFlowSummaryRow.style.alignItems = 'flex-start';
+      actionFlowSummaryRow.style.justifyContent = 'flex-start';
+      openActionFlowButton.style.alignSelf = 'flex-start';
+    } else {
+      actionFlowSummaryRow.style.flexDirection = 'row';
+      actionFlowSummaryRow.style.alignItems = 'center';
+      actionFlowSummaryRow.style.justifyContent = 'space-between';
+      openActionFlowButton.style.alignSelf = 'auto';
+    }
+  };
+
   const updateActionFlowSummary = () => {
     const state = getState();
+    const baseHint =
+      typeof summaryHintMessage === 'string' && summaryHintMessage
+        ? summaryHintMessage
+        : t('editor.actionFlowHintDefault', { limit: MAX_FLOW_SOURCE_LENGTH });
+
     if (state.type !== 'button') {
+      actionFlowSummaryText.textContent = t('editor.actionFlowSummaryUnavailable');
+      actionFlowSummaryText.style.color = '#64748b';
+      actionFlowSummaryHint.textContent = '';
+      openActionFlowButton.disabled = true;
+      openActionFlowButton.style.opacity = '0.6';
+      openActionFlowButton.style.cursor = 'not-allowed';
+      actionFlowHint.textContent = '';
+      actionFlowHint.style.color = actionFlowHint.dataset.defaultColor || '#94a3b8';
+      return;
+    }
+
+    if (flowDisabled) {
       actionFlowSummaryText.textContent = t('editor.actionFlowSummaryUnavailable');
       actionFlowSummaryText.style.color = '#64748b';
       actionFlowSummaryHint.textContent = '';
@@ -453,16 +654,16 @@ export function createActionFlowController(options) {
     } else {
       actionFlowSummaryText.textContent = t('editor.actionFlowSummaryEmpty');
       actionFlowSummaryText.style.color = '#64748b';
-      actionFlowSummaryHint.textContent = t('editor.actionFlowHintDefault', { limit: MAX_FLOW_SOURCE_LENGTH });
+      actionFlowSummaryHint.textContent = baseHint;
       actionFlowSummaryHint.style.color = actionFlowSummaryHint.dataset.defaultColor || '#94a3b8';
-      actionFlowHint.textContent = t('editor.actionFlowHintDefault', { limit: MAX_FLOW_SOURCE_LENGTH });
+      actionFlowHint.textContent = baseHint;
       actionFlowHint.style.color = actionFlowHint.dataset.defaultColor || '#94a3b8';
     }
 
     if (state.actionFlowMode !== 'builder') {
       const flowValue = state.actionFlow.trim();
       if (!flowValue) {
-        actionFlowHint.textContent = t('editor.actionFlowHintDefault', { limit: MAX_FLOW_SOURCE_LENGTH });
+        actionFlowHint.textContent = baseHint;
         actionFlowHint.style.color = actionFlowHint.dataset.defaultColor || '#94a3b8';
       } else if (state.actionFlowError) {
         actionFlowHint.textContent = t('editor.actionFlowHintError', { error: state.actionFlowError });
@@ -548,6 +749,8 @@ export function createActionFlowController(options) {
     return serialized;
   };
 
+  let draggingIndex = null;
+
   const refreshActionBuilderState = () => {
     hideActionMenu();
     const state = getState();
@@ -558,19 +761,32 @@ export function createActionFlowController(options) {
     }
 
     actionStepsContainer.innerHTML = '';
+    const readonlyActive =
+      builderConfig.readonlyAfterAdd && Array.isArray(state.actionSteps) && state.actionSteps.length > 0;
     if (state.actionSteps.length === 0) {
+      actionBuilderEmpty.textContent = builderConfig.emptyHint;
       actionBuilderEmpty.style.display = 'block';
     } else {
       actionBuilderEmpty.style.display = 'none';
       state.actionSteps.forEach((step, index) => {
         actionStepsContainer.appendChild(createActionStepRow(step, index));
       });
+      if (readonlyActive) {
+        addActionMenu.style.display = 'none';
+        addActionButton.setAttribute('aria-expanded', 'false');
+      }
     }
   };
 
   const addActionStep = (type = 'click') => {
     const state = getState();
-    if (state.actionFlowMode !== 'builder') {
+    const computedDisallow =
+      typeof builderConfig.disallowAddWhenHref === 'function'
+        ? builderConfig.disallowAddWhenHref(state)
+        : false;
+    const readonlyActive =
+      builderConfig.readonlyAfterAdd && Array.isArray(state.actionSteps) && state.actionSteps.length > 0;
+    if (state.actionFlowMode !== 'builder' || !builderConfig.allowAdd || computedDisallow || readonlyActive) {
       return;
     }
     hideActionMenu();
@@ -579,9 +795,37 @@ export function createActionFlowController(options) {
     updateActionFlowFromSteps();
   };
 
+  const reorderActionSteps = (from, to) => {
+    const state = getState();
+    if (!Array.isArray(state.actionSteps)) {
+      return;
+    }
+    const steps = [...state.actionSteps];
+    const fromIndex = Number(from);
+    const toIndex = Number(to);
+    if (
+      Number.isNaN(fromIndex) ||
+      Number.isNaN(toIndex) ||
+      fromIndex < 0 ||
+      toIndex < 0 ||
+      fromIndex >= steps.length ||
+      toIndex >= steps.length ||
+      fromIndex === toIndex
+    ) {
+      return;
+    }
+    const [moved] = steps.splice(fromIndex, 1);
+    steps.splice(toIndex, 0, moved);
+    state.actionSteps = steps;
+    refreshActionBuilderState();
+    updateActionFlowFromSteps();
+  };
+
   const removeActionStep = (index) => {
     const state = getState();
-    if (state.actionFlowMode !== 'builder') {
+    const readonlyActive =
+      builderConfig.readonlyAfterAdd && Array.isArray(state.actionSteps) && state.actionSteps.length > 0;
+    if (state.actionFlowMode !== 'builder' || !builderConfig.allowDelete || readonlyActive) {
       return;
     }
     state.actionSteps = state.actionSteps.filter((_, idx) => idx !== index);
@@ -591,7 +835,9 @@ export function createActionFlowController(options) {
 
   const updateActionStep = (index, patch) => {
     const state = getState();
-    if (state.actionFlowMode !== 'builder') {
+    const readonlyActive =
+      builderConfig.readonlyAfterAdd && Array.isArray(state.actionSteps) && state.actionSteps.length > 0;
+    if (state.actionFlowMode !== 'builder' || readonlyActive) {
       return;
     }
     state.actionSteps = state.actionSteps.map((step, idx) => (idx === index ? { ...step, ...patch } : step));
@@ -599,21 +845,11 @@ export function createActionFlowController(options) {
     refreshActionBuilderState();
   };
 
-  const convertActionStepType = (index, type) => {
-    const state = getState();
-    if (state.actionFlowMode !== 'builder') {
-      return;
-    }
-    const current = state.actionSteps[index] || {};
-    state.actionSteps = state.actionSteps.map((step, idx) => (idx === index ? createStepTemplate(type, step) : step));
-    if (current.type !== type) {
-      updateActionFlowFromSteps();
-    }
-    refreshActionBuilderState();
-  };
-
   const createActionStepRow = (step, index) => {
     const state = getState();
+    const readonlyActive =
+      builderConfig.readonlyAfterAdd && Array.isArray(state.actionSteps) && state.actionSteps.length > 0;
+    const pickPlacement = builderConfig.pickButtonPlacement === 'secondRow' ? 'secondRow' : 'row';
     const row = document.createElement('div');
     Object.assign(row.style, {
       display: 'flex',
@@ -636,7 +872,7 @@ export function createActionFlowController(options) {
       display: 'flex',
       alignItems: 'center',
       justifyContent: 'space-between',
-      gap: '12px',
+      gap: '10px',
     });
 
     const badge = document.createElement('span');
@@ -652,6 +888,23 @@ export function createActionFlowController(options) {
       color: '#4f46e5',
       fontSize: '12px',
       fontWeight: '600',
+      cursor: readonlyActive ? 'default' : 'grab',
+      userSelect: 'none',
+    });
+    badge.title = t('editor.actionBuilder.reorderHint');
+
+    const typeChip = document.createElement('span');
+    typeChip.textContent = ACTION_TYPE_LABEL_MAP[step.type] || step.type;
+    Object.assign(typeChip.style, {
+      display: 'inline-flex',
+      alignItems: 'center',
+      padding: '4px 10px',
+      borderRadius: '10px',
+      backgroundColor: 'rgba(99, 102, 241, 0.08)',
+      color: '#312e81',
+      fontSize: '12px',
+      fontWeight: '600',
+      whiteSpace: 'nowrap',
     });
 
     const removeButton = document.createElement('button');
@@ -669,36 +922,70 @@ export function createActionFlowController(options) {
       event.preventDefault();
       removeActionStep(index);
     });
+    if (!builderConfig.allowDelete || readonlyActive) {
+      removeButton.style.display = 'none';
+      removeButton.disabled = true;
+    }
 
-    header.append(badge, removeButton);
+    const headerLeft = document.createElement('div');
+    Object.assign(headerLeft.style, {
+      display: 'flex',
+      alignItems: 'center',
+      gap: '8px',
+      minWidth: '0',
+    });
+    headerLeft.append(badge, typeChip);
+    header.append(headerLeft, removeButton);
     row.appendChild(header);
 
-    const typeLabel = document.createElement('label');
-    typeLabel.textContent = t('editor.actionBuilder.typeLabel');
-    Object.assign(typeLabel.style, {
-      display: 'flex',
-      flexDirection: 'column',
-      gap: '6px',
-      fontSize: '12px',
-      fontWeight: '600',
-      color: '#0f172a',
-    });
+    const resetDragStyles = () => {
+      row.style.outline = '';
+      row.style.opacity = '1';
+    };
 
-    const typeSelect = document.createElement('select');
-    ACTION_TYPE_OPTIONS.forEach((option) => {
-      const opt = document.createElement('option');
-      opt.value = option.value;
-      opt.textContent = option.label;
-      typeSelect.appendChild(opt);
-    });
-    typeSelect.value = step.type;
-    styleInput(typeSelect);
-    typeSelect.addEventListener('change', (event) => {
-      convertActionStepType(index, event.target.value);
-    });
-
-    typeLabel.appendChild(typeSelect);
-    row.appendChild(typeLabel);
+    if (!readonlyActive) {
+      row.draggable = true;
+      row.addEventListener('dragstart', (event) => {
+        draggingIndex = index;
+        row.style.opacity = '0.8';
+        badge.style.cursor = 'grabbing';
+        if (event.dataTransfer) {
+          event.dataTransfer.effectAllowed = 'move';
+          event.dataTransfer.setData('text/plain', String(index));
+        }
+      });
+      row.addEventListener('dragover', (event) => {
+        if (draggingIndex === null) {
+          return;
+        }
+        event.preventDefault();
+        row.style.outline = '1px dashed #6366f1';
+        badge.style.cursor = 'grabbing';
+      });
+      row.addEventListener('dragleave', () => {
+        if (draggingIndex === null) {
+          return;
+        }
+        row.style.outline = '';
+        badge.style.cursor = 'grab';
+      });
+      row.addEventListener('drop', (event) => {
+        if (draggingIndex === null) {
+          return;
+        }
+        event.preventDefault();
+        const fromIndex = draggingIndex;
+        draggingIndex = null;
+        resetDragStyles();
+        reorderActionSteps(fromIndex, index);
+        badge.style.cursor = 'grab';
+      });
+      row.addEventListener('dragend', () => {
+        draggingIndex = null;
+        resetDragStyles();
+        badge.style.cursor = 'grab';
+      });
+    }
 
     const body = document.createElement('div');
     Object.assign(body.style, {
@@ -725,6 +1012,7 @@ export function createActionFlowController(options) {
       delayInput.step = '100';
       delayInput.value = typeof step.ms === 'number' ? String(step.ms) : '1000';
       styleInput(delayInput);
+      delayInput.disabled = readonlyActive;
       delayInput.addEventListener('input', (event) => {
         const nextValue = Number.parseInt(event.target.value, 10);
         const currentState = getState();
@@ -761,6 +1049,7 @@ export function createActionFlowController(options) {
       selectorInput.placeholder = t('editor.actionBuilder.selectorPlaceholder');
       selectorInput.value = step.selector || '';
       styleInput(selectorInput);
+      selectorInput.disabled = readonlyActive;
       selectorInput.addEventListener('input', (event) => {
         const currentState = getState();
         currentState.actionSteps[index] = {
@@ -784,6 +1073,7 @@ export function createActionFlowController(options) {
         cursor: 'pointer',
       });
 
+      pickButton.disabled = readonlyActive;
       pickButton.addEventListener('click', (event) => {
         event.preventDefault();
         row.dataset.picking = 'true';
@@ -807,8 +1097,21 @@ export function createActionFlowController(options) {
         });
       });
 
-      selectorRow.append(selectorInput, pickButton);
-      selectorLabel.appendChild(selectorRow);
+      selectorRow.append(selectorInput);
+      if (pickPlacement === 'row') {
+        selectorRow.appendChild(pickButton);
+        selectorLabel.appendChild(selectorRow);
+      } else {
+        selectorLabel.appendChild(selectorRow);
+        const pickRow = document.createElement('div');
+        Object.assign(pickRow.style, {
+          display: 'flex',
+          gap: '8px',
+          alignItems: 'center',
+        });
+        pickRow.appendChild(pickButton);
+        selectorLabel.appendChild(pickRow);
+      }
       body.appendChild(selectorLabel);
 
       if (step.type === 'input') {
@@ -828,6 +1131,7 @@ export function createActionFlowController(options) {
         valueInput.placeholder = t('editor.actionBuilder.valuePlaceholder');
         valueInput.value = step.value || '';
         styleInput(valueInput);
+        valueInput.disabled = readonlyActive;
         valueInput.addEventListener('input', (event) => {
           const currentState = getState();
           currentState.actionSteps[index] = {
@@ -904,6 +1208,7 @@ export function createActionFlowController(options) {
   };
 
   const closeFlowEditor = ({ reopen = true } = {}) => {
+    stopFlowBubbleDrag({ pointerId: dragPointerId });
     if (flowBubbleAttached) {
       flowBubbleAttached = false;
       flowBubble.style.opacity = '0';
@@ -915,6 +1220,7 @@ export function createActionFlowController(options) {
       }, 200);
     }
 
+    window.removeEventListener('resize', constrainFlowBubbleToViewport, true);
     document.removeEventListener('keydown', handleFlowKeydown, true);
     flowSnapshot = null;
     actionFlowEditorHost.appendChild(actionFlowField.wrapper);
@@ -926,7 +1232,7 @@ export function createActionFlowController(options) {
 
   const openFlowEditor = () => {
     const state = getState();
-    if (flowBubbleAttached || state.type !== 'button') {
+    if (flowBubbleAttached || state.type !== 'button' || flowDisabled) {
       return;
     }
 
@@ -944,10 +1250,14 @@ export function createActionFlowController(options) {
     flowBubble.style.transform = 'translateY(12px)';
     document.body.appendChild(flowBubble);
     flowBubbleAttached = true;
+    window.addEventListener('resize', constrainFlowBubbleToViewport, true);
+    resetFlowBubblePosition();
+    constrainFlowBubbleToViewport();
     document.addEventListener('keydown', handleFlowKeydown, true);
     requestAnimationFrame(() => {
       flowBubble.style.opacity = '1';
       flowBubble.style.transform = 'translateY(0)';
+      constrainFlowBubbleToViewport();
     });
     refreshActionBuilderState();
     updateActionFlowFromSteps({ updateHint: false });
@@ -959,7 +1269,7 @@ export function createActionFlowController(options) {
     event.preventDefault();
     event.stopPropagation();
     const state = getState();
-    if (state.type !== 'button') {
+    if (flowDisabled || state.type !== 'button') {
       return;
     }
     openFlowEditor();
@@ -1095,6 +1405,26 @@ export function createActionFlowController(options) {
     closeFlowEditor,
     openFlowEditor,
     restoreFlowState,
+    setButtonPlacement(placement = 'row') {
+      applyButtonPlacement(placement);
+      updateActionFlowSummary();
+    },
+    setDisabled(disabled) {
+      flowDisabled = Boolean(disabled);
+      if (flowDisabled && flowBubbleAttached) {
+        closeFlowEditor({ reopen: false });
+      }
+      updateActionFlowSummary();
+    },
+    setBuilderConfig(config) {
+      applyBuilderConfig(config);
+      refreshActionBuilderState();
+      updateActionFlowSummary();
+    },
+    setSummaryHint(message) {
+      summaryHintMessage = typeof message === 'string' ? message : null;
+      updateActionFlowSummary();
+    },
     setMainBubbleControls({ attach, detach }) {
       if (typeof attach === 'function') {
         attachMainBubble = attach;

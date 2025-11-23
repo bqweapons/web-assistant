@@ -234,6 +234,7 @@ mergeMessages(messages, {
     positionLabel: '挿入位置',
     actionBuilder: {
       add: 'ステップを追加',
+      modify: 'ステップを編集',
       empty: 'まだステップがありません。「ステップを追加」をクリックしてフローを組み立てましょう。',
       advancedNotice: 'このフローには高度な設定が含まれます。下の JSON を直接編集してください。',
       typeLabel: 'ステップ種類',
@@ -244,6 +245,7 @@ mergeMessages(messages, {
       delayLabel: '待機時間（ミリ秒）',
       pick: '要素を選択',
       remove: '削除',
+      reorderHint: '番号をドラッグして順序を並べ替えます。',
       type: {
         click: '要素をクリック',
         input: '入力欄に入力',
@@ -331,4 +333,3 @@ mergeMessages(messages, {
 });
 
 export default messages;
-

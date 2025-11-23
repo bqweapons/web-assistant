@@ -5,16 +5,15 @@ import {
   DEFAULT_LINK_STYLE,
   DEFAULT_TOOLTIP_STYLE,
   DEFAULT_AREA_STYLE,
-  getTooltipPositionOptions as buildTooltipPositionOptions,
 } from './styles/style-presets.js';
-import { createField, styleInput, createSection } from './ui/field.js';
-import { createTabGroup } from './ui/tab-group.js';
+import { buildFormSections } from './editor/form-controls.js';
+import { getFormSections } from './editor/form-config.js';
+import { getTypeOptions } from './editor/field-config.js';
 import { stepsToJSON } from './actionflow/serializer.js';
 import { createEditorState } from './state.js';
 import { parseFlowForBuilder } from './actionflow/parser-bridge.js';
 import { startPicker } from './actionflow/picker.js';
 import { attach as attachBubble, detach as detachBubble } from './layout/placement.js';
-import { createStyleControls } from './editor/style-controls.js';
 import { createActionFlowController } from './editor/action-flow-controller.js';
 import {
   getDefaultElementValues,
@@ -39,28 +38,6 @@ export { getSuggestedStyles } from './editor/defaults.js';
  *
  * @typedef {ActionClickStep | ActionInputStep | ActionWaitStep} ActionBuilderStep
  */
-
-function getTypeOptions() {
-  return [
-    { value: 'button', label: t('type.button') },
-    { value: 'link', label: t('type.link') },
-    { value: 'tooltip', label: t('type.tooltip') },
-    { value: 'area', label: t('type.area') },
-  ];
-}
-
-function getPositionLabels() {
-  return {
-    append: t('position.append'),
-    prepend: t('position.prepend'),
-    before: t('position.before'),
-    after: t('position.after'),
-  };
-}
-
-function getTooltipPositionOptions() {
-  return buildTooltipPositionOptions(t);
-}
 
 /**
  *
@@ -136,13 +113,15 @@ function createElementBubble() {
   Object.assign(bubble.style, {
     position: 'fixed',
     zIndex: '2147483647',
-    maxWidth: '340px',
-    minWidth: '260px',
-    maxHeight: '85vh',
-    padding: '18px',
-    borderRadius: '16px',
+    width: '100%',
+    maxWidth: '100vw',
+    minWidth: '0',
+    minHeight: '300px',
+    maxHeight: '40vh',
+    padding: '12px 16px',
+    borderRadius: '18px 18px 0 0',
     backgroundColor: '#ffffff',
-    boxShadow: '0 18px 48px rgba(15, 23, 42, 0.18)',
+    boxShadow: '0 -6px 24px rgba(15, 23, 42, 0.14)',
     border: '1px solid rgba(148, 163, 184, 0.45)',
     fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
     fontSize: '13px',
@@ -156,53 +135,100 @@ function createElementBubble() {
     display: 'flex',
     flexDirection: 'column',
     gap: '16px',
+    boxSizing: 'border-box',
   });
 
   bubble.addEventListener('click', (event) => event.stopPropagation());
   bubble.addEventListener('mousedown', (event) => event.stopPropagation());
 
-  const title = document.createElement('h3');
-  title.textContent = t('editor.title');
-  Object.assign(title.style, {
-    margin: '0 0 10px 0',
-    fontSize: '14px',
-    fontWeight: '600',
-    color: '#0f172a',
+  const selectorWrapper = document.createElement('div');
+  selectorWrapper.style.display = 'none';
+  const selectorTitle = document.createElement('span');
+  selectorTitle.textContent = t('editor.selectorLabel');
+  const selectorValue = document.createElement('code');
+  selectorWrapper.append(selectorTitle, selectorValue);
+
+  const headerBar = document.createElement('div');
+  Object.assign(headerBar.style, {
+    display: 'grid',
+    gridTemplateColumns: 'minmax(220px, 1.4fr) 1.2fr auto',
+    alignItems: 'center',
+    gap: '12px',
+    padding: '8px 10px 10px',
+    borderBottom: '1px solid rgba(148, 163, 184, 0.25)',
+    backgroundColor: '#f9fafb',
+    position: 'sticky',
+    top: '0',
+    zIndex: '1',
   });
 
-  const selectorWrapper = document.createElement('div');
-  Object.assign(selectorWrapper.style, {
+  const headerContext = document.createElement('div');
+  Object.assign(headerContext.style, {
+    display: 'flex',
+    alignItems: 'center',
+    gap: '10px',
+    minWidth: '0',
+  });
+
+  const headerTitleStack = document.createElement('div');
+  Object.assign(headerTitleStack.style, {
     display: 'flex',
     flexDirection: 'column',
     gap: '4px',
-    margin: '0',
+    minWidth: '0',
   });
 
-  const selectorTitle = document.createElement('span');
-  selectorTitle.textContent = t('editor.selectorLabel');
-  Object.assign(selectorTitle.style, {
-    fontSize: '12px',
-    fontWeight: '600',
-    textTransform: 'uppercase',
-    color: '#64748b',
-    letterSpacing: '0.03em',
+  const headerTitle = document.createElement('div');
+  headerTitle.textContent = t('editor.title');
+  Object.assign(headerTitle.style, {
+    fontSize: '14px',
+    fontWeight: '700',
+    color: '#0f172a',
+    lineHeight: '1.2',
   });
 
-  const selectorValue = document.createElement('code');
-  Object.assign(selectorValue.style, {
+  const headerTypeBadge = document.createElement('span');
+  Object.assign(headerTypeBadge.style, {
     display: 'inline-flex',
     alignItems: 'center',
-    padding: '6px 8px',
-    borderRadius: '8px',
-    backgroundColor: 'rgba(241, 245, 249, 0.9)',
-    border: '1px solid rgba(148, 163, 184, 0.45)',
+    padding: '4px 10px',
+    borderRadius: '999px',
+    backgroundColor: '#e0e7ff',
+    color: '#312e81',
     fontSize: '12px',
-    color: '#0f172a',
-    lineHeight: '1.4',
-    wordBreak: 'break-all',
+    fontWeight: '700',
+    letterSpacing: '0.01em',
+    whiteSpace: 'nowrap',
   });
 
-  selectorWrapper.append(selectorTitle, selectorValue);
+  const headerSubtitle = document.createElement('div');
+  headerSubtitle.textContent = '';
+  Object.assign(headerSubtitle.style, {
+    fontSize: '11px',
+    color: '#94a3b8',
+    lineHeight: '1.3',
+    minHeight: '14px',
+  });
+
+  const headerTitleRow = document.createElement('div');
+  Object.assign(headerTitleRow.style, {
+    display: 'flex',
+    alignItems: 'center',
+    gap: '8px',
+    minWidth: '0',
+  });
+  headerTitleRow.append(headerTitle, headerTypeBadge);
+
+  headerTitleStack.append(headerTitleRow, headerSubtitle);
+  headerContext.append(headerTitleStack);
+
+  const headerActions = document.createElement('div');
+  Object.assign(headerActions.style, {
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'flex-end',
+    gap: '10px',
+  });
 
   // Preview UI removed
 
@@ -210,7 +236,7 @@ function createElementBubble() {
   Object.assign(form.style, {
     display: 'flex',
     flexDirection: 'column',
-    gap: '16px',
+    gap: '0',
     flex: '1 1 auto',
     minHeight: '0',
   });
@@ -219,120 +245,14 @@ function createElementBubble() {
   Object.assign(formBody.style, {
     display: 'flex',
     flexDirection: 'column',
-    gap: '14px',
+    gap: '12px',
     flex: '1 1 auto',
     minHeight: '0',
     overflowY: 'auto',
-    paddingTop: '6px',
+    padding: '10px 2px 6px',
   });
 
-  const typeSelect = document.createElement('select');
-  getTypeOptions().forEach(({ value, label }) => {
-    const option = document.createElement('option');
-    option.value = value;
-    option.textContent = label;
-    typeSelect.appendChild(option);
-  });
-  styleInput(typeSelect);
-
-  const textInput = document.createElement('input');
-  textInput.type = 'text';
-  textInput.placeholder = t('editor.textPlaceholder');
-  textInput.maxLength = 160;
-  styleInput(textInput);
-
-  const hrefInput = document.createElement('input');
-  hrefInput.type = 'text';
-  hrefInput.placeholder = t('editor.hrefPlaceholder');
-  styleInput(hrefInput);
-
-  const areaLayoutSelect = document.createElement('select');
-  [
-    { value: 'row', label: t('editor.areaLayout.horizontal') },
-    { value: 'column', label: t('editor.areaLayout.vertical') },
-  ].forEach(({ value, label }) => {
-    const option = document.createElement('option');
-    option.value = value;
-    option.textContent = label;
-    areaLayoutSelect.appendChild(option);
-  });
-  styleInput(areaLayoutSelect);
-
-  const linkTargetSelect = document.createElement('select');
-  [
-    { value: 'new-tab', label: t('editor.linkTarget.newTab') },
-    { value: 'same-tab', label: t('editor.linkTarget.sameTab') },
-  ].forEach(({ value, label }) => {
-    const option = document.createElement('option');
-    option.value = value;
-    option.textContent = label;
-    linkTargetSelect.appendChild(option);
-  });
-  styleInput(linkTargetSelect);
-
-  const positionSelect = document.createElement('select');
-  const positionLabels = getPositionLabels();
-  ['append', 'prepend', 'before', 'after'].forEach((value) => {
-    const option = document.createElement('option');
-    option.value = value;
-    option.textContent = positionLabels[value] || value;
-    positionSelect.appendChild(option);
-  });
-  styleInput(positionSelect);
-
-  const tooltipPositionSelect = document.createElement('select');
-  getTooltipPositionOptions().forEach(({ value, label }) => {
-    const option = document.createElement('option');
-    option.value = value;
-    option.textContent = label;
-    tooltipPositionSelect.appendChild(option);
-  });
-  styleInput(tooltipPositionSelect);
-
-  const tooltipPersistentCheckbox = document.createElement('input');
-  tooltipPersistentCheckbox.type = 'checkbox';
-  tooltipPersistentCheckbox.style.width = '16px';
-  tooltipPersistentCheckbox.style.height = '16px';
-  tooltipPersistentCheckbox.style.margin = '0';
-  tooltipPersistentCheckbox.style.cursor = 'pointer';
-  tooltipPersistentCheckbox.style.borderRadius = '4px';
-  tooltipPersistentCheckbox.style.border = '1px solid rgba(148, 163, 184, 0.6)';
-  tooltipPersistentCheckbox.style.accentColor = '#2563eb';
-
-  const tooltipPersistentLabel = document.createElement('span');
-  tooltipPersistentLabel.textContent = t('editor.tooltipPersistenceCheckbox');
-  Object.assign(tooltipPersistentLabel.style, {
-    fontSize: '13px',
-    color: '#0f172a',
-  });
-
-  const tooltipPersistentRow = document.createElement('label');
-  Object.assign(tooltipPersistentRow.style, {
-    display: 'inline-flex',
-    alignItems: 'center',
-    gap: '8px',
-    cursor: 'pointer',
-    fontWeight: '500',
-  });
-  tooltipPersistentRow.append(tooltipPersistentCheckbox, tooltipPersistentLabel);
-
-  const tooltipPersistentHint = document.createElement('p');
-  tooltipPersistentHint.textContent = t('editor.tooltipPersistenceHint');
-  Object.assign(tooltipPersistentHint.style, {
-    margin: '4px 0 0 0',
-    fontSize: '11px',
-    color: '#94a3b8',
-  });
-
-  const typeField = createField(t('editor.typeLabel'), typeSelect);
-  const textField = createField(t('editor.textLabel'), textInput);
-  const hrefField = createField(t('editor.hrefLabel'), hrefInput);
-  const linkTargetField = createField(t('editor.linkTargetLabel'), linkTargetSelect);
-  const positionField = createField(t('editor.positionLabel'), positionSelect);
-  const tooltipPositionField = createField(t('editor.tooltipPositionLabel'), tooltipPositionSelect);
-  const tooltipPersistentField = createField(t('editor.tooltipPersistenceLabel'));
-  tooltipPersistentField.wrapper.append(tooltipPersistentRow, tooltipPersistentHint);
-  const areaLayoutField = createField(t('editor.areaLayoutLabel'), areaLayoutSelect);
+  let refreshUI = () => {};
 
   const editorState = createEditorState();
   let state = editorState.get();
@@ -356,34 +276,19 @@ function createElementBubble() {
     },
   });
 
-  const actionFlowField = actionFlowController.field;
-  const actionFlowSummaryField = actionFlowController.summaryField;
   const actionFlowInput = actionFlowController.input;
-  const actionFlowHint = actionFlowController.hint;
   const openActionFlowButton = actionFlowController.openButton;
-  const actionFlowEditorHost = actionFlowController.editorHost;
-  const styleControls = createStyleControls({ t });
-  const styleFieldset = styleControls.fieldset;
-
-  const actions = document.createElement('div');
-  Object.assign(actions.style, {
-    display: 'flex',
-    justifyContent: 'flex-end',
-    gap: '10px',
-    paddingTop: '12px',
-    borderTop: '1px solid rgba(148, 163, 184, 0.2)',
-  });
 
   const cancelButton = document.createElement('button');
   cancelButton.type = 'button';
   cancelButton.textContent = t('editor.cancel');
   Object.assign(cancelButton.style, {
-    padding: '8px 14px',
+    padding: '8px 12px',
     borderRadius: '10px',
     border: '1px solid rgba(148, 163, 184, 0.6)',
     backgroundColor: '#ffffff',
     color: '#0f172a',
-    fontSize: '13px',
+    fontSize: '12px',
     fontWeight: '600',
     cursor: 'pointer',
   });
@@ -397,13 +302,13 @@ function createElementBubble() {
     border: 'none',
     background: 'linear-gradient(135deg, #2563eb, #1d4ed8)',
     color: '#ffffff',
-    fontSize: '13px',
+    fontSize: '12px',
     fontWeight: '600',
     cursor: 'pointer',
     boxShadow: '0 8px 18px rgba(37, 99, 235, 0.25)',
   });
 
-  actions.append(cancelButton, saveButton);
+  headerActions.append(cancelButton, saveButton);
 
   const errorLabel = document.createElement('p');
   errorLabel.textContent = '';
@@ -414,45 +319,54 @@ function createElementBubble() {
     color: '#dc2626',
   });
 
-  const sectionsTabs = createTabGroup();
+  const panel = document.createElement('section');
+  Object.assign(panel.style, {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: '12px',
+  });
 
-  const basicSection = sectionsTabs.addSection(
-    t('editor.sections.basics.title'),
-    t('editor.sections.basics.description'),
-  );
-  basicSection.content.append(
-    typeField.wrapper,
-    textField.wrapper,
-    hrefField.wrapper,
-    linkTargetField.wrapper,
-    tooltipPositionField.wrapper,
-    tooltipPersistentField.wrapper,
-    areaLayoutField.wrapper,
-  );
+  let suppressAutoRefresh = false;
 
-  const behaviorSection = sectionsTabs.addSection(
-    t('editor.sections.behavior.title'),
-    t('editor.sections.behavior.description'),
-  );
-  behaviorSection.content.append(actionFlowSummaryField.wrapper);
+  const formSections = buildFormSections({
+    t,
+    sections: getFormSections(t),
+    getState: () => state,
+    setState,
+    actionFlowController,
+    clearError: () => {
+      errorLabel.textContent = '';
+    },
+    onFieldChange: (key) => {
+      if (key === 'type') {
+        suppressAutoRefresh = true;
+        handleTypeChange({ applyDefaults: true });
+        suppressAutoRefresh = false;
+      }
+    },
+    onChange: () => {
+      if (suppressAutoRefresh) return;
+      refreshUI();
+    },
+  });
+  const focusTargets = formSections.focusTargets || {};
+  const refreshFields = () => formSections.refreshFields();
+  const updateVisibility = () => formSections.refreshVisibility();
 
-  // const placementSection = sectionsTabs.addSection(
-  //   t('editor.sections.placement.title'),
-  //   t('editor.sections.placement.description'),
-  // );
-  // placementSection.content.append(positionField.wrapper);
+  formSections.fieldsets.forEach((fieldset) => panel.appendChild(fieldset));
+  formBody.append(panel);
 
-  const appearanceSection = sectionsTabs.addSection(
-    t('editor.sections.appearance.title'),
-    t('editor.sections.appearance.description'),
-  );
-  appearanceSection.content.append(styleFieldset);
+  const updateActiveTabTitle = () => {
+    headerTitle.textContent = t('editor.sections.basics.title');
+    headerSubtitle.textContent = t('editor.sections.basics.description');
+    const typeLabel = getTypeOptions(t).find(({ value }) => value === state.type)?.label || '';
+    headerTypeBadge.textContent = typeLabel;
+  };
 
-  formBody.append(sectionsTabs.container);
+  headerBar.append(headerContext, headerActions);
+  form.append(headerBar, formBody);
 
-  form.append(formBody, actions);
-
-  bubble.append(title, selectorWrapper, form, errorLabel);
+  bubble.append(form, errorLabel);
 
   /** @type {Element | null} */
   let currentTarget = null;
@@ -473,30 +387,43 @@ function createElementBubble() {
     errorLabel.textContent = '';
   };
 
-  [
-    textInput,
-    hrefInput,
-    actionFlowInput,
-    typeSelect,
-    positionSelect,
-    tooltipPositionSelect,
-    tooltipPersistentCheckbox,
-    areaLayoutSelect,
-    linkTargetSelect,
-  ].forEach((input) => {
-    input.addEventListener('input', clearError);
-    input.addEventListener('change', clearError);
-  });
-
   const resetStyleState = (source, suggestions) => {
-    styleControls.reset(source, suggestions);
+    formSections.resetStyle(source, suggestions);
+  };
+
+  const focusField = (key) => {
+    const target = focusTargets[key];
+    if (target instanceof HTMLElement && typeof target.focus === 'function') {
+      target.focus({ preventScroll: true });
+    }
+  };
+
+  const validateSubmission = (payload) => {
+    if (payload.type !== 'area' && !payload.text) {
+      errorLabel.textContent = t('editor.errorTextRequired');
+      focusField('text');
+      return false;
+    }
+    if (payload.type === 'link' && !state.href.trim()) {
+      errorLabel.textContent = t('editor.errorUrlRequired');
+      focusField('href');
+      return false;
+    }
+    if (payload.type === 'button' && payload.href && !payload.actionFlow) {
+      errorLabel.textContent = t('editor.errorActionRequiredForUrl');
+      if (openActionFlowButton && typeof openActionFlowButton.focus === 'function') {
+        openActionFlowButton.focus({ preventScroll: true });
+      }
+      return false;
+    }
+    return true;
   };
 
   const buildPayload = () => {
     const textValue = state.text.trim();
     const hrefValue = state.href.trim();
     const position = resolvePosition(state.position);
-    const style = styleControls.getNormalizedStyle();
+    const style = formSections.getNormalizedStyle();
     const type =
       state.type === 'link' || state.type === 'tooltip' || state.type === 'area' ? state.type : 'button';
     const layout = state.layout === 'column' ? 'column' : 'row';
@@ -507,16 +434,22 @@ function createElementBubble() {
       position,
       style,
     };
+    if (type === 'button' && typeof state.actionFlowLocked === 'boolean') {
+      payload.actionFlowLocked = state.actionFlowLocked;
+    }
     const selectorText = typeof state.selector === 'string' ? state.selector.trim() : '';
     if (selectorText) {
       payload.selector = selectorText;
     }
-    if (state.containerId && typeof state.containerId === 'string' && state.containerId.trim()) {
-      payload.containerId = state.containerId.trim();
+    const rawContainerId = typeof state.containerId === 'string' ? state.containerId.trim() : '';
+    if (rawContainerId) {
+      payload.containerId = rawContainerId;
+      payload.floating = false;
     } else {
-      delete payload.containerId;
+      // Explicitly clear container to avoid merging old area ids on save.
+      payload.containerId = '';
+      payload.floating = Boolean(state.floating);
     }
-    payload.floating = Boolean(state.floating);
     if (type === 'link') {
       if (hrefValue) {
         payload.href = hrefValue;
@@ -526,30 +459,17 @@ function createElementBubble() {
       if (hrefValue) {
         payload.href = hrefValue;
       }
-      if (state.actionFlowMode === 'builder') {
-        const actionSteps = Array.isArray(state.actionSteps) ? state.actionSteps : [];
-        if (actionSteps.length === 0) {
-          setState({ actionFlow: '' });
-          errorLabel.textContent = '';
-          delete payload.actionFlow;
-        } else {
-          const serialized = stepsToJSON(actionSteps);
-          setState({ actionFlow: serialized });
-          const { definition, error } = parseActionFlowDefinition(serialized.trim());
-          if (error || !definition) {
-            errorLabel.textContent = t('editor.errorFlowInvalid', { error: error || '' });
-            return null;
-          }
-          errorLabel.textContent = '';
-          payload.actionFlow = serialized;
+      const flowValue = (state.actionFlow || '').trim();
+      if (flowValue) {
+        const { definition, error } = parseActionFlowDefinition(flowValue);
+        if (error || !definition) {
+          errorLabel.textContent = t('editor.errorFlowInvalid', { error: error || '' });
+          return null;
         }
+        errorLabel.textContent = '';
+        payload.actionFlow = flowValue;
       } else {
-        const flowValue = state.actionFlow.trim();
-        if (flowValue) {
-          payload.actionFlow = flowValue;
-        } else {
-          delete payload.actionFlow;
-        }
+        delete payload.actionFlow;
       }
     } else if (type === 'tooltip') {
       const tooltipPosition = resolveTooltipPosition(state.tooltipPosition);
@@ -566,91 +486,48 @@ function createElementBubble() {
   const updatePreview = (options = { propagate: true }) => {
     const payload = buildPayload();
     if (!payload) {
-      actionFlowController.updateSummary();
+      actionFlowController.validateInput();
       return;
     }
     if (options.propagate && typeof previewHandler === 'function') {
       previewHandler(payload);
     }
-    actionFlowController.updateSummary();
   };
 
-  const handleTypeChange = (applyDefaults = false) => {
-    actionFlowController.hideMenu();
-    const isLink = state.type === 'link';
-    const isButton = state.type === 'button';
-    const isTooltip = state.type === 'tooltip';
-    const isArea = state.type === 'area';
-
-    hrefInput.required = isLink;
-    hrefInput.disabled = isTooltip || isArea;
-    hrefInput.placeholder = isLink
-      ? t('editor.hrefPlaceholder')
-      : isTooltip || isArea
-        ? t('editor.hrefTooltipPlaceholder')
-        : t('editor.hrefOptionalPlaceholder');
-    hrefField.label.textContent = isLink
-      ? t('editor.hrefLabel')
-      : isTooltip
-        ? t('editor.hrefTooltipLabel')
-        : t('editor.hrefOptionalLabel');
-    hrefField.wrapper.style.display = isTooltip || isArea ? 'none' : 'flex';
-
-    linkTargetField.wrapper.style.display = isLink ? 'flex' : 'none';
-    linkTargetSelect.disabled = !isLink;
-
-    actionFlowSummaryField.wrapper.style.display = isButton ? 'flex' : 'none';
-    actionFlowField.wrapper.style.display = isButton ? 'flex' : 'none';
-    actionFlowInput.disabled = !isButton;
-    if (!isButton) {
-      stopActionPicker('cancel');
-    }
-    behaviorSection.setVisible(isButton);
-
-    tooltipPositionField.wrapper.style.display = isTooltip ? 'flex' : 'none';
-    tooltipPositionSelect.disabled = !isTooltip;
-    tooltipPersistentField.wrapper.style.display = isTooltip ? 'flex' : 'none';
-    tooltipPersistentCheckbox.disabled = !isTooltip;
-
-    textField.wrapper.style.display = isArea ? 'none' : 'flex';
-    textInput.placeholder = isTooltip ? t('editor.tooltipTextPlaceholder') : t('editor.textPlaceholder');
-
-    areaLayoutField.wrapper.style.display = isArea ? 'flex' : 'none';
-    areaLayoutSelect.disabled = !isArea;
-
+  refreshUI = (options = {}) => {
+    refreshFields();
+    updateVisibility();
+    actionFlowController.syncUI();
     actionFlowController.validateInput();
     actionFlowController.updateSummary();
-    if (applyDefaults) {
-      const defaults = isLink
+    updateActiveTabTitle();
+    if (!options.skipPreview) {
+      updatePreview();
+    }
+  };
+
+  const handleTypeChange = ({ applyDefaults = false, skipPreview = false } = {}) => {
+    actionFlowController.hideMenu();
+    const styleDefaults =
+      state.type === 'link'
         ? DEFAULT_LINK_STYLE
-        : isTooltip
+        : state.type === 'tooltip'
           ? DEFAULT_TOOLTIP_STYLE
-          : isArea
+          : state.type === 'area'
             ? DEFAULT_AREA_STYLE
             : DEFAULT_BUTTON_STYLE;
-      resetStyleState(defaults);
-      if (isTooltip) {
-        state.tooltipPosition = 'top';
-        tooltipPositionSelect.value = 'top';
-        state.tooltipPersistent = false;
-        tooltipPersistentCheckbox.checked = false;
-      } else if (isArea) {
-        state.href = '';
-        hrefInput.value = '';
-        state.actionFlow = '';
-        state.actionSteps = [];
-        state.actionFlowMode = 'builder';
-        tooltipPositionSelect.value = 'top';
-        tooltipPersistentCheckbox.checked = false;
-        state.layout = 'row';
-        areaLayoutSelect.value = 'row';
-      } else if (isLink) {
-        state.linkTarget = 'new-tab';
-        linkTargetSelect.value = 'new-tab';
-      }
+
+    if (state.type !== 'button') {
+      stopActionPicker('cancel');
     }
-    actionFlowController.syncUI();
-    updatePreview();
+    clearError();
+
+    formSections.applyTypeChange({
+      applyDefaults,
+      styleDefaults: applyDefaults ? styleDefaults : null,
+    });
+    refreshUI({ skipPreview });
+    return true;
   };
 
   const handleDraftUpdate = (event) => {
@@ -662,14 +539,17 @@ function createElementBubble() {
       return;
     }
     const stylePatch = detail && typeof detail.style === 'object' ? detail.style : null;
+    const styleSource = detail?.draftSource;
     const hasTextUpdate = Object.prototype.hasOwnProperty.call(detail || {}, 'text');
+    const hasTypeUpdate = Object.prototype.hasOwnProperty.call(detail || {}, 'type');
     const hasContainerUpdate = Object.prototype.hasOwnProperty.call(detail || {}, 'containerId');
     const hasFloatingUpdate = Object.prototype.hasOwnProperty.call(detail || {}, 'floating');
     const hasBubbleSideUpdate = Object.prototype.hasOwnProperty.call(detail || {}, 'bubbleSide');
     const hasSelectorUpdate = Object.prototype.hasOwnProperty.call(detail || {}, 'selector');
     const hasPositionUpdate = Object.prototype.hasOwnProperty.call(detail || {}, 'position');
     const nextPatch = {};
-    if (stylePatch) {
+    const allowStyleMerge = stylePatch && Object.keys(stylePatch).length > 0 && (styleSource === 'drag' || styleSource === 'resize');
+    if (allowStyleMerge) {
       nextPatch.style = { ...state.style, ...stylePatch };
     }
     if (hasContainerUpdate) {
@@ -680,7 +560,7 @@ function createElementBubble() {
       nextPatch.floating = Boolean(detail.floating);
     }
     if (hasBubbleSideUpdate) {
-      nextPatch.bubbleSide = detail.bubbleSide === 'left' ? 'left' : 'right';
+      nextPatch.bubbleSide = 'bottom';
     }
     if (hasSelectorUpdate) {
       const selectorValue =
@@ -695,95 +575,32 @@ function createElementBubble() {
       const textValue = typeof detail.text === 'string' ? detail.text : '';
       nextPatch.text = textValue;
     }
+    if (hasTypeUpdate) {
+      const nextType =
+        detail.type === 'link' || detail.type === 'tooltip' || detail.type === 'area' ? detail.type : 'button';
+      nextPatch.type = nextType;
+    }
     if (Object.keys(nextPatch).length === 0) {
       return;
     }
     setState(nextPatch);
-    if (stylePatch) {
-      styleControls.merge(stylePatch);
+    if (allowStyleMerge) {
+      formSections.mergeStyle(stylePatch);
     }
+    const refreshedByTypeChange = hasTypeUpdate ? handleTypeChange({ applyDefaults: true }) || true : false;
     if (hasBubbleSideUpdate) {
-      bubble.dataset.pageAugmentorPlacement = state.bubbleSide === 'left' ? 'left' : 'right';
-    }
-    if (hasTextUpdate) {
-      textInput.value = state.text;
+      bubble.dataset.pageAugmentorPlacement = 'bottom';
     }
     if (hasSelectorUpdate) {
       selectorValue.textContent = state.selector;
     }
-    if (hasPositionUpdate) {
-      positionSelect.value = state.position;
-    }
     if (hasContainerUpdate || hasFloatingUpdate || hasBubbleSideUpdate || hasSelectorUpdate || hasPositionUpdate) {
       placementControls?.update();
     }
-    updatePreview();
+    if (!refreshedByTypeChange) {
+      refreshUI();
+    }
   };
-
-  typeSelect.addEventListener('change', (event) => {
-    const selected = event.target.value;
-    state.type = selected === 'link' ? 'link' : selected === 'tooltip' ? 'tooltip' : selected === 'area' ? 'area' : 'button';
-    handleTypeChange(true);
-  });
-
-  textInput.addEventListener('input', (event) => {
-    state.text = event.target.value;
-    updatePreview();
-  });
-
-  hrefInput.addEventListener('input', (event) => {
-    state.href = event.target.value;
-    updatePreview();
-  });
-
-  actionFlowInput.addEventListener('input', (event) => {
-    if (state.actionFlowMode === 'builder') {
-      event.target.value = state.actionFlow;
-      return;
-    }
-    state.actionFlow = event.target.value;
-    actionFlowController.validateInput();
-    actionFlowController.updateSummary();
-  });
-
-  actionFlowInput.addEventListener('change', (event) => {
-    if (state.actionFlowMode === 'builder') {
-      event.target.value = state.actionFlow;
-      return;
-    }
-    state.actionFlow = event.target.value;
-    actionFlowController.validateInput();
-    actionFlowController.updateSummary();
-  });
-
-  positionSelect.addEventListener('change', (event) => {
-    state.position = event.target.value;
-    updatePreview();
-  });
-
-  tooltipPositionSelect.addEventListener('change', (event) => {
-    clearError();
-    state.tooltipPosition = event.target.value;
-    updatePreview();
-  });
-
-  tooltipPersistentCheckbox.addEventListener('change', (event) => {
-    clearError();
-    state.tooltipPersistent = Boolean(event.target.checked);
-    updatePreview();
-  });
-
-  areaLayoutSelect.addEventListener('change', (event) => {
-    const value = event.target.value === 'column' ? 'column' : 'row';
-    state.layout = value;
-    updatePreview();
-  });
-
-  linkTargetSelect.addEventListener('change', (event) => {
-    const value = event.target.value === 'same-tab' ? 'same-tab' : 'new-tab';
-    state.linkTarget = value;
-    updatePreview();
-  });
 
   function startActionPicker(options = {}) {
     if (actionPickerCleanup) {
@@ -819,60 +636,14 @@ function createElementBubble() {
     }
   }
 
-  styleControls.attachInteractions({
-    clearError,
-    updatePreview,
-  });
-
   form.addEventListener('submit', (event) => {
     event.preventDefault();
     const payload = buildPayload();
     if (!payload) {
       return;
     }
-    if (payload.type !== 'area' && !payload.text) {
-      errorLabel.textContent = t('editor.errorTextRequired');
-      textInput.focus({ preventScroll: true });
+    if (!validateSubmission(payload)) {
       return;
-    }
-    if (payload.type === 'link' && !state.href.trim()) {
-      errorLabel.textContent = t('editor.errorUrlRequired');
-      hrefInput.focus({ preventScroll: true });
-      return;
-    }
-    if (payload.type === 'button' && payload.href && !payload.actionFlow) {
-      errorLabel.textContent = t('editor.errorActionRequiredForUrl');
-      openActionFlowButton.focus({ preventScroll: true });
-      return;
-    }
-    if (payload.type === 'button') {
-      if (state.actionFlowMode === 'builder') {
-        const serialized = stepsToJSON(Array.isArray(state.actionSteps) ? state.actionSteps : []);
-        setState({ actionFlow: serialized });
-        const { definition, error } = parseActionFlowDefinition(serialized.trim());
-        if (error || !definition) {
-          errorLabel.textContent = t('editor.errorFlowInvalid', { error: error || '' });
-          return;
-        }
-        if (definition.stepCount > 0) {
-          payload.actionFlow = serialized;
-        } else {
-          delete payload.actionFlow;
-        }
-      } else {
-        const flowValue = state.actionFlow.trim();
-        if (flowValue) {
-          const { definition, error } = parseActionFlowDefinition(flowValue);
-          if (error || !definition) {
-            errorLabel.textContent = t('editor.errorFlowInvalid', { error: error || '' });
-            actionFlowInput.focus({ preventScroll: true });
-            return;
-          }
-          payload.actionFlow = flowValue;
-        } else {
-          delete payload.actionFlow;
-        }
-      }
     }
     submitHandler(payload);
   });
@@ -887,25 +658,23 @@ function createElementBubble() {
       return;
     }
     isAttached = true;
-    bubble.dataset.pageAugmentorPlacement = 'right';
+    bubble.dataset.pageAugmentorPlacement = 'bottom';
     attachBubble(bubble);
-    const margin = 32;
-    const desiredTop = 96;
+    const edgeGap = 0;
     const updateFixedPlacement = () => {
-      const bubbleHeight = bubble.offsetHeight || 0;
-      const maxTop = Math.max(margin, window.innerHeight - bubbleHeight - margin);
-      const top = Math.min(maxTop, Math.max(margin, desiredTop));
-      const side = state.bubbleSide === 'left' ? 'left' : 'right';
-      bubble.dataset.pageAugmentorPlacement = side;
-      if (side === 'left') {
-        bubble.style.left = `${margin}px`;
-        bubble.style.right = 'auto';
-      } else {
-        bubble.style.left = 'auto';
-        bubble.style.right = `${margin}px`;
-      }
-      bubble.style.bottom = 'auto';
-      bubble.style.top = `${Math.round(top)}px`;
+      const viewportHeight = window.innerHeight || 0;
+      const targetHeight = Math.max(260, Math.floor(viewportHeight * 0.7));
+      const availableHeight = Math.max(viewportHeight - 12, 0);
+      const cappedHeight = availableHeight ? Math.min(targetHeight, availableHeight) : targetHeight;
+      const maxHeight = availableHeight
+        ? Math.min(Math.max(200, cappedHeight), availableHeight)
+        : Math.max(200, cappedHeight);
+      bubble.dataset.pageAugmentorPlacement = 'bottom';
+      bubble.style.left = `${edgeGap}px`;
+      bubble.style.right = `${edgeGap}px`;
+      bubble.style.bottom = `${edgeGap}px`;
+      bubble.style.top = 'auto';
+      bubble.style.maxHeight = `${maxHeight}px`;
     };
     const handleKeydown = (event) => {
       if (event.key === 'Escape') {
@@ -927,8 +696,13 @@ function createElementBubble() {
       bubble.style.opacity = '1';
       bubble.style.transform = 'translateY(0)';
       updateFixedPlacement();
-      const initialFocus = state.type === 'area' ? typeSelect : textInput;
-      initialFocus.focus({ preventScroll: true });
+      const initialFocus =
+        focusTargets.text ||
+        focusTargets.actionFlow ||
+        bubble.querySelector('input, textarea, select');
+      if (initialFocus instanceof HTMLElement && typeof initialFocus.focus === 'function') {
+        initialFocus.focus({ preventScroll: true });
+      }
     });
     draftUpdateListener = (event) => handleDraftUpdate(event);
     window.addEventListener('page-augmentor-draft-update', draftUpdateListener);
@@ -936,7 +710,7 @@ function createElementBubble() {
       const detail = (event && event.detail) || {};
       if (!detail || (currentElementId && detail.elementId && detail.elementId !== currentElementId)) return;
       if (Object.prototype.hasOwnProperty.call(detail || {}, 'bubbleSide')) {
-        state.bubbleSide = detail.bubbleSide === 'left' ? 'left' : 'right';
+        state.bubbleSide = 'bottom';
         placementControls?.update();
       }
     };
@@ -980,62 +754,62 @@ function createElementBubble() {
       previewHandler = typeof onPreview === 'function' ? onPreview : null;
       currentElementId = typeof values?.id === 'string' ? values.id : null;
       const initial = getDefaultElementValues(values, suggestedStyle, t);
-      state.type = initial.type;
-      state.text = initial.text;
-      state.href = initial.href;
-      state.actionFlow = initial.actionFlow || '';
-      state.actionFlowError = '';
-      state.actionFlowSteps = 0;
-      state.actionFlowMode = 'builder';
-      state.actionSteps = [];
-      state.position = initial.position;
-      state.tooltipPosition = initial.tooltipPosition;
-      state.tooltipPersistent = initial.tooltipPersistent;
-      state.layout = initial.layout || 'row';
-      state.linkTarget = initial.linkTarget || 'new-tab';
-      state.containerId = typeof initial.containerId === 'string' ? initial.containerId : '';
-      state.floating = initial.floating !== false;
-      state.bubbleSide = 'right';
-      typeSelect.value = state.type;
-      textInput.value = state.text;
-      hrefInput.value = state.href;
-      areaLayoutSelect.value = state.layout === 'column' ? 'column' : 'row';
-      linkTargetSelect.value = state.linkTarget === 'same-tab' ? 'same-tab' : 'new-tab';
+      const initialPatch = {
+        type: initial.type,
+        text: initial.text,
+        href: initial.href,
+        actionFlow: initial.actionFlow || '',
+        actionFlowError: '',
+        actionFlowSteps: 0,
+        actionFlowMode: 'builder',
+        actionSteps: [],
+        actionFlowLocked: initial.actionFlowLocked,
+        position: initial.position,
+        tooltipPosition: initial.tooltipPosition,
+        tooltipPersistent: initial.tooltipPersistent,
+        layout: initial.layout || 'row',
+        linkTarget: initial.linkTarget || 'new-tab',
+        containerId: typeof initial.containerId === 'string' ? initial.containerId : '',
+        floating: initial.floating !== false,
+        bubbleSide: 'bottom',
+        style: initial.style || {},
+      };
+      setState(initialPatch);
+      state = editorState.get();
       let initialFlowSource = state.actionFlow;
       if (state.type === 'button' && (!initialFlowSource || !initialFlowSource.trim())) {
         const inheritedSelector = typeof values.actionSelector === 'string' ? values.actionSelector.trim() : '';
         if (inheritedSelector) {
           initialFlowSource = JSON.stringify({ steps: [{ type: 'click', selector: inheritedSelector }] }, null, 2);
-          state.actionFlow = initialFlowSource;
+          setState({ actionFlow: initialFlowSource });
+          state = editorState.get();
         }
       }
       const parsedFlow =
         state.type === 'button' ? parseFlowForBuilder(initialFlowSource) : { mode: 'builder', steps: [], error: '' };
       if (state.type === 'button' && parsedFlow.mode === 'builder') {
-        state.actionFlowMode = 'builder';
-        state.actionSteps = parsedFlow.steps;
-        state.actionFlow = state.actionSteps.length ? stepsToJSON(state.actionSteps) : '';
+        setState({
+          actionFlowMode: 'builder',
+          actionSteps: parsedFlow.steps,
+          actionFlow: parsedFlow.steps.length ? stepsToJSON(parsedFlow.steps) : '',
+        });
+        state = editorState.get();
         actionFlowInput.value = state.actionFlow;
       } else if (state.type === 'button' && parsedFlow.mode === 'advanced') {
-        state.actionFlowMode = 'advanced';
-        state.actionFlow = initial.actionFlow || '';
-        state.actionFlowError = parsedFlow.error || '';
+        setState({
+          actionFlowMode: 'advanced',
+          actionFlow: initial.actionFlow || '',
+          actionFlowError: parsedFlow.error || '',
+        });
+        state = editorState.get();
         actionFlowInput.value = state.actionFlow;
       } else {
         actionFlowInput.value = state.actionFlow;
       }
-      positionSelect.value = state.position;
-      tooltipPositionSelect.value = state.tooltipPosition;
-      tooltipPersistentCheckbox.checked = state.tooltipPersistent;
       resetStyleState(initial.style, initial.styleSuggestions);
       stopActionPicker('cancel');
-      actionFlowController.refreshBuilder();
-      handleTypeChange();
-      actionFlowController.syncUI();
-      errorLabel.textContent = '';
-      title.textContent = mode === 'edit' ? t('editor.titleEdit') : t('editor.titleCreate');
+      handleTypeChange({ skipPreview: true });
       saveButton.textContent = mode === 'edit' ? t('editor.saveUpdate') : t('editor.saveCreate');
-      actionFlowController.validateInput();
       updatePreview({ propagate: false });
       submitHandler = (payload) => {
         actionFlowController.closeFlowEditor({ reopen: false });
@@ -1064,4 +838,3 @@ function createElementBubble() {
     },
   };
 }
-

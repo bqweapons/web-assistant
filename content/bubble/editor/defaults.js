@@ -5,7 +5,7 @@ import {
   DEFAULT_AREA_STYLE,
   VALID_TOOLTIP_POSITIONS,
 } from '../styles/style-presets.js';
-import { getStyleFieldConfigs as buildStyleFieldConfigs } from '../styles/style-config.js';
+import { getStyleFieldConfigs as buildStyleFieldConfigs } from './field-config.js';
 
 export function getDefaultElementValues(values = {}, suggestedStyle = {}, t) {
   const configs = buildStyleFieldConfigs(t);
@@ -16,6 +16,7 @@ export function getDefaultElementValues(values = {}, suggestedStyle = {}, t) {
   const layout = values.layout === 'column' ? 'column' : 'row';
   const linkTarget = values.linkTarget === 'same-tab' || values.linkTarget === 'new-tab' ? values.linkTarget : 'new-tab';
   const actionFlow = typeof values.actionFlow === 'string' ? values.actionFlow : '';
+  const actionFlowLocked = Boolean(values.actionFlowLocked);
   const position = resolvePosition(values.position);
   const tooltipPosition = resolveTooltipPosition(values.tooltipPosition);
   const tooltipPersistent = Boolean(values.tooltipPersistent);
@@ -32,7 +33,9 @@ export function getDefaultElementValues(values = {}, suggestedStyle = {}, t) {
   const style = {};
   const styleSuggestions = {};
 
-  configs.forEach(({ name }) => {
+  configs.forEach((field) => {
+    const name = field.key || field.name;
+    if (!name) return;
     const providedRaw = values.style && typeof values.style[name] === 'string' ? values.style[name] : '';
     const provided = typeof providedRaw === 'string' ? providedRaw.trim() : '';
     if (provided) {
@@ -58,6 +61,7 @@ export function getDefaultElementValues(values = {}, suggestedStyle = {}, t) {
     layout,
     linkTarget,
     actionFlow,
+    actionFlowLocked,
     position,
     tooltipPosition,
     tooltipPersistent,

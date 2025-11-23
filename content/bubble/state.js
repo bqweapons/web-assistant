@@ -9,12 +9,13 @@ const DEFAULT_STATE = {
    linkTarget: 'new-tab',
   containerId: '',
   floating: true,
-  bubbleSide: 'right',
+  bubbleSide: 'bottom',
   actionFlowMode: 'builder',
   actionFlow: '',
   actionFlowError: '',
   actionFlowSteps: 0,
   actionSteps: [],
+  actionFlowLocked: false,
   tooltipPosition: 'top',
   tooltipPersistent: false,
 };
@@ -85,6 +86,8 @@ function mergeState(base, patch) {
   next.selector = typeof patch.selector === 'string' ? patch.selector : base.selector;
   next.layout = typeof patch.layout === 'string' ? patch.layout : base.layout;
   next.linkTarget = typeof patch.linkTarget === 'string' ? patch.linkTarget : base.linkTarget;
+  next.actionFlowLocked =
+    typeof patch.actionFlowLocked === 'boolean' ? patch.actionFlowLocked : base.actionFlowLocked;
   return next;
 }
 
@@ -112,7 +115,9 @@ function cloneState(value) {
     style: cloneRecord(value.style),
     containerId: typeof value.containerId === 'string' ? value.containerId : '',
     floating: Boolean(value.floating),
-    bubbleSide: value.bubbleSide === 'left' ? 'left' : 'right',
+    bubbleSide: typeof value.bubbleSide === 'string' && value.bubbleSide.trim()
+      ? value.bubbleSide.trim()
+      : 'bottom',
     actionFlowMode: value.actionFlowMode,
     actionFlow: value.actionFlow,
     actionFlowError: value.actionFlowError,
@@ -122,5 +127,6 @@ function cloneState(value) {
     tooltipPersistent: Boolean(value.tooltipPersistent),
     layout: value.layout === 'column' ? 'column' : 'row',
     linkTarget: value.linkTarget === 'same-tab' || value.linkTarget === 'new-tab' ? value.linkTarget : 'new-tab',
+    actionFlowLocked: Boolean(value.actionFlowLocked),
   };
 }

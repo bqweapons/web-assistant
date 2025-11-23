@@ -167,6 +167,7 @@ export function attachFloatingDragBehavior(node, element, deps) {
       // Persist container attachment + floating state via draft update
       dispatchDraftUpdateFromHost(host, {
         elementId: element.id,
+        draftSource: 'drag',
         containerId: dropTarget.area.id,
         floating: false,
         // Explicitly clear absolute positioning when moved into an area
@@ -216,6 +217,7 @@ export function attachFloatingDragBehavior(node, element, deps) {
         // Persist selector/position change via draft update so autosave triggers
         dispatchDraftUpdateFromHost(host, {
           elementId: element.id,
+          draftSource: 'drag',
           selector,
           position,
           containerId: '',
@@ -248,6 +250,7 @@ export function attachFloatingDragBehavior(node, element, deps) {
     // Persist floating position so preview/state stay in sync
     dispatchDraftUpdateFromHost(host, {
       elementId: element.id,
+      draftSource: 'drag',
       floating: true,
       containerId: '',
       style: {
@@ -349,11 +352,7 @@ export function attachFloatingDragBehavior(node, element, deps) {
     startRect = rect;
     deps.hideDomDropIndicator();
     deps.removeDropPreviewHost();
-    const isGlobalEditing = host.dataset.pageAugmentorGlobalEditing === 'true';
-    if (!isGlobalEditing) {
-      startDragging();
-      event.preventDefault();
-    }
+    // Drag will start only after movement exceeds the activation threshold.
   });
 
   node.addEventListener('pointerup', (event) => {
@@ -361,11 +360,8 @@ export function attachFloatingDragBehavior(node, element, deps) {
       return;
     }
     const host = getHostFromNode(node);
-    const isGlobalEditing = host?.dataset?.pageAugmentorGlobalEditing === 'true';
-    // In editing mode, a simple click should open the editor bubble.
-    // Avoid running finalize logic (which can interfere with click dispatch)
-    // when no actual drag started.
-    if (isGlobalEditing && !dragStarted) {
+    // Avoid running finalize logic when no actual drag started.
+    if (!dragStarted) {
       pointerId = null;
       dragging = false;
       return;
@@ -373,6 +369,11 @@ export function attachFloatingDragBehavior(node, element, deps) {
     finalizeDrag(dragStarted);
   });
   node.addEventListener('pointercancel', () => {
+    if (!dragStarted) {
+      pointerId = null;
+      dragging = false;
+      return;
+    }
     finalizeDrag(false);
   });
 

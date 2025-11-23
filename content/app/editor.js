@@ -50,6 +50,27 @@ export function openEditorBubble(elementId) {
         pageUrl: runtime.pageUrl,
         updatedAt: Date.now(),
       };
+      // Normalize container/floating so drag-out/attach state persists.
+      if (updated && Object.prototype.hasOwnProperty.call(updated, 'containerId')) {
+        const nextContainer =
+          typeof updated.containerId === 'string' ? updated.containerId.trim() : '';
+        if (nextContainer) {
+          payload.containerId = nextContainer;
+          payload.floating = false;
+        } else {
+          delete payload.containerId;
+          if (Object.prototype.hasOwnProperty.call(updated, 'floating')) {
+            payload.floating = Boolean(updated.floating);
+          } else {
+            payload.floating = true;
+          }
+        }
+      } else if (updated && Object.prototype.hasOwnProperty.call(updated, 'floating')) {
+        payload.floating = Boolean(updated.floating);
+        if (payload.floating) {
+          delete payload.containerId;
+        }
+      }
       // Reflect the latest payload into the local registry immediately so that
       // subsequent editor openings see the saved state (e.g., tooltipPosition).
       try {

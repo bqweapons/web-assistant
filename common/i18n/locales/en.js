@@ -226,6 +226,7 @@ const messages = {
     positionLabel: 'Insertion position',
     actionBuilder: {
       add: 'Add action',
+      modify: 'Modify action',
       empty: 'No actions yet. Use "Add action" to build a sequence.',
       advancedNotice: 'This flow uses advanced features. Edit the JSON directly below.',
       typeLabel: 'Action type',
@@ -236,6 +237,7 @@ const messages = {
       delayLabel: 'Wait duration (ms)',
       pick: 'Pick element',
       remove: 'Remove',
+      reorderHint: 'Drag the step number to reorder.',
       type: {
         click: 'Click element',
         input: 'Fill input',
