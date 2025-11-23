@@ -234,6 +234,7 @@ mergeMessages(messages, {
     positionLabel: '挿入位置',
     actionBuilder: {
       add: 'ステップを追加',
+      modify: 'ステップを編集',
       empty: 'まだステップがありません。「ステップを追加」をクリックしてフローを組み立てましょう。',
       advancedNotice: 'このフローには高度な設定が含まれます。下の JSON を直接編集してください。',
       typeLabel: 'ステップ種類',

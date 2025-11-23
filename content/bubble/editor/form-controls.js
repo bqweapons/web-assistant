@@ -537,6 +537,7 @@ function buildNoteField({ field }) {
     margin: '0',
     fontSize: '11px',
     color: '#94a3b8',
+    flex: '1 1 100%',
   });
   return { wrapper: note };
 }

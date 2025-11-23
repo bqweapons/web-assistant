@@ -59,7 +59,7 @@ export function createActionFlowController(options) {
 
   const openActionFlowButton = document.createElement('button');
   openActionFlowButton.type = 'button';
-  openActionFlowButton.textContent = t('editor.actionBuilder.add');
+  openActionFlowButton.textContent = t('editor.actionBuilder.modify');
   Object.assign(openActionFlowButton.style, {
     padding: '7px 12px',
     borderRadius: '8px',
@@ -84,7 +84,7 @@ export function createActionFlowController(options) {
   actionFlowSummaryHint.dataset.defaultColor = '#94a3b8';
   actionFlowSummaryText.textContent = t('editor.actionFlowSummaryEmpty');
   actionFlowSummaryHint.textContent = `${t('editor.actionFlowHintDefault', { limit: MAX_FLOW_SOURCE_LENGTH })} · ${t('editor.actionBuilder.reorderHint')}`;
-  actionFlowSummaryField.wrapper.append(actionFlowSummaryRow, actionFlowSummaryHint);
+  actionFlowSummaryField.wrapper.append(actionFlowSummaryRow);
 
   const actionFlowEditorHost = document.createElement('div');
   actionFlowEditorHost.style.display = 'none';
@@ -225,7 +225,7 @@ export function createActionFlowController(options) {
   });
 
   addActionContainer.append(addActionButton, addActionMenu);
-
+  
   const reorderHint = document.createElement('p');
   reorderHint.textContent = t('editor.actionBuilder.reorderHint');
   Object.assign(reorderHint.style, {

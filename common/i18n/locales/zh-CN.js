@@ -232,6 +232,7 @@ mergeMessages(messages, {
     positionLabel: '插入位置',
     actionBuilder: {
       add: '新增步骤',
+      modify: '编辑步骤',
       empty: '暂未添加任何步骤。点击“新增步骤”开始构建流程。',
       advancedNotice: '该流程包含高级特性，请在下方直接编辑 JSON。',
       typeLabel: '步骤类型',

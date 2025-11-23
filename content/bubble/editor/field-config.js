@@ -14,15 +14,15 @@ export function getTypeOptions(t) {
 
 export function getBaseInfoFieldConfigs(t) {
   return [
-    {
-      name: 'type',
-      key: 'type',
-      type: 'select',
-      label: t('editor.typeLabel'),
-      minWidth: 200,
-      stateKey: 'type',
-      options: () => getTypeOptions(t),
-    },
+    // {
+    //   name: 'type',
+    //   key: 'type',
+    //   type: 'select',
+    //   label: t('editor.typeLabel'),
+    //   minWidth: 200,
+    //   stateKey: 'type',
+    //   options: () => getTypeOptions(t),
+    // },
     {
       name: 'text',
       key: 'text',
@@ -201,7 +201,7 @@ export function getStyleFieldConfigs(t) {
       colorPicker: true,
       group: 'basic',
     },
-    { key: 'position', name: 'position', type: 'styleInput', label: t('editor.styles.position'), placeholder: 'relative', minWidth: 200, group: 'advanced' },
+    { key: 'position', name: 'position', type: 'styleInput', label: t('editor.styles.position'), placeholder: 'relative', minWidth: 220, group: 'advanced' },
     { key: 'top', name: 'top', type: 'styleInput', label: t('editor.styles.top'), placeholder: '12px', minWidth: 220, group: 'advanced', adjustable: true },
     { key: 'left', name: 'left', type: 'styleInput', label: t('editor.styles.left'), placeholder: '12px', minWidth: 220, group: 'advanced', adjustable: true },
     { key: 'right', name: 'right', type: 'styleInput', label: t('editor.styles.right'), placeholder: '', minWidth: 220, group: 'advanced', adjustable: true },
