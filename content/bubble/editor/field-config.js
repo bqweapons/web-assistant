@@ -53,8 +53,9 @@ export function getBaseInfoFieldConfigs(t) {
           : state.type === 'link'
             ? t('editor.hrefPlaceholder')
             : t('editor.hrefOptionalPlaceholder'),
-      onTypeChange: ({ state, applyDefaults, setState }) => {
-        if ((state.type === 'tooltip' || state.type === 'area') && applyDefaults) {
+      onReset: ({ state, applyDefaults, setState }) => {
+        if (!applyDefaults) return;
+        if (state.type === 'tooltip' || state.type === 'area') {
           setState({ href: '' });
         }
       },
@@ -75,8 +76,10 @@ export function getBaseInfoFieldConfigs(t) {
         { value: 'same-tab', label: t('editor.linkTarget.sameTab') },
       ],
       visibleWhen: (state) => state.type === 'link',
-      onTypeChange: ({ state, applyDefaults, setState }) => {
+      onReset: ({ state, applyDefaults, setState }) => {
         if (state.type === 'link' && applyDefaults) {
+          setState({ linkTarget: 'new-tab' });
+        } else if (applyDefaults) {
           setState({ linkTarget: 'new-tab' });
         }
       },
@@ -104,15 +107,19 @@ export function getBaseInfoFieldConfigs(t) {
       },
       disabledWhen: (state) => state.type !== 'button' || state.actionFlowLocked,
       visibleWhen: (state) => state.type === 'button',
-      onTypeChange: ({ state, setState }) => {
+      onReset: ({ state, applyDefaults, setState }) => {
+        if (!applyDefaults) return;
+        const base = {
+          actionFlow: '',
+          actionFlowError: '',
+          actionFlowSteps: 0,
+          actionFlowMode: 'builder',
+          actionSteps: [],
+        };
         if (state.type !== 'button') {
-          setState({
-            actionFlow: '',
-            actionFlowError: '',
-            actionFlowSteps: 0,
-            actionFlowMode: 'builder',
-            actionSteps: [],
-          });
+          setState(base);
+        } else {
+          setState(base);
         }
       },
     },
@@ -125,8 +132,11 @@ export function getBaseInfoFieldConfigs(t) {
       stateKey: 'tooltipPosition',
       options: () => getTooltipPositionOptions(t),
       visibleWhen: (state) => state.type === 'tooltip',
-      onTypeChange: ({ state, applyDefaults, setState }) => {
-        if (state.type === 'tooltip' && applyDefaults) {
+      onReset: ({ state, applyDefaults, setState }) => {
+        if (!applyDefaults) return;
+        if (state.type === 'tooltip') {
+          setState({ tooltipPosition: 'top' });
+        } else {
           setState({ tooltipPosition: 'top', tooltipPersistent: false });
         }
       },
@@ -140,8 +150,8 @@ export function getBaseInfoFieldConfigs(t) {
       minWidth: 220,
       stateKey: 'tooltipPersistent',
       visibleWhen: (state) => state.type === 'tooltip',
-      onTypeChange: ({ state, applyDefaults, setState }) => {
-        if (state.type === 'tooltip' && applyDefaults) {
+      onReset: ({ applyDefaults, setState }) => {
+        if (applyDefaults) {
           setState({ tooltipPersistent: false });
         }
       },
@@ -158,8 +168,9 @@ export function getBaseInfoFieldConfigs(t) {
         { value: 'column', label: t('editor.areaLayout.vertical') },
       ],
       visibleWhen: (state) => state.type === 'area',
-      onTypeChange: ({ state, applyDefaults, setState }) => {
-        if (state.type === 'area' && applyDefaults) {
+      onReset: ({ state, applyDefaults, setState }) => {
+        if (!applyDefaults) return;
+        if (state.type === 'area') {
           setState({
             layout: 'row',
             href: '',
@@ -168,6 +179,8 @@ export function getBaseInfoFieldConfigs(t) {
             actionSteps: [],
             actionFlowMode: 'builder',
           });
+        } else {
+          setState({ layout: 'row' });
         }
       },
     },
