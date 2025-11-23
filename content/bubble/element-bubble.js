@@ -449,13 +449,13 @@ function createElementBubble() {
     if (selectorText) {
       payload.selector = selectorText;
     }
-    const containerId =
-      typeof state.containerId === 'string' ? state.containerId.trim() : '';
-    if (containerId) {
-      payload.containerId = containerId;
+    const rawContainerId = typeof state.containerId === 'string' ? state.containerId.trim() : '';
+    if (rawContainerId) {
+      payload.containerId = rawContainerId;
       payload.floating = false;
     } else {
-      delete payload.containerId;
+      // Explicitly clear container to avoid merging old area ids on save.
+      payload.containerId = '';
       payload.floating = Boolean(state.floating);
     }
     if (type === 'link') {
@@ -646,9 +646,6 @@ function createElementBubble() {
 
   form.addEventListener('submit', (event) => {
     event.preventDefault();
-    try {
-      console.log('[PageAugmentor][debug] save submit', { state });
-    } catch (_e) {}
     const payload = buildPayload();
     if (!payload) {
       return;
