@@ -242,6 +242,7 @@ mergeMessages(messages, {
       delayLabel: '等待时长（毫秒）',
       pick: '选取元素',
       remove: '移除',
+      reorderHint: '拖动序号可调整顺序。',
       type: {
         click: '点击元素',
         input: '填写输入',

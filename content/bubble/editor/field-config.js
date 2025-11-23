@@ -96,6 +96,8 @@ export function getBaseInfoFieldConfigs(t) {
         allowDelete: !state.actionFlowLocked,
         emptyHint: state.actionFlowLocked ? t('editor.actionFlowSummaryUnavailable') : t('editor.actionBuilder.empty'),
         disallowAddWhenHref: (snapshot) => Boolean(snapshot.href && snapshot.href.trim()),
+        readonlyAfterAdd: false,
+        pickButtonPlacement: 'secondRow',
       }),
       summaryHint: (state) => {
         if (state.actionFlowLocked) {

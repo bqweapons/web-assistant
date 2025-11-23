@@ -83,7 +83,7 @@ export function createActionFlowController(options) {
   });
   actionFlowSummaryHint.dataset.defaultColor = '#94a3b8';
   actionFlowSummaryText.textContent = t('editor.actionFlowSummaryEmpty');
-  actionFlowSummaryHint.textContent = t('editor.actionFlowHintDefault', { limit: MAX_FLOW_SOURCE_LENGTH });
+  actionFlowSummaryHint.textContent = `${t('editor.actionFlowHintDefault', { limit: MAX_FLOW_SOURCE_LENGTH })} · ${t('editor.actionBuilder.reorderHint')}`;
   actionFlowSummaryField.wrapper.append(actionFlowSummaryRow, actionFlowSummaryHint);
 
   const actionFlowEditorHost = document.createElement('div');
@@ -95,6 +95,10 @@ export function createActionFlowController(options) {
     { value: 'input', label: t('editor.actionBuilder.type.input') },
     { value: 'wait', label: t('editor.actionBuilder.type.wait') },
   ];
+  const ACTION_TYPE_LABEL_MAP = ACTION_TYPE_OPTIONS.reduce((map, item) => {
+    map[item.value] = item.label;
+    return map;
+  }, {});
 
   const actionFlowBuilder = document.createElement('div');
   Object.assign(actionFlowBuilder.style, {
@@ -222,6 +226,15 @@ export function createActionFlowController(options) {
 
   addActionContainer.append(addActionButton, addActionMenu);
 
+  const reorderHint = document.createElement('p');
+  reorderHint.textContent = t('editor.actionBuilder.reorderHint');
+  Object.assign(reorderHint.style, {
+    margin: '6px 0 0 0',
+    fontSize: '11px',
+    color: '#94a3b8',
+  });
+  addActionContainer.appendChild(reorderHint);
+
   const actionBuilderAdvancedNote = document.createElement('div');
   actionBuilderAdvancedNote.textContent = t('editor.actionBuilder.advancedNotice');
   Object.assign(actionBuilderAdvancedNote.style, {
@@ -233,7 +246,8 @@ export function createActionFlowController(options) {
     display: 'none',
   });
 
-  actionFlowBuilder.append(actionStepsContainer, actionBuilderEmpty, addActionContainer, actionBuilderAdvancedNote);
+  // 将新增按钮放在列表上方，避免长列表时下拉溢出视窗
+  actionFlowBuilder.append(addActionContainer, actionStepsContainer, actionBuilderEmpty, actionBuilderAdvancedNote);
   actionFlowField.wrapper.appendChild(actionFlowBuilder);
 
   const builderConfig = {
@@ -241,6 +255,8 @@ export function createActionFlowController(options) {
     allowDelete: true,
     emptyHint: t('editor.actionBuilder.empty'),
     disallowAddWhenHref: null,
+    readonlyAfterAdd: false,
+    pickButtonPlacement: 'row',
   };
 
   const applyBuilderConfig = (config = {}) => {
@@ -261,13 +277,21 @@ export function createActionFlowController(options) {
       } else if (config.disallowAddWhenHref === null) {
         builderConfig.disallowAddWhenHref = null;
       }
+      if (Object.prototype.hasOwnProperty.call(config, 'readonlyAfterAdd')) {
+        builderConfig.readonlyAfterAdd = Boolean(config.readonlyAfterAdd);
+      }
+      if (typeof config.pickButtonPlacement === 'string') {
+        builderConfig.pickButtonPlacement = config.pickButtonPlacement === 'secondRow' ? 'secondRow' : 'row';
+      }
     }
     const state = getState();
     const computedDisallow =
       typeof builderConfig.disallowAddWhenHref === 'function'
         ? builderConfig.disallowAddWhenHref(state)
         : false;
-    const canAdd = builderConfig.allowAdd && !computedDisallow;
+    const readonlyActive =
+      builderConfig.readonlyAfterAdd && Array.isArray(state.actionSteps) && state.actionSteps.length > 0;
+    const canAdd = builderConfig.allowAdd && !computedDisallow && !readonlyActive;
 
     addActionContainer.style.display = canAdd ? 'inline-flex' : 'none';
     addActionButton.disabled = !canAdd;
@@ -725,6 +749,8 @@ export function createActionFlowController(options) {
     return serialized;
   };
 
+  let draggingIndex = null;
+
   const refreshActionBuilderState = () => {
     hideActionMenu();
     const state = getState();
@@ -735,6 +761,8 @@ export function createActionFlowController(options) {
     }
 
     actionStepsContainer.innerHTML = '';
+    const readonlyActive =
+      builderConfig.readonlyAfterAdd && Array.isArray(state.actionSteps) && state.actionSteps.length > 0;
     if (state.actionSteps.length === 0) {
       actionBuilderEmpty.textContent = builderConfig.emptyHint;
       actionBuilderEmpty.style.display = 'block';
@@ -743,6 +771,10 @@ export function createActionFlowController(options) {
       state.actionSteps.forEach((step, index) => {
         actionStepsContainer.appendChild(createActionStepRow(step, index));
       });
+      if (readonlyActive) {
+        addActionMenu.style.display = 'none';
+        addActionButton.setAttribute('aria-expanded', 'false');
+      }
     }
   };
 
@@ -752,7 +784,9 @@ export function createActionFlowController(options) {
       typeof builderConfig.disallowAddWhenHref === 'function'
         ? builderConfig.disallowAddWhenHref(state)
         : false;
-    if (state.actionFlowMode !== 'builder' || !builderConfig.allowAdd || computedDisallow) {
+    const readonlyActive =
+      builderConfig.readonlyAfterAdd && Array.isArray(state.actionSteps) && state.actionSteps.length > 0;
+    if (state.actionFlowMode !== 'builder' || !builderConfig.allowAdd || computedDisallow || readonlyActive) {
       return;
     }
     hideActionMenu();
@@ -761,9 +795,37 @@ export function createActionFlowController(options) {
     updateActionFlowFromSteps();
   };
 
+  const reorderActionSteps = (from, to) => {
+    const state = getState();
+    if (!Array.isArray(state.actionSteps)) {
+      return;
+    }
+    const steps = [...state.actionSteps];
+    const fromIndex = Number(from);
+    const toIndex = Number(to);
+    if (
+      Number.isNaN(fromIndex) ||
+      Number.isNaN(toIndex) ||
+      fromIndex < 0 ||
+      toIndex < 0 ||
+      fromIndex >= steps.length ||
+      toIndex >= steps.length ||
+      fromIndex === toIndex
+    ) {
+      return;
+    }
+    const [moved] = steps.splice(fromIndex, 1);
+    steps.splice(toIndex, 0, moved);
+    state.actionSteps = steps;
+    refreshActionBuilderState();
+    updateActionFlowFromSteps();
+  };
+
   const removeActionStep = (index) => {
     const state = getState();
-    if (state.actionFlowMode !== 'builder' || !builderConfig.allowDelete) {
+    const readonlyActive =
+      builderConfig.readonlyAfterAdd && Array.isArray(state.actionSteps) && state.actionSteps.length > 0;
+    if (state.actionFlowMode !== 'builder' || !builderConfig.allowDelete || readonlyActive) {
       return;
     }
     state.actionSteps = state.actionSteps.filter((_, idx) => idx !== index);
@@ -773,7 +835,9 @@ export function createActionFlowController(options) {
 
   const updateActionStep = (index, patch) => {
     const state = getState();
-    if (state.actionFlowMode !== 'builder') {
+    const readonlyActive =
+      builderConfig.readonlyAfterAdd && Array.isArray(state.actionSteps) && state.actionSteps.length > 0;
+    if (state.actionFlowMode !== 'builder' || readonlyActive) {
       return;
     }
     state.actionSteps = state.actionSteps.map((step, idx) => (idx === index ? { ...step, ...patch } : step));
@@ -781,21 +845,11 @@ export function createActionFlowController(options) {
     refreshActionBuilderState();
   };
 
-  const convertActionStepType = (index, type) => {
-    const state = getState();
-    if (state.actionFlowMode !== 'builder') {
-      return;
-    }
-    const current = state.actionSteps[index] || {};
-    state.actionSteps = state.actionSteps.map((step, idx) => (idx === index ? createStepTemplate(type, step) : step));
-    if (current.type !== type) {
-      updateActionFlowFromSteps();
-    }
-    refreshActionBuilderState();
-  };
-
   const createActionStepRow = (step, index) => {
     const state = getState();
+    const readonlyActive =
+      builderConfig.readonlyAfterAdd && Array.isArray(state.actionSteps) && state.actionSteps.length > 0;
+    const pickPlacement = builderConfig.pickButtonPlacement === 'secondRow' ? 'secondRow' : 'row';
     const row = document.createElement('div');
     Object.assign(row.style, {
       display: 'flex',
@@ -818,7 +872,7 @@ export function createActionFlowController(options) {
       display: 'flex',
       alignItems: 'center',
       justifyContent: 'space-between',
-      gap: '12px',
+      gap: '10px',
     });
 
     const badge = document.createElement('span');
@@ -834,6 +888,23 @@ export function createActionFlowController(options) {
       color: '#4f46e5',
       fontSize: '12px',
       fontWeight: '600',
+      cursor: readonlyActive ? 'default' : 'grab',
+      userSelect: 'none',
+    });
+    badge.title = t('editor.actionBuilder.reorderHint');
+
+    const typeChip = document.createElement('span');
+    typeChip.textContent = ACTION_TYPE_LABEL_MAP[step.type] || step.type;
+    Object.assign(typeChip.style, {
+      display: 'inline-flex',
+      alignItems: 'center',
+      padding: '4px 10px',
+      borderRadius: '10px',
+      backgroundColor: 'rgba(99, 102, 241, 0.08)',
+      color: '#312e81',
+      fontSize: '12px',
+      fontWeight: '600',
+      whiteSpace: 'nowrap',
     });
 
     const removeButton = document.createElement('button');
@@ -851,40 +922,70 @@ export function createActionFlowController(options) {
       event.preventDefault();
       removeActionStep(index);
     });
-    if (!builderConfig.allowDelete) {
+    if (!builderConfig.allowDelete || readonlyActive) {
       removeButton.style.display = 'none';
       removeButton.disabled = true;
     }
 
-    header.append(badge, removeButton);
+    const headerLeft = document.createElement('div');
+    Object.assign(headerLeft.style, {
+      display: 'flex',
+      alignItems: 'center',
+      gap: '8px',
+      minWidth: '0',
+    });
+    headerLeft.append(badge, typeChip);
+    header.append(headerLeft, removeButton);
     row.appendChild(header);
 
-    const typeLabel = document.createElement('label');
-    typeLabel.textContent = t('editor.actionBuilder.typeLabel');
-    Object.assign(typeLabel.style, {
-      display: 'flex',
-      flexDirection: 'column',
-      gap: '6px',
-      fontSize: '12px',
-      fontWeight: '600',
-      color: '#0f172a',
-    });
+    const resetDragStyles = () => {
+      row.style.outline = '';
+      row.style.opacity = '1';
+    };
 
-    const typeSelect = document.createElement('select');
-    ACTION_TYPE_OPTIONS.forEach((option) => {
-      const opt = document.createElement('option');
-      opt.value = option.value;
-      opt.textContent = option.label;
-      typeSelect.appendChild(opt);
-    });
-    typeSelect.value = step.type;
-    styleInput(typeSelect);
-    typeSelect.addEventListener('change', (event) => {
-    convertActionStepType(index, event.target.value);
-  });
-
-  typeLabel.appendChild(typeSelect);
-  row.appendChild(typeLabel);
+    if (!readonlyActive) {
+      row.draggable = true;
+      row.addEventListener('dragstart', (event) => {
+        draggingIndex = index;
+        row.style.opacity = '0.8';
+        badge.style.cursor = 'grabbing';
+        if (event.dataTransfer) {
+          event.dataTransfer.effectAllowed = 'move';
+          event.dataTransfer.setData('text/plain', String(index));
+        }
+      });
+      row.addEventListener('dragover', (event) => {
+        if (draggingIndex === null) {
+          return;
+        }
+        event.preventDefault();
+        row.style.outline = '1px dashed #6366f1';
+        badge.style.cursor = 'grabbing';
+      });
+      row.addEventListener('dragleave', () => {
+        if (draggingIndex === null) {
+          return;
+        }
+        row.style.outline = '';
+        badge.style.cursor = 'grab';
+      });
+      row.addEventListener('drop', (event) => {
+        if (draggingIndex === null) {
+          return;
+        }
+        event.preventDefault();
+        const fromIndex = draggingIndex;
+        draggingIndex = null;
+        resetDragStyles();
+        reorderActionSteps(fromIndex, index);
+        badge.style.cursor = 'grab';
+      });
+      row.addEventListener('dragend', () => {
+        draggingIndex = null;
+        resetDragStyles();
+        badge.style.cursor = 'grab';
+      });
+    }
 
     const body = document.createElement('div');
     Object.assign(body.style, {
@@ -911,6 +1012,7 @@ export function createActionFlowController(options) {
       delayInput.step = '100';
       delayInput.value = typeof step.ms === 'number' ? String(step.ms) : '1000';
       styleInput(delayInput);
+      delayInput.disabled = readonlyActive;
       delayInput.addEventListener('input', (event) => {
         const nextValue = Number.parseInt(event.target.value, 10);
         const currentState = getState();
@@ -947,6 +1049,7 @@ export function createActionFlowController(options) {
       selectorInput.placeholder = t('editor.actionBuilder.selectorPlaceholder');
       selectorInput.value = step.selector || '';
       styleInput(selectorInput);
+      selectorInput.disabled = readonlyActive;
       selectorInput.addEventListener('input', (event) => {
         const currentState = getState();
         currentState.actionSteps[index] = {
@@ -970,6 +1073,7 @@ export function createActionFlowController(options) {
         cursor: 'pointer',
       });
 
+      pickButton.disabled = readonlyActive;
       pickButton.addEventListener('click', (event) => {
         event.preventDefault();
         row.dataset.picking = 'true';
@@ -993,8 +1097,21 @@ export function createActionFlowController(options) {
         });
       });
 
-      selectorRow.append(selectorInput, pickButton);
-      selectorLabel.appendChild(selectorRow);
+      selectorRow.append(selectorInput);
+      if (pickPlacement === 'row') {
+        selectorRow.appendChild(pickButton);
+        selectorLabel.appendChild(selectorRow);
+      } else {
+        selectorLabel.appendChild(selectorRow);
+        const pickRow = document.createElement('div');
+        Object.assign(pickRow.style, {
+          display: 'flex',
+          gap: '8px',
+          alignItems: 'center',
+        });
+        pickRow.appendChild(pickButton);
+        selectorLabel.appendChild(pickRow);
+      }
       body.appendChild(selectorLabel);
 
       if (step.type === 'input') {
@@ -1014,6 +1131,7 @@ export function createActionFlowController(options) {
         valueInput.placeholder = t('editor.actionBuilder.valuePlaceholder');
         valueInput.value = step.value || '';
         styleInput(valueInput);
+        valueInput.disabled = readonlyActive;
         valueInput.addEventListener('input', (event) => {
           const currentState = getState();
           currentState.actionSteps[index] = {

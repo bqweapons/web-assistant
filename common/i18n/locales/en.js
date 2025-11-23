@@ -236,6 +236,7 @@ const messages = {
       delayLabel: 'Wait duration (ms)',
       pick: 'Pick element',
       remove: 'Remove',
+      reorderHint: 'Drag the step number to reorder.',
       type: {
         click: 'Click element',
         input: 'Fill input',
