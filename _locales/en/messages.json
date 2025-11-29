@@ -1,0 +1,14 @@
+{
+  "extensionName": {
+    "message": "Page Augmentor: no-code buttons, links and tooltips",
+    "description": "Extension name for listings and toolbar surfaces"
+  },
+  "extensionDescription": {
+    "message": "Create no-code buttons, links and tooltips on any page, personalize calls-to-action, and manage everything from a unified side panel",
+    "description": "Description for the Chrome Web Store and manifest"
+  },
+  "actionDefaultTitle": {
+    "message": "Open Page Augmentor",
+    "description": "Default title for the browser action"
+  }
+}
