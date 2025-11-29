@@ -199,6 +199,11 @@ const messages = {
       newTab: 'New tab',
       sameTab: 'Current tab',
     },
+    scopeLabel: 'Scope',
+    scope: {
+      page: 'This page only',
+      site: 'Entire site',
+    },
     actionLabel: 'Click action (optional)',
     actionPlaceholder: 'e.g. #submit-button',
     actionPick: 'Capture from page',

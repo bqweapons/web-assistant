@@ -5,11 +5,25 @@ import { elementMatchesFrame } from './frame.js';
 
 export async function hydrateElements() {
   try {
-    const elements = await sendMessage(MessageType.LIST_BY_URL, { pageUrl: runtime.pageUrl });
+    const elements = await sendMessage(MessageType.LIST_BY_URL, { pageUrl: runtime.siteKey || runtime.pageUrl });
     synchronizeElements(elements);
   } catch (error) {
     console.error('[PageAugmentor] Failed to hydrate elements', error);
   }
+}
+
+function matchesPageScope(element, pageKey, siteKey) {
+  if (!element) {
+    return false;
+  }
+  const scope = typeof element.pageUrl === 'string' ? element.pageUrl : '';
+  if (!scope) {
+    return true; // treat empty as site-wide
+  }
+  if (siteKey && scope === siteKey) {
+    return true;
+  }
+  return Boolean(pageKey && scope === pageKey);
 }
 
 /**
@@ -38,13 +52,17 @@ export function synchronizeElements(list) {
   });
   const incomingIds = new Set();
   sorted.forEach((element) => {
-    if (elementMatchesFrame(element)) {
+    if (elementMatchesFrame(element) && matchesPageScope(element, runtime.pageKey, runtime.siteKey)) {
       incomingIds.add(element.id);
       injectModule.ensureElement(element);
     }
   });
   injectModule.listElements().forEach((existing) => {
-    if (existing.pageUrl === runtime.pageUrl && elementMatchesFrame(existing) && !incomingIds.has(existing.id)) {
+    if (
+      matchesPageScope(existing, runtime.pageKey, runtime.siteKey) &&
+      elementMatchesFrame(existing) &&
+      !incomingIds.has(existing.id)
+    ) {
       if (state.creationElementId && existing.id === state.creationElementId) {
         return;
       }

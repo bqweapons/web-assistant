@@ -205,6 +205,11 @@ mergeMessages(messages, {
       newTab: '在新标签页中打开',
       sameTab: '在当前标签页中打开',
     },
+    scopeLabel: '作用范围',
+    scope: {
+      page: '仅此页面',
+      site: '整个站点',
+    },
     actionLabel: '点击动作（可选）',
     actionPlaceholder: '例如：#submit-button',
     actionPick: '从页面捕获',

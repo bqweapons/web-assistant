@@ -207,6 +207,11 @@ mergeMessages(messages, {
       newTab: '新しいタブで開く',
       sameTab: '現在のタブで開く',
     },
+    scopeLabel: '適用範囲',
+    scope: {
+      page: 'このページのみ',
+      site: 'サイト全体',
+    },
     actionLabel: 'クリック先（任意）',
     actionPlaceholder: '例: #submit-button',
     actionPick: 'ページから取得',

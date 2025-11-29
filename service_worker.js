@@ -6,7 +6,7 @@ import { getElementsByUrl, upsertElement, deleteElement, getFullStore, clearPage
 import { addAsyncMessageListener, MessageType } from './common/messaging.js';
 import { openSidePanelOrTab } from './common/compat.js';
 import { parseActionFlowDefinition } from './common/flows.js';
-import { normalizePageUrl } from './common/url.js';
+import { normalizePageUrl, normalizePageLocation } from './common/url.js';
 
 const TOOLTIP_POSITIONS = new Set(['top', 'right', 'bottom', 'left']);
 const ELEMENT_TYPES = new Set(['button', 'link', 'tooltip', 'area']);
@@ -92,28 +92,30 @@ addAsyncMessageListener(async (message, sender) => {
       if (message.type === MessageType.UPDATE) {
         element.updatedAt = Date.now();
       }
-      const list = await upsertElement(element);
+      const siteUrl = normalizePageUrl(message.data?.siteUrl || element.siteUrl || element.pageUrl);
+      const list = await upsertElement(element, siteUrl);
       if (message.type === MessageType.CREATE) {
-        await broadcastState(element.pageUrl, list);
+        await broadcastState(siteUrl, list);
       }
       return list;
     }
     case MessageType.DELETE: {
-      const { id, pageUrl } = message.data || {};
-      if (!id || !pageUrl) {
+      const { id } = message.data || {};
+      const siteUrl = normalizePageUrl(message.data?.siteUrl || message.data?.pageUrl);
+      if (!id || !siteUrl) {
         throw new Error('Missing element id or pageUrl.');
       }
-      const list = await deleteElement(pageUrl, id);
-      await broadcastDelete(pageUrl, id);
+      const list = await deleteElement(siteUrl, id);
+      await broadcastDelete(siteUrl, id);
       return list;
     }
     case MessageType.CLEAR_PAGE: {
-      const { pageUrl } = message.data || {};
-      if (!pageUrl) {
+      const siteUrl = normalizePageUrl(message.data?.siteUrl || message.data?.pageUrl);
+      if (!siteUrl) {
         throw new Error('Missing pageUrl.');
       }
-      await clearPage(pageUrl);
-      await broadcastState(pageUrl, []);
+      await clearPage(siteUrl);
+      await broadcastState(siteUrl, []);
       return [];
     }
     case MessageType.START_PICKER: {
@@ -161,11 +163,12 @@ addAsyncMessageListener(async (message, sender) => {
     }
     case MessageType.REHYDRATE: {
       const { pageUrl } = message.data || {};
-      if (!pageUrl) {
+      const siteUrl = normalizePageUrl(pageUrl);
+      if (!siteUrl) {
         throw new Error('Missing pageUrl.');
       }
-      const list = await getElementsByUrl(pageUrl);
-      await broadcastState(pageUrl, list);
+      const list = await getElementsByUrl(siteUrl);
+      await broadcastState(siteUrl, list);
       return list;
     }
     case MessageType.FOCUS_ELEMENT: {
@@ -174,10 +177,11 @@ addAsyncMessageListener(async (message, sender) => {
       if (!targetTabId || !id) {
         throw new Error('Missing tabId or element id.');
       }
-      const element = pageUrl && id ? await findElement(pageUrl, id) : null;
+      const siteUrl = normalizePageUrl(pageUrl);
+      const element = siteUrl && id ? await findElement(siteUrl, id) : null;
       await sendMessageToFrames(targetTabId, {
         type: MessageType.FOCUS_ELEMENT,
-        pageUrl,
+        pageUrl: siteUrl,
         data: {
           id,
           frameSelectors: element?.frameSelectors || [],
@@ -192,10 +196,11 @@ addAsyncMessageListener(async (message, sender) => {
       if (!targetTabId || !id) {
         throw new Error('Missing tabId or element id.');
       }
-      const element = pageUrl && id ? await findElement(pageUrl, id) : null;
+      const siteUrl = normalizePageUrl(pageUrl);
+      const element = siteUrl && id ? await findElement(siteUrl, id) : null;
       await sendMessageToFrames(targetTabId, {
         type: MessageType.OPEN_EDITOR,
-        pageUrl,
+        pageUrl: siteUrl,
         data: {
           id,
           frameSelectors: element?.frameSelectors || [],
@@ -212,7 +217,7 @@ addAsyncMessageListener(async (message, sender) => {
       }
       await sendMessageToFrames(targetTabId, {
         type: MessageType.SET_EDIT_MODE,
-        pageUrl,
+        pageUrl: normalizePageUrl(pageUrl),
         data: { enabled: Boolean(enabled) },
       });
       return true;
@@ -232,9 +237,16 @@ function validateElementPayload(payload) {
   if (!payload) {
     throw new Error('Element payload missing.');
   }
-  if (!payload.pageUrl) {
+  const siteKey = normalizePageUrl(payload.siteUrl || payload.pageUrl);
+  if (!siteKey) {
     throw new Error('pageUrl is required.');
   }
+  const providedPage = typeof payload.pageUrl === 'string' ? payload.pageUrl : '';
+  const normalizedPage = providedPage ? normalizePageLocation(providedPage, siteKey) : '';
+  const pageKey =
+    providedPage && normalizePageUrl(providedPage) === siteKey && providedPage === siteKey
+      ? siteKey
+      : normalizedPage || siteKey;
   if (!payload.id) {
     payload.id = crypto.randomUUID();
   }
@@ -247,6 +259,8 @@ function validateElementPayload(payload) {
     ...payload,
     text: payload.text || '',
   };
+  element.siteUrl = siteKey;
+  element.pageUrl = pageKey;
   if (!ELEMENT_TYPES.has(element.type)) {
     element.type = 'button';
   }
@@ -527,7 +541,8 @@ async function findElement(pageUrl, id) {
  */
 async function notifyPickerResult(type, payload) {
   try {
-    await chrome.runtime.sendMessage({ type, pageUrl: payload?.pageUrl, data: payload });
+    const siteUrl = normalizePageUrl(payload?.siteUrl || payload?.pageUrl);
+    await chrome.runtime.sendMessage({ type, pageUrl: siteUrl, data: payload });
   } catch (error) {
     // No side panel listening; ignore silently.
   }
@@ -552,8 +567,8 @@ async function importStorePayload(rawStore) {
     if (!Array.isArray(list)) {
       throw new Error(`Invalid element list for ${key}.`);
     }
-    const pageUrl = normalizePageUrl(key).trim();
-    if (!pageUrl) {
+    const siteUrl = normalizePageUrl(key).trim();
+    if (!siteUrl) {
       throw new Error(`Import payload contains an invalid pageUrl: ${key}`);
     }
     const sanitized = [];
@@ -561,21 +576,26 @@ async function importStorePayload(rawStore) {
       if (!entry || typeof entry !== 'object') {
         throw new Error(`Invalid element entry for ${key}.`);
       }
-      const normalizedEntryUrl = normalizePageUrl(entry.pageUrl || pageUrl, key).trim();
+      const providedPage = typeof entry.pageUrl === 'string' ? entry.pageUrl : '';
+      const normalizedEntryUrl = providedPage ? normalizePageLocation(providedPage, key).trim() : '';
       const payload = {
         ...entry,
-        pageUrl: normalizedEntryUrl || pageUrl,
+        siteUrl,
+        pageUrl:
+          providedPage && normalizePageUrl(providedPage) === siteUrl && providedPage === siteUrl
+            ? siteUrl
+            : normalizedEntryUrl || siteUrl,
       };
       try {
         const validated = validateElementPayload(payload);
-        validated.pageUrl = pageUrl;
+        validated.siteUrl = siteUrl;
         sanitized.push(validated);
       } catch (error) {
         throw new Error(`Invalid element for ${key}: ${error.message}`);
       }
     }
     if (sanitized.length > 0) {
-      normalizedStore[pageUrl] = sanitized;
+      normalizedStore[siteUrl] = sanitized;
       elementCount += sanitized.length;
     }
   }

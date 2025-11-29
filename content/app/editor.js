@@ -47,7 +47,8 @@ export function openEditorBubble(elementId) {
           ...(((updated || {}).style) || {}),
         },
         id: elementId,
-        pageUrl: runtime.pageUrl,
+        siteUrl: (updated && updated.siteUrl) || runtime.siteKey || runtime.pageUrl,
+        pageUrl: (updated && updated.pageUrl) || baseLatest.pageUrl || runtime.pageKey || runtime.pageUrl,
         updatedAt: Date.now(),
       };
       // Normalize container/floating so drag-out/attach state persists.

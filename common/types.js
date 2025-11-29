@@ -4,6 +4,7 @@
  * @typedef {Object} InjectedElement
  * @property {string} id
  * @property {string} pageUrl
+ * @property {string | undefined} [siteUrl]
  * @property {'button' | 'link' | 'tooltip' | 'area'} type
  * @property {string} text
  * @property {string | undefined} href

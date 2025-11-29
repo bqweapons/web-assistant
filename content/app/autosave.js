@@ -57,7 +57,8 @@ export function setupAutosave() {
       const payload = {
         ...merged,
         id: elementId,
-        pageUrl: runtime.pageUrl,
+        siteUrl: runtime.siteKey || runtime.pageUrl,
+        pageUrl: merged.pageUrl || base.pageUrl || runtime.pageKey || runtime.pageUrl,
         updatedAt: Date.now(),
       };
       // Update local registry immediately to avoid visual snap-back before background roundtrip

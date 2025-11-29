@@ -5,11 +5,12 @@ const DEFAULT_STATE = {
   position: 'append',
   selector: '',
   style: {},
-   layout: 'row',
-   linkTarget: 'new-tab',
+  layout: 'row',
+  linkTarget: 'new-tab',
   containerId: '',
   floating: true,
   bubbleSide: 'bottom',
+  scope: 'page', // 'page' | 'site'
   actionFlowMode: 'builder',
   actionFlow: '',
   actionFlowError: '',
@@ -85,6 +86,7 @@ function mergeState(base, patch) {
   next.bubbleSide = typeof patch.bubbleSide === 'string' ? patch.bubbleSide : base.bubbleSide;
   next.selector = typeof patch.selector === 'string' ? patch.selector : base.selector;
   next.layout = typeof patch.layout === 'string' ? patch.layout : base.layout;
+  next.scope = patch.scope === 'site' || patch.scope === 'page' ? patch.scope : base.scope;
   next.linkTarget = typeof patch.linkTarget === 'string' ? patch.linkTarget : base.linkTarget;
   next.actionFlowLocked =
     typeof patch.actionFlowLocked === 'boolean' ? patch.actionFlowLocked : base.actionFlowLocked;
@@ -118,6 +120,7 @@ function cloneState(value) {
     bubbleSide: typeof value.bubbleSide === 'string' && value.bubbleSide.trim()
       ? value.bubbleSide.trim()
       : 'bottom',
+    scope: value.scope === 'site' ? 'site' : 'page',
     actionFlowMode: value.actionFlowMode,
     actionFlow: value.actionFlow,
     actionFlowError: value.actionFlowError,

@@ -1,12 +1,13 @@
 import { sendMessage, MessageType } from '../common/messaging.js';
 import * as selectorModule from '../selector.js';
-import { state, runtime } from './context.js';
+import { state, runtime, refreshPageContextFromLocation } from './context.js';
 import { closeEditorBubble } from './editor.js';
 import { describeElement } from './describe.js';
 
 export function beginPicker(options = {}) {
   stopPicker();
   closeEditorBubble();
+  refreshPageContextFromLocation();
   document.body.style.cursor = 'crosshair';
   state.pickerSession = selectorModule.startElementPicker({
     mode: options.mode || 'create',
@@ -14,6 +15,7 @@ export function beginPicker(options = {}) {
       const metadata = selectorModule.resolveFrameContext(target.ownerDocument?.defaultView || window);
       sendMessage(MessageType.PICKER_RESULT, {
         pageUrl: runtime.pageUrl,
+        siteUrl: runtime.siteKey || runtime.pageUrl,
         selector,
         frameSelectors: metadata.frameSelectors,
         frameLabel: metadata.frameLabel,
@@ -23,9 +25,11 @@ export function beginPicker(options = {}) {
     },
     onSubmit(payload) {
       stopPicker();
+      const scope = options.scope === 'site' ? 'site' : 'page';
       const elementPayload = {
         ...payload,
-        pageUrl: runtime.pageUrl,
+        siteUrl: runtime.siteKey || runtime.pageUrl,
+        pageUrl: scope === 'site' ? runtime.siteKey || runtime.pageUrl : runtime.pageKey || runtime.pageUrl,
         createdAt: Date.now(),
         updatedAt: Date.now(),
       };
@@ -53,4 +57,3 @@ export function stopPicker() {
   }
   document.body.style.cursor = '';
 }
-
