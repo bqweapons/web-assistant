@@ -313,6 +313,10 @@ export function createActionFlowController(options) {
   actionFlowHint.dataset.defaultColor = '#94a3b8';
   actionFlowField.wrapper.append(actionFlowHint);
 
+  const flowHost = document.createElement('div');
+  flowHost.dataset.pageAugmentorRoot = 'picker-flow-bubble-host';
+  const flowShadow = flowHost.attachShadow({ mode: 'open' });
+
   const flowBubble = document.createElement('div');
   flowBubble.dataset.pageAugmentorRoot = 'picker-flow-bubble';
   Object.assign(flowBubble.style, {
@@ -420,6 +424,7 @@ export function createActionFlowController(options) {
 
   flowBubbleActions.append(flowCancelButton, flowSaveButton);
   flowBubble.append(flowBubbleHeader, flowBubbleBody, flowBubbleActions);
+  flowShadow.append(flowBubble);
 
   let actionMenuVisible = false;
   let actionBuilderInvalidIndex = -1;
@@ -1214,8 +1219,8 @@ export function createActionFlowController(options) {
       flowBubble.style.opacity = '0';
       flowBubble.style.transform = 'translateY(12px)';
       setTimeout(() => {
-        if (!flowBubbleAttached && flowBubble.isConnected) {
-          flowBubble.remove();
+        if (!flowBubbleAttached && flowHost.isConnected) {
+          flowHost.remove();
         }
       }, 200);
     }
@@ -1248,7 +1253,7 @@ export function createActionFlowController(options) {
     flowBubbleBody.appendChild(actionFlowField.wrapper);
     flowBubble.style.opacity = '0';
     flowBubble.style.transform = 'translateY(12px)';
-    document.body.appendChild(flowBubble);
+    document.body.appendChild(flowHost);
     flowBubbleAttached = true;
     window.addEventListener('resize', constrainFlowBubbleToViewport, true);
     resetFlowBubblePosition();

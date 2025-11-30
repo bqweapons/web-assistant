@@ -257,7 +257,7 @@ const messages = {
     sections: {
       basics: {
         title: 'Basics',
-        description: 'Choose the element type and the text visitors will see.',
+        description: 'Choose the element type and the text.',
       },
       behavior: {
         title: 'Behavior and actions',
@@ -296,6 +296,10 @@ const messages = {
       fontSize: 'Font size',
       fontWeight: 'Font weight',
       padding: 'Padding',
+      paddingTop: 'Padding top',
+      paddingRight: 'Padding right',
+      paddingBottom: 'Padding bottom',
+      paddingLeft: 'Padding left',
       border: 'Border',
       borderRadius: 'Border radius',
       presetsLabel: 'Preset styles',

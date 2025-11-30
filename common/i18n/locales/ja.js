@@ -188,8 +188,8 @@ mergeMessages(messages, {
     previewLabel: 'ライブプレビュー',
     typeLabel: '要素タイプ',
     textLabel: 'テキスト',
-    textPlaceholder: '訪問者に表示するテキスト',
-    tooltipTextPlaceholder: 'ツールチップのテキスト',
+    textPlaceholder: 'Button',
+    tooltipTextPlaceholder: 'ツールチップ',
     areaTextPlaceholder: 'このエリアに表示するメモ（任意）',
     areaLayoutLabel: 'レイアウト',
     areaLayout: {
@@ -231,10 +231,10 @@ mergeMessages(messages, {
     actionFlowSummaryConfigured: 'アクションフローを設定済み（{count} ステップ）',
     actionFlowSummaryEmpty: 'アクションフローはまだ設定されていません。',
     actionFlowTitle: 'アクションフローを設定',
-    actionFlowDescription: '訪問者がこのボタンをクリックしたときに実行する一連の処理を定義します。',
+    actionFlowDescription: 'このボタンをクリックしたときに実行する一連の処理を定義します。',
     tooltipPositionLabel: 'ツールチップの配置',
     tooltipPersistenceLabel: '表示方法',
-    tooltipPersistenceCheckbox: '常に表示する',
+    tooltipPersistenceCheckbox: '常に表示',
     tooltipPersistenceHint: 'オフにすると、ホバーまたはフォーカス時のみ表示されます。',
     positionLabel: '挿入位置',
     actionBuilder: {
@@ -265,7 +265,7 @@ mergeMessages(messages, {
     sections: {
       basics: {
         title: '基本情報',
-        description: '要素タイプと、訪問者に表示するテキストを設定します。',
+        description: '要素タイプと、要素のテキストを設定します。',
       },
       behavior: {
         title: '動作とアクション',
@@ -273,7 +273,7 @@ mergeMessages(messages, {
       },
       tooltip: {
         title: 'ツールチップ設定',
-        description: '訪問者にどのように表示するかを決めます。',
+        description: 'どのように表示するかを決めます。',
       },
       placement: {
         title: '配置',
@@ -304,6 +304,10 @@ mergeMessages(messages, {
       fontSize: 'フォントサイズ',
       fontWeight: 'フォントの太さ',
       padding: 'パディング',
+      paddingTop: '上パディング',
+      paddingRight: '右パディング',
+      paddingBottom: '下パディング',
+      paddingLeft: '左パディング',
       border: 'ボーダー',
       borderRadius: '角の丸み',
       presetsLabel: 'プリセットスタイル',
@@ -319,7 +323,7 @@ mergeMessages(messages, {
     cancel: 'キャンセル',
     save: '保存',
     saveCreate: '作成',
-    saveUpdate: '変更を保存',
+    saveUpdate: '保存',
     errorTextRequired: '要素に表示するテキストを入力してください。',
     errorUrlRequired: 'リンクタイプには URL が必要です。',
     errorActionRequiredForUrl: 'URL 付きのボタンにはアクションフローが必要です。',

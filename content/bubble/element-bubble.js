@@ -109,6 +109,10 @@ export function getElementBubble() {
  */
 // Builds the editor bubble DOM structure.
 function createElementBubble() {
+  const host = document.createElement('div');
+  host.dataset.pageAugmentorRoot = 'picker-element-bubble-host';
+  const shadow = host.attachShadow({ mode: 'open' });
+
   const bubble = document.createElement('div');
   bubble.dataset.pageAugmentorRoot = 'picker-element-bubble';
   Object.assign(bubble.style, {
@@ -119,7 +123,7 @@ function createElementBubble() {
     minWidth: '0',
     minHeight: '300px',
     maxHeight: '40vh',
-    padding: '12px 16px',
+    padding: '4px 16px',
     borderRadius: '18px 18px 0 0',
     backgroundColor: '#ffffff',
     boxShadow: '0 -6px 24px rgba(15, 23, 42, 0.14)',
@@ -135,9 +139,11 @@ function createElementBubble() {
     overflow: 'hidden',
     display: 'flex',
     flexDirection: 'column',
-    gap: '16px',
+    gap: '8px',
     boxSizing: 'border-box',
   });
+
+  shadow.appendChild(bubble);
 
   bubble.addEventListener('click', (event) => event.stopPropagation());
   bubble.addEventListener('mousedown', (event) => event.stopPropagation());
@@ -155,9 +161,8 @@ function createElementBubble() {
     gridTemplateColumns: 'minmax(220px, 1.4fr) 1.2fr auto',
     alignItems: 'center',
     gap: '12px',
-    padding: '8px 10px 10px',
+    padding: '4px 10px 6px',
     borderBottom: '1px solid rgba(148, 163, 184, 0.25)',
-    backgroundColor: '#f9fafb',
     position: 'sticky',
     top: '0',
     zIndex: '1',
@@ -194,7 +199,6 @@ function createElementBubble() {
     alignItems: 'center',
     padding: '4px 10px',
     borderRadius: '999px',
-    backgroundColor: '#e0e7ff',
     color: '#312e81',
     fontSize: '12px',
     fontWeight: '700',
@@ -245,11 +249,11 @@ function createElementBubble() {
   Object.assign(formBody.style, {
     display: 'flex',
     flexDirection: 'column',
-    gap: '12px',
+    gap: '6px',
     flex: '1 1 auto',
     minHeight: '0',
     overflowY: 'auto',
-    padding: '10px 2px 6px',
+    padding: '4px 2px 2px',
   });
 
   let refreshUI = () => {};
@@ -323,7 +327,7 @@ const editorState = createEditorState();
   Object.assign(panel.style, {
     display: 'flex',
     flexDirection: 'column',
-    gap: '12px',
+    gap: '6px',
   });
 
   let suppressAutoRefresh = false;
@@ -677,7 +681,7 @@ const editorState = createEditorState();
     }
     isAttached = true;
     bubble.dataset.pageAugmentorPlacement = 'bottom';
-    attachBubble(bubble);
+    attachBubble(host);
     const edgeGap = 0;
     const updateFixedPlacement = () => {
       const viewportHeight = window.innerHeight || 0;
@@ -747,8 +751,8 @@ const editorState = createEditorState();
     bubble.style.opacity = '0';
     bubble.style.transform = 'translateY(6px)';
     setTimeout(() => {
-      if (!isAttached && bubble.isConnected) {
-        detachBubble(bubble);
+      if (!isAttached && host.isConnected) {
+        detachBubble(host);
       }
     }, 160);
     if (draftUpdateListener) {
@@ -860,8 +864,8 @@ const editorState = createEditorState();
     },
     destroy() {
       detach();
-      if (bubble.isConnected) {
-        bubble.remove();
+      if (host.isConnected) {
+        host.remove();
       }
     },
   };

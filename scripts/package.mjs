@@ -88,6 +88,11 @@ async function main() {
     await copyDir(path.join(repoRoot, 'assets'), path.join(stageDir, 'assets'));
   }
 
+  // i18n messages required because manifest uses __MSG_* placeholders
+  if (await pathExists(path.join(repoRoot, '_locales'))) {
+    await copyDir(path.join(repoRoot, '_locales'), path.join(stageDir, '_locales'));
+  }
+
   // common (used by service_worker as ESM imports)
   if (await pathExists(path.join(repoRoot, 'common'))) {
     await copyDir(path.join(repoRoot, 'common'), path.join(stageDir, 'common'));
