@@ -221,8 +221,7 @@ mergeMessages(messages, {
     actionHintPicking: 'コピーしたいボタンをクリックしてください（Esc でキャンセル）。',
     actionFlowLabel: 'アクションフロー（任意）',
     actionFlowPlaceholder: '[\n  {"type":"click","selector":"#target"}\n]',
-    actionFlowHintDefault:
-      '連続する手順を JSON 配列として記述します（最大 {limit} 文字、合計実行時間はおよそ 10 秒）。click / wait / input / if / while / navigate に対応します。',
+    actionFlowHintDefault: '',
     actionFlowHintConfigured: '{count} ステップのフローが設定されています。',
     actionFlowHintError: 'フローエラー: {error}',
     actionFlowConfigure: 'フローを設定',
@@ -231,7 +230,7 @@ mergeMessages(messages, {
     actionFlowSummaryConfigured: 'アクションフローを設定済み（{count} ステップ）',
     actionFlowSummaryEmpty: 'アクションフローはまだ設定されていません。',
     actionFlowTitle: 'アクションフローを設定',
-    actionFlowDescription: 'このボタンをクリックしたときに実行する一連の処理を定義します。',
+    actionFlowDescription: 'ボタンをクリックしたときに実行する一連の処理を定義します。',
     tooltipPositionLabel: 'ツールチップの配置',
     tooltipPersistenceLabel: '表示方法',
     tooltipPersistenceCheckbox: '常に表示',

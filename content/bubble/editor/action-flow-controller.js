@@ -104,7 +104,7 @@ export function createActionFlowController(options) {
   Object.assign(actionFlowBuilder.style, {
     display: 'flex',
     flexDirection: 'column',
-    gap: '12px',
+    gap: '10px',
     padding: '12px',
     border: '1px dashed rgba(148, 163, 184, 0.6)',
     borderRadius: '10px',
@@ -115,7 +115,7 @@ export function createActionFlowController(options) {
   Object.assign(actionStepsContainer.style, {
     display: 'flex',
     flexDirection: 'column',
-    gap: '12px',
+    gap: '10px',
   });
 
   const actionBuilderEmpty = document.createElement('div');
@@ -136,7 +136,7 @@ export function createActionFlowController(options) {
     position: 'relative',
     display: 'inline-flex',
     flexDirection: 'column',
-    gap: '6px',
+    gap: '4px',
   });
 
   const addActionButton = document.createElement('button');
@@ -160,7 +160,7 @@ export function createActionFlowController(options) {
   addActionMenu.setAttribute('role', 'menu');
   Object.assign(addActionMenu.style, {
     position: 'absolute',
-    top: 'calc(100% + 6px)',
+    top: 'calc(100% + 4px)',
     left: '0',
     display: 'none',
     flexDirection: 'column',
@@ -229,11 +229,11 @@ export function createActionFlowController(options) {
   const reorderHint = document.createElement('p');
   reorderHint.textContent = t('editor.actionBuilder.reorderHint');
   Object.assign(reorderHint.style, {
-    margin: '6px 0 0 0',
+    margin: '4px 0 0 0',
     fontSize: '11px',
     color: '#94a3b8',
+    display: 'none',
   });
-  addActionContainer.appendChild(reorderHint);
 
   const actionBuilderAdvancedNote = document.createElement('div');
   actionBuilderAdvancedNote.textContent = t('editor.actionBuilder.advancedNotice');
@@ -247,7 +247,7 @@ export function createActionFlowController(options) {
   });
 
   // 将新增按钮放在列表上方，避免长列表时下拉溢出视窗
-  actionFlowBuilder.append(addActionContainer, actionStepsContainer, actionBuilderEmpty, actionBuilderAdvancedNote);
+  actionFlowBuilder.append(addActionContainer, actionStepsContainer, reorderHint, actionBuilderEmpty, actionBuilderAdvancedNote);
   actionFlowField.wrapper.appendChild(actionFlowBuilder);
 
   const builderConfig = {
@@ -544,8 +544,8 @@ export function createActionFlowController(options) {
     addActionMenu.style.display = 'none';
     addActionButton.setAttribute('aria-expanded', 'false');
     flowBubbleBody.style.overflowY = 'auto';
-    document.removeEventListener('mousedown', handleMenuOutsideClick, true);
-    document.removeEventListener('keydown', handleMenuKeydown, true);
+    flowShadow.removeEventListener('mousedown', handleMenuOutsideClick, true);
+    flowShadow.removeEventListener('keydown', handleMenuKeydown, true);
   }
 
   function showActionMenu() {
@@ -556,8 +556,8 @@ export function createActionFlowController(options) {
     addActionMenu.style.display = 'flex';
     addActionButton.setAttribute('aria-expanded', 'true');
     flowBubbleBody.style.overflowY = 'visible';
-    document.addEventListener('mousedown', handleMenuOutsideClick, true);
-    document.addEventListener('keydown', handleMenuKeydown, true);
+    flowShadow.addEventListener('mousedown', handleMenuOutsideClick, true);
+    flowShadow.addEventListener('keydown', handleMenuKeydown, true);
     requestAnimationFrame(() => {
       const firstOption = addActionMenu.querySelector('button');
       if (firstOption instanceof HTMLButtonElement) {
