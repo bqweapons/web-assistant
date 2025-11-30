@@ -1,6 +1,6 @@
 {
   "extensionName": {
-    "message": "Page Augmentor: no-code buttons, links and tooltips",
+    "message": "Ladybird: no-code buttons, links, and tooltips",
     "description": "Extension name for listings and toolbar surfaces"
   },
   "extensionDescription": {
@@ -8,7 +8,7 @@
     "description": "Description for the Chrome Web Store and manifest"
   },
   "actionDefaultTitle": {
-    "message": "Open Page Augmentor",
+    "message": "Open Ladybird",
     "description": "Default title for the browser action"
   }
 }

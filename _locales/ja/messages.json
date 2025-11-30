@@ -1,14 +1,14 @@
 {
   "extensionName": {
-    "message": "Page Augmentor: ノーコードでボタン・リンク・ツールチップを追加",
+    "message": "Ladybird: ノーコードでボタン・リンク・ツールチップを追加",
     "description": "Chrome ウェブストア向けの拡張機能名"
   },
   "extensionDescription": {
-    "message": "あらゆるページにノーコードでボタン、リンク、ツールチップを追加し、すべての CTA をサイドパネルから一元管理できます。",
+    "message": "あらゆるページにノーコードでボタン・リンク・ツールチップを追加し、すべてのCTAをサイドパネルからまとめて管理します。",
     "description": "Chrome ウェブストアとマニフェストの説明文"
   },
   "actionDefaultTitle": {
-    "message": "Page Augmentor を開く",
+    "message": "Ladybird を開く",
     "description": "ブラウザアクションのデフォルトタイトル"
   }
 }

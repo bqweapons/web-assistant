@@ -1,14 +1,14 @@
 {
   "extensionName": {
-    "message": "页面增强器：无需编码即可添加按钮、链接和提示",
-    "description": "Chrome 网上应用店展示用的扩展名称"
+    "message": "懒鸟：无需编码即可为网页添加按钮、链接和提示",
+    "description": "Chrome 网上应用店展示用扩展名称"
   },
   "extensionDescription": {
-    "message": "为任意网页添加自定义按钮、链接和提示，并在侧边栏集中管理所有增强元素。",
-    "description": "Chrome 网上应用店和清单文件用的描述"
+    "message": "为任意网页添加自定义按钮、链接和提示，并在侧边栏集中管理所有增强内容。",
+    "description": "Chrome 网上应用店和 manifest 使用的描述"
   },
   "actionDefaultTitle": {
-    "message": "打开页面增强器",
+    "message": "打开懒鸟",
     "description": "浏览器操作的默认标题"
   }
 }
