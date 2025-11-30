@@ -320,9 +320,6 @@ if (typeof process !== 'undefined' && process.env && process.env.NODE_ENV !== 'p
       const pTop = resolveDomDropPlacement(probe, midX, nearTop);
       const pMid = resolveDomDropPlacement(probe, midX, midY);
       const pBot = resolveDomDropPlacement(probe, midX, nearBottom);
-      console.log('[PA sanity] top:', pTop?.position, pTop);
-      console.log('[PA sanity] mid:', pMid?.position, pMid);
-      console.log('[PA sanity] bottom:', pBot?.position, pBot);
       probe.remove();
     };
   } catch (_e) {}
@@ -550,17 +547,6 @@ function bindEditingEnhancements(node, element) {
     editable.addEventListener('input', handleInlineInput);
     editable.addEventListener('blur', handleInlineInput);
   }
-
-  // Debug: log element click events while editing to trace unexpected state changes.
-  node.addEventListener('click', (event) => {
-    try {
-      console.log('[PageAugmentor][debug] element click', {
-        id: element.id,
-        type: element.type,
-        target: event.target,
-      });
-    } catch (_e) {}
-  });
 }
 
 

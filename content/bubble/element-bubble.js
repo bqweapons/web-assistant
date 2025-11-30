@@ -20,6 +20,7 @@ import {
   resolvePosition,
   resolveTooltipPosition,
 } from './editor/defaults.js';
+import { normalizeSiteUrl, normalizePageLocation } from '../../common/url.js';
 export { getSuggestedStyles } from './editor/defaults.js';
 
 /**
@@ -231,32 +232,6 @@ function createElementBubble() {
   });
 
   // Preview UI removed
-  // Scope selector (page vs site)
-  const scopeSelect = document.createElement('select');
-  scopeSelect.title = t('editor.scopeLabel') || 'Scope';
-  Object.assign(scopeSelect.style, {
-    borderRadius: '10px',
-    border: '1px solid #e2e8f0',
-    background: '#fff',
-    padding: '6px 10px',
-    fontSize: '12px',
-    fontWeight: '600',
-    color: '#0f172a',
-    outline: 'none',
-  });
-  const scopeOptionPage = document.createElement('option');
-  scopeOptionPage.value = 'page';
-  scopeOptionPage.textContent = t('editor.scope.page') || 'This page';
-  const scopeOptionSite = document.createElement('option');
-  scopeOptionSite.value = 'site';
-  scopeOptionSite.textContent = t('editor.scope.site') || 'Entire site';
-  scopeSelect.append(scopeOptionPage, scopeOptionSite);
-  scopeSelect.addEventListener('change', () => {
-    const next = scopeSelect.value === 'site' ? 'site' : 'page';
-    setState({ scope: next });
-    updatePreview();
-  });
-
   const form = document.createElement('form');
   Object.assign(form.style, {
     display: 'flex',
@@ -279,7 +254,7 @@ function createElementBubble() {
 
   let refreshUI = () => {};
 
-  const editorState = createEditorState();
+const editorState = createEditorState();
   let state = editorState.get();
   let uiUpdateListener = null;
   const setState = (patch) => {
@@ -333,7 +308,7 @@ function createElementBubble() {
     boxShadow: '0 8px 18px rgba(37, 99, 235, 0.25)',
   });
 
-  headerActions.append(scopeSelect, cancelButton, saveButton);
+  headerActions.append(cancelButton, saveButton);
 
   const errorLabel = document.createElement('p');
   errorLabel.textContent = '';
@@ -407,8 +382,19 @@ function createElementBubble() {
   let placementControls = null;
   let currentElementId = null;
   let draftUpdateListener = null;
-  let currentSiteUrl = '';
-  let currentPageUrl = '';
+
+  const resolveCurrentUrls = () => {
+    try {
+      const site = normalizeSiteUrl(window.location.href);
+      const page = normalizePageLocation(window.location.href);
+      return { site, page };
+    } catch (_e) {
+      return { site: '', page: '' };
+    }
+  };
+
+  let currentSiteUrl = resolveCurrentUrls().site;
+  let currentPageUrl = resolveCurrentUrls().page;
 
   const clearError = () => {
     errorLabel.textContent = '';
@@ -789,6 +775,10 @@ function createElementBubble() {
       currentElementId = typeof values?.id === 'string' ? values.id : null;
       const initial = getDefaultElementValues(values, suggestedStyle, t);
       const initialScope = currentSiteUrl && currentPageUrl && currentSiteUrl === currentPageUrl ? 'site' : 'page';
+      // Refresh with live location to avoid stale persisted pageUrl when scope toggles
+      const live = resolveCurrentUrls();
+      currentSiteUrl = live.site || currentSiteUrl;
+      currentPageUrl = live.page || currentPageUrl;
       const initialPatch = {
         type: initial.type,
         text: initial.text,
@@ -808,6 +798,8 @@ function createElementBubble() {
         floating: initial.floating !== false,
         bubbleSide: 'bottom',
         scope: initialScope,
+        siteUrl: currentSiteUrl || '',
+        pageUrl: currentPageUrl || '',
         style: initial.style || {},
       };
       setState(initialPatch);
@@ -846,7 +838,6 @@ function createElementBubble() {
       stopActionPicker('cancel');
       handleTypeChange({ skipPreview: true });
       saveButton.textContent = mode === 'edit' ? t('editor.saveUpdate') : t('editor.saveCreate');
-      scopeSelect.value = state.scope === 'site' ? 'site' : 'page';
       updatePreview({ propagate: false });
       submitHandler = (payload) => {
         actionFlowController.closeFlowEditor({ reopen: false });

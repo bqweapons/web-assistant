@@ -87,6 +87,8 @@ function mergeState(base, patch) {
   next.selector = typeof patch.selector === 'string' ? patch.selector : base.selector;
   next.layout = typeof patch.layout === 'string' ? patch.layout : base.layout;
   next.scope = patch.scope === 'site' || patch.scope === 'page' ? patch.scope : base.scope;
+  next.siteUrl = typeof patch.siteUrl === 'string' ? patch.siteUrl : base.siteUrl;
+  next.pageUrl = typeof patch.pageUrl === 'string' ? patch.pageUrl : base.pageUrl;
   next.linkTarget = typeof patch.linkTarget === 'string' ? patch.linkTarget : base.linkTarget;
   next.actionFlowLocked =
     typeof patch.actionFlowLocked === 'boolean' ? patch.actionFlowLocked : base.actionFlowLocked;
@@ -121,6 +123,8 @@ function cloneState(value) {
       ? value.bubbleSide.trim()
       : 'bottom',
     scope: value.scope === 'site' ? 'site' : 'page',
+    siteUrl: typeof value.siteUrl === 'string' ? value.siteUrl : '',
+    pageUrl: typeof value.pageUrl === 'string' ? value.pageUrl : '',
     actionFlowMode: value.actionFlowMode,
     actionFlow: value.actionFlow,
     actionFlowError: value.actionFlowError,

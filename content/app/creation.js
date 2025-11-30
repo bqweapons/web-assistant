@@ -190,8 +190,6 @@ function beginClickPlacement(requestedType, scope = 'page') {
         }
       }
     } catch (_e) {}
-    const attached = true; // at this point draft is prepared either for area container or DOM target
-    
     highlightPlacementTarget(target);
     const ensured = injectModule.ensureElement(draft);
     if (!ensured) {

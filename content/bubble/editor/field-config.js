@@ -85,6 +85,36 @@ export function getBaseInfoFieldConfigs(t) {
       },
     },
     {
+      name: 'scope',
+      key: 'scope',
+      type: 'select',
+      label: t('editor.scopeLabel'),
+      minWidth: 200,
+      stateKey: 'scope',
+      options: () => [
+        { value: 'page', label: t('editor.scope.page') },
+        { value: 'site', label: t('editor.scope.site') },
+      ],
+      // Only show on root (pageUrl === siteUrl)
+      visibleWhen: (state) => {
+        const site = typeof state.siteUrl === 'string' ? state.siteUrl : '';
+        const page = typeof state.pageUrl === 'string' ? state.pageUrl : '';
+        return site && page && (site === page || `${site}/` === page  );
+      },
+      onReset: ({ applyDefaults, setState }) => {
+        if (applyDefaults) {
+          setState({ scope: 'page' });
+        }
+      },
+      onChange: ({ value, setState, state }) => {
+        const next = value === 'site' ? 'site' : 'page';
+        const currentSite = typeof state?.siteUrl === 'string' ? state.siteUrl : '';
+        const currentPage = typeof state?.pageUrl === 'string' ? state.pageUrl : currentSite;
+        const nextPageUrl = next === 'site' ? currentSite || currentPage : currentPage;
+        setState({ scope: next, pageUrl: nextPageUrl });
+      },
+    },
+    {
       name: 'actionFlow',
       key: 'actionFlow',
       type: 'flow',
