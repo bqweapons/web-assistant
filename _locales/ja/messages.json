@@ -1,0 +1,14 @@
+{
+  "extensionName": {
+    "message": "Ladybird: ノーコードでボタン・リンク・ツールチップを追加",
+    "description": "Chrome ウェブストア向けの拡張機能名"
+  },
+  "extensionDescription": {
+    "message": "あらゆるページにノーコードでボタン・リンク・ツールチップを追加し、すべてのCTAをサイドパネルからまとめて管理します。",
+    "description": "Chrome ウェブストアとマニフェストの説明文"
+  },
+  "actionDefaultTitle": {
+    "message": "Ladybird を開く",
+    "description": "ブラウザアクションのデフォルトタイトル"
+  }
+}

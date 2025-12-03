@@ -1,6 +1,17 @@
-import { normalizePageUrl } from '../common/url.js';
+import { normalizeSiteUrl, normalizePageLocation } from '../common/url.js';
 
-export function getPageUrl() {
-  return normalizePageUrl(window.location.href);
+export function getSiteKey() {
+  return normalizeSiteUrl(window.location.href);
+}
+
+export function getPageKey() {
+  return normalizePageLocation(window.location.href);
+}
+
+export function getPageContext() {
+  return {
+    siteKey: getSiteKey(),
+    pageKey: getPageKey(),
+  };
 }
 

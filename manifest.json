@@ -1,11 +1,12 @@
 {
   "manifest_version": 3,
-  "name": "Page Augmentor: no-code buttons, links and tooltips",
-  "version": "1.0.2",
-  "description": "Create no-code buttons, links and tooltips on any page, personalize calls-to-action, and manage everything from a unified side panel",
+  "name": "__MSG_extensionName__",
+  "version": "1.0.2.100",
+  "description": "__MSG_extensionDescription__",
   "action": {
-    "default_title": "Open Page Augmentor"
+    "default_title": "__MSG_actionDefaultTitle__"
   },
+  "default_locale": "en",
   "side_panel": {
     "default_path": "sidepanel/sidepanel.html"
   },

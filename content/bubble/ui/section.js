@@ -8,8 +8,8 @@ export function createSectionShell({ legendText }) {
   Object.assign(fieldset.style, {
     display: 'flex',
     flexDirection: 'column',
-    gap: '12px',
-    padding: '14px',
+    gap: '4px',
+    padding: '5px',
     border: '1px solid rgba(148, 163, 184, 0.35)',
     borderRadius: '16px',
     backgroundColor: 'rgba(248, 250, 252, 0.85)',

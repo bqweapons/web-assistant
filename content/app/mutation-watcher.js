@@ -15,7 +15,7 @@ export function setupMutationWatcher() {
   }
 
   /**
-   * Determines whether an element is part of the Page Augmentor UI tree
+   * Determines whether an element is part of the Ladybird UI tree
    * (bubble, overlays, etc.) and should be ignored by the watcher.
    * @param {Element} el
    */

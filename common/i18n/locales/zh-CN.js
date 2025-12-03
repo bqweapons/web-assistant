@@ -7,7 +7,7 @@ const messages = cloneMessages(enMessages);
 
 mergeMessages(messages, {
   app: {
-    title: '页面增强器',
+    title: 'Ladybird(懒鸟)',
     subtitle: '为任意网页添加自定义按钮、链接和提示，并在侧边栏集中管理所有增强元素。',
     language: {
       label: '语言',
@@ -165,12 +165,12 @@ mergeMessages(messages, {
         description: '选择侧边栏使用的界面语言。',
       },
       share: {
-        title: '分享 Page Augmentor',
+        title: '分享 Ladybird(懒鸟)',
         description: '把 Chrome 应用商店链接发给同事或朋友，让他们也能安装这个扩展。',
       },
     },
     actions: {
-      share: '分享 Page Augmentor',
+      share: '分享 Ladybird(懒鸟)',
       shareCopy: '复制商店链接',
       shareOpen: '打开 Chrome 应用商店页面',
     },
@@ -186,7 +186,7 @@ mergeMessages(messages, {
     previewLabel: '实时预览',
     typeLabel: '元素类型',
     textLabel: '文本',
-    textPlaceholder: '展示给访客的文本',
+    textPlaceholder: 'Button',
     tooltipTextPlaceholder: '提示文本',
     areaTextPlaceholder: '可在区域中展示的备注内容（可选）',
     areaLayoutLabel: '布局',
@@ -205,6 +205,11 @@ mergeMessages(messages, {
       newTab: '在新标签页中打开',
       sameTab: '在当前标签页中打开',
     },
+    scopeLabel: '作用范围',
+    scope: {
+      page: '仅此页面',
+      site: '整个站点',
+    },
     actionLabel: '点击动作（可选）',
     actionPlaceholder: '例如：#submit-button',
     actionPick: '从页面捕获',
@@ -214,8 +219,7 @@ mergeMessages(messages, {
     actionHintPicking: '点击要复用的按钮（按 Esc 取消）。',
     actionFlowLabel: '动作流程（可选）',
     actionFlowPlaceholder: '[\n  {"type":"click","selector":"#target"}\n]',
-    actionFlowHintDefault:
-      '可选：使用 JSON 数组描述连续步骤（最多 {limit} 个字符，总执行时间约 10 秒）。支持 click、wait、input、if、while、navigate。',
+    actionFlowHintDefault: '',
     actionFlowHintConfigured: '已配置 {count} 个步骤的流程。',
     actionFlowHintError: '流程错误：{error}',
     actionFlowConfigure: '配置流程',
@@ -224,7 +228,7 @@ mergeMessages(messages, {
     actionFlowSummaryConfigured: '已配置动作流程（{count} 个步骤）',
     actionFlowSummaryEmpty: '尚未配置动作流程。',
     actionFlowTitle: '配置动作流程',
-    actionFlowDescription: '定义访客点击按钮后要执行的一系列操作。',
+    actionFlowDescription: '定义按钮点击按钮后要执行的一系列操作。',
     tooltipPositionLabel: '提示位置',
     tooltipPersistenceLabel: '显示方式',
     tooltipPersistenceCheckbox: '始终显示提示',
@@ -258,7 +262,7 @@ mergeMessages(messages, {
     sections: {
       basics: {
         title: '基础信息',
-        description: '选择元素类型并设置访客可见的文本内容。',
+        description: '选择元素类型并设置文本内容。',
       },
       behavior: {
         title: '行为与动作',
@@ -297,6 +301,10 @@ mergeMessages(messages, {
       fontSize: '字体大小',
       fontWeight: '字体粗细',
       padding: '内边距',
+      paddingTop: '上内边距',
+      paddingRight: '右内边距',
+      paddingBottom: '下内边距',
+      paddingLeft: '左内边距',
       border: '边框',
       borderRadius: '圆角',
       presetsLabel: '预设样式',
@@ -312,7 +320,7 @@ mergeMessages(messages, {
     cancel: '取消',
     save: '保存',
     saveCreate: '创建',
-    saveUpdate: '保存修改',
+    saveUpdate: '保存',
     errorTextRequired: '请输入元素文本。',
     errorUrlRequired: '链接类型需要填写 URL。',
     errorActionRequiredForUrl: '带 URL 的按钮需要配置动作流程。',

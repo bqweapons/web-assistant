@@ -20,6 +20,7 @@ import {
   resolvePosition,
   resolveTooltipPosition,
 } from './editor/defaults.js';
+import { normalizeSiteUrl, normalizePageLocation } from '../../common/url.js';
 export { getSuggestedStyles } from './editor/defaults.js';
 
 /**
@@ -108,6 +109,10 @@ export function getElementBubble() {
  */
 // Builds the editor bubble DOM structure.
 function createElementBubble() {
+  const host = document.createElement('div');
+  host.dataset.pageAugmentorRoot = 'picker-element-bubble-host';
+  const shadow = host.attachShadow({ mode: 'open' });
+
   const bubble = document.createElement('div');
   bubble.dataset.pageAugmentorRoot = 'picker-element-bubble';
   Object.assign(bubble.style, {
@@ -118,7 +123,7 @@ function createElementBubble() {
     minWidth: '0',
     minHeight: '300px',
     maxHeight: '40vh',
-    padding: '12px 16px',
+    padding: '4px 16px',
     borderRadius: '18px 18px 0 0',
     backgroundColor: '#ffffff',
     boxShadow: '0 -6px 24px rgba(15, 23, 42, 0.14)',
@@ -134,9 +139,11 @@ function createElementBubble() {
     overflow: 'hidden',
     display: 'flex',
     flexDirection: 'column',
-    gap: '16px',
+    gap: '8px',
     boxSizing: 'border-box',
   });
+
+  shadow.appendChild(bubble);
 
   bubble.addEventListener('click', (event) => event.stopPropagation());
   bubble.addEventListener('mousedown', (event) => event.stopPropagation());
@@ -154,9 +161,8 @@ function createElementBubble() {
     gridTemplateColumns: 'minmax(220px, 1.4fr) 1.2fr auto',
     alignItems: 'center',
     gap: '12px',
-    padding: '8px 10px 10px',
+    padding: '4px 10px 6px',
     borderBottom: '1px solid rgba(148, 163, 184, 0.25)',
-    backgroundColor: '#f9fafb',
     position: 'sticky',
     top: '0',
     zIndex: '1',
@@ -193,7 +199,6 @@ function createElementBubble() {
     alignItems: 'center',
     padding: '4px 10px',
     borderRadius: '999px',
-    backgroundColor: '#e0e7ff',
     color: '#312e81',
     fontSize: '12px',
     fontWeight: '700',
@@ -231,7 +236,6 @@ function createElementBubble() {
   });
 
   // Preview UI removed
-
   const form = document.createElement('form');
   Object.assign(form.style, {
     display: 'flex',
@@ -245,16 +249,16 @@ function createElementBubble() {
   Object.assign(formBody.style, {
     display: 'flex',
     flexDirection: 'column',
-    gap: '12px',
+    gap: '6px',
     flex: '1 1 auto',
     minHeight: '0',
     overflowY: 'auto',
-    padding: '10px 2px 6px',
+    padding: '4px 2px 2px',
   });
 
   let refreshUI = () => {};
 
-  const editorState = createEditorState();
+const editorState = createEditorState();
   let state = editorState.get();
   let uiUpdateListener = null;
   const setState = (patch) => {
@@ -323,7 +327,7 @@ function createElementBubble() {
   Object.assign(panel.style, {
     display: 'flex',
     flexDirection: 'column',
-    gap: '12px',
+    gap: '6px',
   });
 
   let suppressAutoRefresh = false;
@@ -382,6 +386,19 @@ function createElementBubble() {
   let placementControls = null;
   let currentElementId = null;
   let draftUpdateListener = null;
+
+  const resolveCurrentUrls = () => {
+    try {
+      const site = normalizeSiteUrl(window.location.href);
+      const page = normalizePageLocation(window.location.href);
+      return { site, page };
+    } catch (_e) {
+      return { site: '', page: '' };
+    }
+  };
+
+  let currentSiteUrl = resolveCurrentUrls().site;
+  let currentPageUrl = resolveCurrentUrls().page;
 
   const clearError = () => {
     errorLabel.textContent = '';
@@ -480,6 +497,11 @@ function createElementBubble() {
       delete payload.actionFlow;
       payload.layout = layout;
     }
+    payload.siteUrl = currentSiteUrl || '';
+    payload.pageUrl =
+      state.scope === 'site'
+        ? currentSiteUrl || currentPageUrl || ''
+        : currentPageUrl || currentSiteUrl || '';
     return payload;
   };
 
@@ -659,7 +681,7 @@ function createElementBubble() {
     }
     isAttached = true;
     bubble.dataset.pageAugmentorPlacement = 'bottom';
-    attachBubble(bubble);
+    attachBubble(host);
     const edgeGap = 0;
     const updateFixedPlacement = () => {
       const viewportHeight = window.innerHeight || 0;
@@ -729,8 +751,8 @@ function createElementBubble() {
     bubble.style.opacity = '0';
     bubble.style.transform = 'translateY(6px)';
     setTimeout(() => {
-      if (!isAttached && bubble.isConnected) {
-        detachBubble(bubble);
+      if (!isAttached && host.isConnected) {
+        detachBubble(host);
       }
     }, 160);
     if (draftUpdateListener) {
@@ -748,12 +770,19 @@ function createElementBubble() {
   return {
     open(config) {
       const { selector, target, values, suggestedStyle, onSubmit, onCancel, onPreview, mode } = config;
+      currentSiteUrl = typeof values?.siteUrl === 'string' ? values.siteUrl : '';
+      currentPageUrl = typeof values?.pageUrl === 'string' ? values.pageUrl : currentSiteUrl;
       currentTarget = target;
       selectorValue.textContent = selector;
       state.selector = typeof selector === 'string' ? selector.trim() : '';
       previewHandler = typeof onPreview === 'function' ? onPreview : null;
       currentElementId = typeof values?.id === 'string' ? values.id : null;
       const initial = getDefaultElementValues(values, suggestedStyle, t);
+      const initialScope = currentSiteUrl && currentPageUrl && currentSiteUrl === currentPageUrl ? 'site' : 'page';
+      // Refresh with live location to avoid stale persisted pageUrl when scope toggles
+      const live = resolveCurrentUrls();
+      currentSiteUrl = live.site || currentSiteUrl;
+      currentPageUrl = live.page || currentPageUrl;
       const initialPatch = {
         type: initial.type,
         text: initial.text,
@@ -772,6 +801,9 @@ function createElementBubble() {
         containerId: typeof initial.containerId === 'string' ? initial.containerId : '',
         floating: initial.floating !== false,
         bubbleSide: 'bottom',
+        scope: initialScope,
+        siteUrl: currentSiteUrl || '',
+        pageUrl: currentPageUrl || '',
         style: initial.style || {},
       };
       setState(initialPatch);
@@ -832,8 +864,8 @@ function createElementBubble() {
     },
     destroy() {
       detach();
-      if (bubble.isConnected) {
-        bubble.remove();
+      if (host.isConnected) {
+        host.remove();
       }
     },
   };

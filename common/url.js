@@ -1,14 +1,13 @@
 const FALLBACK_ORIGIN = 'https://extension.invalid';
 
 /**
- * Normalizes a URL into a stable, site-scoped storage key.
- * Keeps only the origin (scheme + host + optional port) so that all
- * routes on the same site share the same key. Query and hash are ignored.
+ * Normalizes a URL to a stable site key (origin only).
+ * Query/hash/path are stripped; use when storing per-site buckets.
  * @param {string} input
  * @param {string} [base]
  * @returns {string}
  */
-export function normalizePageUrl(input, base) {
+export function normalizeSiteUrl(input, base) {
   if (!input) {
     return '';
   }
@@ -21,8 +20,6 @@ export function normalizePageUrl(input, base) {
     if (!value) {
       return '';
     }
-    // Fallback: try to extract a scheme + host prefix; if that fails,
-    // strip query/hash and return the remaining prefix.
     const originMatch = value.match(/^[a-zA-Z][a-zA-Z0-9+.-]*:\/\/[^/]+/);
     if (originMatch) {
       return originMatch[0];
@@ -41,6 +38,48 @@ export function normalizePageUrl(input, base) {
 }
 
 /**
+ * Normalizes a URL to a page key (origin + pathname).
+ * Query/hash are stripped; ensures trailing slash on bare origins.
+ * @param {string} input
+ * @param {string} [base]
+ * @returns {string}
+ */
+export function normalizePageLocation(input, base) {
+  if (!input) {
+    return '';
+  }
+  const reference = base || (typeof window !== 'undefined' ? window.location.href : FALLBACK_ORIGIN);
+  try {
+    const url = new URL(String(input), reference);
+    const pathname = url.pathname || '/';
+    return `${url.origin}${pathname}`;
+  } catch (_error) {
+    const value = String(input || '').trim();
+    if (!value) {
+      return '';
+    }
+    const originMatch = value.match(/^[a-zA-Z][a-zA-Z0-9+.-]*:\/\/[^/]+/);
+    const origin = originMatch ? originMatch[0] : '';
+    if (!origin) {
+      return normalizeSiteUrl(value, base);
+    }
+    const afterOrigin = value.slice(origin.length);
+    const path = afterOrigin.split(/[?#]/)[0] || '/';
+    return `${origin}${path.startsWith('/') ? path : `/${path}`}`;
+  }
+}
+
+/**
+ * Backward-compatible alias: returns site key (origin only).
+ * @param {string} input
+ * @param {string} [base]
+ * @returns {string}
+ */
+export function normalizePageUrl(input, base) {
+  return normalizeSiteUrl(input, base);
+}
+
+/**
  * Convenience helper returning the normalized key for the provided window.
  * @param {Window} [win]
  * @returns {string}
@@ -49,6 +88,18 @@ export function currentPageKey(win = typeof window !== 'undefined' ? window : un
   if (!win || !win.location) {
     return '';
   }
-  return normalizePageUrl(win.location.href);
+  return normalizeSiteUrl(win.location.href);
+}
+
+/**
+ * Convenience helper returning the normalized page key (origin + pathname).
+ * @param {Window} [win]
+ * @returns {string}
+ */
+export function currentPageLocation(win = typeof window !== 'undefined' ? window : undefined) {
+  if (!win || !win.location) {
+    return '';
+  }
+  return normalizePageLocation(win.location.href);
 }
 

@@ -1,11 +1,11 @@
-# Page Augmentor
+# Ladybird
 
 [English](README.md) / [日本語](README.ja.md) / [简体中文](README.zh-CN.md)
 
 ---
 
 ### Overview
-Page Augmentor is a Manifest V3 Chrome extension for layering custom buttons, links, tooltips, and rich callouts onto any web page. You manage everything from the side panel (Manage, Overview, Settings). Every injected element is scoped to its page URL and stored in `chrome.storage.local`, so your customisations reappear automatically whenever you revisit the site.
+Ladybird is a Manifest V3 Chrome extension for layering custom buttons, links, tooltips, and rich callouts onto any web page. You manage everything from the side panel (Manage, Overview, Settings). Every injected element is scoped to its page URL and stored in `chrome.storage.local`, so your customisations reappear automatically whenever you revisit the site.
 
 ## Demo Video
 [![Demo Video](https://img.youtube.com/vi/-iTlNX4J8FM/maxresdefault.jpg)](https://youtu.be/-iTlNX4J8FM)
@@ -15,7 +15,7 @@ Page Augmentor is a Manifest V3 Chrome extension for layering custom buttons, li
 - **Frame-aware visual picker**: Highlight DOM nodes in context, including same-origin iframes, auto-generate CSS selectors, and jump straight into the editor bubble.
 - **Rich element types**: Configure buttons, links, tooltips, or area callouts with placement (`append`, `prepend`, `before`, `after`), optional mirrored click selectors, and granular styles.
 - **Action flow builder**: Chain multi-step automations (`click`, `wait`, `input`, `navigate`, `log`, `if`, `while`) that run before fallback link or selector behaviour when injected buttons are clicked.
-- **Drag-friendly areas**: Drop area elements anywhere on the page canvas and Page Augmentor will persist their coordinates automatically; other injected elements can be dropped inside areas as containers.
+- **Drag-friendly areas**: Drop area elements anywhere on the page canvas and Ladybird will persist their coordinates automatically; other injected elements can be dropped inside areas as containers.
 - **Shadow DOM isolation**: Rendered controls live in a Shadow DOM host so they keep their appearance even when the page ships heavy CSS.
 - **Resilient sync and persistence**: Data lives in `chrome.storage.local`; a `MutationObserver` restores hosts after DOM changes and broadcasts updates across tabs and the side panel.
 
@@ -23,25 +23,11 @@ Page Augmentor is a Manifest V3 Chrome extension for layering custom buttons, li
 - Action flow: drag the step number chip to reorder steps; added clearer hints and kept the add menu visible by moving it above the list.
 - UI polish: step type now shows as a chip beside the index to reduce accidental changes, while preserving the existing builder layout.
 
-### Installation
-
-```bash
-npm install
-npm run build
-```
-
-1. Open `chrome://extensions/` and enable **Developer mode**.
-2. Click **Load unpacked** and select the project root.
-3. Pin the extension and open the side panel from the toolbar when needed.
-
-To build a distributable zip under `release/`, run:
-
-```bash
-npm run package
-```
+### Chrome Webstore
+- Install from the Chrome Web Store: https://chromewebstore.google.com/detail/ladybird-no-code-buttons/nefpepdpcjejamkgpndlfehkffkfgbpe
 
 ### Usage
-1. Click the Page Augmentor icon to open the side panel on the active tab.
+1. Click the Ladybird icon to open the side panel on the active tab.
 2. In **Manage**, press **Pick target** and select the element you want to augment (same-origin iframes are supported).
 3. Use the editor bubble to choose a type (button, link, tooltip, or area), adjust text, placement, styles, and optionally attach a URL, mirrored selector, or action flow before saving. Area elements can also be dragged directly on the page to fine-tune their position or act as containers for other injected elements.
 4. Use the Manage filters to search, focus injected items, reopen the editor, or remove them per page.

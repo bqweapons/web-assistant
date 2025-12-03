@@ -1,4 +1,10 @@
 import { ALLOWED_STYLE_KEYS, NODE_CLASS, TOOLTIP_POSITIONS, kebabCase } from '../core/index.js';
+import {
+  DEFAULT_BUTTON_STYLE,
+  DEFAULT_LINK_STYLE,
+  DEFAULT_AREA_STYLE,
+  DEFAULT_TOOLTIP_STYLE,
+} from '../../bubble/styles/style-presets.js';
 
 export function applyStyle(node, style) {
   if (!(node instanceof HTMLElement)) {
@@ -39,19 +45,19 @@ export function applyBaseAppearance(node, type) {
     node.style.gap = '0.75rem';
     node.style.boxSizing = 'border-box';
     node.style.minHeight = '80px';
-    node.style.padding = '16px';
-    node.style.borderRadius = '14px';
-    node.style.backgroundColor = 'transparent';
+    node.style.padding = DEFAULT_AREA_STYLE.padding || '16px';
+    node.style.borderRadius = DEFAULT_AREA_STYLE.borderRadius || '14px';
+    node.style.backgroundColor = DEFAULT_AREA_STYLE.backgroundColor || 'transparent';
     node.style.position = 'relative';
-    node.style.color = '#0f172a';
+    node.style.color = DEFAULT_AREA_STYLE.color || '#0f172a';
     node.style.lineHeight = '1.5';
     return;
   }
   if (type === 'link') {
     node.removeAttribute('type');
     node.style.display = 'inline';
-    node.style.color = '#2563eb';
-    node.style.textDecoration = 'underline';
+    node.style.color = DEFAULT_LINK_STYLE.color || '#2563eb';
+    node.style.textDecoration = DEFAULT_LINK_STYLE.textDecoration || 'underline';
     node.style.backgroundColor = 'transparent';
     node.style.padding = '0.5rem 1rem';
     node.style.lineHeight = 'inherit';
@@ -60,6 +66,17 @@ export function applyBaseAppearance(node, type) {
     if (node instanceof HTMLAnchorElement) {
       node.setAttribute('role', 'link');
     }
+  } else if (type === 'tooltip') {
+    node.style.display = 'inline-block';
+    node.style.color = DEFAULT_TOOLTIP_STYLE.color || '#f8fafc';
+    node.style.backgroundColor = DEFAULT_TOOLTIP_STYLE.backgroundColor || 'rgba(17, 24, 39, 0.5)';
+    node.style.fontSize = DEFAULT_TOOLTIP_STYLE.fontSize || '12px';
+    node.style.padding = DEFAULT_TOOLTIP_STYLE.padding || '8px 12px';
+    node.style.borderRadius = DEFAULT_TOOLTIP_STYLE.borderRadius || '12px';
+    if (DEFAULT_TOOLTIP_STYLE.width) {
+      node.style.width = DEFAULT_TOOLTIP_STYLE.width;
+    }
+    node.style.lineHeight = '1.2';
   } else {
     if (node instanceof HTMLButtonElement) {
       node.type = 'button';
@@ -67,12 +84,12 @@ export function applyBaseAppearance(node, type) {
     node.style.display = 'inline-flex';
     node.style.alignItems = 'center';
     node.style.justifyContent = 'center';
-    node.style.padding = '0.5rem 1rem';
-    node.style.borderRadius = '8px';
-    node.style.backgroundColor = '#1b84ff';
-    node.style.color = '#ffffff';
-    node.style.fontSize = '16px';
-    node.style.fontWeight = '600';
+    node.style.padding = DEFAULT_BUTTON_STYLE.padding || '0.5rem 1rem';
+    node.style.borderRadius = DEFAULT_BUTTON_STYLE.borderRadius || '8px';
+    node.style.backgroundColor = DEFAULT_BUTTON_STYLE.backgroundColor || '#1b84ff';
+    node.style.color = DEFAULT_BUTTON_STYLE.color || '#ffffff';
+    node.style.fontSize = DEFAULT_BUTTON_STYLE.fontSize || '16px';
+    node.style.fontWeight = DEFAULT_BUTTON_STYLE.fontWeight || '600';
     node.style.lineHeight = '1.2';
     node.style.border = 'none';
     node.style.textDecoration = 'none';

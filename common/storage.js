@@ -1,6 +1,8 @@
 // 注入要素の永続化と監視を扱うストレージユーティリティ。
 // 永続化データは chrome.storage.local の単一キーにまとめる設計となっている。
 // キーを定数として切り出すことで、読み書き処理の整合性を保ちつつ再利用性を高めている。
+import { normalizeSiteUrl } from './url.js';
+
 const STORAGE_KEY = 'injectedElements';
 
 /**
@@ -71,7 +73,8 @@ async function writeStore(value) {
  */
 export async function getElementsByUrl(pageUrl) {
   const store = await readStore();
-  const list = store[pageUrl];
+  const key = normalizeSiteUrl(pageUrl);
+  const list = store[key];
   return Array.isArray(list) ? cloneElementList(list) : [];
 }
 
@@ -83,11 +86,12 @@ export async function getElementsByUrl(pageUrl) {
  */
 export async function setElementsForUrl(pageUrl, elements) {
   const store = await readStore();
+  const key = normalizeSiteUrl(pageUrl);
   const cloned = cloneElementList(Array.isArray(elements) ? elements : []);
   if (cloned.length === 0) {
-    delete store[pageUrl];
+    delete store[key];
   } else {
-    store[pageUrl] = cloned;
+    store[key] = cloned.map((item) => ({ ...item, siteUrl: key }));
   }
   await writeStore(store);
 }
@@ -95,18 +99,19 @@ export async function setElementsForUrl(pageUrl, elements) {
 /**
  * Inserts or updates a single element, returning the updated collection.
  * @param {import('./types.js').InjectedElement} element
+ * @param {string | undefined} siteUrl
  * @returns {Promise<import('./types.js').InjectedElement[]>}
  */
-export async function upsertElement(element) {
+export async function upsertElement(element, siteUrl) {
+  const key = normalizeSiteUrl(siteUrl || element.siteUrl || element.pageUrl);
   const store = await readStore();
-  const list = Array.isArray(store[element.pageUrl])
-    ? cloneElementList(store[element.pageUrl])
-    : [];
+  const list = Array.isArray(store[key]) ? cloneElementList(store[key]) : [];
   const index = list.findIndex((item) => item.id === element.id);
   if (index >= 0) {
     const existing = list[index];
     list[index] = {
       ...element,
+      siteUrl: key,
       createdAt: existing.createdAt,
       updatedAt: Date.now(),
     };
@@ -114,11 +119,12 @@ export async function upsertElement(element) {
     const now = Date.now();
     list.push({
       ...element,
+      siteUrl: key,
       createdAt: element.createdAt || now,
       updatedAt: element.updatedAt || now,
     });
   }
-  store[element.pageUrl] = list;
+  store[key] = list;
   await writeStore(store);
   return cloneElementList(list);
 }
@@ -131,12 +137,13 @@ export async function upsertElement(element) {
  */
 export async function deleteElement(pageUrl, elementId) {
   const store = await readStore();
-  const list = Array.isArray(store[pageUrl]) ? cloneElementList(store[pageUrl]) : [];
+  const key = normalizeSiteUrl(pageUrl);
+  const list = Array.isArray(store[key]) ? cloneElementList(store[key]) : [];
   const filtered = list.filter((item) => item.id !== elementId);
   if (filtered.length === 0) {
-    delete store[pageUrl];
+    delete store[key];
   } else {
-    store[pageUrl] = filtered;
+    store[key] = filtered;
   }
   await writeStore(store);
   return cloneElementList(filtered);
@@ -149,8 +156,9 @@ export async function deleteElement(pageUrl, elementId) {
  */
 export async function clearPage(pageUrl) {
   const store = await readStore();
-  if (store[pageUrl]) {
-    delete store[pageUrl];
+  const key = normalizeSiteUrl(pageUrl);
+  if (store[key]) {
+    delete store[key];
     await writeStore(store);
   }
 }
@@ -166,7 +174,7 @@ export async function getFullStore() {
     if (!Array.isArray(list)) {
       continue;
     }
-    clone[pageUrl] = cloneElementList(list);
+    clone[pageUrl] = cloneElementList(list).map((item) => ({ ...item, siteUrl: normalizeSiteUrl(pageUrl) }));
   }
   return clone;
 }
@@ -183,11 +191,12 @@ export async function replaceStore(value) {
       if (!Array.isArray(list)) {
         continue;
       }
+      const siteKey = normalizeSiteUrl(pageUrl);
       const cloned = cloneElementList(list);
       if (cloned.length === 0) {
         continue;
       }
-      payload[pageUrl] = cloned;
+      payload[siteKey] = cloned.map((item) => ({ ...item, siteUrl: siteKey }));
     }
   }
   await writeStore(payload);

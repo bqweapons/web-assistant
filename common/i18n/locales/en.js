@@ -1,7 +1,7 @@
 // 英語 UI 向けの翻訳文字列セット。サイドパネル・バブル・サービスワーカーで共有する。
 const messages = {
   app: {
-    title: 'Page Augmentor',
+    title: 'Ladybird',
     subtitle: 'Create no-code buttons, links, and tooltips for any page and manage every call-to-action from a unified side panel.',
     language: {
       label: 'Language',
@@ -159,12 +159,12 @@ const messages = {
         description: 'Choose your preferred language for the side panel.',
       },
       share: {
-        title: 'Share Page Augmentor',
+        title: 'Share Ladybird',
         description: 'Send the Chrome Web Store link to teammates or friends so they can install the extension.',
       },
     },
     actions: {
-      share: 'Share Page Augmentor',
+      share: 'Share Ladybird',
       shareCopy: 'Copy Web Store link',
       shareOpen: 'Open Chrome Web Store page',
     },
@@ -199,6 +199,11 @@ const messages = {
       newTab: 'New tab',
       sameTab: 'Current tab',
     },
+    scopeLabel: 'Scope',
+    scope: {
+      page: 'This page only',
+      site: 'Entire site',
+    },
     actionLabel: 'Click action (optional)',
     actionPlaceholder: 'e.g. #submit-button',
     actionPick: 'Capture from page',
@@ -208,8 +213,7 @@ const messages = {
     actionHintPicking: 'Click the button to copy (Esc to cancel).',
     actionFlowLabel: 'Action flow (optional)',
     actionFlowPlaceholder: '[\n  {"type":"click","selector":"#target"}\n]',
-    actionFlowHintDefault:
-      'Optional JSON array describing sequential steps (max {limit} chars, total runtime about 10 seconds). Supports click, wait, input, if, while, navigate.',
+    actionFlowHintDefault:'',
     actionFlowHintConfigured: 'Flow configured with {count} step(s).',
     actionFlowHintError: 'Flow error: {error}',
     actionFlowConfigure: 'Configure flow',
@@ -252,7 +256,7 @@ const messages = {
     sections: {
       basics: {
         title: 'Basics',
-        description: 'Choose the element type and the text visitors will see.',
+        description: 'Choose the element type and the text.',
       },
       behavior: {
         title: 'Behavior and actions',
@@ -291,6 +295,10 @@ const messages = {
       fontSize: 'Font size',
       fontWeight: 'Font weight',
       padding: 'Padding',
+      paddingTop: 'Padding top',
+      paddingRight: 'Padding right',
+      paddingBottom: 'Padding bottom',
+      paddingLeft: 'Padding left',
       border: 'Border',
       borderRadius: 'Border radius',
       presetsLabel: 'Preset styles',

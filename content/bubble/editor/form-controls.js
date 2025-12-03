@@ -7,7 +7,7 @@ import {
   getStyleFieldConfigs as buildStyleFieldConfigs,
 } from './field-config.js';
 import { normalizeStyleState } from '../styles/style-normalize.js';
-import { DEFAULT_AREA_STYLE, DEFAULT_BUTTON_STYLE, DEFAULT_LINK_STYLE } from '../styles/style-presets.js';
+import { DEFAULT_AREA_STYLE, DEFAULT_BUTTON_STYLE, DEFAULT_LINK_STYLE, STYLE_PRESETS } from '../styles/style-presets.js';
 
 const HEX_COLOR_PATTERN = /^#(?:[0-9a-fA-F]{3}|[0-9a-fA-F]{6})$/i;
 const POSITION_OPTIONS = ['relative', 'absolute', 'fixed', 'static', 'sticky'];
@@ -368,7 +368,7 @@ function buildSelectField({ field, defaultWidth, clearError, getState, setState,
     notifyChange();
   };
 
-  select.addEventListener('input', handleChange);
+  // select.addEventListener('input', handleChange);
   select.addEventListener('change', handleChange);
 
   const onTypeChange = (options) => {
@@ -581,36 +581,10 @@ function createStyleApi({ t, clearError, onChange }) {
   const styleState = {};
   const styleInputs = new Map();
   const notifyChange = typeof onChange === 'function' ? onChange : () => {};
-  const presets = [
-    { value: '', label: t('editor.styles.presets.custom'), styles: null },
-    { value: 'button-default', label: t('editor.styles.presets.primary'), styles: DEFAULT_BUTTON_STYLE },
-    {
-      value: 'button-outline',
-      label: t('editor.styles.presets.outline'),
-      styles: {
-        backgroundColor: 'transparent',
-        color: '#2563eb',
-        border: '2px solid #2563eb',
-        padding: '8px 16px',
-        borderRadius: '10px',
-      },
-    },
-    {
-      value: 'floating-card',
-      label: t('editor.styles.presets.floating'),
-      styles: {
-        backgroundColor: '#ffffff',
-        color: '#0f172a',
-        border: '1px solid rgba(15, 23, 42, 0.12)',
-        borderRadius: '12px',
-        padding: '16px',
-        boxShadow: '0 12px 32px rgba(15, 23, 42, 0.18)',
-        position: 'relative',
-      },
-    },
-    { value: 'link-default', label: t('editor.styles.presets.link'), styles: DEFAULT_LINK_STYLE },
-    { value: 'area-default', label: t('editor.styles.presets.area'), styles: DEFAULT_AREA_STYLE },
-  ];
+  const presets = STYLE_PRESETS.map((preset) => ({
+    ...preset,
+    label: typeof preset.labelKey === 'string' ? t(preset.labelKey) : '',
+  }));
 
   styleFieldConfigs.forEach((field) => {
     const name = field.key || field.name;

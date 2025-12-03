@@ -5,11 +5,12 @@ import { t } from '../../common/i18n.js';
 import { Z_INDEX_FLOATING_DEFAULT } from '../injection/core/constants.js';
 import { sendMessage, MessageType } from '../common/messaging.js';
 import { highlightPlacementTarget } from './highlight.js';
-import { state, runtime } from './context.js';
+import { state, runtime, refreshPageContextFromLocation } from './context.js';
 import { cancelCreationDraft, closeEditorBubble } from './editor.js';
 import { stopPicker } from './picker.js';
 
-export function buildDraftElement(type) {
+export function buildDraftElement(type, scope = 'page') {
+  refreshPageContextFromLocation();
   const normalized = type === 'link' || type === 'tooltip' || type === 'area' ? type : 'button';
   const id = crypto.randomUUID();
   const now = Date.now();
@@ -33,9 +34,11 @@ export function buildDraftElement(type) {
       : normalized === 'area'
         ? ''
         : t('editor.textPlaceholder');
+  const isSiteWide = scope === 'site';
   return {
     id,
-    pageUrl: runtime.pageUrl,
+    siteUrl: runtime.siteKey || runtime.pageUrl,
+    pageUrl: isSiteWide ? runtime.siteKey || runtime.pageUrl : runtime.pageKey || runtime.pageUrl,
     type: normalized,
     text: defaultText,
     selector: 'body',
@@ -95,9 +98,10 @@ export function applyDraftPlacementToTarget(draft, target) {
   return true;
 }
 
-function beginClickPlacement(requestedType) {
+function beginClickPlacement(requestedType, scope = 'page') {
   // Ensure clean state before starting click-based placement
   stopPicker();
+  refreshPageContextFromLocation();
   const overlay = selectorModule.createOverlay();
   document.body.appendChild(overlay.container);
   document.body.style.cursor = 'crosshair';
@@ -140,7 +144,10 @@ function beginClickPlacement(requestedType) {
     event.preventDefault();
     event.stopPropagation();
     cleanup(false);
-    const draft = buildDraftElement(requestedType === 'tooltip' || requestedType === 'link' || requestedType === 'button' ? requestedType : 'button');
+    const draft = buildDraftElement(
+      requestedType === 'tooltip' || requestedType === 'link' || requestedType === 'button' ? requestedType : 'button',
+      scope,
+    );
     if (requestedType === 'button') {
       // Provide sensible default size for buttons even when attached
       draft.style = {
@@ -183,8 +190,6 @@ function beginClickPlacement(requestedType) {
         }
       }
     } catch (_e) {}
-    const attached = true; // at this point draft is prepared either for area container or DOM target
-    
     highlightPlacementTarget(target);
     const ensured = injectModule.ensureElement(draft);
     if (!ensured) {
@@ -226,7 +231,8 @@ function beginClickPlacement(requestedType) {
           ...draft,
           ...updated,
           id: draft.id,
-          pageUrl: runtime.pageUrl,
+          siteUrl: (updated && updated.siteUrl) || runtime.siteKey || runtime.pageUrl,
+          pageUrl: (updated && updated.pageUrl) || draft.pageUrl || runtime.pageKey || runtime.pageUrl,
           selector: draft.selector,
           position: draft.position,
           frameSelectors: Array.isArray(runtime.frameContext?.frameSelectors)
@@ -280,14 +286,15 @@ export function beginCreationSession(options = {}) {
   closeEditorBubble();
   cancelCreationDraft();
   const requestedType = typeof options.type === 'string' ? options.type : 'button';
+  const scope = options.scope === 'site' ? 'site' : 'page';
   if (requestedType !== 'area') {
-    beginClickPlacement(requestedType);
+    beginClickPlacement(requestedType, scope);
     return;
   }
   // Area keeps rectangle draw to define placement and size
   const drawer = selectorModule.startRectDraw({
     onComplete(rect) {
-      const draft = buildDraftElement(requestedType);
+      const draft = buildDraftElement(requestedType, scope);
       draft.style = {
         ...(draft.style || {}),
         position: 'absolute',
@@ -337,7 +344,8 @@ export function beginCreationSession(options = {}) {
             ...draft,
             ...updated,
             id: draft.id,
-            pageUrl: runtime.pageUrl,
+            siteUrl: (updated && updated.siteUrl) || runtime.siteKey || runtime.pageUrl,
+            pageUrl: (updated && updated.pageUrl) || draft.pageUrl || runtime.pageKey || runtime.pageUrl,
             selector: draft.selector,
             position: draft.position,
             frameSelectors: Array.isArray(runtime.frameContext?.frameSelectors)

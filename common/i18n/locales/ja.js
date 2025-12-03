@@ -7,7 +7,7 @@ const messages = cloneMessages(enMessages);
 
 mergeMessages(messages, {
   app: {
-    title: 'Page Augmentor',
+    title: 'Ladybird',
     subtitle:
       'あらゆるページにノーコードでボタン・リンク・ツールチップを追加し、すべての CTA をサイドパネルから一元管理できます。',
     language: {
@@ -166,13 +166,13 @@ mergeMessages(messages, {
         description: 'サイドパネルで使用する言語を選択します。',
       },
       share: {
-        title: 'Page Augmentor を共有',
+        title: 'Ladybird を共有',
         description:
           'Chrome ウェブストアのリンクを共有して、チームメンバーや友人にもこの拡張機能をインストールしてもらいましょう。',
       },
     },
     actions: {
-      share: 'Page Augmentor を共有',
+      share: 'Ladybird を共有',
       shareCopy: 'ストアリンクをコピー',
       shareOpen: 'Chrome ウェブストアを開く',
     },
@@ -188,8 +188,8 @@ mergeMessages(messages, {
     previewLabel: 'ライブプレビュー',
     typeLabel: '要素タイプ',
     textLabel: 'テキスト',
-    textPlaceholder: '訪問者に表示するテキスト',
-    tooltipTextPlaceholder: 'ツールチップのテキスト',
+    textPlaceholder: 'Button',
+    tooltipTextPlaceholder: 'ツールチップ',
     areaTextPlaceholder: 'このエリアに表示するメモ（任意）',
     areaLayoutLabel: 'レイアウト',
     areaLayout: {
@@ -207,6 +207,11 @@ mergeMessages(messages, {
       newTab: '新しいタブで開く',
       sameTab: '現在のタブで開く',
     },
+    scopeLabel: '適用範囲',
+    scope: {
+      page: 'このページのみ',
+      site: 'サイト全体',
+    },
     actionLabel: 'クリック先（任意）',
     actionPlaceholder: '例: #submit-button',
     actionPick: 'ページから取得',
@@ -216,8 +221,7 @@ mergeMessages(messages, {
     actionHintPicking: 'コピーしたいボタンをクリックしてください（Esc でキャンセル）。',
     actionFlowLabel: 'アクションフロー（任意）',
     actionFlowPlaceholder: '[\n  {"type":"click","selector":"#target"}\n]',
-    actionFlowHintDefault:
-      '連続する手順を JSON 配列として記述します（最大 {limit} 文字、合計実行時間はおよそ 10 秒）。click / wait / input / if / while / navigate に対応します。',
+    actionFlowHintDefault: '',
     actionFlowHintConfigured: '{count} ステップのフローが設定されています。',
     actionFlowHintError: 'フローエラー: {error}',
     actionFlowConfigure: 'フローを設定',
@@ -226,10 +230,10 @@ mergeMessages(messages, {
     actionFlowSummaryConfigured: 'アクションフローを設定済み（{count} ステップ）',
     actionFlowSummaryEmpty: 'アクションフローはまだ設定されていません。',
     actionFlowTitle: 'アクションフローを設定',
-    actionFlowDescription: '訪問者がこのボタンをクリックしたときに実行する一連の処理を定義します。',
+    actionFlowDescription: 'ボタンをクリックしたときに実行する一連の処理を定義します。',
     tooltipPositionLabel: 'ツールチップの配置',
     tooltipPersistenceLabel: '表示方法',
-    tooltipPersistenceCheckbox: '常に表示する',
+    tooltipPersistenceCheckbox: '常に表示',
     tooltipPersistenceHint: 'オフにすると、ホバーまたはフォーカス時のみ表示されます。',
     positionLabel: '挿入位置',
     actionBuilder: {
@@ -260,7 +264,7 @@ mergeMessages(messages, {
     sections: {
       basics: {
         title: '基本情報',
-        description: '要素タイプと、訪問者に表示するテキストを設定します。',
+        description: '要素タイプと、要素のテキストを設定します。',
       },
       behavior: {
         title: '動作とアクション',
@@ -268,7 +272,7 @@ mergeMessages(messages, {
       },
       tooltip: {
         title: 'ツールチップ設定',
-        description: '訪問者にどのように表示するかを決めます。',
+        description: 'どのように表示するかを決めます。',
       },
       placement: {
         title: '配置',
@@ -299,6 +303,10 @@ mergeMessages(messages, {
       fontSize: 'フォントサイズ',
       fontWeight: 'フォントの太さ',
       padding: 'パディング',
+      paddingTop: '上パディング',
+      paddingRight: '右パディング',
+      paddingBottom: '下パディング',
+      paddingLeft: '左パディング',
       border: 'ボーダー',
       borderRadius: '角の丸み',
       presetsLabel: 'プリセットスタイル',
@@ -314,7 +322,7 @@ mergeMessages(messages, {
     cancel: 'キャンセル',
     save: '保存',
     saveCreate: '作成',
-    saveUpdate: '変更を保存',
+    saveUpdate: '保存',
     errorTextRequired: '要素に表示するテキストを入力してください。',
     errorUrlRequired: 'リンクタイプには URL が必要です。',
     errorActionRequiredForUrl: 'URL 付きのボタンにはアクションフローが必要です。',

@@ -109,10 +109,6 @@ export function createHost(element) {
       transition: transform 0.15s ease, box-shadow 0.15s ease;
       box-shadow: 0 2px 4px rgba(0, 0, 0, 0.12);
     }
-    button.${NODE_CLASS}:hover {
-      transform: translateY(-1px);
-      box-shadow: 0 4px 8px rgba(0, 0, 0, 0.18);
-    }
     button.${NODE_CLASS}:focus-visible {
       outline: 2px solid #1b84ff;
       outline-offset: 2px;

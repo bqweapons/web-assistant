@@ -75,7 +75,13 @@ export function applyEditingMode(enabled) {
       idsToPersist.forEach((id) => {
         const latest = injectModule.getElement(id);
         if (latest) {
-          const payload = { ...latest, id, pageUrl: runtime.pageUrl, updatedAt: Date.now() };
+          const payload = {
+            ...latest,
+            id,
+            siteUrl: runtime.siteKey || runtime.pageUrl,
+            pageUrl: latest.pageUrl || runtime.pageKey || runtime.pageUrl,
+            updatedAt: Date.now(),
+          };
           sendMessage(MessageType.UPDATE, payload).catch(() => {});
         }
       });
@@ -85,4 +91,3 @@ export function applyEditingMode(enabled) {
     }
   }
 }
-

@@ -1,10 +1,10 @@
-﻿# Page Augmentor
+﻿# Ladybird（懒鸟）
 [English](README.md) / [日本語](README.ja.md) / [简体中文](README.zh-CN.md)
 
 ---
 
 ### 概述
-Page Augmentor 是一款基于 Manifest V3 的 Chrome 扩展，可以在任意网页上叠加自定义按钮、链接、提示气泡和富文本标注。你可以在侧边栏（Manage / Overview / Settings）中集中管理这些元素。每个注入元素都会按页面 URL 存储在 `chrome.storage.local` 中，当你再次访问同一站点时会自动恢复。
+Ladybird（懒鸟） 是一款基于 Manifest V3 的 Chrome 扩展，可以在任意网页上叠加自定义按钮、链接、提示气泡和富文本标注。你可以在侧边栏（Manage / Overview / Settings）中集中管理这些元素。每个注入元素都会按页面 URL 存储在 `chrome.storage.local` 中，当你再次访问同一站点时会自动恢复。
 
 ## 演示视频
 [![Demo Video](https://img.youtube.com/vi/-iTlNX4J8FM/maxresdefault.jpg)](https://youtu.be/-iTlNX4J8FM)
@@ -22,26 +22,13 @@ Page Augmentor 是一款基于 Manifest V3 的 Chrome 扩展，可以在任意�
 - 动作流程：支持拖动步骤序号调整顺序；将“新增步骤”移到列表上方并增加提示，避免长列表时下拉菜单溢出。
 - UI 优化：步骤类型以标签形式展示在序号旁，减少误触更改，同时保留现有构建器布局。
 
-### 安装
+### Chrome Webstore
+- 从Chrome 应用商店安装: https://chromewebstore.google.com/detail/ladybird-no-code-buttons/nefpepdpcjejamkgpndlfehkffkfgbpe
 
-```bash
-npm install
-npm run build
-```
 
-1. 打开 `chrome://extensions/`。
-2. 启用 **Developer mode（开发者模式）**。
-3. 点击 **Load unpacked（加载已解压的扩展程序）**，选择项目根目录。
-4. 视需要在工具栏中固定扩展图标，以便随时打开侧边栏。
-
-要在 `release/` 目录下生成可分发的 ZIP 包：
-
-```bash
-npm run package
-```
 
 ### 使用方法
-1. 点击 Page Augmentor 图标，在当前标签页中打开侧边栏。
+1. 点击 Ladybird（懒鸟） 图标，在当前标签页中打开侧边栏。
 2. 在 **Manage** 中点击 **Pick target**，选择需要增强的元素（支持同源 iframe）。
 3. 在编辑气泡中选择类型（按钮 / 链接 / 提示 / 区域），调整文本、位置和样式，并可以选择性地配置 URL、镜像点击选择器或动作流程。区域元素可以直接在页面上拖拽微调位置，也可以作为容器承载其它注入元素。
 4. 使用 Manage 中的过滤和搜索功能查找元素，并进行聚焦、重新编辑或按页面删除。
