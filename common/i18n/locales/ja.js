@@ -7,7 +7,7 @@ const messages = cloneMessages(enMessages);
 
 mergeMessages(messages, {
   app: {
-    title: 'Page Augmentor',
+    title: 'Ladybird',
     subtitle:
       'あらゆるページにノーコードでボタン・リンク・ツールチップを追加し、すべての CTA をサイドパネルから一元管理できます。',
     language: {
@@ -166,13 +166,13 @@ mergeMessages(messages, {
         description: 'サイドパネルで使用する言語を選択します。',
       },
       share: {
-        title: 'Page Augmentor を共有',
+        title: 'Ladybird を共有',
         description:
           'Chrome ウェブストアのリンクを共有して、チームメンバーや友人にもこの拡張機能をインストールしてもらいましょう。',
       },
     },
     actions: {
-      share: 'Page Augmentor を共有',
+      share: 'Ladybird を共有',
       shareCopy: 'ストアリンクをコピー',
       shareOpen: 'Chrome ウェブストアを開く',
     },

@@ -7,7 +7,7 @@ const messages = cloneMessages(enMessages);
 
 mergeMessages(messages, {
   app: {
-    title: '页面增强器',
+    title: 'Ladybird(懒鸟)',
     subtitle: '为任意网页添加自定义按钮、链接和提示，并在侧边栏集中管理所有增强元素。',
     language: {
       label: '语言',
@@ -165,12 +165,12 @@ mergeMessages(messages, {
         description: '选择侧边栏使用的界面语言。',
       },
       share: {
-        title: '分享 Page Augmentor',
+        title: '分享 Ladybird(懒鸟)',
         description: '把 Chrome 应用商店链接发给同事或朋友，让他们也能安装这个扩展。',
       },
     },
     actions: {
-      share: '分享 Page Augmentor',
+      share: '分享 Ladybird(懒鸟)',
       shareCopy: '复制商店链接',
       shareOpen: '打开 Chrome 应用商店页面',
     },

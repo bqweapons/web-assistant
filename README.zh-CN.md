@@ -23,7 +23,7 @@ Ladybird（懒鸟） 是一款基于 Manifest V3 的 Chrome 扩展，可以在�
 - UI 优化：步骤类型以标签形式展示在序号旁，减少误触更改，同时保留现有构建器布局。
 
 ### Chrome Webstore
-Chrome 应用商店: https://chromewebstore.google.com/detail/ladybird-no-code-buttons/nefpepdpcjejamkgpndlfehkffkfgbpe
+- 从Chrome 应用商店安装: https://chromewebstore.google.com/detail/ladybird-no-code-buttons/nefpepdpcjejamkgpndlfehkffkfgbpe
 
 
 

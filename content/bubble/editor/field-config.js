@@ -32,7 +32,7 @@ export function getBaseInfoFieldConfigs(t) {
       stateKey: 'text',
       placeholder: (state) =>
         state.type === 'tooltip' ? t('editor.tooltipTextPlaceholder') : t('editor.textPlaceholder'),
-      onChange: ({ value, setState }) => setState({ text: typeof value === 'string' ? value.trim() : '' }),
+      onChange: ({ value, setState }) => setState({ text: typeof value === 'string' ? value : '' }),
     },
     {
       name: 'href',

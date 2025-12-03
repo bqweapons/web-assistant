@@ -1,7 +1,7 @@
 // 英語 UI 向けの翻訳文字列セット。サイドパネル・バブル・サービスワーカーで共有する。
 const messages = {
   app: {
-    title: 'Page Augmentor',
+    title: 'Ladybird',
     subtitle: 'Create no-code buttons, links, and tooltips for any page and manage every call-to-action from a unified side panel.',
     language: {
       label: 'Language',
@@ -159,12 +159,12 @@ const messages = {
         description: 'Choose your preferred language for the side panel.',
       },
       share: {
-        title: 'Share Page Augmentor',
+        title: 'Share Ladybird',
         description: 'Send the Chrome Web Store link to teammates or friends so they can install the extension.',
       },
     },
     actions: {
-      share: 'Share Page Augmentor',
+      share: 'Share Ladybird',
       shareCopy: 'Copy Web Store link',
       shareOpen: 'Open Chrome Web Store page',
     },
