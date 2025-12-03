@@ -1,11 +1,11 @@
-﻿# Page Augmentor
+﻿# Ladybird
 
 [English](README.md) / [日本語](README.ja.md) / [简体中文](README.zh-CN.md)
 
 ---
 
 ### 概要
-Page Augmentor は Manifest V3 対応の Chrome 拡張機能で、任意の Web ページにカスタムボタン、リンク、ツールチップ、リッチなコールアウトを重ねて表示できます。管理はすべてサイドパネル（Manage / Overview / Settings）から行います。挿入した要素はページ URL ごとに `chrome.storage.local` に保存されるため、同じサイトを再訪すると自動的に復元されます。
+Ladybird は Manifest V3 対応の Chrome 拡張機能で、任意の Web ページにカスタムボタン、リンク、ツールチップ、リッチなコールアウトを重ねて表示できます。管理はすべてサイドパネル（Manage / Overview / Settings）から行います。挿入した要素はページ URL ごとに `chrome.storage.local` に保存されるため、同じサイトを再訪すると自動的に復元されます。
 
 ## デモ動画
 [![Demo Video](https://img.youtube.com/vi/-iTlNX4J8FM/maxresdefault.jpg)](https://youtu.be/-iTlNX4J8FM)
@@ -23,25 +23,12 @@ Page Augmentor は Manifest V3 対応の Chrome 拡張機能で、任意の Web 
 - アクションフロー: ステップ番号をドラッグして並べ替え可能に。「ステップを追加」をリスト上部に移動し、長いリストでもメニューが見切れないようにしました。
 - UI: ステップタイプをインデックス横のチップで表示し、誤って切り替えるリスクを減らしました（レイアウトは従来どおり）。
 
-### インストール
+### Chrome Webstore
+Chrome ウェブストアからインストール: https://chromewebstore.google.com/detail/ladybird-no-code-buttons/nefpepdpcjejamkgpndlfehkffkfgbpe
 
-```bash
-npm install
-npm run build
-```
-
-1. `chrome://extensions/` を開き、**デベロッパーモード** をオンにします。
-2. **パッケージ化されていない拡張機能を読み込む** をクリックし、リポジトリのルートディレクトリを選択します。
-3. 必要に応じて拡張機能をピン留めし、ツールバーからサイドパネルを開きます。
-
-`release/` 以下に配布用 ZIP を作成するには:
-
-```bash
-npm run package
-```
 
 ### 使い方
-1. Page Augmentor アイコンをクリックして、アクティブなタブにサイドパネルを開きます。
+1. Ladybird アイコンをクリックして、アクティブなタブにサイドパネルを開きます。
 2. **Manage** で **Pick target** を押し、拡張したい要素（同一オリジンの iframe を含む）を選択します。
 3. エディターバブルでタイプ（ボタン / リンク / ツールチップ / エリア）を選び、テキスト・配置・スタイルを調整し、必要に応じて URL、ミラークリックセレクター、アクションフローを設定して保存します。エリア要素はページ上で直接ドラッグして位置を微調整したり、他の要素のコンテナとして使ったりできます。
 4. Manage のフィルターを使って要素を検索し、フォーカス・再編集・削除を行います。
