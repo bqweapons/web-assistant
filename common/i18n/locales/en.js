@@ -240,6 +240,8 @@ const messages = {
       valuePlaceholder: 'Content to type',
       delayLabel: 'Wait duration (ms)',
       pick: 'Pick element',
+      pickActive: 'Selecting...',
+      pickHint: 'Click the target on the page, then press Esc to cancel.',
       remove: 'Remove',
       reorderHint: 'Drag the step number to reorder.',
       type: {

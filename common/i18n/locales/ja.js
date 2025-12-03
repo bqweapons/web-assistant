@@ -248,6 +248,8 @@ mergeMessages(messages, {
       valuePlaceholder: '入力するテキスト',
       delayLabel: '待機時間（ミリ秒）',
       pick: '要素を選択',
+      pickActive: '要素を選択中...',
+      pickHint: 'ページ上のターゲットをクリックして、Esc キーを押すとキャンセルできます。',
       remove: '削除',
       reorderHint: '番号をドラッグして順序を並べ替えます。',
       type: {

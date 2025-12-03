@@ -626,11 +626,17 @@ const editorState = createEditorState();
 
   function startActionPicker(options = {}) {
     if (actionPickerCleanup) {
-      return;
+      if (options && typeof options.onCancel === 'function') {
+        options.onCancel();
+      }
+      return actionPickerCleanup;
     }
-    const { accept = 'clickable', onSelect, onCancel } = options;
+    const { accept = 'clickable', hint, onSelect, onCancel } = options;
+    const hintText =
+      typeof hint === 'string' && hint.trim() ? hint : t('editor.actionBuilder.pickHint');
     const stop = startPicker({
       accept,
+      hint: hintText,
       onSelect: (selector) => {
         if (typeof onSelect === 'function') {
           onSelect(selector);
@@ -648,6 +654,7 @@ const editorState = createEditorState();
       stop(reason);
       actionPickerCleanup = null;
     };
+    return actionPickerCleanup;
   }
 
   function stopActionPicker(reason = 'cancel') {

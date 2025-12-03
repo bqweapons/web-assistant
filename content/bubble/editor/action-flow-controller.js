@@ -1066,7 +1066,9 @@ export function createActionFlowController(options) {
 
       const pickButton = document.createElement('button');
       pickButton.type = 'button';
-      pickButton.textContent = t('editor.actionBuilder.pick');
+      const pickButtonDefaultText = t('editor.actionBuilder.pick');
+      const pickButtonActiveText = t('editor.actionBuilder.pickActive') || pickButtonDefaultText;
+      pickButton.textContent = pickButtonDefaultText;
       Object.assign(pickButton.style, {
         padding: '8px 12px',
         borderRadius: '8px',
@@ -1078,25 +1080,47 @@ export function createActionFlowController(options) {
         cursor: 'pointer',
       });
 
-      pickButton.disabled = readonlyActive;
+      const pickingHint = document.createElement('div');
+      pickingHint.textContent = t('editor.actionBuilder.pickHint');
+      Object.assign(pickingHint.style, {
+        display: 'none',
+        margin: '2px 0 0 0',
+        padding: '8px 10px',
+        borderRadius: '8px',
+        border: '1px solid rgba(59, 130, 246, 0.25)',
+        backgroundColor: '#e0f2fe',
+        color: '#075985',
+        fontSize: '12px',
+        fontWeight: '600',
+      });
+
+      const setPickingState = (picking) => {
+        row.dataset.picking = picking ? 'true' : 'false';
+        pickButton.disabled = readonlyActive || picking;
+        pickButton.textContent = picking ? pickButtonActiveText : pickButtonDefaultText;
+        pickingHint.style.display = picking ? 'block' : 'none';
+      };
+      setPickingState(false);
+
       pickButton.addEventListener('click', (event) => {
         event.preventDefault();
-        row.dataset.picking = 'true';
+        setPickingState(true);
         const currentState = getState();
         const currentStep = currentState.actionSteps[index];
         const accept = currentStep && currentStep.type === 'input' ? 'input' : step.type === 'input' ? 'input' : 'clickable';
         startPicker({
           accept,
           source: 'builder',
+          hint: t('editor.actionBuilder.pickHint'),
           onSelect: (selector) => {
-            row.dataset.picking = 'false';
+            setPickingState(false);
             const nextState = getState();
             nextState.actionSteps[index] = { ...nextState.actionSteps[index], selector };
             updateActionFlowFromSteps();
             refreshActionBuilderState();
           },
           onCancel: () => {
-            row.dataset.picking = 'false';
+            setPickingState(false);
             refreshActionBuilderState();
           },
         });
@@ -1105,7 +1129,7 @@ export function createActionFlowController(options) {
       selectorRow.append(selectorInput);
       if (pickPlacement === 'row') {
         selectorRow.appendChild(pickButton);
-        selectorLabel.appendChild(selectorRow);
+        selectorLabel.append(selectorRow, pickingHint);
       } else {
         selectorLabel.appendChild(selectorRow);
         const pickRow = document.createElement('div');
@@ -1115,7 +1139,7 @@ export function createActionFlowController(options) {
           alignItems: 'center',
         });
         pickRow.appendChild(pickButton);
-        selectorLabel.appendChild(pickRow);
+        selectorLabel.append(pickRow, pickingHint);
       }
       body.appendChild(selectorLabel);
 

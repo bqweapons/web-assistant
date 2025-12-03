@@ -246,6 +246,8 @@ mergeMessages(messages, {
       valuePlaceholder: '要填入的文本',
       delayLabel: '等待时长（毫秒）',
       pick: '选取元素',
+      pickActive: '???...',
+      pickHint: '点击页面上的目标，然后按下 Esc 键即可取消。',
       remove: '移除',
       reorderHint: '拖动序号可调整顺序。',
       type: {
