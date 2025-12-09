@@ -8,6 +8,8 @@ import {
   releasePointerCaptureSafe,
   dispatchDraftUpdateFromHost,
   dispatchUiUpdateFromHost,
+  suppressPageSelection,
+  restorePageSelection,
 } from '../drag/core.js';
 import { registerThrottledPointerMove } from '../scheduler.js';
 
@@ -53,6 +55,7 @@ export function attachFloatingDragBehavior(node, element, deps) {
   let startRect = null;
   let suppressNextClick = false;
   let lastBubbleSide = 'right';
+  let selectionGuardActive = false;
 
   // ドロップ候補のエリアを強調表示し、前回のハイライトを解除する。
   const updateHighlight = (areaTarget) => {
@@ -63,6 +66,13 @@ export function attachFloatingDragBehavior(node, element, deps) {
     if (areaTarget && areaTarget.areaNode && highlightedArea !== areaTarget) {
       areaTarget.areaNode.classList.add('page-augmentor-area-drop-target');
       highlightedArea = areaTarget;
+    }
+  };
+
+  const releaseSelectionGuard = () => {
+    if (selectionGuardActive) {
+      restorePageSelection();
+      selectionGuardActive = false;
     }
   };
 
@@ -110,6 +120,7 @@ export function attachFloatingDragBehavior(node, element, deps) {
 
   // ドラッグ終了時に位置を確定または元に戻す。
   const finalizeDrag = (commit) => {
+    releaseSelectionGuard();
     const host = getHostFromNode(node);
     if (!host) {
       return;
@@ -331,6 +342,10 @@ export function attachFloatingDragBehavior(node, element, deps) {
     dragging = true;
     dragStarted = false;
     suppressNextClick = false;
+    if (!selectionGuardActive) {
+      suppressPageSelection();
+      selectionGuardActive = true;
+    }
     pointerId = event.pointerId;
     // Defer pointer capture until an actual drag starts to avoid
     // interfering with click handling in editing mode. Pointer capture
@@ -364,6 +379,7 @@ export function attachFloatingDragBehavior(node, element, deps) {
     if (!dragStarted) {
       pointerId = null;
       dragging = false;
+      releaseSelectionGuard();
       return;
     }
     finalizeDrag(dragStarted);
@@ -372,6 +388,7 @@ export function attachFloatingDragBehavior(node, element, deps) {
     if (!dragStarted) {
       pointerId = null;
       dragging = false;
+      releaseSelectionGuard();
       return;
     }
     finalizeDrag(false);

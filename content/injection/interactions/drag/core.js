@@ -2,6 +2,18 @@ import { HOST_ATTRIBUTE, Z_INDEX_FLOATING_DEFAULT, Z_INDEX_HOST_DEFAULT } from '
 
 export const AREA_DRAG_THRESHOLD = 4;
 
+const selectionGuardState = {
+  count: 0,
+  htmlUserSelect: '',
+  htmlUserSelectPriority: '',
+  htmlWebkitUserSelect: '',
+  htmlWebkitUserSelectPriority: '',
+  bodyUserSelect: '',
+  bodyUserSelectPriority: '',
+  bodyWebkitUserSelect: '',
+  bodyWebkitUserSelectPriority: '',
+};
+
 /**
  * ホストが編集モードで操作可能かを判定する。
  * Determines whether drag interactions are permitted for the host.
@@ -39,6 +51,94 @@ export function releasePointerCaptureSafe(el, pointerId) {
   try {
     el.releasePointerCapture(pointerId);
   } catch (_e) {}
+}
+
+/**
+ * ページ全体のテキスト選択を一時的に無効化する。
+ * Suppresses text selection on the page while dragging.
+ */
+export function suppressPageSelection() {
+  if (typeof document === 'undefined') return;
+  const { documentElement, body } = document;
+  if (!documentElement) return;
+  if (selectionGuardState.count === 0) {
+    selectionGuardState.htmlUserSelect = documentElement.style.getPropertyValue('user-select') || '';
+    selectionGuardState.htmlUserSelectPriority =
+      documentElement.style.getPropertyPriority('user-select') || '';
+    selectionGuardState.htmlWebkitUserSelect =
+      documentElement.style.getPropertyValue('-webkit-user-select') || '';
+    selectionGuardState.htmlWebkitUserSelectPriority =
+      documentElement.style.getPropertyPriority('-webkit-user-select') || '';
+    if (body) {
+      selectionGuardState.bodyUserSelect = body.style.getPropertyValue('user-select') || '';
+      selectionGuardState.bodyUserSelectPriority = body.style.getPropertyPriority('user-select') || '';
+      selectionGuardState.bodyWebkitUserSelect =
+        body.style.getPropertyValue('-webkit-user-select') || '';
+      selectionGuardState.bodyWebkitUserSelectPriority =
+        body.style.getPropertyPriority('-webkit-user-select') || '';
+    }
+  }
+  selectionGuardState.count += 1;
+  documentElement.style.setProperty('user-select', 'none', 'important');
+  documentElement.style.setProperty('-webkit-user-select', 'none', 'important');
+  if (body) {
+    body.style.setProperty('user-select', 'none', 'important');
+    body.style.setProperty('-webkit-user-select', 'none', 'important');
+  }
+}
+
+/**
+ * ページ全体のテキスト選択無効化を解除する。
+ * Restores page text selection after dragging finishes.
+ */
+export function restorePageSelection() {
+  if (typeof document === 'undefined') return;
+  const { documentElement, body } = document;
+  if (!documentElement || selectionGuardState.count === 0) {
+    return;
+  }
+  selectionGuardState.count -= 1;
+  if (selectionGuardState.count > 0) {
+    return;
+  }
+  if (selectionGuardState.htmlUserSelect) {
+    documentElement.style.setProperty(
+      'user-select',
+      selectionGuardState.htmlUserSelect,
+      selectionGuardState.htmlUserSelectPriority || '',
+    );
+  } else {
+    documentElement.style.removeProperty('user-select');
+  }
+  if (selectionGuardState.htmlWebkitUserSelect) {
+    documentElement.style.setProperty(
+      '-webkit-user-select',
+      selectionGuardState.htmlWebkitUserSelect,
+      selectionGuardState.htmlWebkitUserSelectPriority || '',
+    );
+  } else {
+    documentElement.style.removeProperty('-webkit-user-select');
+  }
+  if (body) {
+    if (selectionGuardState.bodyUserSelect) {
+      body.style.setProperty(
+        'user-select',
+        selectionGuardState.bodyUserSelect,
+        selectionGuardState.bodyUserSelectPriority || '',
+      );
+    } else {
+      body.style.removeProperty('user-select');
+    }
+    if (selectionGuardState.bodyWebkitUserSelect) {
+      body.style.setProperty(
+        '-webkit-user-select',
+        selectionGuardState.bodyWebkitUserSelect,
+        selectionGuardState.bodyWebkitUserSelectPriority || '',
+      );
+    } else {
+      body.style.removeProperty('-webkit-user-select');
+    }
+  }
 }
 
 /**

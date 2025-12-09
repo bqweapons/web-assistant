@@ -9,6 +9,8 @@ import {
   buildAbsoluteStyle,
   dispatchDraftUpdateFromHost,
   dispatchUiUpdateFromHost,
+  suppressPageSelection,
+  restorePageSelection,
 } from './core.js';
 import { NODE_CLASS } from '../../core/constants.js';
 import { registerThrottledPointerMove } from '../scheduler.js';
@@ -39,6 +41,7 @@ export function attachAreaDragBehavior(node, element) {
   let originTop = 0;
   let movedSincePointerDown = false;
   let lastBubbleSide = 'right';
+  let selectionGuardActive = false;
 
   const handleMove = (event) => {
     if (!dragging || pointerId !== event.pointerId) {
@@ -75,6 +78,10 @@ export function attachAreaDragBehavior(node, element) {
       return;
     }
     dragging = false;
+    if (selectionGuardActive) {
+      restorePageSelection();
+      selectionGuardActive = false;
+    }
     node.classList.remove('page-augmentor-area-dragging');
     node.style.userSelect = '';
     const host = getHostFromNode(node);
@@ -125,6 +132,10 @@ export function attachAreaDragBehavior(node, element) {
     }
     dispatchUiUpdateFromHost(host, { bubbleSide: 'left' });
     dragging = true;
+    if (!selectionGuardActive) {
+      suppressPageSelection();
+      selectionGuardActive = true;
+    }
     pointerId = event.pointerId;
     movedSincePointerDown = false;
     startX = event.clientX;
