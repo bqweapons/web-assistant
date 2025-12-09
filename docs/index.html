@@ -1,0 +1,347 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Web Assistant | サイドパネル使い方ガイド</title>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;600;700&family=Inter:wght@400;600&display=swap');
+
+    :root {
+      --bg: #0f172a;
+      --surface: rgba(255, 255, 255, 0.9);
+      --surface-strong: #0b1224;
+      --ink: #0b1224;
+      --muted: #475569;
+      --accent: #0ea5e9;
+      --accent-strong: #0ea77d;
+      --border: #e2e8f0;
+      --card-shadow: 0 18px 60px rgba(15, 23, 42, 0.22);
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      padding: 48px 18px 64px;
+      font-family: "Noto Sans JP", "Inter", "Segoe UI", -apple-system, BlinkMacSystemFont, sans-serif;
+      color: var(--ink);
+      background: radial-gradient(circle at 15% 20%, rgba(14, 165, 233, 0.25), transparent 32%),
+                  radial-gradient(circle at 80% 0%, rgba(14, 167, 125, 0.25), transparent 30%),
+                  #f8fafc;
+    }
+
+    .page {
+      max-width: 1080px;
+      margin: 0 auto;
+      position: relative;
+      z-index: 1;
+    }
+
+    .hero {
+      background: linear-gradient(120deg, rgba(14, 165, 233, 0.18), rgba(14, 167, 125, 0.16));
+      border: 1px solid rgba(226, 232, 240, 0.6);
+      border-radius: 20px;
+      padding: 28px 28px 24px;
+      box-shadow: 0 14px 48px rgba(15, 23, 42, 0.14);
+      margin-bottom: 28px;
+    }
+
+    .eyebrow {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 8px 12px;
+      border-radius: 999px;
+      background: rgba(11, 18, 36, 0.08);
+      color: #0f172a;
+      font-weight: 600;
+      font-size: 13px;
+      letter-spacing: 0.2px;
+    }
+
+    h1 {
+      margin: 14px 0 10px;
+      font-size: 28px;
+      line-height: 1.3;
+      letter-spacing: -0.3px;
+    }
+
+    .lede {
+      margin: 0;
+      color: var(--muted);
+      line-height: 1.6;
+    }
+
+    .cta-link {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      margin: 14px 0 4px;
+      padding: 12px 16px;
+      border-radius: 12px;
+      text-decoration: none;
+      background: linear-gradient(120deg, #0ea5e9, #0ea77d);
+      color: #fff;
+      font-weight: 700;
+      box-shadow: 0 12px 30px rgba(14, 165, 233, 0.28);
+      transition: transform 120ms ease, box-shadow 120ms ease, opacity 120ms ease;
+    }
+
+    .cta-link:hover {
+      transform: translateY(-1px);
+      box-shadow: 0 16px 38px rgba(14, 165, 233, 0.32);
+      opacity: 0.95;
+    }
+
+    .anchor-list {
+      margin: 18px 0 0;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      padding: 0;
+      list-style: none;
+    }
+
+    .anchor-list a {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 10px 14px;
+      border-radius: 12px;
+      text-decoration: none;
+      border: 1px solid rgba(14, 165, 233, 0.28);
+      background: #fff;
+      color: #0f172a;
+      font-weight: 600;
+      transition: transform 120ms ease, box-shadow 120ms ease;
+      box-shadow: 0 10px 26px rgba(15, 23, 42, 0.08);
+    }
+
+    .anchor-list a:hover {
+      transform: translateY(-1px);
+      box-shadow: 0 16px 38px rgba(15, 23, 42, 0.12);
+    }
+
+    .section {
+      background: var(--surface);
+      border: 1px solid rgba(226, 232, 240, 0.9);
+      border-radius: 16px;
+      padding: 22px;
+      margin-bottom: 18px;
+      box-shadow: var(--card-shadow);
+    }
+
+    .section header h2 {
+      margin: 0 0 8px;
+      font-size: 22px;
+      letter-spacing: -0.2px;
+    }
+
+    .section header p {
+      margin: 0 0 12px;
+      color: var(--muted);
+    }
+
+    .section-inner {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+      gap: 16px;
+      align-items: center;
+    }
+
+    .copy {
+      line-height: 1.7;
+      color: #111827;
+    }
+
+    .copy ul {
+      margin: 10px 0 0 18px;
+      padding: 0;
+    }
+
+    .copy li {
+      margin-bottom: 6px;
+    }
+
+    .ordered {
+      margin: 10px 0 0 18px;
+      padding: 0;
+    }
+
+    figure {
+      margin: 0;
+      border-radius: 14px;
+      overflow: hidden;
+      border: 1px solid rgba(226, 232, 240, 0.9);
+      background: #0b1224;
+      box-shadow: 0 12px 34px rgba(15, 23, 42, 0.16);
+    }
+
+    figure img {
+      display: block;
+      width: 100%;
+      height: auto;
+    }
+
+    .pill {
+      display: inline-block;
+      padding: 6px 10px;
+      border-radius: 10px;
+      background: rgba(14, 167, 125, 0.12);
+      color: #0f766e;
+      font-weight: 700;
+      font-size: 12px;
+      letter-spacing: 0.4px;
+      text-transform: uppercase;
+    }
+
+    footer {
+      margin-top: 30px;
+      color: var(--muted);
+      font-size: 14px;
+      text-align: center;
+    }
+
+    @media (max-width: 720px) {
+      body {
+        padding: 24px 16px 48px;
+      }
+
+      h1 {
+        font-size: 24px;
+      }
+
+      .anchor-list a {
+        width: 100%;
+        justify-content: center;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="page">
+    <header class="hero">
+      <span class="eyebrow">Ladybird</span>
+      <h1>no-code buttons, links and tooltips<br>ノーコードでボタン・リンク・ツールチップを追加</h1>
+      <p class="lede">あらゆるページにノーコードでボタン・リンク・ツールチップを追加し、すべてのCTAをサイドパネルからまとめて管理します。</p>
+      <a class="cta-link" href="https://chromewebstore.google.com/detail/page-augmentor/nefpepdpcjejamkgpndlfehkffkfgbpe" target="_blank" rel="noopener">Chrome Web Store で入手</a>
+      <ul class="anchor-list">
+        <li><a href="#layout">レイアウト概要</a></li>
+        <li><a href="#button">ボタンの追加</a></li>
+        <li><a href="#action">Action Flow</a></li>
+        <li><a href="#area">Areaの追加</a></li>
+        <li><a href="#adjust">位置調整</a></li>
+      </ul>
+    </header>
+
+    <section class="section" id="layout">
+      <header>
+        <div class="pill">overview</div>
+        <h2>サイドパネルレイアウト紹介</h2>
+        <p>左ペインで要素追加と検索、中央でページ別の一覧、右ペインで設定・バックアップを操作する三分割レイアウトです。</p>
+      </header>
+      <div class="section-inner">
+        <div class="copy">
+          <p class="copy">トップビューから配置編集や新規作成に即アクセスでき、保存済み要素の検索や一括削除も可能です。ページ単位でエクスポート／インポートすれば、他デバイスやチームと共有できます。</p>
+          <ul>
+            <li>ホーム: 追加・編集・テストをまとめたトップ。編集モードで配置済み要素をハイライトし、ドラッグやクリックで即編集。</li>
+            <li>要素一覧: ページ別の保存要素を一覧化。検索・フィルター・一括削除、さらにページごとのバックアップ/復元が可能。</li>
+            <li>設定: 言語やバックアップ、エクスポート/インポートを管理。共有用ストアリンクのコピーもここから。</li>
+          </ul>
+          <p class="copy">この3タブを押さえたら、次は要素の追加に進みます。</p>
+        </div>
+        <figure>
+          <img src="./Overview.png" alt="サイドパネル全体のスクリーンショット">
+        </figure>
+      </div>
+    </section>
+
+    <section class="section" id="button">
+      <header>
+        <div class="pill">add button</div>
+        <h2>ボタンの追加</h2>
+        <p>最も基本的な要素。ページ上に仮配置したあと、右ペインでテキストや色、リンク先を整えます。</p>
+      </header>
+      <div class="section-inner">
+        <div class="copy">
+          <ol class="ordered">
+            <li>サイドパネル左で「要素タイプ」に「ボタン」を選択。</li>
+            <li>「要素を追加」をクリックするとページ上に仮配置されます。</li>
+            <li>右ペインでテキスト・色・リンク先を設定し、必要ならドラッグで位置を調整します。</li>
+          </ol>
+        </div>
+        <figure>
+          <img src="add%20button.gif" alt="ボタン追加デモ">
+        </figure>
+      </div>
+    </section>
+
+    <section class="section" id="action">
+      <header>
+        <div class="pill">action flow</div>
+        <h2>Action Flowの追加</h2>
+        <p>1つのボタンにクリック、入力、スクロールなど複数アクションを順番に紐づけ、フローとして自動実行できます。</p>
+      </header>
+      <div class="section-inner">
+        <div class="copy">
+          <ol class="ordered">
+            <li>追加したボタンを選択し、Action Flow編集を開きます。</li>
+            <li>「ステップを追加」からクリック・入力・スクロールなどを順番に追加。</li>
+            <li>並び替えや削除でフローを調整し、保存すると次のクリックから自動実行されます。</li>
+          </ol>
+        </div>
+        <figure>
+          <img src="add%20Action.gif" alt="Action追加デモ">
+        </figure>
+      </div>
+    </section>
+
+    <section class="section" id="area">
+      <header>
+        <div class="pill">area</div>
+        <h2>Areaの追加</h2>
+        <p>任意の矩形エリアを操作対象として保存。UI変化に合わせて複数エリアを使い分けできます。</p>
+      </header>
+      <div class="section-inner">
+        <div class="copy">
+          <ol class="ordered">
+            <li>編集モードに入り、「Area」を選択。</li>
+            <li>ページ上をドラッグしてエリアを囲み、保存します。</li>
+            <li>保存したエリアはActionのターゲットとして何度でも再利用できます。</li>
+          </ol>
+        </div>
+        <figure>
+          <img src="add%20area.gif" alt="Area追加デモ">
+        </figure>
+      </div>
+    </section>
+
+    <section class="section" id="adjust">
+      <header>
+        <div class="pill">fine tune</div>
+        <h2>位置調整</h2>
+        <p>配置後はドラッグで再調整。右ペインに座標がリアルタイム表示されるので、ピクセル単位の微調整が簡単です。</p>
+      </header>
+      <div class="section-inner">
+        <div class="copy">
+          <ol class="ordered">
+            <li>編集モードで対象の要素をドラッグして移動。</li>
+            <li>右ペインの座標を見ながら微調整。</li>
+            <li>クリックで確定。別ページに移動しても位置は保持されます。</li>
+          </ol>
+        </div>
+        <figure>
+          <img src="../release/note/20251203/move%20button.gif" alt="位置調整デモ">
+        </figure>
+      </div>
+    </section>
+
+    <footer>
+      Ladybirdガイド | 最終更新: 2025-12-03
+    </footer>
+  </div>
+</body>
+</html>

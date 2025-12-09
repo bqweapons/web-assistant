@@ -9,7 +9,7 @@ const ACTION_TYPE_OPTIONS = [
  * @param {HTMLElement} container
  * @param {{
  *   t: (key: string, params?: Record<string, any>) => string;
- *   startPicker: (options: { accept?: 'clickable' | 'input'; onSelect?: (selector: string) => void; onCancel?: () => void }) => () => void;
+ *   startPicker: (options: { accept?: 'clickable' | 'input'; hint?: string; onSelect?: (selector: string) => void; onCancel?: () => void }) => () => void;
  *   onStepsChange: (steps: Array<{ type: 'click' | 'input' | 'wait'; selector?: string; value?: string; ms?: number }>) => void;
  *   getInitialSteps?: () => Array<{ type: 'click' | 'input' | 'wait'; selector?: string; value?: string; ms?: number }>;
  *   setInvalidIndex?: (index: number) => void;
@@ -421,7 +421,9 @@ export function mountActionBuilder(container, deps) {
 
       const pickButton = document.createElement('button');
       pickButton.type = 'button';
-      pickButton.textContent = t('editor.actionBuilder.pick');
+      const pickButtonDefaultText = t('editor.actionBuilder.pick');
+      const pickButtonActiveText = t('editor.actionBuilder.pickActive') || pickButtonDefaultText;
+      pickButton.textContent = pickButtonDefaultText;
       Object.assign(pickButton.style, {
         padding: '8px 12px',
         borderRadius: '8px',
@@ -432,22 +434,44 @@ export function mountActionBuilder(container, deps) {
         fontWeight: '600',
         cursor: 'pointer',
       });
+      const pickingHint = document.createElement('div');
+      pickingHint.textContent = t('editor.actionBuilder.pickHint');
+      Object.assign(pickingHint.style, {
+        display: 'none',
+        margin: '2px 0 0 0',
+        padding: '8px 10px',
+        borderRadius: '8px',
+        border: '1px solid rgba(59, 130, 246, 0.25)',
+        backgroundColor: '#e0f2fe',
+        color: '#075985',
+        fontSize: '12px',
+        fontWeight: '600',
+      });
+
+      const setPickingState = (picking) => {
+        row.dataset.picking = picking ? 'true' : 'false';
+        pickButton.disabled = Boolean(picking);
+        pickButton.textContent = picking ? pickButtonActiveText : pickButtonDefaultText;
+        pickingHint.style.display = picking ? 'block' : 'none';
+      };
+
       pickButton.addEventListener('click', (event) => {
         event.preventDefault();
         event.stopPropagation();
         stopActivePicker();
-        row.dataset.picking = 'true';
+        setPickingState(true);
         const accept = step.type === 'input' ? 'input' : 'clickable';
         stopPicker = startPicker({
           accept,
+          hint: t('editor.actionBuilder.pickHint'),
           onSelect: (selector) => {
-            row.dataset.picking = 'false';
+            setPickingState(false);
             stopPicker = null;
             applyStepPatch(index, { selector });
             emitChange();
           },
           onCancel: () => {
-            row.dataset.picking = 'false';
+            setPickingState(false);
             stopPicker = null;
             render();
           },
@@ -455,8 +479,9 @@ export function mountActionBuilder(container, deps) {
       });
 
       selectorRow.append(selectorInput, pickButton);
-      selectorLabel.appendChild(selectorRow);
+      selectorLabel.append(selectorRow, pickingHint);
       body.appendChild(selectorLabel);
+      setPickingState(false);
 
       if (step.type === 'input') {
         const valueLabel = document.createElement('label');
