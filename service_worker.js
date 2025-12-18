@@ -12,6 +12,43 @@ const TOOLTIP_POSITIONS = new Set(['top', 'right', 'bottom', 'left']);
 const ELEMENT_TYPES = new Set(['button', 'link', 'tooltip', 'area']);
 /** @type {Map<string, Set<number>>} */
 const pageUrlTabIds = new Map();
+const FLOW_SESSION_STORAGE_KEY = 'pageAugmentor.flowSessions';
+/** @type {Map<string, { flowId: string; currentStepId: string | null; currentIndex?: number; steps?: any[]; tabId: number; pageKey?: string; status: 'idle' | 'running' | 'paused' | 'waiting' | 'error' | 'finished'; resumeToken?: unknown; updatedAt: number; result?: unknown; waitingForNavigation?: boolean; error?: { code?: string; message?: string; detail?: unknown } }>} */
+const flowSessions = new Map();
+/** @type {Map<number, { pageKey?: string; capabilities?: unknown; updatedAt: number }>} */
+const flowExecutors = new Map();
+let flowSessionsLoaded = false;
+let flowSessionSavePending = null;
+/** @type {Map<string, number>} */
+const flowStepTimeouts = new Map();
+
+function getStepId(step, index) {
+  if (step && typeof step.id === 'string' && step.id.trim()) {
+    return step.id.trim();
+  }
+  return `step-${index}`;
+}
+
+function getStepTimeoutValue(step) {
+  const raw = step?.timeout ?? step?.timeoutMs;
+  const value = Number(raw);
+  if (!Number.isFinite(value) || value <= 0) {
+    return undefined;
+  }
+  return value;
+}
+
+function isSameTabNavigationStep(step) {
+  if (!step || typeof step !== 'object') {
+    return false;
+  }
+  const type = typeof step.type === 'string' ? step.type.toLowerCase() : '';
+  if (type !== 'navigate' && type !== 'openpage') {
+    return false;
+  }
+  const target = typeof step.target === 'string' ? step.target.trim().toLowerCase() : '';
+  return target === '' || target === '_self';
+}
 
 /**
  * Tracks that a given tab is associated with a normalized page URL key.
@@ -42,7 +79,205 @@ if (chrome.tabs?.onRemoved) {
         pageUrlTabIds.delete(pageUrl);
       }
     }
+    flowExecutors.delete(tabId);
+    for (const [flowId, session] of flowSessions) {
+      if (session.tabId === tabId && session.status !== 'finished' && session.status !== 'idle') {
+        updateFlowSession(flowId, {
+          status: 'error',
+          waitingForNavigation: false,
+          error: { code: 'TAB_CLOSED', message: 'Tab closed during flow.' },
+        });
+      }
+    }
   });
+}
+
+async function ensureFlowSessionsLoaded() {
+  if (flowSessionsLoaded) {
+    return;
+  }
+  if (!chrome.storage?.session) {
+    flowSessionsLoaded = true;
+    return;
+  }
+  try {
+    const stored = await chrome.storage.session.get(FLOW_SESSION_STORAGE_KEY);
+    const rawSessions = stored?.[FLOW_SESSION_STORAGE_KEY];
+    if (rawSessions && typeof rawSessions === 'object') {
+      for (const [flowId, value] of Object.entries(rawSessions)) {
+        if (value && typeof value === 'object') {
+          flowSessions.set(flowId, { flowId, ...value });
+        }
+      }
+    }
+  } catch (error) {
+    console.warn('[PageAugmentor] Failed to load flow sessions', error);
+  }
+  flowSessionsLoaded = true;
+}
+
+async function persistFlowSessions() {
+  if (!chrome.storage?.session) {
+    return;
+  }
+  if (flowSessionSavePending) {
+    return;
+  }
+  flowSessionSavePending = setTimeout(async () => {
+    flowSessionSavePending = null;
+    try {
+      const payload = {};
+      for (const [flowId, session] of flowSessions) {
+        payload[flowId] = session;
+      }
+      await chrome.storage.session.set({ [FLOW_SESSION_STORAGE_KEY]: payload });
+    } catch (error) {
+      console.warn('[PageAugmentor] Failed to persist flow sessions', error);
+    }
+  }, 50);
+}
+
+function updateFlowSession(flowId, patch) {
+  if (!flowId) {
+    return;
+  }
+  const previous =
+    flowSessions.get(flowId) || { flowId, status: 'idle', tabId: -1, currentStepId: null, updatedAt: 0, waitingForNavigation: false };
+  const next = {
+    ...previous,
+    ...patch,
+    flowId,
+    updatedAt: Date.now(),
+  };
+  flowSessions.set(flowId, next);
+  persistFlowSessions();
+}
+
+function clearStepTimeout(flowId) {
+  const handle = flowStepTimeouts.get(flowId);
+  if (handle) {
+    clearTimeout(handle);
+    flowStepTimeouts.delete(flowId);
+  }
+}
+
+function scheduleStepTimeout(flowId, stepId, timeoutMs) {
+  clearStepTimeout(flowId);
+  if (!Number.isFinite(timeoutMs) || timeoutMs <= 0) {
+    return;
+  }
+  const handle = setTimeout(() => {
+    updateFlowSession(flowId, {
+      currentStepId: stepId || null,
+      status: 'error',
+      error: { code: 'STEP_TIMEOUT', message: `Step timed out after ${timeoutMs}ms.` },
+    });
+    flowStepTimeouts.delete(flowId);
+  }, timeoutMs);
+  flowStepTimeouts.set(flowId, handle);
+}
+
+function normalizeFlowSteps(input) {
+  if (!input) {
+    return [];
+  }
+  if (Array.isArray(input)) {
+    return input;
+  }
+  if (typeof input === 'string') {
+    const { definition, error } = parseActionFlowDefinition(input);
+    if (error || !definition?.steps) {
+      throw new Error(error || 'Invalid flow source.');
+    }
+    return definition.steps;
+  }
+  if (input && typeof input === 'object' && Array.isArray(input.steps)) {
+    return input.steps;
+  }
+  return [];
+}
+
+async function dispatchNextStep(flowId) {
+  await ensureFlowSessionsLoaded();
+  const session = flowSessions.get(flowId);
+  if (!session || session.status !== 'running') {
+    return null;
+  }
+  const steps = Array.isArray(session.steps) ? session.steps : [];
+  const currentIndex = Number.isFinite(session.currentIndex) ? session.currentIndex : 0;
+  if (steps.length === 0 || currentIndex >= steps.length) {
+    updateFlowSession(flowId, { status: 'finished', currentStepId: null, currentIndex, waitingForNavigation: false });
+    return null;
+  }
+  const step = steps[currentIndex];
+  const stepId = getStepId(step, currentIndex);
+  const timeoutValue = getStepTimeoutValue(step);
+  updateFlowSession(flowId, { currentStepId: stepId, currentIndex, waitingForNavigation: false });
+  try {
+    await sendMessageToFrames(session.tabId, {
+      type: MessageType.RUN_STEP,
+      pageUrl: session.pageKey,
+      data: {
+        flowId,
+        stepId,
+        pageKey: session.pageKey,
+        tabId: session.tabId,
+        stepPayload: step,
+        timeout: timeoutValue,
+      },
+    });
+    scheduleStepTimeout(flowId, stepId, timeoutValue);
+    const hasMoreSteps = currentIndex + 1 < steps.length;
+    if (isSameTabNavigationStep(step) && hasMoreSteps) {
+      advanceStep(flowId);
+      updateFlowSession(flowId, {
+        status: 'waiting',
+        waitingForNavigation: true,
+        currentStepId: null,
+      });
+      return step;
+    }
+  } catch (error) {
+    updateFlowSession(flowId, {
+      status: 'error',
+      error: { code: 'DISPATCH_FAILED', message: error?.message || 'Failed to dispatch step.' },
+    });
+    throw error;
+  }
+  return step;
+}
+
+async function resumeWaitingFlowsForTab(tabId, pageUrl) {
+  await ensureFlowSessionsLoaded();
+  const candidates = Array.from(flowSessions.values()).filter(
+    (session) => session.tabId === tabId && session.status === 'waiting' && session.waitingForNavigation,
+  );
+  if (candidates.length === 0) {
+    return;
+  }
+  if (!flowExecutors.has(tabId)) {
+    return;
+  }
+  const resolvedPageKey = normalizePageUrl(pageUrl) || pageUrl || undefined;
+  for (const session of candidates) {
+    clearStepTimeout(session.flowId);
+    updateFlowSession(session.flowId, {
+      status: 'running',
+      waitingForNavigation: false,
+      pageKey: resolvedPageKey || session.pageKey,
+      currentStepId: null,
+    });
+    await dispatchNextStep(session.flowId);
+  }
+}
+
+function advanceStep(flowId) {
+  const session = flowSessions.get(flowId);
+  if (!session) {
+    return;
+  }
+  const nextIndex = (Number.isFinite(session.currentIndex) ? session.currentIndex : 0) + 1;
+  updateFlowSession(flowId, { currentIndex: nextIndex, currentStepId: null });
 }
 
 chrome.runtime.onInstalled.addListener(async () => {
@@ -60,12 +295,98 @@ if (chrome.runtime.onStartup) {
   });
 }
 
+if (chrome.tabs?.onUpdated) {
+  chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
+    if (changeInfo.status === 'complete') {
+      resumeWaitingFlowsForTab(tabId, tab?.url).catch(() => {});
+    }
+  });
+}
+
 chrome.action.onClicked.addListener(async () => {
   await openSidePanelOrTab();
 });
 
 addAsyncMessageListener(async (message, sender) => {
   switch (message.type) {
+    case MessageType.RUN_FLOW: {
+      const { flowId, steps, flowSource, definition, tabId, pageKey, targetUrl, pageUrl, resumeToken } = message.data || {};
+      const targetTabId = typeof tabId === 'number' ? tabId : sender.tab?.id;
+      if (!flowId || typeof targetTabId !== 'number') {
+        throw new Error('Missing flowId or tabId for flow run.');
+      }
+      if (!flowExecutors.has(targetTabId)) {
+        throw new Error(`No executor registered for tab ${targetTabId}.`);
+      }
+      const normalizedSteps = normalizeFlowSteps(steps || definition || flowSource);
+      if (!normalizedSteps || normalizedSteps.length === 0) {
+        throw new Error('No steps to run.');
+      }
+      const resolvedPageKey =
+        normalizePageUrl(pageKey || targetUrl || pageUrl) || pageKey || targetUrl || pageUrl || undefined;
+      await ensureFlowSessionsLoaded();
+      clearStepTimeout(flowId);
+      updateFlowSession(flowId, {
+        tabId: targetTabId,
+        pageKey: resolvedPageKey,
+        status: 'running',
+        currentIndex: 0,
+        currentStepId: null,
+        resumeToken,
+        steps: normalizedSteps,
+        result: undefined,
+        error: undefined,
+        waitingForNavigation: false,
+      });
+      await dispatchNextStep(flowId);
+      return flowSessions.get(flowId) || null;
+    }
+    case MessageType.PAUSE_FLOW: {
+      const { flowId } = message.data || {};
+      if (!flowId) {
+        throw new Error('Missing flowId for pause.');
+      }
+      await ensureFlowSessionsLoaded();
+      const session = flowSessions.get(flowId);
+      if (!session) {
+        return null;
+      }
+      clearStepTimeout(flowId);
+      updateFlowSession(flowId, { status: 'paused', waitingForNavigation: false });
+      return flowSessions.get(flowId) || null;
+    }
+    case MessageType.RESUME_FLOW: {
+      const { flowId } = message.data || {};
+      if (!flowId) {
+        throw new Error('Missing flowId for resume.');
+      }
+      await ensureFlowSessionsLoaded();
+      const session = flowSessions.get(flowId);
+      if (!session) {
+        return null;
+      }
+      updateFlowSession(flowId, { status: 'running', waitingForNavigation: false });
+      await dispatchNextStep(flowId);
+      return flowSessions.get(flowId) || null;
+    }
+    case MessageType.STOP_FLOW: {
+      const { flowId } = message.data || {};
+      if (!flowId) {
+        throw new Error('Missing flowId for stop.');
+      }
+      await ensureFlowSessionsLoaded();
+      clearStepTimeout(flowId);
+      updateFlowSession(flowId, {
+        status: 'idle',
+        currentStepId: null,
+        currentIndex: 0,
+        steps: [],
+        result: undefined,
+        error: undefined,
+        waitingForNavigation: false,
+      });
+      return flowSessions.get(flowId) || null;
+    }
     case MessageType.LIST_BY_URL: {
       const { pageUrl } = message.data || {};
       if (!pageUrl) {
@@ -150,6 +471,166 @@ addAsyncMessageListener(async (message, sender) => {
       }
       await sendMessageToFrames(targetTabId, { type: MessageType.CANCEL_PICKER, pageUrl });
       return true;
+    }
+    case MessageType.REGISTER_EXECUTOR: {
+      const { tabId, pageKey, capabilities } = message.data || {};
+      const targetTabId = typeof tabId === 'number' ? tabId : sender.tab?.id;
+      if (typeof targetTabId !== 'number') {
+        throw new Error('Missing tabId for executor registration.');
+      }
+      flowExecutors.set(targetTabId, { pageKey, capabilities, updatedAt: Date.now() });
+      await resumeWaitingFlowsForTab(targetTabId, pageKey);
+      return { tabId: targetTabId, pageKey };
+    }
+    case MessageType.RUN_STEP: {
+      const { flowId, stepId, pageKey, targetUrl, pageUrl, resumeToken, tabId, timeout, timeoutMs, stepPayload, ...rest } =
+        message.data || {};
+      const targetTabId = typeof tabId === 'number' ? tabId : sender.tab?.id;
+      if (!flowId || typeof targetTabId !== 'number') {
+        throw new Error('Missing flowId or tabId for run.');
+      }
+      if (!flowExecutors.has(targetTabId)) {
+        throw new Error(`No executor registered for tab ${targetTabId}.`);
+      }
+      await ensureFlowSessionsLoaded();
+      const resolvedPageKey =
+        normalizePageUrl(pageKey || targetUrl || pageUrl) || pageKey || targetUrl || pageUrl || undefined;
+      updateFlowSession(flowId, {
+        currentStepId: stepId || null,
+        tabId: targetTabId,
+        pageKey: resolvedPageKey,
+        status: 'running',
+        resumeToken,
+        waitingForNavigation: false,
+      });
+      const payload = {
+        flowId,
+        stepId,
+        pageKey,
+        targetUrl,
+        pageUrl,
+        resumeToken,
+        stepPayload,
+        tabId: targetTabId,
+        timeout: timeout ?? timeoutMs ?? stepPayload?.timeout ?? stepPayload?.timeoutMs,
+        ...rest,
+      };
+      delete payload.tabId;
+      try {
+        await sendMessageToFrames(targetTabId, {
+          type: MessageType.RUN_STEP,
+          pageUrl: resolvedPageKey,
+          data: payload,
+        });
+        const timeoutValue =
+          Number(payload.timeout) || Number(stepPayload?.timeout) || Number(stepPayload?.timeoutMs) || 0;
+        scheduleStepTimeout(flowId, stepId, timeoutValue);
+      } catch (error) {
+        updateFlowSession(flowId, {
+          status: 'error',
+          error: { code: 'DISPATCH_FAILED', message: error?.message || 'Failed to dispatch step.' },
+        });
+        throw error;
+      }
+      return flowSessions.get(flowId) || null;
+    }
+    case MessageType.STEP_DONE: {
+      const { flowId, stepId, result } = message.data || {};
+      await ensureFlowSessionsLoaded();
+      if (flowId && flowSessions.has(flowId)) {
+        clearStepTimeout(flowId);
+        const session = flowSessions.get(flowId);
+        if (session && session.status === 'waiting' && session.waitingForNavigation) {
+          updateFlowSession(flowId, {
+            result,
+            error: undefined,
+          });
+          return true;
+        }
+        if (session && stepId && session.currentStepId && session.currentStepId !== stepId) {
+          return true;
+        }
+        const stepIndex = Number.isFinite(session?.currentIndex) ? session.currentIndex : 0;
+        const currentStep = session && Array.isArray(session.steps) ? session.steps[stepIndex] : null;
+        const navigationStep = isSameTabNavigationStep(currentStep);
+        const hasMore =
+          session && Array.isArray(session.steps)
+            ? (Number.isFinite(stepIndex) ? stepIndex : 0) + 1 < session.steps.length
+            : false;
+        if (session && session.status === 'paused') {
+          updateFlowSession(flowId, {
+            currentStepId: null,
+            result,
+            error: undefined,
+            waitingForNavigation: false,
+          });
+          return true;
+        }
+        if (session && session.status === 'running' && hasMore && navigationStep) {
+          advanceStep(flowId);
+          updateFlowSession(flowId, {
+            status: 'waiting',
+            waitingForNavigation: true,
+            result,
+            error: undefined,
+          });
+          return true;
+        }
+        if (session && session.status === 'running' && hasMore) {
+          advanceStep(flowId);
+          await dispatchNextStep(flowId);
+        } else {
+          updateFlowSession(flowId, {
+            currentStepId: stepId || null,
+            status: 'finished',
+            result,
+            error: undefined,
+            waitingForNavigation: false,
+          });
+        }
+      }
+      return true;
+    }
+    case MessageType.STEP_ERROR: {
+      const { flowId, stepId, code, message: errorMessage, detail } = message.data || {};
+      await ensureFlowSessionsLoaded();
+      if (flowId && flowSessions.has(flowId)) {
+        clearStepTimeout(flowId);
+        const session = flowSessions.get(flowId);
+        if (session && stepId && session.currentStepId && session.currentStepId !== stepId) {
+          return true;
+        }
+        updateFlowSession(flowId, {
+          currentStepId: stepId || null,
+          status: 'error',
+          waitingForNavigation: false,
+          error: { code, message: errorMessage, detail },
+        });
+      }
+      return true;
+    }
+    case MessageType.REJOIN_FLOW: {
+      const { flowId } = message.data || {};
+      if (!flowId) {
+        throw new Error('Missing flowId for rejoin.');
+      }
+      await ensureFlowSessionsLoaded();
+      const session = flowSessions.get(flowId) || null;
+      if (!session) {
+        return null;
+      }
+      const targetTabId = session.tabId;
+      if (typeof targetTabId === 'number' && !flowExecutors.has(targetTabId)) {
+        try {
+          const tab = await chrome.tabs.get(targetTabId);
+          if (!tab) {
+            return null;
+          }
+        } catch (_error) {
+          return null;
+        }
+      }
+      return session;
     }
     case MessageType.PICKER_RESULT: {
       const payload = message.data || {};

@@ -6,6 +6,9 @@ import {
   TrashIcon as HeroTrashIcon,
   ArrowTopRightOnSquareIcon,
   XCircleIcon,
+  PlayCircleIcon,
+  PauseCircleIcon,
+  StopCircleIcon,
 } from '@heroicons/react/20/solid';
 
 export function RefreshIcon(props) {
@@ -30,4 +33,16 @@ export function OpenPageIcon(props) {
 
 export function ClearPageIcon(props) {
   return <XCircleIcon aria-hidden="true" {...props} />;
+}
+
+export function PlayIcon(props) {
+  return <PlayCircleIcon aria-hidden="true" {...props} />;
+}
+
+export function PauseIcon(props) {
+  return <PauseCircleIcon aria-hidden="true" {...props} />;
+}
+
+export function StopIcon(props) {
+  return <StopCircleIcon aria-hidden="true" {...props} />;
 }

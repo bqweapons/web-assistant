@@ -39,12 +39,16 @@ const MAX_FLOW_SOURCE_LENGTH = 8000;
  * @property {'click'} type
  * @property {string} selector
  * @property {boolean} all
+ * @property {number | undefined} timeout
+ * @property {number | undefined} retry
  */
 
 /**
  * @typedef {Object} WaitStep
  * @property {'wait'} type
  * @property {number} ms
+ * @property {number | undefined} timeout
+ * @property {number | undefined} retry
  */
 
 /**
@@ -52,6 +56,8 @@ const MAX_FLOW_SOURCE_LENGTH = 8000;
  * @property {'input'} type
  * @property {string} selector
  * @property {string} value
+ * @property {number | undefined} timeout
+ * @property {number | undefined} retry
  */
 
 /**
@@ -59,12 +65,25 @@ const MAX_FLOW_SOURCE_LENGTH = 8000;
  * @property {'navigate'} type
  * @property {string} url
  * @property {string | undefined} target
+ * @property {number | undefined} timeout
+ * @property {number | undefined} retry
  */
 
 /**
  * @typedef {Object} LogStep
  * @property {'log'} type
  * @property {string} message
+ * @property {number | undefined} timeout
+ * @property {number | undefined} retry
+ */
+
+/**
+ * @typedef {Object} AssertStep
+ * @property {'assert'} type
+ * @property {FlowCondition} condition
+ * @property {string | undefined} message
+ * @property {number | undefined} timeout
+ * @property {number | undefined} retry
  */
 
 /**
@@ -84,7 +103,7 @@ const MAX_FLOW_SOURCE_LENGTH = 8000;
  */
 
 /**
- * @typedef {ClickStep | WaitStep | InputStep | NavigateStep | LogStep | IfStep | WhileStep} FlowStep
+ * @typedef {ClickStep | WaitStep | InputStep | NavigateStep | LogStep | AssertStep | IfStep | WhileStep} FlowStep
  */
 
 /**
@@ -188,11 +207,13 @@ function normalizeStep(entry, path, stats) {
   const record = /** @type {Record<string, unknown>} */ (entry);
   const rawType = typeof record.type === 'string' ? record.type : typeof record.action === 'string' ? record.action : '';
   const type = rawType.trim().toLowerCase();
+  const timeout = normalizeTimeout(record.timeout ?? record.timeoutMs);
+  const retry = normalizeRetry(record.retry ?? record.retries);
   switch (type) {
     case 'click': {
       stats.count += 1;
       const selector = requireString(record.selector, `Click step at ${path} requires a selector.`);
-      return { type: 'click', selector, all: Boolean(record.all) };
+      return { type: 'click', selector, all: Boolean(record.all), timeout, retry };
     }
     case 'wait': {
       stats.count += 1;
@@ -203,24 +224,36 @@ function normalizeStep(entry, path, stats) {
         throw new Error(`Wait step at ${path} requires a duration in milliseconds.`);
       }
       const ms = clampNumber(Math.max(0, msNumber), 0, MAX_FLOW_WAIT_MS);
-      return { type: 'wait', ms };
+      return { type: 'wait', ms, timeout, retry };
     }
     case 'input': {
       stats.count += 1;
       const selector = requireString(record.selector, `Input step at ${path} requires a selector.`);
       const value = requireString(record.value ?? record.text ?? '', `Input step at ${path} requires a value.`);
-      return { type: 'input', selector, value };
+      return { type: 'input', selector, value, timeout, retry };
     }
     case 'navigate': {
       stats.count += 1;
       const url = requireString(record.url ?? record.href ?? '', `Navigate step at ${path} requires a URL.`);
       const target = optionalString(record.target);
-      return { type: 'navigate', url, target };
+      return { type: 'navigate', url, target, timeout, retry };
+    }
+    case 'openpage': {
+      stats.count += 1;
+      const url = requireString(record.url ?? record.href ?? '', `Open page step at ${path} requires a URL.`);
+      const target = optionalString(record.target);
+      return { type: 'navigate', url, target, timeout, retry };
     }
     case 'log': {
       stats.count += 1;
       const message = requireString(record.message ?? record.text ?? '', `Log step at ${path} requires a message.`);
-      return { type: 'log', message };
+      return { type: 'log', message, timeout, retry };
+    }
+    case 'assert': {
+      stats.count += 1;
+      const condition = normalizeCondition(record.condition ?? record.test, `${path}.condition`);
+      const message = optionalString(record.message ?? record.text);
+      return { type: 'assert', condition, message, timeout, retry };
     }
     case 'if': {
       stats.count += 1;
@@ -345,6 +378,35 @@ function clampInteger(value, min, max) {
   }
   const rounded = Math.trunc(value);
   return Math.min(Math.max(rounded, min), max);
+}
+
+/**
+ * 正のタイムアウト値を正規化する、E
+ * @param {unknown} raw
+ * @returns {number | undefined}
+ */
+function normalizeTimeout(raw) {
+  if (!Number.isFinite(raw)) {
+    return undefined;
+  }
+  const value = Number(raw);
+  if (value <= 0) {
+    return undefined;
+  }
+  return value;
+}
+
+/**
+ * 正のリトライ回数を正規化する、E
+ * @param {unknown} raw
+ * @returns {number | undefined}
+ */
+function normalizeRetry(raw) {
+  if (!Number.isFinite(raw)) {
+    return undefined;
+  }
+  const value = Math.max(0, Math.trunc(Number(raw)));
+  return value;
 }
 
 export { MAX_FLOW_ITERATIONS, MAX_FLOW_SOURCE_LENGTH, MAX_FLOW_STEPS, MAX_FLOW_WAIT_MS };

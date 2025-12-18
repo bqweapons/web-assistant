@@ -12,6 +12,7 @@ export function ItemList({
   formatTooltipMode,
   onFocus,
   onOpenEditor,
+  onOpenFlow,
   onDelete,
   showActions = true,
 }) {
@@ -65,6 +66,20 @@ export function ItemList({
                     <TrashIcon className="h-4 w-4" />
                     <span className="sr-only">{t('manage.item.delete')}</span>
                   </button>
+                  {onOpenFlow && (
+                    <button
+                      type="button"
+                      className="inline-flex h-7 w-7 items-center justify-center rounded-full text-indigo-600 transition hover:bg-slate-100 hover:text-indigo-700"
+                      aria-label={t('manage.item.flow')}
+                      onClick={(event) => {
+                        event.stopPropagation();
+                        onOpenFlow(item.id);
+                      }}
+                    >
+                      <span className="text-[11px] font-bold">AF</span>
+                      <span className="sr-only">{t('manage.item.flow')}</span>
+                    </button>
+                  )}
                 </div>
               )}
             </header>

@@ -3,10 +3,12 @@ import { MessageType, sendMessage } from '../../common/messaging.js';
 import { getActiveTab } from '../../common/compat.js';
 import { normalizePageUrl } from '../../common/url.js';
 import { formatDateTime } from '../../common/i18n.js';
+import { parseActionFlowDefinition } from '../../common/flows.js';
 import { ItemList } from './components/ItemList.jsx';
 import { OverviewSection } from './components/OverviewSection.jsx';
 import { useI18n } from './hooks/useI18n.js';
 import { createMessage, formatPreview } from './utils/messages.js';
+import { FlowDrawer } from './components/FlowDrawer.jsx';
 
 const initialContextState = { kind: 'message', key: 'context.loading' };
 
@@ -24,8 +26,24 @@ export default function App() {
   const [exporting, setExporting] = useState(false);
   const [importing, setImporting] = useState(false);
   const [editingMode, setEditingModeState] = useState(false);
+  const [flowDrawerOpen, setFlowDrawerOpen] = useState(false);
+  const [flowTargetId, setFlowTargetId] = useState(null);
+  const [flowSteps, setFlowSteps] = useState([]);
+  const [flowSession, setFlowSession] = useState(null);
+  const [flowBusy, setFlowBusy] = useState(false);
+  const [flowPickerTarget, setFlowPickerTarget] = useState(null);
+  const [flowPickerSelection, setFlowPickerSelection] = useState(null);
+  const [flowPickerError, setFlowPickerError] = useState('');
   const importInputRef = useRef(null);
   const editingModeRef = useRef(false);
+  const flowPollRef = useRef(null);
+
+  const stopFlowPolling = useCallback(() => {
+    if (flowPollRef.current) {
+      clearInterval(flowPollRef.current);
+      flowPollRef.current = null;
+    }
+  }, []);
 
   useEffect(() => {
     editingModeRef.current = editingMode;
@@ -36,8 +54,18 @@ export default function App() {
       if (editingModeRef.current && tabId) {
         sendMessage(MessageType.SET_EDIT_MODE, { enabled: false, tabId, pageUrl }).catch(() => {});
       }
+      stopFlowPolling();
     };
-  }, [tabId, pageUrl]);
+  }, [stopFlowPolling, tabId, pageUrl]);
+
+  useEffect(() => {
+    if (!flowSession) {
+      return;
+    }
+    if (['finished', 'error', 'idle'].includes(flowSession.status)) {
+      stopFlowPolling();
+    }
+  }, [flowSession, stopFlowPolling]);
 
   const typeLabels = useMemo(
     () => ({
@@ -48,6 +76,8 @@ export default function App() {
     }),
     [t],
   );
+
+  const flowTarget = useMemo(() => items.find((item) => item.id === flowTargetId) || null, [items, flowTargetId]);
 
   const tabs = useMemo(
     () => [
@@ -215,6 +245,11 @@ export default function App() {
                 : createMessage('manage.picker.selected'),
             );
           }
+          if (flowPickerTarget && message.data?.selector) {
+            setFlowPickerSelection({ selector: message.data.selector, target: flowPickerTarget });
+            setFlowPickerTarget(null);
+            setFlowPickerError('');
+          }
           break;
         }
         case MessageType.PICKER_CANCELLED:
@@ -222,6 +257,10 @@ export default function App() {
             setCreationMessage(createMessage('manage.creation.error', { error: message.data.error }));
           } else {
             setCreationMessage(createMessage('manage.picker.cancelled'));
+          }
+          if (flowPickerTarget) {
+            setFlowPickerError(message.data?.error || t('manage.picker.cancelled'));
+            setFlowPickerTarget(null);
           }
           break;
         case MessageType.REHYDRATE:
@@ -378,6 +417,25 @@ export default function App() {
     }
   }, [creationType, pageUrl, tabId]);
 
+  const startFlowPicker = useCallback(
+    async (target) => {
+      if (!tabId || !pageUrl) {
+        setCreationMessage(createMessage('context.tabUnavailable'));
+        return;
+      }
+      setFlowPickerTarget(target || null);
+      setFlowPickerSelection(null);
+      setFlowPickerError('');
+      try {
+        await sendMessage(MessageType.START_PICKER, { tabId, pageUrl, targetType: 'selector' });
+      } catch (error) {
+        setCreationMessage(createMessage('manage.picker.startError', { error: error.message }));
+        setFlowPickerTarget(null);
+      }
+    },
+    [pageUrl, tabId],
+  );
+
   const focusElement = useCallback(
     async (id) => {
       if (!tabId || !pageUrl) {
@@ -409,6 +467,168 @@ export default function App() {
     },
     [pageUrl, t],
   );
+
+  const refreshFlowSession = useCallback(
+    async (flowId) => {
+      if (!flowId) {
+        return;
+      }
+      try {
+        const session = await sendMessage(MessageType.REJOIN_FLOW, { flowId, pageUrl });
+        setFlowSession(session || null);
+      } catch (error) {
+        setFlowSession(null);
+      }
+    },
+    [pageUrl],
+  );
+
+  const parseFlowSteps = useCallback((source) => {
+    if (!source || typeof source !== 'string') {
+      return [];
+    }
+    const { definition } = parseActionFlowDefinition(source);
+    return definition?.steps || [];
+  }, []);
+
+  const openFlowDrawer = useCallback(
+    async (id) => {
+      const target = items.find((item) => item.id === id);
+      if (!target) {
+        setCreationMessage(createMessage('flow.messages.missingTarget'));
+        return;
+      }
+      setFlowTargetId(id);
+      setFlowDrawerOpen(true);
+      setFlowSession(null);
+      stopFlowPolling();
+      setFlowSteps(parseFlowSteps(target.actionFlow));
+      await refreshFlowSession(id);
+    },
+    [items, parseFlowSteps, refreshFlowSession, stopFlowPolling],
+  );
+
+  const closeFlowDrawer = useCallback(() => {
+    setFlowDrawerOpen(false);
+    setFlowTargetId(null);
+    setFlowSession(null);
+    setFlowPickerTarget(null);
+    setFlowPickerSelection(null);
+    setFlowPickerError('');
+    if (tabId && pageUrl) {
+      sendMessage(MessageType.CANCEL_PICKER, { tabId, pageUrl }).catch(() => {});
+    }
+    stopFlowPolling();
+  }, [pageUrl, stopFlowPolling, tabId]);
+
+  const handleSaveFlow = useCallback(
+    async (steps, properties = null) => {
+      const target = items.find((item) => item.id === flowTargetId);
+      if (!target || !pageUrl) {
+        setCreationMessage(createMessage('flow.messages.missingTarget'));
+        return;
+      }
+      setFlowBusy(true);
+      try {
+        const actionFlow = JSON.stringify(steps, null, 2);
+        const nextElement = {
+          ...target,
+          actionFlow,
+          pageUrl,
+          siteUrl: target.siteUrl,
+          ...(properties || {}),
+        };
+        const list = await sendMessage(MessageType.UPDATE, nextElement);
+        setItems(Array.isArray(list) ? list : items);
+        setCreationMessage(createMessage('flow.messages.saveSuccess'));
+      } catch (error) {
+        setCreationMessage(createMessage('flow.messages.saveError', { error: error.message }));
+      } finally {
+        setFlowBusy(false);
+      }
+    },
+    [flowTargetId, items, pageUrl],
+  );
+
+  const handleRunFlow = useCallback(
+    async (steps) => {
+      if (!flowTargetId || !tabId || !pageUrl) {
+        setCreationMessage(createMessage('flow.messages.runPrereq'));
+        return;
+      }
+      setFlowBusy(true);
+      try {
+        const session = await sendMessage(MessageType.RUN_FLOW, {
+          flowId: flowTargetId,
+          steps,
+          tabId,
+          pageKey: pageUrl,
+          pageUrl,
+        });
+        setFlowSession(session || null);
+        stopFlowPolling();
+        flowPollRef.current = window.setInterval(() => refreshFlowSession(flowTargetId), 1200);
+        setCreationMessage(createMessage('flow.messages.runStarted'));
+      } catch (error) {
+        setCreationMessage(createMessage('flow.messages.runError', { error: error.message }));
+      } finally {
+        setFlowBusy(false);
+      }
+    },
+    [flowTargetId, pageUrl, refreshFlowSession, stopFlowPolling, tabId],
+  );
+
+  const handlePauseFlow = useCallback(async () => {
+    if (!flowTargetId) {
+      return;
+    }
+    setFlowBusy(true);
+    try {
+      const session = await sendMessage(MessageType.PAUSE_FLOW, { flowId: flowTargetId });
+      setFlowSession(session || null);
+      stopFlowPolling();
+      setCreationMessage(createMessage('flow.messages.pauseSuccess'));
+    } catch (error) {
+      setCreationMessage(createMessage('flow.messages.pauseError', { error: error.message }));
+    } finally {
+      setFlowBusy(false);
+    }
+  }, [flowTargetId, stopFlowPolling]);
+
+  const handleResumeFlow = useCallback(async () => {
+    if (!flowTargetId) {
+      return;
+    }
+    setFlowBusy(true);
+    try {
+      const session = await sendMessage(MessageType.RESUME_FLOW, { flowId: flowTargetId });
+      setFlowSession(session || null);
+      stopFlowPolling();
+      flowPollRef.current = window.setInterval(() => refreshFlowSession(flowTargetId), 1200);
+      setCreationMessage(createMessage('flow.messages.resumeSuccess'));
+    } catch (error) {
+      setCreationMessage(createMessage('flow.messages.resumeError', { error: error.message }));
+    } finally {
+      setFlowBusy(false);
+    }
+  }, [flowTargetId, refreshFlowSession, stopFlowPolling]);
+
+  const handleStopFlow = useCallback(async () => {
+    if (!flowTargetId) {
+      return;
+    }
+    setFlowBusy(true);
+    try {
+      const session = await sendMessage(MessageType.STOP_FLOW, { flowId: flowTargetId });
+      setFlowSession(session || null);
+      stopFlowPolling();
+      setCreationMessage(createMessage('flow.messages.stopSuccess'));
+    } catch (error) {
+      setCreationMessage(createMessage('flow.messages.stopError', { error: error.message }));
+    } finally {
+      setFlowBusy(false);
+    }
+  }, [flowTargetId, stopFlowPolling]);
 
   const openEditorBubble = useCallback(
     async (id) => {
@@ -490,7 +710,8 @@ export default function App() {
   const statusMessageText = creationMessage ? t(creationMessage.key, creationMessage.values) : '';
 
   return (
-    <main className="flex min-h-screen flex-col gap-6 bg-slate-50 p-6">
+    <>
+      <main className="flex min-h-screen flex-col gap-6 bg-slate-50 p-6">
 
       <nav className="flex gap-2 rounded-2xl border border-slate-200 bg-white p-1 shadow-brand">
         {tabs.map((tab) => {
@@ -607,6 +828,7 @@ export default function App() {
                 formatTooltipMode={formatTooltipMode}
                 onFocus={focusElement}
                 onOpenEditor={openEditorBubble}
+                onOpenFlow={openFlowDrawer}
                 onDelete={deleteElement}
                 showActions
               />
@@ -638,6 +860,7 @@ export default function App() {
                     formatTooltipMode={formatTooltipMode}
                     onFocus={focusElement}
                     onOpenEditor={openEditorBubble}
+                    onOpenFlow={openFlowDrawer}
                     onDelete={deleteElement}
                     showActions
                   />
@@ -748,5 +971,26 @@ export default function App() {
         </section>
       )}
     </main>
+
+      <FlowDrawer
+        open={flowDrawerOpen}
+        onClose={closeFlowDrawer}
+        item={flowTarget}
+        initialSteps={flowSteps}
+        onSave={handleSaveFlow}
+        onRun={handleRunFlow}
+        onPause={handlePauseFlow}
+        onResume={handleResumeFlow}
+        onStop={handleStopFlow}
+        onRefreshSession={() => refreshFlowSession(flowTargetId)}
+        session={flowSession}
+        busyAction={flowBusy}
+        onPickSelector={startFlowPicker}
+        pickerSelection={flowPickerSelection}
+        onPickerSelectionHandled={() => setFlowPickerSelection(null)}
+        pickerError={flowPickerError}
+        t={t}
+      />
+    </>
   );
 }

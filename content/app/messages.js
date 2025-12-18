@@ -8,9 +8,99 @@ import { applyEditingMode } from './editing-mode.js';
 import { matchesFrameSelectors, elementMatchesFrame } from './frame.js';
 import { synchronizeElements } from './hydration.js';
 import * as injectModule from '../inject.js';
-import { MessageType } from '../common/messaging.js';
+import { MessageType, sendMessage } from '../common/messaging.js';
+import { executeActionFlow } from '../injection/core/flow-runner.js';
+
+let executorRegistered = false;
+
+async function registerExecutor() {
+  if (executorRegistered) {
+    return;
+  }
+  try {
+    await sendMessage(MessageType.REGISTER_EXECUTOR, {
+      pageKey: runtime.pageKey,
+      capabilities: { flowVersion: 1 },
+    });
+    executorRegistered = true;
+  } catch (error) {
+    // registration may fail if background not ready; ignore and retry later
+    executorRegistered = false;
+  }
+}
+
+async function handleRunStep(message) {
+  await registerExecutor();
+  const { flowId, stepId, stepPayload, definition, steps, timeout, timeoutMs } = message?.data || {};
+  const payload =
+    stepPayload ||
+    (Array.isArray(steps) && steps.length > 0 ? steps[0] : null) ||
+    (definition && Array.isArray(definition.steps) && definition.steps.length > 0 ? definition.steps[0] : null);
+  if (!payload) {
+    const error = { code: 'INVALID_STEP', message: 'Missing step payload.' };
+    await sendMessage(MessageType.STEP_ERROR, { flowId, stepId, ...error });
+    return { ok: false, error };
+  }
+  const host = document.body || document.documentElement;
+  const timeoutValue = Number(timeout ?? timeoutMs ?? stepPayload?.timeout ?? stepPayload?.timeoutMs ?? 0);
+  const retries = Math.max(0, Number.isFinite(Number(stepPayload?.retry)) ? Number(stepPayload.retry) : 0);
+
+  const runOnceWithTimeout = async () => {
+    if (timeoutValue > 0) {
+      return Promise.race([
+        executeActionFlow(host, { steps: [payload], stepCount: 1 }),
+        new Promise((_, reject) => setTimeout(() => reject(new Error('Step timeout exceeded')), timeoutValue)),
+      ]);
+    }
+    return executeActionFlow(host, { steps: [payload], stepCount: 1 });
+  };
+
+  try {
+    let attempt = 0;
+    let performed = false;
+    let lastError = null;
+    while (attempt <= retries) {
+      try {
+        performed = Boolean(await runOnceWithTimeout());
+        lastError = null;
+        break;
+      } catch (error) {
+        lastError = error;
+        attempt += 1;
+        if (attempt > retries) {
+          break;
+        }
+      }
+    }
+    if (lastError) {
+      throw lastError;
+    }
+    const result = { performed };
+    try {
+      await sendMessage(MessageType.STEP_DONE, { flowId, stepId, result });
+    } catch (_error) {
+      // background may be unreachable; ignore
+    }
+    return { ok: true, data: result };
+  } catch (error) {
+    const detail = { message: error?.message || String(error) };
+    try {
+      await sendMessage(MessageType.STEP_ERROR, {
+        flowId,
+        stepId,
+        code: error?.message === 'Step timeout exceeded' ? 'STEP_TIMEOUT' : 'EXECUTION_FAILED',
+        message: detail.message,
+        detail,
+      });
+    } catch (_sendError) {
+      // ignore send error
+    }
+    return { ok: false, error: detail };
+  }
+}
 
 export function setupMessageBridge() {
+  registerExecutor();
   chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     if (!message?.type) {
       return;
@@ -82,6 +172,14 @@ export function setupMessageBridge() {
       case MessageType.SET_EDIT_MODE: {
         applyEditingMode(Boolean(message.data?.enabled));
         sendResponse?.({ ok: true });
+        break;
+      }
+      case MessageType.RUN_STEP: {
+        handleRunStep(message).then(sendResponse);
+        return true;
+      }
+      case MessageType.REJOIN_FLOW: {
+        sendResponse?.({ ok: true, data: { pageKey: runtime.pageKey, pageUrl: runtime.pageUrl } });
         break;
       }
       default:

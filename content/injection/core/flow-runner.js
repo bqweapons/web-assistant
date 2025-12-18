@@ -109,6 +109,15 @@ async function runFlowStep(step, context, depth) {
       console.info('[PageAugmentor][Flow]', step.message);
       break;
     }
+    case 'assert': {
+      const outcome = evaluateFlowCondition(step.condition, context);
+      if (!outcome) {
+        const message =
+          typeof step.message === 'string' && step.message.trim() ? step.message.trim() : 'Assertion failed.';
+        throw new Error(message);
+      }
+      break;
+    }
     case 'if': {
       const outcome = evaluateFlowCondition(step.condition, context);
       await runFlowSteps(outcome ? step.thenSteps : step.elseSteps, context, depth + 1);
