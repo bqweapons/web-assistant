@@ -21,6 +21,9 @@ let flowSessionsLoaded = false;
 let flowSessionSavePending = null;
 /** @type {Map<string, number>} */
 const flowStepTimeouts = new Map();
+/** @type {Map<string, number>} */
+const flowNavigationTimeouts = new Map();
+const NAVIGATION_WAIT_MS = 45000;
 
 function getStepId(step, index) {
   if (step && typeof step.id === 'string' && step.id.trim()) {
@@ -161,6 +164,14 @@ function clearStepTimeout(flowId) {
   }
 }
 
+function clearNavigationTimeout(flowId) {
+  const handle = flowNavigationTimeouts.get(flowId);
+  if (handle) {
+    clearTimeout(handle);
+    flowNavigationTimeouts.delete(flowId);
+  }
+}
+
 function scheduleStepTimeout(flowId, stepId, timeoutMs) {
   clearStepTimeout(flowId);
   if (!Number.isFinite(timeoutMs) || timeoutMs <= 0) {
@@ -175,6 +186,32 @@ function scheduleStepTimeout(flowId, stepId, timeoutMs) {
     flowStepTimeouts.delete(flowId);
   }, timeoutMs);
   flowStepTimeouts.set(flowId, handle);
+}
+
+function scheduleNavigationTimeout(flowId, pageUrl) {
+  clearNavigationTimeout(flowId);
+  const handle = setTimeout(() => {
+    updateFlowSession(flowId, {
+      status: 'error',
+      currentStepId: null,
+      waitingForNavigation: false,
+      error: { code: 'NAVIGATION_TIMEOUT', message: 'Navigation timeout.' },
+    });
+    flowNavigationTimeouts.delete(flowId);
+    sendMessageToFramesForFlow(flowId, {
+      type: MessageType.STEP_ERROR,
+      data: { flowId, code: 'NAVIGATION_TIMEOUT', message: 'Navigation timeout.' },
+      pageUrl,
+    }).catch(() => {});
+  }, NAVIGATION_WAIT_MS);
+  flowNavigationTimeouts.set(flowId, handle);
+}
+
+async function sendMessageToFramesForFlow(flowId, message) {
+  await ensureFlowSessionsLoaded();
+  const session = flowSessions.get(flowId);
+  if (!session) return;
+  await sendMessageToFrames(session.tabId, { ...message, pageUrl: session.pageKey });
 }
 
 function normalizeFlowSteps(input) {
@@ -554,10 +591,26 @@ addAsyncMessageListener(async (message, sender) => {
           pageUrl: resolvedPageKey,
           data: payload,
         });
-        const timeoutValue =
-          Number(payload.timeout) || Number(stepPayload?.timeout) || Number(stepPayload?.timeoutMs) || 0;
-        scheduleStepTimeout(flowId, stepId, timeoutValue);
-      } catch (error) {
+    const timeoutValue =
+      Number(payload.timeout) || Number(stepPayload?.timeout) || Number(stepPayload?.timeoutMs) || 0;
+    scheduleStepTimeout(flowId, stepId, timeoutValue);
+    const hasMoreSteps =
+      flowSessions.has(flowId) &&
+      Array.isArray(flowSessions.get(flowId).steps) &&
+      (Number.isFinite(flowSessions.get(flowId).currentIndex) ? flowSessions.get(flowId).currentIndex : 0) + 1 <
+        flowSessions.get(flowId).steps.length;
+    if (isSameTabNavigationStep(stepPayload) && hasMoreSteps) {
+      advanceStep(flowId);
+      updateFlowSession(flowId, {
+        status: 'waiting',
+        waitingForNavigation: true,
+        result: undefined,
+        error: undefined,
+      });
+      scheduleNavigationTimeout(flowId, resolvedPageKey);
+      return flowSessions.get(flowId) || null;
+    }
+  } catch (error) {
         updateFlowSession(flowId, {
           status: 'error',
           error: { code: 'DISPATCH_FAILED', message: error?.message || 'Failed to dispatch step.' },
