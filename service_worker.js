@@ -220,6 +220,8 @@ async function dispatchNextStep(flowId) {
       data: {
         flowId,
         stepId,
+        currentIndex,
+        total: steps.length,
         pageKey: session.pageKey,
         tabId: session.tabId,
         stepPayload: step,
@@ -353,6 +355,15 @@ addAsyncMessageListener(async (message, sender) => {
       }
       clearStepTimeout(flowId);
       updateFlowSession(flowId, { status: 'paused', waitingForNavigation: false });
+      try {
+        await sendMessageToFrames(session.tabId, {
+          type: MessageType.STEP_DONE,
+          pageUrl: session.pageKey,
+          data: { flowId, status: 'paused' },
+        });
+      } catch (_error) {
+        // ignore
+      }
       return flowSessions.get(flowId) || null;
     }
     case MessageType.RESUME_FLOW: {
@@ -366,6 +377,15 @@ addAsyncMessageListener(async (message, sender) => {
         return null;
       }
       updateFlowSession(flowId, { status: 'running', waitingForNavigation: false });
+      try {
+        await sendMessageToFrames(session.tabId, {
+          type: MessageType.STEP_DONE,
+          pageUrl: session.pageKey,
+          data: { flowId, status: 'running' },
+        });
+      } catch (_error) {
+        // ignore
+      }
       await dispatchNextStep(flowId);
       return flowSessions.get(flowId) || null;
     }
@@ -385,6 +405,18 @@ addAsyncMessageListener(async (message, sender) => {
         error: undefined,
         waitingForNavigation: false,
       });
+      const session = flowSessions.get(flowId);
+      if (session) {
+        try {
+          await sendMessageToFrames(session.tabId, {
+            type: MessageType.STEP_DONE,
+            pageUrl: session.pageKey,
+            data: { flowId, status: 'stopped' },
+          });
+        } catch (_error) {
+          // ignore
+        }
+      }
       return flowSessions.get(flowId) || null;
     }
     case MessageType.LIST_BY_URL: {
@@ -575,16 +607,25 @@ addAsyncMessageListener(async (message, sender) => {
           }
           return true;
         }
-        if (session && session.status === 'running' && hasMore && navigationStep) {
-          advanceStep(flowId);
-          updateFlowSession(flowId, {
-            status: 'waiting',
-            waitingForNavigation: true,
-            result,
-            error: undefined,
-          });
-          return true;
-        }
+    if (session && session.status === 'running' && hasMore && navigationStep) {
+      advanceStep(flowId);
+      updateFlowSession(flowId, {
+        status: 'waiting',
+        waitingForNavigation: true,
+        result,
+        error: undefined,
+      });
+      try {
+        await sendMessageToFrames(session.tabId, {
+          type: MessageType.STEP_DONE,
+          pageUrl: session.pageKey,
+          data: { flowId, stepId, status: 'waiting', result },
+        });
+      } catch (_error) {
+        // ignore
+      }
+      return true;
+    }
         if (session && session.status === 'running' && hasMore) {
           advanceStep(flowId);
           await dispatchNextStep(flowId);
@@ -672,7 +713,7 @@ addAsyncMessageListener(async (message, sender) => {
         await sendMessageToFrames(session.tabId, {
           type: MessageType.REJOIN_FLOW,
           pageUrl: session.pageKey,
-          data: { flowId: session.flowId, pageKey: session.pageKey },
+          data: { flowId: session.flowId, pageKey: session.pageKey, status: session.status },
         });
       } catch (_error) {
         // ignore

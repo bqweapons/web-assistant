@@ -11,6 +11,7 @@ import * as injectModule from '../inject.js';
 import { MessageType, sendMessage } from '../common/messaging.js';
 import { executeActionFlow } from '../injection/core/flow-runner.js';
 import { showHUD } from './hud.js';
+import { getMessage } from './i18n.js';
 
 let executorRegistered = false;
 
@@ -78,7 +79,7 @@ async function handleRunStep(message) {
     }
     const result = { performed };
     try {
-      await sendMessage(MessageType.STEP_DONE, { flowId, stepId, result });
+      await sendMessage(MessageType.STEP_DONE, { flowId, stepId, result, status: 'running' });
     } catch (_error) {
       // background may be unreachable; ignore
     }
@@ -180,7 +181,10 @@ export function setupMessageBridge() {
       }
       case MessageType.RUN_STEP: {
         if (message?.data?.flowId) {
-          showHUD(`Running flow step: ${message.data.stepId || ''}`, 'info');
+          const { currentIndex, total } = message.data || {};
+          const progress =
+            Number.isFinite(currentIndex) && Number.isFinite(total) ? ` (${currentIndex + 1}/${total})` : '';
+          showHUD(`${getMessage('hud_running_step', 'Running flow step')}${progress}`, 'info');
         }
         handleRunStep(message).then(sendResponse);
         return true;
@@ -197,14 +201,25 @@ export function setupMessageBridge() {
       case MessageType.STEP_DONE: {
         const status = message?.data?.status;
         if (status === 'finished') {
-          showHUD('Flow finished', 'info');
+          showHUD(getMessage('hud_flow_finished', 'Flow finished'), 'info');
+        } else if (status === 'waiting') {
+          showHUD(getMessage('hud_waiting_navigation', 'Waiting for navigation…'), 'info');
+        } else if (status === 'paused') {
+          showHUD(getMessage('hud_flow_paused', 'Flow paused'), 'warning');
+        } else if (status === 'running') {
+          showHUD(getMessage('hud_flow_resumed', 'Flow resumed'), 'info');
+        } else if (status === 'stopped') {
+          showHUD(getMessage('hud_flow_stopped', 'Flow stopped'), 'warning');
         } else {
-          showHUD('Step completed', 'info');
+          showHUD(getMessage('hud_step_completed', 'Step completed'), 'info');
         }
         sendResponse?.({ ok: true, data: message.data });
         break;
       }
       case MessageType.REJOIN_FLOW: {
+        if (message?.data?.status === 'waiting') {
+          showHUD(getMessage('hud_rejoin_waiting', 'Restored flow; waiting for navigation…'), 'info');
+        }
         sendResponse?.({ ok: true, data: { pageKey: runtime.pageKey, pageUrl: runtime.pageUrl } });
         break;
       }

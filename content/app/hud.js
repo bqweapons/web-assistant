@@ -20,6 +20,7 @@ function createCard(text, variant = 'info') {
   const card = document.createElement('div');
   card.style.maxWidth = '320px';
   card.style.marginTop = '8px';
+  card.style.position = 'relative';
   card.style.padding = '12px 14px';
   card.style.borderRadius = '12px';
   card.style.border = '1px solid rgba(148, 163, 184, 0.6)';
