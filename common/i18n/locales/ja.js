@@ -206,6 +206,7 @@ mergeMessages(messages, {
       resumeError: '再開に失敗しました: {error}',
       stopSuccess: 'フローを停止しました。',
       stopError: '停止に失敗しました: {error}',
+      pickerApplied: 'セレクターを適用しました: {selector}',
     },
   },
   overview: {

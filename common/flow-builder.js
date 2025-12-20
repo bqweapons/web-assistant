@@ -1,3 +1,5 @@
+import { parseActionFlowDefinition } from './flows.js';
+
 const BUILDER_STEP_TYPES = ['click', 'input', 'wait', 'navigate', 'log', 'assert'];
 
 function coerceTimeout(value) {
@@ -101,3 +103,118 @@ export function parseBuilderSteps(source) {
 }
 
 export { BUILDER_STEP_TYPES };
+
+/**
+ * Parses either a JSON builder payload or a full flow definition string into builder steps.
+ * @param {string | undefined | null} source
+ * @returns {ReturnType<typeof normalizeBuilderSteps>}
+ */
+export function builderStepsFromSource(source) {
+  const raw = typeof source === 'string' ? source : '';
+  if (!raw.trim()) {
+    return [];
+  }
+  const parsed = parseBuilderSteps(raw);
+  if (parsed.steps) {
+    return parsed.steps;
+  }
+  const { definition } = parseActionFlowDefinition(raw);
+  if (definition && Array.isArray(definition.steps)) {
+    return normalizeBuilderSteps(definition.steps);
+  }
+  return [];
+}
+
+/**
+ * Validates builder steps and returns normalized steps plus any validation errors.
+ * @param {ReturnType<typeof normalizeBuilderSteps> | any[]} rawSteps
+ * @returns {{ valid: boolean; steps: ReturnType<typeof normalizeBuilderSteps>; errors: Array<{ index: number; code: string; message: string }> }}
+ */
+export function validateBuilderSteps(rawSteps) {
+  const steps = normalizeBuilderSteps(rawSteps);
+  const errors = [];
+  const isNonEmptyString = (value) => typeof value === 'string' && value.trim().length > 0;
+
+  steps.forEach((step, index) => {
+    switch (step.type) {
+      case 'click':
+        if (!isNonEmptyString(step.selector)) {
+          errors.push({
+            index,
+            code: 'missing_selector',
+            message: `Step #${index + 1} requires a selector.`,
+          });
+        }
+        break;
+      case 'input':
+        if (!isNonEmptyString(step.selector)) {
+          errors.push({
+            index,
+            code: 'missing_selector',
+            message: `Step #${index + 1} requires a selector.`,
+          });
+        }
+        if (!isNonEmptyString(step.value)) {
+          errors.push({
+            index,
+            code: 'missing_value',
+            message: `Step #${index + 1} requires input text.`,
+          });
+        }
+        break;
+      case 'wait': {
+        const ms = Number(step.ms);
+        if (!Number.isFinite(ms) || ms < 0) {
+          errors.push({
+            index,
+            code: 'invalid_wait',
+            message: `Step #${index + 1} requires a non-negative wait time.`,
+          });
+        }
+        break;
+      }
+      case 'navigate':
+        if (!isNonEmptyString(step.url)) {
+          errors.push({
+            index,
+            code: 'missing_url',
+            message: `Step #${index + 1} requires a URL.`,
+          });
+        }
+        break;
+      case 'log':
+        if (!isNonEmptyString(step.message)) {
+          errors.push({
+            index,
+            code: 'missing_message',
+            message: `Step #${index + 1} requires a log message.`,
+          });
+        }
+        break;
+      case 'assert': {
+        const condition = step.condition || {};
+        const kind = typeof condition.kind === 'string' ? condition.kind : '';
+        if (kind === 'exists') {
+          if (!isNonEmptyString(condition.selector)) {
+            errors.push({
+              index,
+              code: 'missing_selector',
+              message: `Step #${index + 1} requires a selector.`,
+            });
+          }
+        } else {
+          errors.push({
+            index,
+            code: 'invalid_condition',
+            message: `Step #${index + 1} requires a valid condition.`,
+          });
+        }
+        break;
+      }
+      default:
+        break;
+    }
+  });
+
+  return { valid: errors.length === 0, steps, errors };
+}

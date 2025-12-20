@@ -1,5 +1,6 @@
 import { createField, styleInput } from '../ui/field.js';
 import { stepsToJSON } from '../actionflow/serializer.js';
+import { createDefaultStep, validateBuilderSteps } from '../../../common/flow-builder.js';
 
 /**
  * Creates the action flow controls used by the element editor.
@@ -574,19 +575,10 @@ export function createActionFlowController(options) {
     }
   }
 
-  const createStepTemplate = (type, previous = {}) => {
-    if (type === 'input') {
-      return { type: 'input', selector: previous.selector || '', value: previous.value || '' };
-    }
-    if (type === 'wait') {
-      const ms =
-        typeof previous.ms === 'number' && Number.isFinite(previous.ms) && previous.ms >= 0
-          ? Math.round(previous.ms)
-          : 1000;
-      return { type: 'wait', ms };
-    }
-    return { type: 'click', selector: previous.selector || '' };
-  };
+  const createStepTemplate = (type, previous = {}) => ({
+    ...createDefaultStep(type),
+    ...previous,
+  });
 
   const applyButtonPlacement = (placement) => {
     const normalized = placement === 'stacked' ? 'stacked' : 'row';
@@ -702,51 +694,30 @@ export function createActionFlowController(options) {
       return '';
     }
 
-    for (let index = 0; index < state.actionSteps.length; index += 1) {
-      const step = state.actionSteps[index];
-      if (step.type === 'wait') {
-        const ms = Number(step.ms);
-        if (!Number.isFinite(ms) || ms < 0) {
-          state.actionFlowError = t('editor.actionBuilder.error.delay', { index: index + 1 });
-          state.actionFlowSteps = 0;
-          state.actionFlow = '';
-          actionBuilderInvalidIndex = index;
-          if (updateHint) {
-            updateActionFlowSummary();
-          }
-          return null;
-        }
-      } else {
-        const selector = (step.selector || '').trim();
-        if (!selector) {
-          state.actionFlowError = t('editor.actionBuilder.error.selector', { index: index + 1 });
-          state.actionFlowSteps = 0;
-          state.actionFlow = '';
-          actionBuilderInvalidIndex = index;
-          if (updateHint) {
-            updateActionFlowSummary();
-          }
-          return null;
-        }
-        if (step.type === 'input') {
-          if (!((step.value || '').trim())) {
-            state.actionFlowError = t('editor.actionBuilder.error.value', { index: index + 1 });
-            state.actionFlowSteps = 0;
-            state.actionFlow = '';
-            actionBuilderInvalidIndex = index;
-            if (updateHint) {
-              updateActionFlowSummary();
-            }
-            return null;
-          }
-        }
+    const validation = validateBuilderSteps(state.actionSteps);
+    if (!validation.valid) {
+      const first = validation.errors[0];
+      const map = {
+        missing_selector: 'editor.actionBuilder.error.selector',
+        missing_value: 'editor.actionBuilder.error.value',
+        invalid_wait: 'editor.actionBuilder.error.delay',
+      };
+      actionBuilderInvalidIndex = typeof first?.index === 'number' ? first.index : -1;
+      const key = first?.code ? map[first.code] : null;
+      state.actionFlowError = key ? t(key, { index: actionBuilderInvalidIndex + 1 }) : first?.message || '';
+      state.actionFlowSteps = 0;
+      state.actionFlow = '';
+      if (updateHint) {
+        updateActionFlowSummary();
       }
+      return null;
     }
 
-    const serialized = stepsToJSON(state.actionSteps);
+    state.actionSteps = validation.steps;
+    const serialized = stepsToJSON(validation.steps);
     state.actionFlow = serialized;
     state.actionFlowError = '';
-    state.actionFlowSteps = state.actionSteps.length;
+    state.actionFlowSteps = validation.steps.length;
     actionFlowInput.value = serialized;
     if (updateHint) {
       updateActionFlowSummary();

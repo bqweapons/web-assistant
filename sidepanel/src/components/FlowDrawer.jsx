@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { BUILDER_STEP_TYPES, createDefaultStep, normalizeBuilderSteps } from '../../../common/flow-builder.js';
+import { BUILDER_STEP_TYPES, createDefaultStep, normalizeBuilderSteps, validateBuilderSteps } from '../../../common/flow-builder.js';
 import { PauseIcon, PlayIcon, StopIcon } from './Icons.jsx';
 
 function StepEditor({ index, step, onChange, onDelete, onPick, t }) {
@@ -174,17 +174,13 @@ function StepEditor({ index, step, onChange, onDelete, onPick, t }) {
     <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
       <div className="mb-3 flex items-center justify-between">
         <div className="flex items-center gap-2 text-xs font-semibold text-slate-700">
-          <span className="inline-flex h-6 w-6 items-center justify-center rounded-full bg-indigo-100 text-indigo-700">
+          <span className="inline-flex h-6 w-6 items-center justify-center rounded-full bg-indigo-100 text-indigo-700 cursor-grab">
             {index + 1}
           </span>
           <select
             className="rounded-lg border border-slate-200 bg-slate-50 px-2 py-1 text-xs font-semibold text-slate-700"
             value={step.type}
-            onChange={(event) => {
-              const nextType = event.target.value;
-              const template = createDefaultStep(nextType);
-              update({ ...template, id: step.id || template.id });
-            }}
+            disabled
           >
             {BUILDER_STEP_TYPES.map((type) => (
               <option key={type} value={type}>
@@ -250,6 +246,7 @@ export function FlowDrawer({
   const [steps, setSteps] = useState(normalizeBuilderSteps(initialSteps));
   const [error, setError] = useState('');
   const [activeTab, setActiveTab] = useState('flow');
+  const [draggingIndex, setDraggingIndex] = useState(null);
   const [properties, setProperties] = useState({
     type: item?.type || 'button',
     text: item?.text || '',
@@ -348,22 +345,62 @@ export function FlowDrawer({
     setSteps(next);
   };
 
+  const handleReorder = (from, to) => {
+    if (from === to || from < 0 || to < 0 || from >= steps.length || to >= steps.length) {
+      return;
+    }
+    const next = [...steps];
+    const [moved] = next.splice(from, 1);
+    next.splice(to, 0, moved);
+    setSteps(next);
+  };
+
   const handleAddStep = () => {
     setSteps((prev) => [...prev, createDefaultStep('click', `step-${Date.now()}`)]);
   };
 
+  const validateAndNormalize = () => {
+    const validation = validateBuilderSteps(steps);
+    if (!validation.valid) {
+      const first = validation.errors[0] || null;
+      const keyMap = {
+        missing_selector: 'editor.actionBuilder.error.selector',
+        missing_value: 'editor.actionBuilder.error.value',
+        invalid_wait: 'editor.actionBuilder.error.delay',
+      };
+      const index = typeof first?.index === 'number' ? first.index + 1 : undefined;
+      const translated = first?.code && keyMap[first.code] ? t(keyMap[first.code], { index }) : null;
+      setError(translated || first?.message || t('flow.session.error'));
+      setActiveTab('flow');
+      return null;
+    }
+    setError('');
+    const normalized = validation.steps;
+    if (JSON.stringify(normalized) !== JSON.stringify(steps)) {
+      setSteps(normalized);
+    }
+    return normalized;
+  };
+
   const handleSave = () => {
     try {
-      setError('');
-      onSave?.(steps, properties);
+      const normalized = validateAndNormalize();
+      if (!normalized) {
+        return;
+      }
+      onSave?.(normalized, properties);
     } catch (err) {
       setError(err?.message || String(err));
     }
   };
 
   const handleRun = () => {
+    const normalized = validateAndNormalize();
+    if (!normalized) {
+      return;
+    }
     setError('');
-    onRun?.(steps);
+    onRun?.(normalized);
   };
 
   const handlePause = () => onPause?.();
@@ -598,15 +635,34 @@ export function FlowDrawer({
               ) : (
                 <>
                   {steps.map((step, index) => (
-                    <StepEditor
+                    <div
                       key={step.id || index}
-                      index={index}
-                      step={step}
-                      t={t}
-                      onChange={(next) => handleStepChange(index, next)}
-                      onDelete={() => setSteps(steps.filter((_, i) => i !== index))}
-                      onPick={(idx) => handlePickSelector({ kind: 'step', index: idx })}
-                    />
+                      draggable
+                      onDragStart={(event) => {
+                        setDraggingIndex(index);
+                        event.dataTransfer.effectAllowed = 'move';
+                      }}
+                      onDragOver={(event) => {
+                        event.preventDefault();
+                      }}
+                      onDrop={(event) => {
+                        event.preventDefault();
+                        if (draggingIndex !== null) {
+                          handleReorder(draggingIndex, index);
+                          setDraggingIndex(null);
+                        }
+                      }}
+                      onDragEnd={() => setDraggingIndex(null)}
+                    >
+                      <StepEditor
+                        index={index}
+                        step={step}
+                        t={t}
+                        onChange={(next) => handleStepChange(index, next)}
+                        onDelete={() => setSteps(steps.filter((_, i) => i !== index))}
+                        onPick={(idx) => handlePickSelector({ kind: 'step', index: idx, stepType: step.type })}
+                      />
+                    </div>
                   ))}
 
                   <button

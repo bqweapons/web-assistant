@@ -200,6 +200,7 @@ const messages = {
       resumeError: 'Unable to resume: {error}',
       stopSuccess: 'Flow stopped.',
       stopError: 'Unable to stop: {error}',
+      pickerApplied: 'Selector applied: {selector}',
     },
   },
   overview: {

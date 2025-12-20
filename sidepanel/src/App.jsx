@@ -3,8 +3,7 @@ import { MessageType, sendMessage } from '../../common/messaging.js';
 import { getActiveTab } from '../../common/compat.js';
 import { normalizePageUrl } from '../../common/url.js';
 import { formatDateTime } from '../../common/i18n.js';
-import { parseActionFlowDefinition } from '../../common/flows.js';
-import { parseBuilderSteps, serializeBuilderSteps, normalizeBuilderSteps } from '../../common/flow-builder.js';
+import { serializeBuilderSteps, builderStepsFromSource } from '../../common/flow-builder.js';
 import { ItemList } from './components/ItemList.jsx';
 import { OverviewSection } from './components/OverviewSection.jsx';
 import { useI18n } from './hooks/useI18n.js';
@@ -38,6 +37,7 @@ export default function App() {
   const importInputRef = useRef(null);
   const editingModeRef = useRef(false);
   const flowPollRef = useRef(null);
+  const lastPageUrlRef = useRef('');
 
   const stopFlowPolling = useCallback(() => {
     if (flowPollRef.current) {
@@ -233,18 +233,22 @@ export default function App() {
       if (!message?.type) {
         return;
       }
-      if (message.pageUrl && message.pageUrl !== pageUrl) {
+      if (message.pageUrl && message.pageUrl !== pageUrl && !(flowPickerTarget && message.type === MessageType.PICKER_RESULT)) {
         return;
       }
       switch (message.type) {
         case MessageType.PICKER_RESULT: {
           if (message.data?.selector) {
             const preview = formatPreview(message.data.preview, t);
-            setCreationMessage(
-              preview
-                ? createMessage('manage.picker.selectedWithPreview', { preview })
-                : createMessage('manage.picker.selected'),
-            );
+            if (flowPickerTarget) {
+              setCreationMessage(createMessage('flow.messages.pickerApplied', { selector: message.data.selector }));
+            } else {
+              setCreationMessage(
+                preview
+                  ? createMessage('manage.picker.selectedWithPreview', { preview })
+                  : createMessage('manage.picker.selected'),
+              );
+            }
           }
           if (flowPickerTarget && message.data?.selector) {
             setFlowPickerSelection({ selector: message.data.selector, target: flowPickerTarget });
@@ -296,7 +300,7 @@ export default function App() {
     return () => {
       chrome.runtime.onMessage.removeListener(listener);
     };
-  }, [pageUrl, t]);
+  }, [pageUrl, t, flowPickerTarget]);
 
   const filteredItems = useMemo(() => {
     const query = filterText.trim().toLowerCase();
@@ -419,7 +423,7 @@ export default function App() {
   }, [creationType, pageUrl, tabId]);
 
   const startFlowPicker = useCallback(
-    async (target) => {
+    async (target, accept = 'selector') => {
       if (!tabId || !pageUrl) {
         setCreationMessage(createMessage('context.tabUnavailable'));
         return;
@@ -428,7 +432,14 @@ export default function App() {
       setFlowPickerSelection(null);
       setFlowPickerError('');
       try {
-        await sendMessage(MessageType.START_PICKER, { tabId, pageUrl, targetType: 'selector' });
+        await sendMessage(MessageType.START_PICKER, {
+          tabId,
+          pageUrl,
+          targetType: 'selector',
+          source: 'flow-drawer',
+          accept,
+          mode: 'select',
+        });
       } catch (error) {
         setCreationMessage(createMessage('manage.picker.startError', { error: error.message }));
         setFlowPickerTarget(null);
@@ -484,17 +495,7 @@ export default function App() {
     [pageUrl],
   );
 
-  const parseFlowSteps = useCallback((source) => {
-    if (!source || typeof source !== 'string') {
-      return [];
-    }
-    const parsed = parseBuilderSteps(source);
-    if (parsed.steps) {
-      return parsed.steps;
-    }
-    const { definition } = parseActionFlowDefinition(source);
-    return definition?.steps || [];
-  }, []);
+  const parseFlowSteps = useCallback((source) => builderStepsFromSource(source), []);
 
   const openFlowDrawer = useCallback(
     async (id) => {
@@ -689,6 +690,15 @@ export default function App() {
       // ignore
     }
   }, []);
+
+  useEffect(() => {
+    if (flowDrawerOpen && lastPageUrlRef.current && pageUrl && lastPageUrlRef.current !== pageUrl) {
+      closeFlowDrawer();
+    }
+    if (pageUrl) {
+      lastPageUrlRef.current = pageUrl;
+    }
+  }, [pageUrl, flowDrawerOpen, closeFlowDrawer]);
 
   const contextLabelText = contextInfo?.kind === 'url' ? contextInfo.value : t(contextInfo.key, contextInfo.values);
   const statusMessageText = creationMessage ? t(creationMessage.key, creationMessage.values) : '';
@@ -967,7 +977,7 @@ export default function App() {
         onRefreshSession={() => refreshFlowSession(flowTargetId)}
         session={flowSession}
         busyAction={flowBusy}
-        onPickSelector={startFlowPicker}
+        onPickSelector={(target) => startFlowPicker(target, target?.stepType === 'input' ? 'input' : 'selector')}
         pickerSelection={flowPickerSelection}
         onPickerSelectionHandled={() => setFlowPickerSelection(null)}
         pickerError={flowPickerError}

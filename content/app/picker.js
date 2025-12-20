@@ -9,8 +9,11 @@ export function beginPicker(options = {}) {
   closeEditorBubble();
   refreshPageContextFromLocation();
   document.body.style.cursor = 'crosshair';
+  const selectionOnly =
+    options.mode === 'select' || options.source === 'flow-drawer' || options.accept === 'selector' || options.accept === 'input';
+  const mode = selectionOnly ? 'select' : options.mode || 'create';
   state.pickerSession = selectorModule.startElementPicker({
-    mode: options.mode || 'create',
+    mode,
     onTarget(target, selector) {
       const metadata = selectorModule.resolveFrameContext(target.ownerDocument?.defaultView || window);
       sendMessage(MessageType.PICKER_RESULT, {
@@ -24,6 +27,10 @@ export function beginPicker(options = {}) {
       }).catch((error) => console.error('[PageAugmentor] Failed to send picker result', error));
     },
     onSubmit(payload) {
+      // Flow drawer only needs the selector; do not create elements.
+      if (selectionOnly) {
+        return;
+      }
       stopPicker();
       const scope = options.scope === 'site' ? 'site' : 'page';
       const elementPayload = {

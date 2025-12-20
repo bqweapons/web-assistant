@@ -205,6 +205,7 @@ mergeMessages(messages, {
       resumeError: '继续失败：{error}',
       stopSuccess: '流程已停止。',
       stopError: '停止失败：{error}',
+      pickerApplied: '已应用选择器：{selector}',
     },
   },
   overview: {
