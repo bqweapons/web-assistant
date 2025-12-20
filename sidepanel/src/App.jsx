@@ -4,6 +4,7 @@ import { getActiveTab } from '../../common/compat.js';
 import { normalizePageUrl } from '../../common/url.js';
 import { formatDateTime } from '../../common/i18n.js';
 import { parseActionFlowDefinition } from '../../common/flows.js';
+import { parseBuilderSteps, serializeBuilderSteps, normalizeBuilderSteps } from '../../common/flow-builder.js';
 import { ItemList } from './components/ItemList.jsx';
 import { OverviewSection } from './components/OverviewSection.jsx';
 import { useI18n } from './hooks/useI18n.js';
@@ -487,6 +488,10 @@ export default function App() {
     if (!source || typeof source !== 'string') {
       return [];
     }
+    const parsed = parseBuilderSteps(source);
+    if (parsed.steps) {
+      return parsed.steps;
+    }
     const { definition } = parseActionFlowDefinition(source);
     return definition?.steps || [];
   }, []);
@@ -530,7 +535,7 @@ export default function App() {
       }
       setFlowBusy(true);
       try {
-        const actionFlow = JSON.stringify(steps, null, 2);
+        const actionFlow = serializeBuilderSteps(steps);
         const nextElement = {
           ...target,
           actionFlow,
@@ -629,27 +634,6 @@ export default function App() {
       setFlowBusy(false);
     }
   }, [flowTargetId, stopFlowPolling]);
-
-  const openEditorBubble = useCallback(
-    async (id) => {
-      if (!pageUrl) {
-        setCreationMessage(createMessage('context.pageUrlUnavailable'));
-        return;
-      }
-      if (!tabId) {
-        setCreationMessage(createMessage('context.tabUnavailable'));
-        return;
-      }
-      try {
-        await chrome.tabs.update(tabId, { active: true });
-        await sendMessage(MessageType.OPEN_EDITOR, { id, pageUrl, tabId });
-        setCreationMessage(createMessage('manage.openBubble.success'));
-      } catch (error) {
-        setCreationMessage(createMessage('manage.openBubble.error', { error: error.message }));
-      }
-    },
-    [pageUrl, tabId],
-  );
 
   const openPageUrl = useCallback((targetUrl) => {
     if (!targetUrl) {
@@ -827,7 +811,6 @@ export default function App() {
                 formatTooltipPosition={formatTooltipPosition}
                 formatTooltipMode={formatTooltipMode}
                 onFocus={focusElement}
-                onOpenEditor={openEditorBubble}
                 onOpenFlow={openFlowDrawer}
                 onDelete={deleteElement}
                 showActions
@@ -859,7 +842,6 @@ export default function App() {
                     formatTooltipPosition={formatTooltipPosition}
                     formatTooltipMode={formatTooltipMode}
                     onFocus={focusElement}
-                    onOpenEditor={openEditorBubble}
                     onOpenFlow={openFlowDrawer}
                     onDelete={deleteElement}
                     showActions

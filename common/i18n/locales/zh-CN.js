@@ -159,6 +159,15 @@ mergeMessages(messages, {
       progress: '步骤 {progress}',
       error: '流程执行失败。',
     },
+    errors: {
+      elementNotFound: '未找到目标元素。',
+      assertionFailed: '断言失败。',
+      stepTimeout: '步骤超时。',
+      executionFailed: '步骤执行失败。',
+      dispatchFailed: '无法发送步骤到页面。',
+      tabClosed: '执行过程中标签页已关闭。',
+      navigationTimeout: '页面导航超时。',
+    },
     form: {
       selector: '选择器',
       value: '输入值',

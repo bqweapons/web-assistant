@@ -70,6 +70,12 @@ async function runFlowStep(step, context, depth) {
         }
       }
       if (targets.length === 0) {
+        const error = new Error('Element not found for click step');
+        // @ts-ignore
+        error.code = 'ELEMENT_NOT_FOUND';
+        throw error;
+      }
+      if (targets.length === 0) {
         break;
       }
       targets.forEach((target) => {
@@ -91,6 +97,12 @@ async function runFlowStep(step, context, depth) {
     }
     case 'input': {
       const target = resolveFlowElement(step.selector, context);
+      if (!target) {
+        const error = new Error('Element not found for input step');
+        // @ts-ignore
+        error.code = 'ELEMENT_NOT_FOUND';
+        throw error;
+      }
       if (target && applyInputValue(target, step.value)) {
         context.performed = true;
       }
@@ -114,7 +126,10 @@ async function runFlowStep(step, context, depth) {
       if (!outcome) {
         const message =
           typeof step.message === 'string' && step.message.trim() ? step.message.trim() : 'Assertion failed.';
-        throw new Error(message);
+        const error = new Error(message);
+        // @ts-ignore
+        error.code = 'ASSERTION_FAILED';
+        throw error;
       }
       break;
     }

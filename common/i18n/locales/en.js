@@ -154,6 +154,15 @@ const messages = {
       progress: 'Step {progress}',
       error: 'Flow failed.',
     },
+    errors: {
+      elementNotFound: 'Target element not found.',
+      assertionFailed: 'Assertion failed.',
+      stepTimeout: 'Step timed out.',
+      executionFailed: 'Step execution failed.',
+      dispatchFailed: 'Failed to dispatch step to the page.',
+      tabClosed: 'Tab closed during flow execution.',
+      navigationTimeout: 'Navigation timed out.',
+    },
     form: {
       selector: 'Selector',
       value: 'Value',

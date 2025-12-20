@@ -160,6 +160,15 @@ mergeMessages(messages, {
       progress: 'ステップ {progress}',
       error: 'フローが失敗しました。',
     },
+    errors: {
+      elementNotFound: '対象要素が見つかりません。',
+      assertionFailed: 'アサーションに失敗しました。',
+      stepTimeout: 'ステップがタイムアウトしました。',
+      executionFailed: 'ステップの実行に失敗しました。',
+      dispatchFailed: 'ステップをページへ送信できませんでした。',
+      tabClosed: 'フロー実行中にタブが閉じられました。',
+      navigationTimeout: 'ナビゲーションがタイムアウトしました。',
+    },
     form: {
       selector: 'セレクター',
       value: '入力値',

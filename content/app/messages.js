@@ -10,6 +10,7 @@ import { synchronizeElements } from './hydration.js';
 import * as injectModule from '../inject.js';
 import { MessageType, sendMessage } from '../common/messaging.js';
 import { executeActionFlow } from '../injection/core/flow-runner.js';
+import { showHUD } from './hud.js';
 
 let executorRegistered = false;
 
@@ -83,12 +84,15 @@ async function handleRunStep(message) {
     }
     return { ok: true, data: result };
   } catch (error) {
-    const detail = { message: error?.message || String(error) };
+    const code =
+      error?.code ||
+      (error?.message === 'Step timeout exceeded' ? 'STEP_TIMEOUT' : error?.message ? 'EXECUTION_FAILED' : 'EXECUTION_FAILED');
+    const detail = { message: error?.message || String(error), code };
     try {
       await sendMessage(MessageType.STEP_ERROR, {
         flowId,
         stepId,
-        code: error?.message === 'Step timeout exceeded' ? 'STEP_TIMEOUT' : 'EXECUTION_FAILED',
+        code,
         message: detail.message,
         detail,
       });
@@ -175,8 +179,30 @@ export function setupMessageBridge() {
         break;
       }
       case MessageType.RUN_STEP: {
+        if (message?.data?.flowId) {
+          showHUD(`Running flow step: ${message.data.stepId || ''}`, 'info');
+        }
         handleRunStep(message).then(sendResponse);
         return true;
+      }
+      case MessageType.STEP_ERROR: {
+        // Let HUD or other UI show error; simply ack here.
+        if (message?.data?.message) {
+          const code = message.data.code ? ` (${message.data.code})` : '';
+          showHUD(`${message.data.message}${code}`, 'error');
+        }
+        sendResponse?.({ ok: true, data: message.data });
+        break;
+      }
+      case MessageType.STEP_DONE: {
+        const status = message?.data?.status;
+        if (status === 'finished') {
+          showHUD('Flow finished', 'info');
+        } else {
+          showHUD('Step completed', 'info');
+        }
+        sendResponse?.({ ok: true, data: message.data });
+        break;
       }
       case MessageType.REJOIN_FLOW: {
         sendResponse?.({ ok: true, data: { pageKey: runtime.pageKey, pageUrl: runtime.pageUrl } });

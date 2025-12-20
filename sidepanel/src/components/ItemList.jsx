@@ -11,7 +11,6 @@ export function ItemList({
   formatTooltipPosition,
   formatTooltipMode,
   onFocus,
-  onOpenEditor,
   onOpenFlow,
   onDelete,
   showActions = true,
@@ -34,7 +33,7 @@ export function ItemList({
           <article
             key={item.id}
             className="flex h-full flex-col justify-between rounded-2xl border border-slate-200 bg-white p-4 shadow-brand transition hover:cursor-pointer hover:border-blue-200 hover:shadow-xl"
-            onClick={() => onOpenEditor(item.id)}
+            onClick={() => onOpenFlow?.(item.id)}
           >
             <header className="flex items-center justify-between gap-2">
               <span className="inline-flex items-center rounded-full bg-indigo-100 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-indigo-700">
@@ -66,20 +65,6 @@ export function ItemList({
                     <TrashIcon className="h-4 w-4" />
                     <span className="sr-only">{t('manage.item.delete')}</span>
                   </button>
-                  {onOpenFlow && (
-                    <button
-                      type="button"
-                      className="inline-flex h-7 w-7 items-center justify-center rounded-full text-indigo-600 transition hover:bg-slate-100 hover:text-indigo-700"
-                      aria-label={t('manage.item.flow')}
-                      onClick={(event) => {
-                        event.stopPropagation();
-                        onOpenFlow(item.id);
-                      }}
-                    >
-                      <span className="text-[11px] font-bold">AF</span>
-                      <span className="sr-only">{t('manage.item.flow')}</span>
-                    </button>
-                  )}
                 </div>
               )}
             </header>

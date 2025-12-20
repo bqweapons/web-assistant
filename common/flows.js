@@ -2,6 +2,7 @@ const MAX_FLOW_STEPS = 200;
 const MAX_FLOW_ITERATIONS = 50;
 const MAX_FLOW_WAIT_MS = 10000;
 const MAX_FLOW_SOURCE_LENGTH = 8000;
+const FLOW_VERSION = 1;
 
 /**
  * @typedef {Object} ExistsCondition
@@ -65,6 +66,8 @@ const MAX_FLOW_SOURCE_LENGTH = 8000;
  * @property {'navigate'} type
  * @property {string} url
  * @property {string | undefined} target
+ * @property {string | undefined} pageKey
+ * @property {string | undefined} targetUrl
  * @property {number | undefined} timeout
  * @property {number | undefined} retry
  */
@@ -108,9 +111,23 @@ const MAX_FLOW_SOURCE_LENGTH = 8000;
 
 /**
  * @typedef {Object} FlowDefinition
+ * @property {number} version
  * @property {FlowStep[]} steps
  * @property {number} stepCount
  */
+
+/**
+ * Migrates legacy flow definitions to the current version.
+ * @param {any} raw
+ * @returns {any}
+ */
+function migrateFlow(raw) {
+  if (!raw || typeof raw !== 'object') {
+    return raw;
+  }
+  // Placeholder for future migrations; currently pass through.
+  return raw;
+}
 
 /**
  * JSON 文字列からフロー定義を解析し、正規化された構造に変換する。
@@ -150,15 +167,16 @@ export function parseActionFlowDefinition(source) {
  * @returns {FlowDefinition}
  */
 function normalizeFlow(raw) {
+  const migrated = migrateFlow(raw);
   const stats = { count: 0 };
-  const steps = normalizeSteps(raw, 'flow', stats);
+  const steps = normalizeSteps(migrated, 'flow', stats);
   if (steps.length === 0) {
     throw new Error('Provide at least one flow step.');
   }
   if (stats.count > MAX_FLOW_STEPS) {
     throw new Error(`Flows support at most ${MAX_FLOW_STEPS} steps.`);
   }
-  return { steps, stepCount: stats.count };
+  return { version: FLOW_VERSION, steps, stepCount: stats.count };
 }
 
 /**
@@ -236,13 +254,17 @@ function normalizeStep(entry, path, stats) {
       stats.count += 1;
       const url = requireString(record.url ?? record.href ?? '', `Navigate step at ${path} requires a URL.`);
       const target = optionalString(record.target);
-      return { type: 'navigate', url, target, timeout, retry };
+      const pageKey = optionalString(record.pageKey);
+      const targetUrl = optionalString(record.targetUrl);
+      return { type: 'navigate', url, target, pageKey, targetUrl, timeout, retry };
     }
     case 'openpage': {
       stats.count += 1;
       const url = requireString(record.url ?? record.href ?? '', `Open page step at ${path} requires a URL.`);
       const target = optionalString(record.target);
-      return { type: 'navigate', url, target, timeout, retry };
+      const pageKey = optionalString(record.pageKey);
+      const targetUrl = optionalString(record.targetUrl);
+      return { type: 'navigate', url, target, pageKey, targetUrl, timeout, retry };
     }
     case 'log': {
       stats.count += 1;

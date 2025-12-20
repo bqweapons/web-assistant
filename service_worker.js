@@ -564,6 +564,15 @@ addAsyncMessageListener(async (message, sender) => {
             error: undefined,
             waitingForNavigation: false,
           });
+          try {
+            await sendMessageToFrames(session.tabId, {
+              type: MessageType.STEP_DONE,
+              pageUrl: session.pageKey,
+              data: { flowId, stepId, status: 'paused', result },
+            });
+          } catch (_error) {
+            // ignore
+          }
           return true;
         }
         if (session && session.status === 'running' && hasMore && navigationStep) {
@@ -587,6 +596,15 @@ addAsyncMessageListener(async (message, sender) => {
             error: undefined,
             waitingForNavigation: false,
           });
+          try {
+            await sendMessageToFrames(session.tabId, {
+              type: MessageType.STEP_DONE,
+              pageUrl: session.pageKey,
+              data: { flowId, stepId, status: 'finished', result },
+            });
+          } catch (_error) {
+            // ignore
+          }
         }
       }
       return true;
@@ -606,6 +624,26 @@ addAsyncMessageListener(async (message, sender) => {
           waitingForNavigation: false,
           error: { code, message: errorMessage, detail },
         });
+      }
+      try {
+        await chrome.runtime.sendMessage({
+          type: MessageType.STEP_ERROR,
+          data: { flowId, stepId, code, message: errorMessage, detail },
+        });
+      } catch (_error) {
+        // ignore
+      }
+      try {
+        if (flowId && flowSessions.has(flowId)) {
+          const session = flowSessions.get(flowId);
+          await sendMessageToFrames(session?.tabId, {
+            type: MessageType.STEP_ERROR,
+            pageUrl: session?.pageKey,
+            data: { flowId, stepId, code, message: errorMessage, detail },
+          });
+        }
+      } catch (_error) {
+        // ignore
       }
       return true;
     }
@@ -629,6 +667,15 @@ addAsyncMessageListener(async (message, sender) => {
         } catch (_error) {
           return null;
         }
+      }
+      try {
+        await sendMessageToFrames(session.tabId, {
+          type: MessageType.REJOIN_FLOW,
+          pageUrl: session.pageKey,
+          data: { flowId: session.flowId, pageKey: session.pageKey },
+        });
+      } catch (_error) {
+        // ignore
       }
       return session;
     }
