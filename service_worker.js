@@ -116,7 +116,7 @@ async function ensureFlowSessionsLoaded() {
       }
     }
   } catch (error) {
-    console.warn('[PageAugmentor] Failed to load flow sessions', error);
+    console.warn('[Ladybrid] Failed to load flow sessions', error);
   }
   flowSessionsLoaded = true;
 }
@@ -137,7 +137,7 @@ async function persistFlowSessions() {
       }
       await chrome.storage.session.set({ [FLOW_SESSION_STORAGE_KEY]: payload });
     } catch (error) {
-      console.warn('[PageAugmentor] Failed to persist flow sessions', error);
+      console.warn('[Ladybrid] Failed to persist flow sessions', error);
     }
   }, 50);
 }
@@ -331,7 +331,7 @@ chrome.runtime.onInstalled.addListener(async () => {
 if (chrome.runtime.onStartup) {
   chrome.runtime.onStartup.addListener(() => {
     rehydrateTabsFromStore().catch((error) => {
-      console.error('[PageAugmentor] Startup rehydrate failed', error);
+      console.error('[Ladybrid] Startup rehydrate failed', error);
     });
   });
 }
@@ -1459,6 +1459,6 @@ async function rehydrateTabsFromStore() {
       await Promise.allSettled(tasks);
     }
   } catch (error) {
-    console.error('[PageAugmentor] Failed to rehydrate tabs from storage', error);
+    console.error('[Ladybrid] Failed to rehydrate tabs from storage', error);
   }
 }

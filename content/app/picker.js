@@ -24,7 +24,7 @@ export function beginPicker(options = {}) {
         frameLabel: metadata.frameLabel,
         frameUrl: metadata.frameUrl,
         preview: describeElement(target),
-      }).catch((error) => console.error('[PageAugmentor] Failed to send picker result', error));
+      }).catch((error) => console.error('[Ladybrid] Failed to send picker result', error));
     },
     onSubmit(payload) {
       // Flow drawer only needs the selector; do not create elements.
@@ -41,13 +41,13 @@ export function beginPicker(options = {}) {
         updatedAt: Date.now(),
       };
       sendMessage(MessageType.CREATE, elementPayload).catch((error) =>
-        console.error('[PageAugmentor] Failed to save new element', error),
+        console.error('[Ladybrid] Failed to save new element', error),
       );
     },
     onCancel() {
       stopPicker();
       sendMessage(MessageType.PICKER_CANCELLED, { pageUrl: runtime.pageUrl }).catch((error) =>
-        console.error('[PageAugmentor] Failed to report picker cancel', error),
+        console.error('[Ladybrid] Failed to report picker cancel', error),
       );
     },
   });
@@ -58,7 +58,7 @@ export function stopPicker() {
     try {
       state.pickerSession.stop();
     } catch (error) {
-      console.warn('[PageAugmentor] Failed to stop picker cleanly', error);
+      console.warn('[Ladybrid] Failed to stop picker cleanly', error);
     }
     state.pickerSession = null;
   }

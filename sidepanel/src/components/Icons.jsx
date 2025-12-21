@@ -11,6 +11,7 @@ import {
   PauseCircleIcon,
   StopCircleIcon,
   CheckIcon,
+  PlusIcon as HeroPlusIcon,
 } from '@heroicons/react/20/solid';
 
 export function RefreshIcon(props) {
@@ -55,4 +56,8 @@ export function PauseIcon(props) {
 
 export function StopIcon(props) {
   return <StopCircleIcon aria-hidden="true" {...props} />;
+}
+
+export function PlusIcon(props) {
+  return <HeroPlusIcon aria-hidden="true" {...props} />;
 }

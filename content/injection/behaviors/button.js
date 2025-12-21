@@ -20,7 +20,7 @@ export function applyButtonBehavior(node, href, actionSelector, actionFlow) {
   if (flowSource) {
     const { definition, error } = parseActionFlowDefinition(flowSource);
     if (error) {
-      console.warn('[PageAugmentor] Ignoring invalid action flow:', error);
+      console.warn('[Ladybrid] Ignoring invalid action flow:', error);
     } else if (definition) {
       parsedFlow = definition;
       if (selector) {
@@ -58,7 +58,7 @@ export function applyButtonBehavior(node, href, actionSelector, actionFlow) {
       try {
         handled = await executeActionFlow(node, parsedFlow);
       } catch (error) {
-        console.error('[PageAugmentor] Failed to execute flow', error);
+        console.error('[Ladybrid] Failed to execute flow', error);
       }
     }
     if (handled) {
@@ -75,7 +75,7 @@ export function applyButtonBehavior(node, href, actionSelector, actionFlow) {
             try {
               target.click();
             } catch (clickError) {
-              console.warn('[PageAugmentor] Native click fallback failed', clickError);
+              console.warn('[Ladybrid] Native click fallback failed', clickError);
             }
           }
         }

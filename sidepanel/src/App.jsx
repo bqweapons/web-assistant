@@ -8,7 +8,6 @@ import { ItemList } from './components/ItemList.jsx';
 import { OverviewSection } from './components/OverviewSection.jsx';
 import { useI18n } from './hooks/useI18n.js';
 import { createMessage, formatPreview } from './utils/messages.js';
-import { FlowDrawer } from './components/FlowDrawer.jsx';
 import { ElementDrawer } from './components/ElementDrawer.jsx';
 import { ActionFlowsSection } from './components/ActionFlowsSection.jsx';
 import { FlowLibraryDrawer } from './components/FlowLibraryDrawer.jsx';
@@ -31,15 +30,13 @@ export default function App() {
   const [exporting, setExporting] = useState(false);
   const [importing, setImporting] = useState(false);
   const [editingMode, setEditingModeState] = useState(false);
-  const [flowDrawerOpen, setFlowDrawerOpen] = useState(false);
-  const [flowTargetId, setFlowTargetId] = useState(null);
-  const [flowSteps, setFlowSteps] = useState([]);
-  const [flowSession, setFlowSession] = useState(null);
-  const [flowBusy, setFlowBusy] = useState(false);
   const [flowLibraryBusy, setFlowLibraryBusy] = useState(false);
   const [flows, setFlows] = useState([]);
   const [flowLibraryOpen, setFlowLibraryOpen] = useState(false);
   const [flowEditing, setFlowEditing] = useState(null);
+  const [flowLibraryMode, setFlowLibraryMode] = useState('library');
+  const [flowLibraryElementId, setFlowLibraryElementId] = useState(null);
+  const [flowLibrarySeed, setFlowLibrarySeed] = useState({ baseSteps: [], defaultLabel: '' });
   const [flowPickerTarget, setFlowPickerTarget] = useState(null);
   const [flowPickerSelection, setFlowPickerSelection] = useState(null);
   const [flowPickerError, setFlowPickerError] = useState('');
@@ -51,15 +48,7 @@ export default function App() {
   const [draftElement, setDraftElement] = useState(null);
   const importInputRef = useRef(null);
   const editingModeRef = useRef(false);
-  const flowPollRef = useRef(null);
   const lastPageUrlRef = useRef('');
-
-  const stopFlowPolling = useCallback(() => {
-    if (flowPollRef.current) {
-      clearInterval(flowPollRef.current);
-      flowPollRef.current = null;
-    }
-  }, []);
 
   useEffect(() => {
     editingModeRef.current = editingMode;
@@ -70,18 +59,8 @@ export default function App() {
       if (editingModeRef.current && tabId) {
         sendMessage(MessageType.SET_EDIT_MODE, { enabled: false, tabId, pageUrl }).catch(() => {});
       }
-      stopFlowPolling();
     };
-  }, [stopFlowPolling, tabId, pageUrl]);
-
-  useEffect(() => {
-    if (!flowSession) {
-      return;
-    }
-    if (['finished', 'error', 'idle'].includes(flowSession.status)) {
-      stopFlowPolling();
-    }
-  }, [flowSession, stopFlowPolling]);
+  }, [tabId, pageUrl]);
 
   useEffect(() => {
     if (!creationMessage) {
@@ -103,7 +82,41 @@ export default function App() {
     [t],
   );
 
-  const flowTarget = useMemo(() => items.find((item) => item.id === flowTargetId) || null, [items, flowTargetId]);
+  const parseFlowSteps = useCallback((source) => builderStepsFromSource(source), []);
+  const resolveFlowName = useCallback(
+    (element) => {
+      const name = typeof element?.text === 'string' ? element.text.trim() : '';
+      const label = name || t('flow.drawer.untitled');
+      return t('flow.library.defaultElementFlowName', { label });
+    },
+    [t],
+  );
+  const createNamedFlow = useCallback(
+    async (element, steps, overrides = {}) => {
+      if (!Array.isArray(steps) || steps.length === 0) {
+        return '';
+      }
+      const flowId =
+        typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function'
+          ? crypto.randomUUID()
+          : `flow-${Date.now()}-${Math.random().toString(16).slice(2)}`;
+      const baseLabel = resolveFlowName(element);
+      const name = typeof overrides.name === 'string' && overrides.name.trim() ? overrides.name.trim() : baseLabel;
+      const description =
+        typeof overrides.description === 'string' && overrides.description.trim() ? overrides.description.trim() : baseLabel;
+      const flow = {
+        id: flowId,
+        name,
+        description,
+        steps,
+      };
+      const list = await sendMessage(MessageType.UPSERT_FLOW, { flow, scope: 'global', pageUrl });
+      setFlows(Array.isArray(list) ? list : []);
+      return flowId;
+    },
+    [pageUrl, resolveFlowName],
+  );
+
   const elementTarget = useMemo(() => {
     if (draftElement && draftElement.id === elementTargetId) {
       return draftElement;
@@ -413,7 +426,6 @@ export default function App() {
       cancelDraftElement();
       setElementDrawerOpen(false);
       setElementTargetId(null);
-      setFlowDrawerOpen(false);
       await sendMessage(MessageType.INIT_CREATE, {
         tabId,
         pageUrl,
@@ -441,7 +453,7 @@ export default function App() {
           tabId,
           pageUrl,
           targetType: 'selector',
-          source: 'flow-drawer',
+          source: 'flow-library',
           accept,
           mode: 'select',
         });
@@ -454,19 +466,80 @@ export default function App() {
   );
 
   const openFlowLibraryCreate = useCallback(() => {
+    setFlowLibraryMode('library');
+    setFlowLibraryElementId(null);
+    setFlowLibrarySeed({ baseSteps: [], defaultLabel: '' });
     setFlowEditing(null);
     setFlowLibraryOpen(true);
   }, []);
 
   const openFlowLibraryEdit = useCallback((flow) => {
+    setFlowLibraryMode('library');
+    setFlowLibraryElementId(null);
+    setFlowLibrarySeed({ baseSteps: [], defaultLabel: '' });
     setFlowEditing(flow || null);
     setFlowLibraryOpen(true);
   }, []);
+
+  const closeFlowLibraryDrawer = useCallback(() => {
+    setFlowLibraryOpen(false);
+    setFlowEditing(null);
+    setFlowLibraryMode('library');
+    setFlowLibraryElementId(null);
+    setFlowLibrarySeed({ baseSteps: [], defaultLabel: '' });
+    setFlowPickerTarget(null);
+    setFlowPickerSelection(null);
+    setFlowPickerError('');
+    if (tabId && pageUrl) {
+      sendMessage(MessageType.CANCEL_PICKER, { tabId, pageUrl }).catch(() => {});
+    }
+  }, [pageUrl, tabId]);
 
   const handleSaveLibraryFlow = useCallback(
     async (payload, options = {}) => {
       setFlowLibraryBusy(true);
       try {
+        if (flowLibraryMode === 'element') {
+          if (!flowLibraryElementId) {
+            throw new Error('Missing target element for flow.');
+          }
+          const target = items.find((item) => item.id === flowLibraryElementId);
+          if (!target) {
+            throw new Error('Missing target element for flow.');
+          }
+          const steps = Array.isArray(payload?.steps) ? payload.steps : [];
+          const actionFlow = serializeBuilderSteps(steps);
+          const fallbackLabel = flowLibrarySeed.defaultLabel || resolveFlowName(target);
+          const name = typeof payload?.name === 'string' && payload.name.trim() ? payload.name.trim() : fallbackLabel;
+          const description =
+            typeof payload?.description === 'string' && payload.description.trim() ? payload.description.trim() : fallbackLabel;
+          const flowId = await createNamedFlow(target, steps, { name, description });
+          if (!flowId) {
+            throw new Error('Failed to create flow.');
+          }
+          const nextElement = {
+            ...target,
+            actionFlow,
+            actionFlowId: flowId,
+            actionSelector: '',
+            pageUrl,
+            siteUrl: target.siteUrl,
+          };
+          const list = await sendMessage(MessageType.UPDATE, nextElement);
+          setItems(Array.isArray(list) ? list : items);
+          setCreationMessage(createMessage('flow.messages.saveSuccess'));
+          if (options.runAfterSave) {
+            await sendMessage(MessageType.RUN_FLOW, {
+              flowId,
+              steps,
+              tabId,
+              pageKey: pageUrl,
+              pageUrl,
+            });
+          }
+          closeFlowLibraryDrawer();
+          return;
+        }
         const list = await sendMessage(MessageType.UPSERT_FLOW, { flow: payload, scope: 'global', pageUrl });
         setFlows(Array.isArray(list) ? list : []);
         setCreationMessage(createMessage('flow.messages.saveSuccess'));
@@ -480,14 +553,24 @@ export default function App() {
             pageUrl,
           });
         }
-        setFlowLibraryOpen(false);
+        closeFlowLibraryDrawer();
       } catch (error) {
         setCreationMessage(createMessage('flow.messages.saveError', { error: error.message }));
       } finally {
         setFlowLibraryBusy(false);
       }
     },
-    [pageUrl, tabId],
+    [
+      closeFlowLibraryDrawer,
+      createNamedFlow,
+      flowLibraryElementId,
+      flowLibraryMode,
+      flowLibrarySeed.defaultLabel,
+      items,
+      pageUrl,
+      resolveFlowName,
+      tabId,
+    ],
   );
 
   const handleRunLibraryFlow = useCallback(
@@ -566,23 +649,6 @@ export default function App() {
     [pageUrl, t],
   );
 
-  const refreshFlowSession = useCallback(
-    async (flowId) => {
-      if (!flowId) {
-        return;
-      }
-      try {
-        const session = await sendMessage(MessageType.REJOIN_FLOW, { flowId, pageUrl });
-        setFlowSession(session || null);
-      } catch (error) {
-        setFlowSession(null);
-      }
-    },
-    [pageUrl],
-  );
-
-  const parseFlowSteps = useCallback((source) => builderStepsFromSource(source), []);
-
   const openElementDrawer = useCallback(
     (id) => {
       const target = items.find((item) => item.id === id);
@@ -593,7 +659,6 @@ export default function App() {
       cancelDraftElement();
       setElementTargetId(id);
       setElementDrawerOpen(true);
-      setFlowDrawerOpen(false);
       if (tabId && pageUrl) {
         sendMessage(MessageType.FOCUS_ELEMENT, { id, tabId, pageUrl }).catch(() => {});
         sendMessage(MessageType.SET_EDITING_ELEMENT, { id, enabled: true, tabId, pageUrl }).catch(() => {});
@@ -618,7 +683,6 @@ export default function App() {
               setDraftElement(draft);
               setElementTargetId(draft.id);
               setElementDrawerOpen(true);
-              setFlowDrawerOpen(false);
               setCreationMessage(createMessage('manage.creation.started'));
             } else {
               setCreationMessage(createMessage('manage.creation.error', { error: 'Draft element unavailable.' }));
@@ -695,8 +759,8 @@ export default function App() {
     };
   }, [pageUrl, t, flowPickerTarget, openElementDrawer]);
 
-  const openFlowDrawer = useCallback(
-    async (id) => {
+  const openFlowLibraryForElement = useCallback(
+    (id) => {
       const target = items.find((item) => item.id === id);
       if (!target) {
         setCreationMessage(createMessage('flow.messages.missingTarget'));
@@ -710,28 +774,16 @@ export default function App() {
       cancelDraftElement();
       setElementTargetId(null);
       setElementDrawerOpen(false);
-      setFlowTargetId(id);
-      setFlowDrawerOpen(true);
-      setFlowSession(null);
-      stopFlowPolling();
-      setFlowSteps(parseFlowSteps(target.actionFlow));
-      await refreshFlowSession(id);
+      setFlowLibraryMode('element');
+      setFlowLibraryElementId(id);
+      const baseSteps = parseFlowSteps(target.actionFlow);
+      const defaultLabel = resolveFlowName(target);
+      setFlowLibrarySeed({ baseSteps, defaultLabel });
+      setFlowEditing(null);
+      setFlowLibraryOpen(true);
     },
-    [cancelDraftElement, elementTargetId, items, pageUrl, parseFlowSteps, refreshFlowSession, stopFlowPolling, tabId],
+    [cancelDraftElement, elementTargetId, items, pageUrl, parseFlowSteps, resolveFlowName, tabId],
   );
-
-  const closeFlowDrawer = useCallback(() => {
-    setFlowDrawerOpen(false);
-    setFlowTargetId(null);
-    setFlowSession(null);
-    setFlowPickerTarget(null);
-    setFlowPickerSelection(null);
-    setFlowPickerError('');
-    if (tabId && pageUrl) {
-      sendMessage(MessageType.CANCEL_PICKER, { tabId, pageUrl }).catch(() => {});
-    }
-    stopFlowPolling();
-  }, [pageUrl, stopFlowPolling, tabId]);
 
   const closeElementDrawer = useCallback((options = {}) => {
     const keepDraft = options.keepDraft === true;
@@ -750,35 +802,6 @@ export default function App() {
     }
   }, [cancelDraftElement, elementTargetId, pageUrl, tabId]);
 
-  const handleSaveFlow = useCallback(
-    async (steps, properties = null) => {
-      const target = items.find((item) => item.id === flowTargetId);
-      if (!target || !pageUrl) {
-        setCreationMessage(createMessage('flow.messages.missingTarget'));
-        return;
-      }
-      setFlowBusy(true);
-      try {
-        const actionFlow = serializeBuilderSteps(steps);
-        const nextElement = {
-          ...target,
-          actionFlow,
-          pageUrl,
-          siteUrl: target.siteUrl,
-          ...(properties || {}),
-        };
-        const list = await sendMessage(MessageType.UPDATE, nextElement);
-        setItems(Array.isArray(list) ? list : items);
-        setCreationMessage(createMessage('flow.messages.saveSuccess'));
-      } catch (error) {
-        setCreationMessage(createMessage('flow.messages.saveError', { error: error.message }));
-      } finally {
-        setFlowBusy(false);
-      }
-    },
-    [flowTargetId, items, pageUrl],
-  );
-
   const handleSaveElement = useCallback(
     async (properties) => {
       const isDraft = draftElement && draftElement.id === elementTargetId;
@@ -794,6 +817,13 @@ export default function App() {
           pageUrl: properties?.pageUrl || pageUrl,
           siteUrl: properties?.siteUrl || target.siteUrl,
         };
+        if (payload.actionFlow && !payload.actionFlowId) {
+          const steps = builderStepsFromSource(payload.actionFlow);
+          const flowId = await createNamedFlow(payload, steps);
+          if (flowId) {
+            payload.actionFlowId = flowId;
+          }
+        }
         const list = await sendMessage(isDraft ? MessageType.CREATE : MessageType.UPDATE, payload);
         setItems(Array.isArray(list) ? list : items);
         setCreationMessage(createMessage('flow.messages.saveSuccess'));
@@ -808,90 +838,8 @@ export default function App() {
         setCreationMessage(createMessage('flow.messages.saveError', { error: error.message }));
       }
     },
-    [closeElementDrawer, draftElement, elementTargetId, items, pageUrl, tabId],
+    [closeElementDrawer, createNamedFlow, draftElement, elementTargetId, items, pageUrl, tabId],
   );
-
-  const handleRunFlow = useCallback(
-    async (steps, properties = null) => {
-      if (!flowTargetId || !tabId || !pageUrl) {
-        setCreationMessage(createMessage('flow.messages.runPrereq'));
-        return;
-      }
-      setFlowBusy(true);
-      try {
-        const target = items.find((item) => item.id === flowTargetId);
-        const flowIdToUse = properties?.actionFlowId || target?.actionFlowId || flowTargetId;
-        const session = await sendMessage(MessageType.RUN_FLOW, {
-          flowId: flowIdToUse,
-          steps,
-          tabId,
-          pageKey: pageUrl,
-          pageUrl,
-        });
-        setFlowSession(session || null);
-        stopFlowPolling();
-        flowPollRef.current = window.setInterval(() => refreshFlowSession(flowTargetId), 1200);
-        setCreationMessage(createMessage('flow.messages.runStarted'));
-      } catch (error) {
-        setCreationMessage(createMessage('flow.messages.runError', { error: error.message }));
-      } finally {
-        setFlowBusy(false);
-      }
-    },
-    [flowTargetId, pageUrl, refreshFlowSession, stopFlowPolling, tabId, items],
-  );
-
-  const handlePauseFlow = useCallback(async () => {
-    if (!flowTargetId) {
-      return;
-    }
-    setFlowBusy(true);
-    try {
-      const session = await sendMessage(MessageType.PAUSE_FLOW, { flowId: flowTargetId });
-      setFlowSession(session || null);
-      stopFlowPolling();
-      setCreationMessage(createMessage('flow.messages.pauseSuccess'));
-    } catch (error) {
-      setCreationMessage(createMessage('flow.messages.pauseError', { error: error.message }));
-    } finally {
-      setFlowBusy(false);
-    }
-  }, [flowTargetId, stopFlowPolling]);
-
-  const handleResumeFlow = useCallback(async () => {
-    if (!flowTargetId) {
-      return;
-    }
-    setFlowBusy(true);
-    try {
-      const session = await sendMessage(MessageType.RESUME_FLOW, { flowId: flowTargetId });
-      setFlowSession(session || null);
-      stopFlowPolling();
-      flowPollRef.current = window.setInterval(() => refreshFlowSession(flowTargetId), 1200);
-      setCreationMessage(createMessage('flow.messages.resumeSuccess'));
-    } catch (error) {
-      setCreationMessage(createMessage('flow.messages.resumeError', { error: error.message }));
-    } finally {
-      setFlowBusy(false);
-    }
-  }, [flowTargetId, refreshFlowSession, stopFlowPolling]);
-
-  const handleStopFlow = useCallback(async () => {
-    if (!flowTargetId) {
-      return;
-    }
-    setFlowBusy(true);
-    try {
-      const session = await sendMessage(MessageType.STOP_FLOW, { flowId: flowTargetId });
-      setFlowSession(session || null);
-      stopFlowPolling();
-      setCreationMessage(createMessage('flow.messages.stopSuccess'));
-    } catch (error) {
-      setCreationMessage(createMessage('flow.messages.stopError', { error: error.message }));
-    } finally {
-      setFlowBusy(false);
-    }
-  }, [flowTargetId, stopFlowPolling]);
 
   const openPageUrl = useCallback((targetUrl) => {
     if (!targetUrl) {
@@ -1017,8 +965,8 @@ export default function App() {
   }, []);
 
   useEffect(() => {
-    if (flowDrawerOpen && lastPageUrlRef.current && pageUrl && lastPageUrlRef.current !== pageUrl) {
-      closeFlowDrawer();
+    if (flowLibraryOpen && lastPageUrlRef.current && pageUrl && lastPageUrlRef.current !== pageUrl) {
+      closeFlowLibraryDrawer();
     }
     if (elementDrawerOpen && lastPageUrlRef.current && pageUrl && lastPageUrlRef.current !== pageUrl) {
       closeElementDrawer();
@@ -1026,7 +974,7 @@ export default function App() {
     if (pageUrl) {
       lastPageUrlRef.current = pageUrl;
     }
-  }, [pageUrl, flowDrawerOpen, elementDrawerOpen, closeFlowDrawer, closeElementDrawer]);
+  }, [pageUrl, flowLibraryOpen, elementDrawerOpen, closeFlowLibraryDrawer, closeElementDrawer]);
 
   const contextLabelText = contextInfo?.kind === 'url' ? contextInfo.value : t(contextInfo.key, contextInfo.values);
   const statusMessageText = creationMessage ? t(creationMessage.key, creationMessage.values) : '';
@@ -1331,44 +1279,15 @@ export default function App() {
         </section>
       )}
     </main>
-
-      <FlowDrawer
-        open={flowDrawerOpen}
-        onClose={closeFlowDrawer}
-        item={flowTarget}
-        initialSteps={flowSteps}
-        onSave={handleSaveFlow}
-        onRun={handleRunFlow}
-        onPause={handlePauseFlow}
-        onResume={handleResumeFlow}
-        onStop={handleStopFlow}
-        onRefreshSession={() => refreshFlowSession(flowTargetId)}
-        session={flowSession}
-        busyAction={flowBusy}
-        onPickSelector={(target) => startFlowPicker(target, target?.stepType === 'input' ? 'input' : 'selector')}
-        pickerSelection={flowPickerSelection}
-        onPickerSelectionHandled={() => setFlowPickerSelection(null)}
-        pickerError={flowPickerError}
-        flows={flows}
-        onCreateFlowShortcut={openFlowLibraryCreate}
-        onSwitchToElement={() => {
-          setFlowDrawerOpen(false);
-          if (flowTargetId) {
-            openElementDrawer(flowTargetId);
-          }
-        }}
-        t={t}
-      />
       <ElementDrawer
         open={elementDrawerOpen}
         onClose={closeElementDrawer}
         item={elementTarget}
         onSave={handleSaveElement}
-        busyAction={flowBusy}
+        busyAction={flowLibraryBusy}
         onSwitchToFlow={() => {
-          setElementDrawerOpen(false);
           if (elementTargetId) {
-            openFlowDrawer(elementTargetId);
+            openFlowLibraryForElement(elementTargetId);
           }
         }}
         tabId={tabId}
@@ -1378,10 +1297,16 @@ export default function App() {
       <FlowLibraryDrawer
         open={flowLibraryOpen}
         flow={flowEditing}
-        onClose={() => setFlowLibraryOpen(false)}
+        mode={flowLibraryMode}
+        seed={flowLibrarySeed}
+        templates={flows}
+        onClose={closeFlowLibraryDrawer}
         onSave={handleSaveLibraryFlow}
         onRun={handleRunLibraryFlow}
         onPickSelector={(target) => startFlowPicker(target, target?.stepType === 'input' ? 'input' : 'selector')}
+        pickerSelection={flowPickerSelection}
+        onPickerSelectionHandled={() => setFlowPickerSelection(null)}
+        pickerError={flowPickerError}
         busyAction={flowLibraryBusy}
         t={t}
       />

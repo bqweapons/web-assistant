@@ -220,7 +220,7 @@ function beginClickPlacement(requestedType, scope = 'page', options = {}) {
         frameUrl: frameMetadata.frameUrl,
         intent: 'create-draft',
         draft,
-      }).catch((error) => console.error('[PageAugmentor] Failed to notify draft placement', error));
+      }).catch((error) => console.error('[Ladybrid] Failed to notify draft placement', error));
       injectModule.focusElement(draft.id);
       return;
     }
@@ -261,7 +261,7 @@ function beginClickPlacement(requestedType, scope = 'page', options = {}) {
           updatedAt: Date.now(),
         };
         sendMessage(MessageType.CREATE, payload).catch((error) =>
-          console.error('[PageAugmentor] Failed to save new element', error),
+          console.error('[Ladybrid] Failed to save new element', error),
         );
       },
       onCancel() {
@@ -351,7 +351,7 @@ export function beginCreationSession(options = {}) {
           frameUrl: frameMetadata.frameUrl,
           intent: 'create-draft',
           draft,
-        }).catch((error) => console.error('[PageAugmentor] Failed to notify draft placement', error));
+        }).catch((error) => console.error('[Ladybrid] Failed to notify draft placement', error));
         injectModule.focusElement(draft.id);
         return;
       }
@@ -391,7 +391,7 @@ export function beginCreationSession(options = {}) {
             updatedAt: Date.now(),
           };
           sendMessage(MessageType.CREATE, payload).catch((error) =>
-            console.error('[PageAugmentor] Failed to save new element', error),
+            console.error('[Ladybrid] Failed to save new element', error),
           );
         },
         onCancel() {

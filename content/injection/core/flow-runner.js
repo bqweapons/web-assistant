@@ -84,7 +84,7 @@ async function runFlowStep(step, context, depth) {
           try {
             target.click();
           } catch (error) {
-            console.warn('[PageAugmentor] Flow click fallback failed', error);
+            console.warn('[Ladybrid] Flow click fallback failed', error);
           }
         }
       });
@@ -118,7 +118,7 @@ async function runFlowStep(step, context, depth) {
       break;
     }
     case 'log': {
-      console.info('[PageAugmentor][Flow]', step.message);
+      console.info('[Ladybrid][Flow]', step.message);
       break;
     }
     case 'assert': {
@@ -177,7 +177,7 @@ function resolveFlowElements(selector, context) {
   try {
     return Array.from((context.document || document).querySelectorAll(selector));
   } catch (error) {
-    console.warn('[PageAugmentor] Invalid flow selector', selector, error);
+    console.warn('[Ladybrid] Invalid flow selector', selector, error);
     return [];
   }
 }

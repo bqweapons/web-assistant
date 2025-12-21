@@ -12,3 +12,6 @@ export const btnIconPrimary =
 
 export const btnDanger =
   'inline-flex items-center justify-center rounded-full border border-rose-200 bg-rose-50 px-4 py-2 text-sm font-semibold text-rose-700 shadow-sm transition hover:bg-rose-100 disabled:opacity-60 disabled:cursor-not-allowed';
+
+export const btnIconDanger =
+  'inline-flex h-9 w-9 items-center justify-center rounded-full border border-rose-200 bg-rose-50 text-rose-700 shadow-sm transition hover:bg-rose-100 disabled:opacity-60 disabled:cursor-not-allowed';

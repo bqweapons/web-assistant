@@ -1,19 +1,75 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { FlowBuilder } from './FlowBuilder.jsx';
-import { validateBuilderSteps } from '../../../common/flow-builder.js';
+import { SaveIcon, PlayIcon } from './Icons.jsx';
+import { normalizeBuilderSteps, validateBuilderSteps } from '../../../common/flow-builder.js';
+import { useBodyScrollLock } from '../hooks/useBodyScrollLock.js';
 
-export function FlowLibraryDrawer({ open, flow, onClose, onSave, onRun, onPickSelector, busyAction, t }) {
+export function FlowLibraryDrawer({
+  open,
+  flow,
+  mode = 'library',
+  seed = { baseSteps: [], defaultLabel: '' },
+  templates = [],
+  onClose,
+  onSave,
+  onRun,
+  onPickSelector,
+  pickerSelection,
+  onPickerSelectionHandled,
+  pickerError,
+  busyAction,
+  t,
+}) {
+  const isElementMode = mode === 'element';
   const [name, setName] = useState(flow?.name || '');
   const [description, setDescription] = useState(flow?.description || '');
   const [steps, setSteps] = useState(flow?.steps || []);
+  const [templateId, setTemplateId] = useState('');
   const [error, setError] = useState('');
+  useBodyScrollLock(open);
+
+  const defaultLabel = typeof seed?.defaultLabel === 'string' ? seed.defaultLabel : '';
+  const baseSteps = useMemo(
+    () => normalizeBuilderSteps(Array.isArray(seed?.baseSteps) ? seed.baseSteps : []),
+    [seed?.baseSteps],
+  );
+
+  const templateOptions = useMemo(
+    () =>
+      (templates || [])
+        .slice()
+        .sort((a, b) => (a?.name || '').localeCompare(b?.name || '')),
+    [templates],
+  );
 
   useEffect(() => {
-    setName(flow?.name || '');
-    setDescription(flow?.description || '');
-    setSteps(flow?.steps || []);
+    const fallbackLabel = isElementMode ? defaultLabel : '';
+    const initialSteps = flow?.steps ? normalizeBuilderSteps(flow.steps) : isElementMode ? baseSteps : [];
+    setName(flow?.name || fallbackLabel);
+    setDescription(flow?.description || fallbackLabel);
+    setSteps(initialSteps);
+    setTemplateId('');
     setError('');
-  }, [flow?.id, open]);
+  }, [flow?.id, open, isElementMode, defaultLabel, baseSteps]);
+
+  useEffect(() => {
+    if (!open || !pickerSelection || !pickerSelection.selector) {
+      return;
+    }
+    if (pickerSelection.target?.kind !== 'step' || !Number.isInteger(pickerSelection.target.index)) {
+      return;
+    }
+    const idx = pickerSelection.target.index;
+    setSteps((prev) => {
+      if (idx < 0 || idx >= prev.length) {
+        return prev;
+      }
+      const next = [...prev];
+      next[idx] = { ...next[idx], selector: pickerSelection.selector };
+      return next;
+    });
+    onPickerSelectionHandled?.();
+  }, [open, pickerSelection, onPickerSelectionHandled]);
 
   const validation = useMemo(() => validateBuilderSteps(steps), [steps]);
 
@@ -42,6 +98,22 @@ export function FlowLibraryDrawer({ open, flow, onClose, onSave, onRun, onPickSe
       return;
     }
     onRun?.({ ...(flow || {}), name: name.trim() || flow?.name || 'Flow', steps: validation.steps });
+  };
+
+  const handleTemplateChange = (event) => {
+    const nextId = event.target.value;
+    setTemplateId(nextId);
+    setError('');
+    if (!nextId) {
+      if (isElementMode) {
+        setSteps(baseSteps);
+      }
+      return;
+    }
+    const selected = templateOptions.find((option) => option?.id === nextId);
+    if (selected?.steps) {
+      setSteps(normalizeBuilderSteps(selected.steps));
+    }
   };
 
   return (
@@ -77,7 +149,24 @@ export function FlowLibraryDrawer({ open, flow, onClose, onSave, onRun, onPickSe
           </header>
 
           <div className="grid grid-cols-1 gap-4 px-5 py-4 md:grid-cols-[2fr,1fr]">
-            <div className="space-y-4 max-h-[70vh] overflow-y-auto pr-1">
+            <div className="max-h-[70vh] space-y-4 overflow-y-auto pr-1">
+              {isElementMode && (
+                <label className="block text-xs font-semibold text-slate-700">
+                  {t('flow.library.templateLabel')}
+                  <select
+                    className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm"
+                    value={templateId}
+                    onChange={handleTemplateChange}
+                  >
+                    <option value="">{t('flow.library.templatePlaceholder')}</option>
+                    {templateOptions.map((option) => (
+                      <option key={option.id} value={option.id}>
+                        {option.name || t('flow.drawer.untitled')}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              )}
               <label className="block text-xs font-semibold text-slate-700">
                 {t('flow.library.name')}
                 <input
@@ -87,17 +176,18 @@ export function FlowLibraryDrawer({ open, flow, onClose, onSave, onRun, onPickSe
                   placeholder={t('flow.library.namePlaceholder')}
                 />
               </label>
-      <label className="block text-xs font-semibold text-slate-700">
-        {t('flow.library.descriptionField')}
-        <textarea
-          className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm"
-          rows={3}
-          value={description}
-          onChange={(event) => setDescription(event.target.value)}
+              <label className="block text-xs font-semibold text-slate-700">
+                {t('flow.library.descriptionField')}
+                <textarea
+                  className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm"
+                  rows={3}
+                  value={description}
+                  onChange={(event) => setDescription(event.target.value)}
                   placeholder={t('flow.library.descriptionPlaceholder')}
                 />
               </label>
               <FlowBuilder value={steps} onChange={setSteps} onPickSelector={onPickSelector} t={t} />
+              {pickerError && <p className="text-xs text-rose-600">{pickerError}</p>}
             </div>
             <aside className="flex flex-col gap-3 rounded-2xl border border-slate-200 bg-slate-50 p-4">
               <p className="text-xs font-semibold text-slate-700">{t('flow.library.summary')}</p>
@@ -111,22 +201,27 @@ export function FlowLibraryDrawer({ open, flow, onClose, onSave, onRun, onPickSe
                   onClick={() => handleSave(false)}
                   disabled={busyAction}
                 >
+                  <SaveIcon className="h-4 w-4" />
                   {t('flow.actions.save')}
                 </button>
-                <button
-                  type="button"
-                  className="inline-flex items-center gap-1 rounded-full border border-slate-200 bg-white px-4 py-2 text-xs font-semibold text-slate-700 shadow-sm transition hover:shadow-md disabled:cursor-not-allowed disabled:opacity-60"
-                  onClick={() => handleSave(true)}
-                  disabled={busyAction}
-                >
-                  {t('flow.library.saveAndRun')}
-                </button>
+                {!isElementMode && (
+                  <button
+                    type="button"
+                    className="inline-flex items-center gap-1 rounded-full border border-slate-200 bg-white px-4 py-2 text-xs font-semibold text-slate-700 shadow-sm transition hover:shadow-md disabled:cursor-not-allowed disabled:opacity-60"
+                    onClick={() => handleSave(true)}
+                    disabled={busyAction}
+                  >
+                    <PlayIcon className="h-4 w-4" />
+                    {t('flow.library.saveAndRun')}
+                  </button>
+                )}
                 <button
                   type="button"
                   className="inline-flex items-center gap-1 rounded-full bg-gradient-to-r from-blue-600 to-indigo-500 px-4 py-2 text-xs font-semibold text-white shadow-md transition hover:shadow-lg disabled:cursor-not-allowed disabled:opacity-60"
-                  onClick={handleRun}
+                  onClick={isElementMode ? () => handleSave(true) : handleRun}
                   disabled={busyAction}
                 >
+                  <PlayIcon className="h-4 w-4" />
                   {t('flow.actions.run')}
                 </button>
               </div>

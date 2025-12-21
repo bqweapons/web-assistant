@@ -7,20 +7,20 @@ export function openEditorBubble(elementId) {
   closeEditorBubble();
   const element = injectModule.getElement(elementId);
   if (!element) {
-    console.warn('[PageAugmentor] Requested editor for unknown element', elementId);
+    console.warn('[Ladybrid] Requested editor for unknown element', elementId);
     return false;
   }
   let host = injectModule.getHost(elementId);
   if (!host) {
     const ensured = injectModule.ensureElement(element);
     if (!ensured) {
-      console.warn('[PageAugmentor] Unable to ensure element before opening editor', elementId);
+      console.warn('[Ladybrid] Unable to ensure element before opening editor', elementId);
       return false;
     }
     host = injectModule.getHost(elementId);
   }
   if (!host) {
-    console.warn('[PageAugmentor] Host element not found for editor', elementId);
+    console.warn('[Ladybrid] Host element not found for editor', elementId);
     return false;
   }
   state.activeEditorElementId = elementId;
@@ -78,7 +78,7 @@ export function openEditorBubble(elementId) {
         injectModule.updateElement(payload);
       } catch (_e) {}
       sendMessage(MessageType.UPDATE, payload).catch((error) =>
-        console.error('[PageAugmentor] Failed to update element', error),
+        console.error('[Ladybrid] Failed to update element', error),
       );
       try { dirtyIds.add(elementId); } catch (_e) {}
     },
@@ -111,7 +111,7 @@ export function closeEditorBubble() {
     try {
       state.editorSession.close();
     } catch (error) {
-      console.warn('[PageAugmentor] Failed to close editor bubble', error);
+      console.warn('[Ladybrid] Failed to close editor bubble', error);
     }
     state.editorSession = null;
   }
@@ -120,7 +120,7 @@ export function closeEditorBubble() {
       injectModule.setEditingElement(state.activeEditorElementId, false);
       injectModule.previewElement(state.activeEditorElementId, {});
     } catch (error) {
-      console.warn('[PageAugmentor] Failed to reset preview element', error);
+      console.warn('[Ladybrid] Failed to reset preview element', error);
     }
     state.activeEditorElementId = null;
   }

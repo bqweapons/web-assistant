@@ -1,4 +1,6 @@
 import React from 'react';
+import { PlusIcon, PlayIcon, TrashIcon } from './Icons.jsx';
+import { btnIconPrimary, btnIconSecondary, btnIconDanger } from '../styles/buttons.js';
 
 export function ActionFlowsSection({ flows, onCreate, onEdit, onDelete, onRun, t }) {
   const sorted = (flows || []).slice().sort((a, b) => (b.updatedAt || 0) - (a.updatedAt || 0));
@@ -11,10 +13,12 @@ export function ActionFlowsSection({ flows, onCreate, onEdit, onDelete, onRun, t
         </div>
         <button
           type="button"
-          className="rounded-full bg-gradient-to-r from-blue-600 to-indigo-500 px-4 py-2 text-sm font-semibold text-white shadow-md transition hover:shadow-lg"
+          className={btnIconPrimary}
           onClick={onCreate}
+          aria-label={t('flow.library.createAction')}
+          title={t('flow.library.createAction')}
         >
-          {t('flow.library.createAction')}
+          <PlusIcon className="h-4 w-4" />
         </button>
       </header>
       {sorted.length === 0 ? (
@@ -26,7 +30,17 @@ export function ActionFlowsSection({ flows, onCreate, onEdit, onDelete, onRun, t
           {sorted.map((flow) => (
             <article
               key={flow.id}
-              className="flex h-full flex-col justify-between rounded-2xl border border-slate-200 bg-white p-4 shadow-brand"
+              role="button"
+              tabIndex={0}
+              className="flex h-full cursor-pointer flex-col justify-between rounded-2xl border border-slate-200 bg-white p-4 shadow-brand transition hover:shadow-md focus:outline-none focus:ring-2 focus:ring-blue-200"
+              onClick={() => onEdit?.(flow)}
+              onKeyDown={(event) => {
+                if (event.key === 'Enter' || event.key === ' ') {
+                  event.preventDefault();
+                  onEdit?.(flow);
+                }
+              }}
+              aria-label={t('flow.library.editTitle')}
             >
               <div className="space-y-1">
                 <h3 className="line-clamp-2 text-sm font-semibold text-slate-900">{flow.name}</h3>
@@ -38,24 +52,27 @@ export function ActionFlowsSection({ flows, onCreate, onEdit, onDelete, onRun, t
             <div className="mt-3 flex flex-wrap gap-2 text-xs">
                 <button
                   type="button"
-                  className="rounded-full border border-slate-200 bg-white px-4 py-2 font-semibold text-slate-700 shadow-sm transition hover:shadow-md"
-                  onClick={() => onRun?.(flow)}
+                  className={btnIconSecondary}
+                  onClick={(event) => {
+                    event.stopPropagation();
+                    onRun?.(flow);
+                  }}
+                  aria-label={t('flow.actions.run')}
+                  title={t('flow.actions.run')}
                 >
-                  {t('flow.actions.run')}
+                  <PlayIcon className="h-4 w-4" />
                 </button>
                 <button
                   type="button"
-                  className="rounded-full border border-slate-200 bg-white px-4 py-2 font-semibold text-slate-700 shadow-sm transition hover:shadow-md"
-                  onClick={() => onEdit?.(flow)}
+                  className={btnIconDanger}
+                  onClick={(event) => {
+                    event.stopPropagation();
+                    onDelete?.(flow);
+                  }}
+                  aria-label={t('manage.delete.confirm')}
+                  title={t('manage.delete.confirm')}
                 >
-                  {t('flow.actions.save')}
-                </button>
-                <button
-                  type="button"
-                  className="rounded-full border border-rose-200 bg-rose-50 px-4 py-2 font-semibold text-rose-700 shadow-sm transition hover:bg-rose-100"
-                  onClick={() => onDelete?.(flow)}
-                >
-                  {t('manage.delete.confirm')}
+                  <TrashIcon className="h-4 w-4" />
                 </button>
             </div>
             </article>

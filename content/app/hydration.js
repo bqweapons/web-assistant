@@ -8,7 +8,7 @@ export async function hydrateElements() {
     const elements = await sendMessage(MessageType.LIST_BY_URL, { pageUrl: runtime.siteKey || runtime.pageUrl });
     synchronizeElements(elements);
   } catch (error) {
-    console.error('[PageAugmentor] Failed to hydrate elements', error);
+    console.error('[Ladybrid] Failed to hydrate elements', error);
   }
 }
 
