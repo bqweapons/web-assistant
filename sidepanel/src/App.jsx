@@ -48,6 +48,7 @@ export default function App() {
   const [homeSubTab, setHomeSubTab] = useState('add');
   const [elementDrawerOpen, setElementDrawerOpen] = useState(false);
   const [elementTargetId, setElementTargetId] = useState(null);
+  const [draftElement, setDraftElement] = useState(null);
   const importInputRef = useRef(null);
   const editingModeRef = useRef(false);
   const flowPollRef = useRef(null);
@@ -93,10 +94,12 @@ export default function App() {
   );
 
   const flowTarget = useMemo(() => items.find((item) => item.id === flowTargetId) || null, [items, flowTargetId]);
-  const elementTarget = useMemo(
-    () => items.find((item) => item.id === elementTargetId) || null,
-    [items, elementTargetId],
-  );
+  const elementTarget = useMemo(() => {
+    if (draftElement && draftElement.id === elementTargetId) {
+      return draftElement;
+    }
+    return items.find((item) => item.id === elementTargetId) || null;
+  }, [draftElement, items, elementTargetId]);
 
   const tabs = useMemo(
     () => [
@@ -464,12 +467,27 @@ export default function App() {
       return;
     }
     try {
-      await sendMessage(MessageType.INIT_CREATE, { tabId, pageUrl, type: creationType });
+      cancelDraftElement();
+      const draft = await sendMessage(MessageType.BEGIN_DRAFT, {
+        tabId,
+        pageUrl,
+        type: creationType,
+        scope: 'page',
+      });
+      if (!draft?.id) {
+        throw new Error('Draft element unavailable.');
+      }
+      setDraftElement(draft);
+      setElementTargetId(draft.id);
+      setElementDrawerOpen(true);
+      setFlowDrawerOpen(false);
       setCreationMessage(createMessage('manage.creation.started'));
+      sendMessage(MessageType.SET_EDITING_ELEMENT, { id: draft.id, enabled: true, tabId, pageUrl }).catch(() => {});
+      sendMessage(MessageType.FOCUS_ELEMENT, { id: draft.id, tabId, pageUrl }).catch(() => {});
     } catch (error) {
       setCreationMessage(createMessage('manage.creation.error', { error: error.message }));
     }
-  }, [creationType, pageUrl, tabId]);
+  }, [cancelDraftElement, creationType, pageUrl, tabId]);
 
   const startFlowPicker = useCallback(
     async (target, accept = 'selector') => {
@@ -627,6 +645,13 @@ export default function App() {
 
   const parseFlowSteps = useCallback((source) => builderStepsFromSource(source), []);
 
+  const cancelDraftElement = useCallback(() => {
+    if (draftElement?.id && tabId && pageUrl) {
+      sendMessage(MessageType.CANCEL_DRAFT, { id: draftElement.id, tabId, pageUrl }).catch(() => {});
+    }
+    setDraftElement(null);
+  }, [draftElement, pageUrl, tabId]);
+
   const openElementDrawer = useCallback(
     (id) => {
       const target = items.find((item) => item.id === id);
@@ -634,11 +659,16 @@ export default function App() {
         setCreationMessage(createMessage('flow.messages.missingTarget'));
         return;
       }
+      cancelDraftElement();
       setElementTargetId(id);
       setElementDrawerOpen(true);
       setFlowDrawerOpen(false);
+      if (tabId && pageUrl) {
+        sendMessage(MessageType.FOCUS_ELEMENT, { id, tabId, pageUrl }).catch(() => {});
+        sendMessage(MessageType.SET_EDITING_ELEMENT, { id, enabled: true, tabId, pageUrl }).catch(() => {});
+      }
     },
-    [items],
+    [cancelDraftElement, items, pageUrl, tabId],
   );
 
   const openFlowDrawer = useCallback(
@@ -648,15 +678,22 @@ export default function App() {
         setCreationMessage(createMessage('flow.messages.missingTarget'));
         return;
       }
+      if (elementTargetId && tabId && pageUrl) {
+        sendMessage(MessageType.SET_EDITING_ELEMENT, { id: elementTargetId, enabled: false, tabId, pageUrl }).catch(
+          () => {},
+        );
+      }
+      cancelDraftElement();
+      setElementTargetId(null);
+      setElementDrawerOpen(false);
       setFlowTargetId(id);
       setFlowDrawerOpen(true);
-      setElementDrawerOpen(false);
       setFlowSession(null);
       stopFlowPolling();
       setFlowSteps(parseFlowSteps(target.actionFlow));
       await refreshFlowSession(id);
     },
-    [items, parseFlowSteps, refreshFlowSession, stopFlowPolling],
+    [cancelDraftElement, elementTargetId, items, pageUrl, parseFlowSteps, refreshFlowSession, stopFlowPolling, tabId],
   );
 
   const closeFlowDrawer = useCallback(() => {
@@ -673,12 +710,18 @@ export default function App() {
   }, [pageUrl, stopFlowPolling, tabId]);
 
   const closeElementDrawer = useCallback(() => {
+    if (elementTargetId && tabId && pageUrl) {
+      sendMessage(MessageType.SET_EDITING_ELEMENT, { id: elementTargetId, enabled: false, tabId, pageUrl }).catch(
+        () => {},
+      );
+    }
+    cancelDraftElement();
     setElementDrawerOpen(false);
     setElementTargetId(null);
     if (tabId && pageUrl) {
       sendMessage(MessageType.CANCEL_PICKER, { tabId, pageUrl }).catch(() => {});
     }
-  }, [pageUrl, tabId]);
+  }, [cancelDraftElement, elementTargetId, pageUrl, tabId]);
 
   const handleSaveFlow = useCallback(
     async (steps, properties = null) => {
@@ -711,25 +754,33 @@ export default function App() {
 
   const handleSaveElement = useCallback(
     async (properties) => {
-      const target = items.find((item) => item.id === elementTargetId);
+      const isDraft = draftElement && draftElement.id === elementTargetId;
+      const target = isDraft ? draftElement : items.find((item) => item.id === elementTargetId);
       if (!target || !pageUrl) {
         setCreationMessage(createMessage('flow.messages.missingTarget'));
         return;
       }
       try {
-        const list = await sendMessage(MessageType.UPDATE, {
+        const payload = {
           ...target,
           ...properties,
-          pageUrl,
-          siteUrl: target.siteUrl,
-        });
+          pageUrl: properties?.pageUrl || pageUrl,
+          siteUrl: properties?.siteUrl || target.siteUrl,
+        };
+        const list = await sendMessage(isDraft ? MessageType.CREATE : MessageType.UPDATE, payload);
         setItems(Array.isArray(list) ? list : items);
         setCreationMessage(createMessage('flow.messages.saveSuccess'));
+        if (isDraft) {
+          setDraftElement(null);
+          if (tabId && pageUrl) {
+            sendMessage(MessageType.FINALIZE_DRAFT, { id: target.id, tabId, pageUrl }).catch(() => {});
+          }
+        }
       } catch (error) {
         setCreationMessage(createMessage('flow.messages.saveError', { error: error.message }));
       }
     },
-    [elementTargetId, items, pageUrl],
+    [draftElement, elementTargetId, items, pageUrl, tabId],
   );
 
   const handleRunFlow = useCallback(
@@ -941,10 +992,13 @@ export default function App() {
     if (flowDrawerOpen && lastPageUrlRef.current && pageUrl && lastPageUrlRef.current !== pageUrl) {
       closeFlowDrawer();
     }
+    if (elementDrawerOpen && lastPageUrlRef.current && pageUrl && lastPageUrlRef.current !== pageUrl) {
+      closeElementDrawer();
+    }
     if (pageUrl) {
       lastPageUrlRef.current = pageUrl;
     }
-  }, [pageUrl, flowDrawerOpen, closeFlowDrawer]);
+  }, [pageUrl, flowDrawerOpen, elementDrawerOpen, closeFlowDrawer, closeElementDrawer]);
 
   const contextLabelText = contextInfo?.kind === 'url' ? contextInfo.value : t(contextInfo.key, contextInfo.values);
   const statusMessageText = creationMessage ? t(creationMessage.key, creationMessage.values) : '';
@@ -1283,10 +1337,6 @@ export default function App() {
         onClose={closeElementDrawer}
         item={elementTarget}
         onSave={handleSaveElement}
-        onPickSelector={(target) => startFlowPicker(target, target?.stepType === 'input' ? 'input' : 'selector')}
-        pickerSelection={flowPickerSelection}
-        onPickerSelectionHandled={() => setFlowPickerSelection(null)}
-        pickerError={flowPickerError}
         busyAction={flowBusy}
         onSwitchToFlow={() => {
           setElementDrawerOpen(false);
@@ -1294,6 +1344,8 @@ export default function App() {
             openFlowDrawer(elementTargetId);
           }
         }}
+        tabId={tabId}
+        pageUrl={pageUrl}
         t={t}
       />
       <FlowLibraryDrawer

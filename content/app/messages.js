@@ -1,7 +1,12 @@
 /* eslint-disable no-undef */
 import { runtime } from './context.js';
 import { beginPicker } from './picker.js';
-import { beginCreationSession } from './creation.js';
+import {
+  beginCreationSession,
+  beginDrawerDraft,
+  cancelDraftElement,
+  finalizeDraftElement,
+} from './creation.js';
 import { stopPicker } from './picker.js';
 import { openEditorBubble } from './editor.js';
 import { applyEditingMode } from './editing-mode.js';
@@ -124,13 +129,46 @@ export function setupMessageBridge() {
     if (message.pageUrl && message.pageUrl !== runtime.pageUrl) {
       return;
     }
+    let keepPort = true;
     switch (message.type) {
+      case MessageType.BEGIN_DRAFT: {
+        if (!message.data?.forwarded) {
+          keepPort = false;
+          break;
+        }
+        const draft = beginDrawerDraft(message.data || {});
+        sendResponse?.({ ok: true, data: draft });
+        break;
+      }
       case MessageType.REHYDRATE: {
         synchronizeElements(message.data || []);
         sendResponse?.({ ok: true });
         break;
       }
+      case MessageType.PREVIEW_ELEMENT: {
+        const scope = typeof message.data?.pageUrl === 'string' ? message.data.pageUrl : '';
+        const matchesScope = !scope || scope === runtime.siteKey || scope === runtime.pageKey;
+        const id = message.data?.id || message.data?.element?.id;
+        if (!matchesScope || !id) {
+          sendResponse?.({ ok: true });
+          break;
+        }
+        const existing = injectModule.getElement(id);
+        if (existing && elementMatchesFrame(existing)) {
+          const overrides = message.data?.reset ? {} : message.data?.element || message.data?.overrides || {};
+          injectModule.previewElement(id, overrides || {});
+        }
+        sendResponse?.({ ok: true });
+        break;
+      }
       case MessageType.UPDATE: {
+        const scope = typeof message.data?.pageUrl === 'string' ? message.data.pageUrl : '';
+        const matchesScope =
+          !scope || scope === runtime.siteKey || scope === runtime.pageKey;
+        if (!matchesScope) {
+          sendResponse?.({ ok: true });
+          break;
+        }
         if (message.data && elementMatchesFrame(message.data)) {
           injectModule.updateElement(message.data);
         } else if (message.data?.id) {
@@ -138,6 +176,19 @@ export function setupMessageBridge() {
           if (existing && elementMatchesFrame(existing)) {
             injectModule.updateElement({ ...existing, ...message.data });
           }
+        }
+        sendResponse?.({ ok: true });
+        break;
+      }
+      case MessageType.SET_EDITING_ELEMENT: {
+        const id = message.data?.id;
+        if (!id) {
+          sendResponse?.({ ok: true });
+          break;
+        }
+        const existing = injectModule.getElement(id);
+        if (existing && elementMatchesFrame(existing)) {
+          injectModule.setEditingElement(id, Boolean(message.data?.enabled));
         }
         sendResponse?.({ ok: true });
         break;
@@ -170,6 +221,16 @@ export function setupMessageBridge() {
       }
       case MessageType.INIT_CREATE: {
         beginCreationSession(message.data || {});
+        sendResponse?.({ ok: true });
+        break;
+      }
+      case MessageType.CANCEL_DRAFT: {
+        cancelDraftElement(message.data?.id);
+        sendResponse?.({ ok: true });
+        break;
+      }
+      case MessageType.FINALIZE_DRAFT: {
+        finalizeDraftElement(message.data?.id);
         sendResponse?.({ ok: true });
         break;
       }
@@ -243,6 +304,6 @@ export function setupMessageBridge() {
       default:
         break;
     }
-    return true;
+    return keepPort;
   });
 }

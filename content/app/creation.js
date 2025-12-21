@@ -385,3 +385,58 @@ export function beginCreationSession(options = {}) {
   // store to allow explicit cancellation if needed later
   state.pickerSession = drawer;
 }
+
+export function beginDrawerDraft(options = {}) {
+  stopPicker();
+  closeEditorBubble();
+  cancelCreationDraft();
+  const requestedType = typeof options.type === 'string' ? options.type : 'button';
+  const scope = options.scope === 'site' ? 'site' : 'page';
+  const draft = buildDraftElement(requestedType, scope);
+  const ensured = injectModule.ensureElement(draft);
+  if (!ensured) {
+    return null;
+  }
+  injectModule.setEditingElement(draft.id, true);
+  state.creationElementId = draft.id;
+  state.activeEditorElementId = null;
+  state.editorSession = null;
+  return draft;
+}
+
+export function cancelDraftElement(draftId) {
+  if (state.creationElementId && (!draftId || state.creationElementId === draftId)) {
+    cancelCreationDraft();
+    return;
+  }
+  if (!draftId) {
+    return;
+  }
+  try {
+    injectModule.setEditingElement(draftId, false);
+  } catch (_error) {
+    // ignore
+  }
+  try {
+    injectModule.removeElement(draftId);
+  } catch (_error) {
+    // ignore
+  }
+}
+
+export function finalizeDraftElement(draftId) {
+  if (!draftId) {
+    return;
+  }
+  if (state.creationElementId === draftId) {
+    state.creationElementId = null;
+  }
+  if (state.activeEditorElementId === draftId) {
+    state.activeEditorElementId = null;
+  }
+  try {
+    injectModule.setEditingElement(draftId, false);
+  } catch (_error) {
+    // ignore
+  }
+}

@@ -508,6 +508,9 @@ addAsyncMessageListener(async (message, sender) => {
       const list = await upsertElement(element, siteUrl);
       if (message.type === MessageType.CREATE) {
         await broadcastState(siteUrl, list);
+      } else {
+        const updated = list.find((entry) => entry.id === element.id) || element;
+        await broadcastUpdate(siteUrl, updated);
       }
       return list;
     }
@@ -540,6 +543,71 @@ addAsyncMessageListener(async (message, sender) => {
       delete forwarded.tabId;
       delete forwarded.pageUrl;
       await sendMessageToFrames(targetTabId, { type: MessageType.START_PICKER, pageUrl, data: forwarded });
+      return true;
+    }
+    case MessageType.BEGIN_DRAFT: {
+      const { tabId, pageUrl } = message.data || {};
+      if (!tabId) {
+        throw new Error('Missing tabId for draft.');
+      }
+      const response = await sendMessageToTab(tabId, {
+        type: MessageType.BEGIN_DRAFT,
+        pageUrl: normalizePageUrl(pageUrl),
+        data: { ...(message.data || {}), forwarded: true },
+      });
+      if (!response?.ok) {
+        throw new Error(response?.error || 'Failed to create draft element.');
+      }
+      return response.data;
+    }
+    case MessageType.CANCEL_DRAFT: {
+      const { tabId, pageUrl, id } = message.data || {};
+      if (!tabId) {
+        throw new Error('Missing tabId for draft cancel.');
+      }
+      await sendMessageToFrames(tabId, {
+        type: MessageType.CANCEL_DRAFT,
+        pageUrl: normalizePageUrl(pageUrl),
+        data: { id },
+      });
+      return true;
+    }
+    case MessageType.FINALIZE_DRAFT: {
+      const { tabId, pageUrl, id } = message.data || {};
+      if (!tabId) {
+        throw new Error('Missing tabId for draft finalize.');
+      }
+      await sendMessageToFrames(tabId, {
+        type: MessageType.FINALIZE_DRAFT,
+        pageUrl: normalizePageUrl(pageUrl),
+        data: { id },
+      });
+      return true;
+    }
+    case MessageType.PREVIEW_ELEMENT: {
+      const { tabId, pageUrl, element, id, reset } = message.data || {};
+      if (!tabId) {
+        throw new Error('Missing tabId for preview.');
+      }
+      await sendMessageToFrames(tabId, {
+        type: MessageType.PREVIEW_ELEMENT,
+        pageUrl: normalizePageUrl(pageUrl || element?.pageUrl),
+        data: { element, id, reset, pageUrl: normalizePageUrl(pageUrl || element?.pageUrl) },
+      });
+      return true;
+    }
+    case MessageType.SET_EDITING_ELEMENT: {
+      const { tabId, pageUrl, id, enabled } = message.data || {};
+      if (!tabId || !id) {
+        throw new Error('Missing tabId or element id for editing state.');
+      }
+      const normalized = normalizePageUrl(pageUrl);
+      const element = normalized ? await findElement(normalized, id) : null;
+      await sendMessageToFrames(tabId, {
+        type: MessageType.SET_EDITING_ELEMENT,
+        pageUrl: normalized,
+        data: { id, enabled: Boolean(enabled), frameSelectors: element?.frameSelectors || [] },
+      });
       return true;
     }
     case MessageType.LIST_HIDDEN_RULES: {
@@ -1176,6 +1244,57 @@ async function broadcastDelete(pageUrl, elementId) {
 }
 
 /**
+ * Broadcasts an update event to side panels and matching tabs.
+ * @param {string} pageUrl
+ * @param {import('./common/types.js').InjectedElement} element
+ * @returns {Promise<void>}
+ */
+async function broadcastUpdate(pageUrl, element) {
+  const normalized = normalizePageUrl(pageUrl || element?.siteUrl || element?.pageUrl);
+  if (!normalized || !element?.id) {
+    return;
+  }
+
+  const payload = { ...element };
+
+  /** @type {number[]} */
+  let targetTabIds = [];
+  const cached = pageUrlTabIds.get(normalized);
+  if (cached && cached.size > 0) {
+    targetTabIds = Array.from(cached);
+  } else {
+    const tabs = await chrome.tabs.query({});
+    const collected = [];
+    for (const tab of tabs) {
+      if (typeof tab.id !== 'number' || !tab.url) {
+        continue;
+      }
+      if (normalizePageUrl(tab.url) === normalized) {
+        collected.push(tab.id);
+      }
+    }
+    if (collected.length > 0) {
+      pageUrlTabIds.set(normalized, new Set(collected));
+      targetTabIds = collected;
+    }
+  }
+
+  if (targetTabIds.length > 0) {
+    await Promise.allSettled(
+      targetTabIds.map((tabId) =>
+        sendMessageToFrames(tabId, { type: MessageType.UPDATE, pageUrl: normalized, data: payload }),
+      ),
+    );
+  }
+
+  try {
+    await chrome.runtime.sendMessage({ type: MessageType.UPDATE, pageUrl: normalized, data: payload });
+  } catch (error) {
+    // ignore when no listeners are ready
+  }
+}
+
+/**
  * タブへメッセージを送信し、失敗時は静かに握りつぶす。
  * Dispatches a message to a tab, ignoring failures quietly.
  * @param {number} tabId
@@ -1212,6 +1331,10 @@ async function sendMessageToFrames(tabId, message) {
   } catch (error) {
     await safeSendMessage(tabId, message);
   }
+}
+
+async function sendMessageToTab(tabId, message) {
+  return chrome.tabs.sendMessage(tabId, message);
 }
 
 async function pushHiddenRulesToTab(tabId, pageUrl) {

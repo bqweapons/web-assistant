@@ -6,9 +6,11 @@ import {
   TrashIcon as HeroTrashIcon,
   ArrowTopRightOnSquareIcon,
   XCircleIcon,
+  XMarkIcon,
   PlayCircleIcon,
   PauseCircleIcon,
   StopCircleIcon,
+  CheckIcon,
 } from '@heroicons/react/20/solid';
 
 export function RefreshIcon(props) {
@@ -33,6 +35,14 @@ export function OpenPageIcon(props) {
 
 export function ClearPageIcon(props) {
   return <XCircleIcon aria-hidden="true" {...props} />;
+}
+
+export function CloseIcon(props) {
+  return <XMarkIcon aria-hidden="true" {...props} />;
+}
+
+export function SaveIcon(props) {
+  return <CheckIcon aria-hidden="true" {...props} />;
 }
 
 export function PlayIcon(props) {

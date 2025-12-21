@@ -9,7 +9,7 @@ import { resolveFrameContext } from './frame.js';
  * DOM 要素を選択するインタラクティブなピッカーを起動する。
  * Starts the interactive element picker.
  * @param {{
- *   mode?: 'create' | 'edit';
+ *   mode?: 'create' | 'edit' | 'select';
  *   onSubmit?: (result: import('../../common/types.js').InjectedElement) => void;
  *   onCancel?: () => void;
  *   onTarget?: (element: Element, selector: string) => void;
@@ -47,6 +47,11 @@ export function startElementPicker(options = {}) {
     const selector = generateSelector(target);
     overlay.show(target);
     removeListeners();
+    if (mode === 'select') {
+      onTarget?.(target, selector);
+      dispose();
+      return;
+    }
     const suggestedStyle = getSuggestedStyles(target);
     bubble.open({
       mode,
