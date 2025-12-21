@@ -83,6 +83,16 @@ export default function App() {
     }
   }, [flowSession, stopFlowPolling]);
 
+  useEffect(() => {
+    if (!creationMessage) {
+      return;
+    }
+    const timer = window.setTimeout(() => {
+      setCreationMessage(null);
+    }, 3000);
+    return () => window.clearTimeout(timer);
+  }, [creationMessage]);
+
   const typeLabels = useMemo(
     () => ({
       button: t('type.button'),
@@ -280,80 +290,6 @@ export default function App() {
     };
   }, [tabId, pageUrl]);
 
-  useEffect(() => {
-    const listener = (message) => {
-      if (!message?.type) {
-        return;
-      }
-      if (message.pageUrl && message.pageUrl !== pageUrl && !(flowPickerTarget && message.type === MessageType.PICKER_RESULT)) {
-        return;
-      }
-      switch (message.type) {
-        case MessageType.PICKER_RESULT: {
-          if (message.data?.selector) {
-            const preview = formatPreview(message.data.preview, t);
-            if (flowPickerTarget) {
-              setCreationMessage(createMessage('flow.messages.pickerApplied', { selector: message.data.selector }));
-            } else {
-              setCreationMessage(
-                preview
-                  ? createMessage('manage.picker.selectedWithPreview', { preview })
-                  : createMessage('manage.picker.selected'),
-              );
-            }
-          }
-          if (flowPickerTarget && message.data?.selector) {
-            setFlowPickerSelection({ selector: message.data.selector, target: flowPickerTarget });
-            setFlowPickerTarget(null);
-            setFlowPickerError('');
-          }
-          break;
-        }
-        case MessageType.PICKER_CANCELLED:
-          if (message.data?.error) {
-            setCreationMessage(createMessage('manage.creation.error', { error: message.data.error }));
-          } else {
-            setCreationMessage(createMessage('manage.picker.cancelled'));
-          }
-          if (flowPickerTarget) {
-            setFlowPickerError(message.data?.error || t('manage.picker.cancelled'));
-            setFlowPickerTarget(null);
-          }
-          break;
-        case MessageType.REHYDRATE:
-          setItems(Array.isArray(message.data) ? message.data : []);
-          break;
-        case MessageType.UPDATE: {
-          const updated = message.data;
-          if (!updated) {
-            break;
-          }
-          setItems((current) => {
-            const index = current.findIndex((item) => item.id === updated.id);
-            if (index >= 0) {
-              const copy = [...current];
-              copy[index] = updated;
-              return copy;
-            }
-            return [...current, updated];
-          });
-          break;
-        }
-        case MessageType.DELETE:
-          if (message.data?.id) {
-            setItems((current) => current.filter((item) => item.id !== message.data.id));
-          }
-          break;
-        default:
-          break;
-      }
-    };
-    chrome.runtime.onMessage.addListener(listener);
-    return () => {
-      chrome.runtime.onMessage.removeListener(listener);
-    };
-  }, [pageUrl, t, flowPickerTarget]);
-
   const filteredItems = useMemo(() => {
     const query = filterText.trim().toLowerCase();
     return items
@@ -475,22 +411,17 @@ export default function App() {
     }
     try {
       cancelDraftElement();
-      const draft = await sendMessage(MessageType.BEGIN_DRAFT, {
+      setElementDrawerOpen(false);
+      setElementTargetId(null);
+      setFlowDrawerOpen(false);
+      await sendMessage(MessageType.INIT_CREATE, {
         tabId,
         pageUrl,
         type: creationType,
         scope: 'page',
+        mode: 'drawer',
       });
-      if (!draft?.id) {
-        throw new Error('Draft element unavailable.');
-      }
-      setDraftElement(draft);
-      setElementTargetId(draft.id);
-      setElementDrawerOpen(true);
-      setFlowDrawerOpen(false);
       setCreationMessage(createMessage('manage.creation.started'));
-      sendMessage(MessageType.SET_EDITING_ELEMENT, { id: draft.id, enabled: true, tabId, pageUrl }).catch(() => {});
-      sendMessage(MessageType.FOCUS_ELEMENT, { id: draft.id, tabId, pageUrl }).catch(() => {});
     } catch (error) {
       setCreationMessage(createMessage('manage.creation.error', { error: error.message }));
     }
@@ -671,6 +602,99 @@ export default function App() {
     [cancelDraftElement, items, pageUrl, tabId],
   );
 
+  useEffect(() => {
+    const listener = (message) => {
+      if (!message?.type) {
+        return;
+      }
+      if (message.pageUrl && message.pageUrl !== pageUrl && !(flowPickerTarget && message.type === MessageType.PICKER_RESULT)) {
+        return;
+      }
+      switch (message.type) {
+        case MessageType.PICKER_RESULT: {
+          if (message.data?.intent === 'create-draft') {
+            const draft = message.data?.draft;
+            if (draft?.id) {
+              setDraftElement(draft);
+              setElementTargetId(draft.id);
+              setElementDrawerOpen(true);
+              setFlowDrawerOpen(false);
+              setCreationMessage(createMessage('manage.creation.started'));
+            } else {
+              setCreationMessage(createMessage('manage.creation.error', { error: 'Draft element unavailable.' }));
+            }
+            break;
+          }
+          if (message.data?.selector) {
+            const preview = formatPreview(message.data.preview, t);
+            if (flowPickerTarget) {
+              setCreationMessage(createMessage('flow.messages.pickerApplied', { selector: message.data.selector }));
+            } else {
+              setCreationMessage(
+                preview
+                  ? createMessage('manage.picker.selectedWithPreview', { preview })
+                  : createMessage('manage.picker.selected'),
+              );
+            }
+          }
+          if (flowPickerTarget && message.data?.selector) {
+            setFlowPickerSelection({ selector: message.data.selector, target: flowPickerTarget });
+            setFlowPickerTarget(null);
+            setFlowPickerError('');
+          }
+          break;
+        }
+        case MessageType.OPEN_ELEMENT_DRAWER: {
+          if (message.data?.id) {
+            openElementDrawer(message.data.id);
+          }
+          break;
+        }
+        case MessageType.PICKER_CANCELLED:
+          if (message.data?.error) {
+            setCreationMessage(createMessage('manage.creation.error', { error: message.data.error }));
+          } else {
+            setCreationMessage(createMessage('manage.picker.cancelled'));
+          }
+          if (flowPickerTarget) {
+            setFlowPickerError(message.data?.error || t('manage.picker.cancelled'));
+            setFlowPickerTarget(null);
+          }
+          break;
+        case MessageType.REHYDRATE:
+          setItems(Array.isArray(message.data) ? message.data : []);
+          break;
+        case MessageType.UPDATE: {
+          const updated = message.data;
+          if (!updated) {
+            break;
+          }
+          setItems((current) => {
+            const index = current.findIndex((item) => item.id === updated.id);
+            if (index >= 0) {
+              const copy = [...current];
+              copy[index] = updated;
+              return copy;
+            }
+            return [...current, updated];
+          });
+          break;
+        }
+        case MessageType.DELETE:
+          if (message.data?.id) {
+            setItems((current) => current.filter((item) => item.id !== message.data.id));
+          }
+          break;
+        default:
+          break;
+      }
+    };
+    chrome.runtime.onMessage.addListener(listener);
+    return () => {
+      chrome.runtime.onMessage.removeListener(listener);
+    };
+  }, [pageUrl, t, flowPickerTarget, openElementDrawer]);
+
   const openFlowDrawer = useCallback(
     async (id) => {
       const target = items.find((item) => item.id === id);
@@ -709,13 +733,16 @@ export default function App() {
     stopFlowPolling();
   }, [pageUrl, stopFlowPolling, tabId]);
 
-  const closeElementDrawer = useCallback(() => {
+  const closeElementDrawer = useCallback((options = {}) => {
+    const keepDraft = options.keepDraft === true;
     if (elementTargetId && tabId && pageUrl) {
       sendMessage(MessageType.SET_EDITING_ELEMENT, { id: elementTargetId, enabled: false, tabId, pageUrl }).catch(
         () => {},
       );
     }
-    cancelDraftElement();
+    if (!keepDraft) {
+      cancelDraftElement();
+    }
     setElementDrawerOpen(false);
     setElementTargetId(null);
     if (tabId && pageUrl) {
@@ -776,11 +803,12 @@ export default function App() {
             sendMessage(MessageType.FINALIZE_DRAFT, { id: target.id, tabId, pageUrl }).catch(() => {});
           }
         }
+        closeElementDrawer({ keepDraft: isDraft });
       } catch (error) {
         setCreationMessage(createMessage('flow.messages.saveError', { error: error.message }));
       }
     },
-    [draftElement, elementTargetId, items, pageUrl, tabId],
+    [closeElementDrawer, draftElement, elementTargetId, items, pageUrl, tabId],
   );
 
   const handleRunFlow = useCallback(
@@ -1005,6 +1033,11 @@ export default function App() {
 
   return (
     <>
+      {statusMessageText && (
+        <div className="fixed left-1/2 top-4 z-50 w-[90%] max-w-sm -translate-x-1/2 rounded-2xl border border-slate-900 bg-slate-900 px-4 py-3 text-sm font-semibold text-white shadow-lg shadow-slate-900/40">
+          {statusMessageText}
+        </div>
+      )}
       <main className="flex min-h-screen flex-col gap-6 bg-slate-50 p-6">
 
       <nav className="flex gap-2 rounded-2xl border border-slate-200 bg-white p-1 shadow-brand">
@@ -1025,15 +1058,9 @@ export default function App() {
         })}
       </nav>
 
-      {statusMessageText && (
-        <section className="rounded-2xl border border-slate-200 bg-blue-50 px-4 py-3 text-sm text-blue-700 shadow-brand">
-          {statusMessageText}
-        </section>
-      )}
-
           {activeTab === 'home' && (
             <>
-              <section className="mb-4 flex rounded-2xl border border-slate-200 bg-white p-1 shadow-brand">
+              <section className="flex rounded-2xl border border-slate-200 bg-white p-1 shadow-brand">
                 <button
                   type="button"
               className={`flex-1 rounded-xl px-4 py-2 text-sm font-semibold transition ${

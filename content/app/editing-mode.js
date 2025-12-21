@@ -2,7 +2,7 @@ import { HOST_ATTRIBUTE } from '../injection/core/constants.js';
 import * as injectModule from '../inject.js';
 import { sendMessage, MessageType } from '../common/messaging.js';
 import { state, dirtyIds, runtime } from './context.js';
-import { openEditorBubble, closeEditorBubble } from './editor.js';
+import { closeEditorBubble } from './editor.js';
 
 function resolveHostFromEvent(event) {
   if (!event || typeof event.composedPath !== 'function') {
@@ -53,7 +53,7 @@ function handleEditingClick(event) {
   if (state.activeEditorElementId && state.activeEditorElementId === elementId && state.editorSession) {
     return;
   }
-  openEditorBubble(elementId);
+  sendMessage(MessageType.OPEN_ELEMENT_DRAWER, { id: elementId, pageUrl: runtime.pageUrl }).catch(() => {});
 }
 
 export function applyEditingMode(enabled) {

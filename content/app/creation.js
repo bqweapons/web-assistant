@@ -98,7 +98,7 @@ export function applyDraftPlacementToTarget(draft, target) {
   return true;
 }
 
-function beginClickPlacement(requestedType, scope = 'page') {
+function beginClickPlacement(requestedType, scope = 'page', options = {}) {
   // Ensure clean state before starting click-based placement
   stopPicker();
   refreshPageContextFromLocation();
@@ -106,6 +106,7 @@ function beginClickPlacement(requestedType, scope = 'page') {
   document.body.appendChild(overlay.container);
   document.body.style.cursor = 'crosshair';
   let disposed = false;
+  const useDrawer = options?.mode === 'drawer';
 
   const cleanup = (notifyCancel) => {
     if (disposed) {
@@ -206,7 +207,23 @@ function beginClickPlacement(requestedType, scope = 'page') {
     }
     injectModule.setEditingElement(draft.id, true);
     state.creationElementId = draft.id;
-    state.activeEditorElementId = draft.id;
+    state.activeEditorElementId = useDrawer ? null : draft.id;
+    state.editorSession = null;
+    if (useDrawer) {
+      const frameMetadata = selectorModule.resolveFrameContext(target.ownerDocument?.defaultView || window);
+      sendMessage(MessageType.PICKER_RESULT, {
+        pageUrl: runtime.pageUrl,
+        siteUrl: runtime.siteKey || runtime.pageUrl,
+        selector: draft.selector,
+        frameSelectors: frameMetadata.frameSelectors,
+        frameLabel: frameMetadata.frameLabel,
+        frameUrl: frameMetadata.frameUrl,
+        intent: 'create-draft',
+        draft,
+      }).catch((error) => console.error('[PageAugmentor] Failed to notify draft placement', error));
+      injectModule.focusElement(draft.id);
+      return;
+    }
     const host = injectModule.getHost(draft.id);
     if (!host) {
       cancelCreationDraft();
@@ -287,8 +304,9 @@ export function beginCreationSession(options = {}) {
   cancelCreationDraft();
   const requestedType = typeof options.type === 'string' ? options.type : 'button';
   const scope = options.scope === 'site' ? 'site' : 'page';
+  const useDrawer = options.mode === 'drawer';
   if (requestedType !== 'area') {
-    beginClickPlacement(requestedType, scope);
+    beginClickPlacement(requestedType, scope, { mode: options.mode });
     return;
   }
   // Area keeps rectangle draw to define placement and size
@@ -320,7 +338,23 @@ export function beginCreationSession(options = {}) {
       }
       injectModule.setEditingElement(draft.id, true);
       state.creationElementId = draft.id;
-      state.activeEditorElementId = draft.id;
+      state.activeEditorElementId = useDrawer ? null : draft.id;
+      state.editorSession = null;
+      if (useDrawer) {
+        const frameMetadata = selectorModule.resolveFrameContext(window);
+        sendMessage(MessageType.PICKER_RESULT, {
+          pageUrl: runtime.pageUrl,
+          siteUrl: runtime.siteKey || runtime.pageUrl,
+          selector: draft.selector,
+          frameSelectors: frameMetadata.frameSelectors,
+          frameLabel: frameMetadata.frameLabel,
+          frameUrl: frameMetadata.frameUrl,
+          intent: 'create-draft',
+          draft,
+        }).catch((error) => console.error('[PageAugmentor] Failed to notify draft placement', error));
+        injectModule.focusElement(draft.id);
+        return;
+      }
       const host = injectModule.getHost(draft.id);
       if (!host) {
         cancelCreationDraft();
