@@ -36,7 +36,7 @@ export default function App() {
   const [flowEditing, setFlowEditing] = useState(null);
   const [flowLibraryMode, setFlowLibraryMode] = useState('library');
   const [flowLibraryElementId, setFlowLibraryElementId] = useState(null);
-  const [flowLibrarySeed, setFlowLibrarySeed] = useState({ baseSteps: [], defaultLabel: '' });
+  const [flowLibrarySeed, setFlowLibrarySeed] = useState({ baseSteps: [], defaultLabel: '', templateId: '' });
   const [flowPickerTarget, setFlowPickerTarget] = useState(null);
   const [flowPickerSelection, setFlowPickerSelection] = useState(null);
   const [flowPickerError, setFlowPickerError] = useState('');
@@ -468,7 +468,7 @@ export default function App() {
   const openFlowLibraryCreate = useCallback(() => {
     setFlowLibraryMode('library');
     setFlowLibraryElementId(null);
-    setFlowLibrarySeed({ baseSteps: [], defaultLabel: '' });
+    setFlowLibrarySeed({ baseSteps: [], defaultLabel: '', templateId: '' });
     setFlowEditing(null);
     setFlowLibraryOpen(true);
   }, []);
@@ -476,7 +476,7 @@ export default function App() {
   const openFlowLibraryEdit = useCallback((flow) => {
     setFlowLibraryMode('library');
     setFlowLibraryElementId(null);
-    setFlowLibrarySeed({ baseSteps: [], defaultLabel: '' });
+    setFlowLibrarySeed({ baseSteps: [], defaultLabel: '', templateId: '' });
     setFlowEditing(flow || null);
     setFlowLibraryOpen(true);
   }, []);
@@ -486,7 +486,7 @@ export default function App() {
     setFlowEditing(null);
     setFlowLibraryMode('library');
     setFlowLibraryElementId(null);
-    setFlowLibrarySeed({ baseSteps: [], defaultLabel: '' });
+    setFlowLibrarySeed({ baseSteps: [], defaultLabel: '', templateId: '' });
     setFlowPickerTarget(null);
     setFlowPickerSelection(null);
     setFlowPickerError('');
@@ -509,6 +509,46 @@ export default function App() {
           }
           const steps = Array.isArray(payload?.steps) ? payload.steps : [];
           const actionFlow = serializeBuilderSteps(steps);
+          const selectedTemplateId = typeof payload?.templateId === 'string' ? payload.templateId.trim() : '';
+          if (selectedTemplateId) {
+            const selectedFlow = flows.find((flow) => flow.id === selectedTemplateId);
+            if (!selectedFlow) {
+              throw new Error('Missing flow template.');
+            }
+            const updatedFlow = {
+              ...selectedFlow,
+              name: typeof payload?.name === 'string' && payload.name.trim() ? payload.name.trim() : selectedFlow.name,
+              description:
+                typeof payload?.description === 'string' && payload.description.trim()
+                  ? payload.description.trim()
+                  : selectedFlow.description || '',
+              steps,
+            };
+            const list = await sendMessage(MessageType.UPSERT_FLOW, { flow: updatedFlow, scope: 'global', pageUrl });
+            setFlows(Array.isArray(list) ? list : []);
+            const nextElement = {
+              ...target,
+              actionFlow,
+              actionFlowId: selectedFlow.id,
+              actionSelector: '',
+              pageUrl,
+              siteUrl: target.siteUrl,
+            };
+            const elementList = await sendMessage(MessageType.UPDATE, nextElement);
+            setItems(Array.isArray(elementList) ? elementList : items);
+            setCreationMessage(createMessage('flow.messages.saveSuccess'));
+            if (options.runAfterSave) {
+              await sendMessage(MessageType.RUN_FLOW, {
+                flowId: selectedFlow.id,
+                steps,
+                tabId,
+                pageKey: pageUrl,
+                pageUrl,
+              });
+            }
+            closeFlowLibraryDrawer();
+            return;
+          }
           const fallbackLabel = flowLibrarySeed.defaultLabel || resolveFlowName(target);
           const name = typeof payload?.name === 'string' && payload.name.trim() ? payload.name.trim() : fallbackLabel;
           const description =
@@ -566,6 +606,7 @@ export default function App() {
       flowLibraryElementId,
       flowLibraryMode,
       flowLibrarySeed.defaultLabel,
+      flows,
       items,
       pageUrl,
       resolveFlowName,
@@ -766,6 +807,7 @@ export default function App() {
         setCreationMessage(createMessage('flow.messages.missingTarget'));
         return;
       }
+      const linkedFlow = target.actionFlowId ? flows.find((flow) => flow.id === target.actionFlowId) : null;
       if (elementTargetId && tabId && pageUrl) {
         sendMessage(MessageType.SET_EDITING_ELEMENT, { id: elementTargetId, enabled: false, tabId, pageUrl }).catch(
           () => {},
@@ -776,13 +818,17 @@ export default function App() {
       setElementDrawerOpen(false);
       setFlowLibraryMode('element');
       setFlowLibraryElementId(id);
-      const baseSteps = parseFlowSteps(target.actionFlow);
+      const baseSteps = target.actionFlow
+        ? parseFlowSteps(target.actionFlow)
+        : Array.isArray(linkedFlow?.steps)
+          ? linkedFlow.steps
+          : [];
       const defaultLabel = resolveFlowName(target);
-      setFlowLibrarySeed({ baseSteps, defaultLabel });
+      setFlowLibrarySeed({ baseSteps, defaultLabel, templateId: linkedFlow?.id || '' });
       setFlowEditing(null);
       setFlowLibraryOpen(true);
     },
-    [cancelDraftElement, elementTargetId, items, pageUrl, parseFlowSteps, resolveFlowName, tabId],
+    [cancelDraftElement, elementTargetId, flows, items, pageUrl, parseFlowSteps, resolveFlowName, tabId],
   );
 
   const closeElementDrawer = useCallback((options = {}) => {

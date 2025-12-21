@@ -8,7 +8,7 @@ export function FlowLibraryDrawer({
   open,
   flow,
   mode = 'library',
-  seed = { baseSteps: [], defaultLabel: '' },
+  seed = { baseSteps: [], defaultLabel: '', templateId: '' },
   templates = [],
   onClose,
   onSave,
@@ -29,6 +29,7 @@ export function FlowLibraryDrawer({
   useBodyScrollLock(open);
 
   const defaultLabel = typeof seed?.defaultLabel === 'string' ? seed.defaultLabel : '';
+  const seedTemplateId = typeof seed?.templateId === 'string' ? seed.templateId : '';
   const baseSteps = useMemo(
     () => normalizeBuilderSteps(Array.isArray(seed?.baseSteps) ? seed.baseSteps : []),
     [seed?.baseSteps],
@@ -44,13 +45,28 @@ export function FlowLibraryDrawer({
 
   useEffect(() => {
     const fallbackLabel = isElementMode ? defaultLabel : '';
-    const initialSteps = flow?.steps ? normalizeBuilderSteps(flow.steps) : isElementMode ? baseSteps : [];
-    setName(flow?.name || fallbackLabel);
-    setDescription(flow?.description || fallbackLabel);
-    setSteps(initialSteps);
-    setTemplateId('');
+    let nextTemplateId = isElementMode ? seedTemplateId : '';
+    let nextName = flow?.name || fallbackLabel;
+    let nextDescription = flow?.description || fallbackLabel;
+    let nextSteps = flow?.steps ? normalizeBuilderSteps(flow.steps) : isElementMode ? baseSteps : [];
+
+    if (isElementMode && nextTemplateId) {
+      const selected = templateOptions.find((option) => option?.id === nextTemplateId);
+      if (selected) {
+        nextName = selected.name || nextName;
+        nextDescription = selected.description || '';
+        nextSteps = normalizeBuilderSteps(selected.steps || []);
+      } else {
+        nextTemplateId = '';
+      }
+    }
+
+    setName(nextName);
+    setDescription(nextDescription);
+    setSteps(nextSteps);
+    setTemplateId(nextTemplateId);
     setError('');
-  }, [flow?.id, open, isElementMode, defaultLabel, baseSteps]);
+  }, [flow?.id, open, isElementMode, defaultLabel, baseSteps, seedTemplateId, templateOptions]);
 
   useEffect(() => {
     if (!open || !pickerSelection || !pickerSelection.selector) {
@@ -89,6 +105,9 @@ export function FlowLibraryDrawer({
       description: description.trim(),
       steps: validation.steps,
     };
+    if (isElementMode && templateId) {
+      payload.templateId = templateId;
+    }
     onSave?.(payload, { runAfterSave });
   };
 
@@ -107,12 +126,17 @@ export function FlowLibraryDrawer({
     if (!nextId) {
       if (isElementMode) {
         setSteps(baseSteps);
+        const fallbackLabel = defaultLabel;
+        setName(fallbackLabel);
+        setDescription(fallbackLabel);
       }
       return;
     }
     const selected = templateOptions.find((option) => option?.id === nextId);
     if (selected?.steps) {
       setSteps(normalizeBuilderSteps(selected.steps));
+      setName(selected.name || '');
+      setDescription(selected.description || '');
     }
   };
 
