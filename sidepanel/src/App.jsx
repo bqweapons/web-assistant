@@ -457,6 +457,13 @@ export default function App() {
     [pageUrl, refreshItems],
   );
 
+  const cancelDraftElement = useCallback(() => {
+    if (draftElement?.id && tabId && pageUrl) {
+      sendMessage(MessageType.CANCEL_DRAFT, { id: draftElement.id, tabId, pageUrl }).catch(() => {});
+    }
+    setDraftElement(null);
+  }, [draftElement, pageUrl, tabId]);
+
   const handleStartCreation = useCallback(async () => {
     if (!pageUrl) {
       setCreationMessage(createMessage('context.pageUrlUnavailable'));
@@ -644,13 +651,6 @@ export default function App() {
   );
 
   const parseFlowSteps = useCallback((source) => builderStepsFromSource(source), []);
-
-  const cancelDraftElement = useCallback(() => {
-    if (draftElement?.id && tabId && pageUrl) {
-      sendMessage(MessageType.CANCEL_DRAFT, { id: draftElement.id, tabId, pageUrl }).catch(() => {});
-    }
-    setDraftElement(null);
-  }, [draftElement, pageUrl, tabId]);
 
   const openElementDrawer = useCallback(
     (id) => {
