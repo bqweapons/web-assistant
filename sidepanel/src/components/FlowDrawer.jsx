@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { BUILDER_STEP_TYPES, createDefaultStep, normalizeBuilderSteps, validateBuilderSteps } from '../../../common/flow-builder.js';
 import { PauseIcon, PlayIcon, StopIcon } from './Icons.jsx';
+import { btnSecondary } from '../styles/buttons.js';
 
 function StepEditor({ index, step, onChange, onDelete, onPick, t }) {
   const update = (patch) => onChange({ ...step, ...patch });
@@ -242,6 +243,9 @@ export function FlowDrawer({
   onPickerSelectionHandled,
   pickerError,
   t,
+  flows = [],
+  onCreateFlowShortcut,
+  onSwitchToElement,
 }) {
   const [steps, setSteps] = useState(normalizeBuilderSteps(initialSteps));
   const [error, setError] = useState('');
@@ -257,6 +261,10 @@ export function FlowDrawer({
     tooltipPosition: item?.tooltipPosition || 'top',
     tooltipPersistent: Boolean(item?.tooltipPersistent),
     actionFlowLocked: Boolean(item?.actionFlowLocked),
+    actionFlowId: item?.actionFlowId || '',
+    position: item?.position || 'append',
+    layout: item?.layout || 'row',
+    style: item?.style || {},
   });
 
   useEffect(() => {
@@ -270,13 +278,17 @@ export function FlowDrawer({
       text: item?.text || '',
       selector: item?.selector || '',
       actionSelector: item?.actionSelector || '',
-      href: item?.href || '',
-      linkTarget: item?.linkTarget || 'new-tab',
-      tooltipPosition: item?.tooltipPosition || 'top',
-      tooltipPersistent: Boolean(item?.tooltipPersistent),
-      actionFlowLocked: Boolean(item?.actionFlowLocked),
-    });
-  }, [item?.id]);
+    href: item?.href || '',
+    linkTarget: item?.linkTarget || 'new-tab',
+    tooltipPosition: item?.tooltipPosition || 'top',
+    tooltipPersistent: Boolean(item?.tooltipPersistent),
+    actionFlowLocked: Boolean(item?.actionFlowLocked),
+    actionFlowId: item?.actionFlowId || '',
+    position: item?.position || 'append',
+    layout: item?.layout || 'row',
+    style: item?.style || {},
+  });
+}, [item?.id]);
 
   useEffect(() => {
     if (!pickerSelection || !pickerSelection.selector) {
@@ -400,7 +412,7 @@ export function FlowDrawer({
       return;
     }
     setError('');
-    onRun?.(normalized);
+    onRun?.(normalized, properties);
   };
 
   const handlePause = () => onPause?.();
@@ -427,7 +439,11 @@ export function FlowDrawer({
       (properties.linkTarget || '') !== (item?.linkTarget || '') ||
       Boolean(properties.tooltipPersistent) !== Boolean(item?.tooltipPersistent) ||
       (properties.tooltipPosition || '') !== (item?.tooltipPosition || '') ||
-      Boolean(properties.actionFlowLocked) !== Boolean(item?.actionFlowLocked),
+      Boolean(properties.actionFlowLocked) !== Boolean(item?.actionFlowLocked) ||
+      (properties.actionFlowId || '') !== (item?.actionFlowId || '') ||
+      (properties.position || 'append') !== (item?.position || 'append') ||
+      (properties.layout || '') !== (item?.layout || '') ||
+      JSON.stringify(properties.style || {}) !== JSON.stringify(item?.style || {}),
     [
       item?.actionFlowLocked,
       item?.actionSelector,
@@ -445,8 +461,195 @@ export function FlowDrawer({
       properties.text,
       properties.tooltipPersistent,
       properties.tooltipPosition,
+      properties.actionFlowId,
+      properties.position,
+      properties.layout,
+      properties.style,
     ],
   );
+
+  const updateStyle = (key, value) => {
+    setProperties((prev) => {
+      const nextStyle = { ...(prev.style || {}) };
+      if (value === '' || value === undefined || value === null) {
+        delete nextStyle[key];
+      } else {
+        nextStyle[key] = value;
+      }
+      return { ...prev, style: nextStyle };
+    });
+  };
+
+  const renderStyleControls = () => (
+    <div className="space-y-3">
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+        <label className="block text-xs font-semibold text-slate-700">
+          {t('editor.styles.color')}
+          <input
+            className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm"
+            value={properties.style?.color || ''}
+            onChange={(e) => updateStyle('color', e.target.value)}
+            placeholder="#111827"
+          />
+        </label>
+        <label className="block text-xs font-semibold text-slate-700">
+          {t('editor.styles.backgroundColor')}
+          <input
+            className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm"
+            value={properties.style?.backgroundColor || ''}
+            onChange={(e) => updateStyle('backgroundColor', e.target.value)}
+            placeholder="#ffffff"
+          />
+        </label>
+      </div>
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+        <label className="block text-xs font-semibold text-slate-700">
+          {t('editor.styles.fontSize')}
+          <input
+            className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm"
+            value={properties.style?.fontSize || ''}
+            onChange={(e) => updateStyle('fontSize', e.target.value)}
+            placeholder="14px"
+          />
+        </label>
+        <label className="block text-xs font-semibold text-slate-700">
+          {t('editor.styles.fontWeight')}
+          <input
+            className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm"
+            value={properties.style?.fontWeight || ''}
+            onChange={(e) => updateStyle('fontWeight', e.target.value)}
+            placeholder="600"
+          />
+        </label>
+      </div>
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+        <label className="block text-xs font-semibold text-slate-700">
+          {t('editor.styles.padding')}
+          <input
+            className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm"
+            value={properties.style?.padding || ''}
+            onChange={(e) => updateStyle('padding', e.target.value)}
+            placeholder="8px 12px"
+          />
+        </label>
+        <label className="block text-xs font-semibold text-slate-700">
+          {t('editor.styles.border')}
+          <input
+            className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm"
+            value={properties.style?.border || ''}
+            onChange={(e) => updateStyle('border', e.target.value)}
+            placeholder="1px solid #e2e8f0"
+          />
+        </label>
+      </div>
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+        <label className="block text-xs font-semibold text-slate-700">
+          {t('editor.styles.borderRadius')}
+          <input
+            className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm"
+            value={properties.style?.borderRadius || ''}
+            onChange={(e) => updateStyle('borderRadius', e.target.value)}
+            placeholder="10px"
+          />
+        </label>
+        <label className="block text-xs font-semibold text-slate-700">
+          {t('editor.styles.boxShadow')}
+          <input
+            className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm"
+            value={properties.style?.boxShadow || ''}
+            onChange={(e) => updateStyle('boxShadow', e.target.value)}
+            placeholder="0 4px 12px rgba(0,0,0,0.08)"
+          />
+        </label>
+      </div>
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+        <label className="block text-xs font-semibold text-slate-700">
+          {t('editor.styles.width')}
+          <input
+            className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm"
+            value={properties.style?.width || ''}
+            onChange={(e) => updateStyle('width', e.target.value)}
+            placeholder="auto"
+          />
+        </label>
+        <label className="block text-xs font-semibold text-slate-700">
+          {t('editor.styles.height')}
+          <input
+            className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm"
+            value={properties.style?.height || ''}
+            onChange={(e) => updateStyle('height', e.target.value)}
+            placeholder="auto"
+          />
+        </label>
+      </div>
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+        <label className="block text-xs font-semibold text-slate-700">
+          {t('editor.styles.position')}
+          <select
+            className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm"
+            value={properties.style?.position || ''}
+            onChange={(e) => updateStyle('position', e.target.value)}
+          >
+            <option value="">{t('manage.actions.cancel')}</option>
+            <option value="static">static</option>
+            <option value="relative">relative</option>
+            <option value="absolute">absolute</option>
+            <option value="fixed">fixed</option>
+          </select>
+        </label>
+        <label className="block text-xs font-semibold text-slate-700">
+          {t('editor.styles.zIndex')}
+          <input
+            className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm"
+            value={properties.style?.zIndex || ''}
+            onChange={(e) => updateStyle('zIndex', e.target.value)}
+            placeholder="1000"
+          />
+        </label>
+      </div>
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+        <label className="block text-xs font-semibold text-slate-700">
+          {t('editor.styles.top')}
+          <input
+            className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm"
+            value={properties.style?.top || ''}
+            onChange={(e) => updateStyle('top', e.target.value)}
+            placeholder="auto"
+          />
+        </label>
+        <label className="block text-xs font-semibold text-slate-700">
+          {t('editor.styles.right')}
+          <input
+            className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm"
+            value={properties.style?.right || ''}
+            onChange={(e) => updateStyle('right', e.target.value)}
+            placeholder="auto"
+          />
+        </label>
+      </div>
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+        <label className="block text-xs font-semibold text-slate-700">
+          {t('editor.styles.bottom')}
+          <input
+            className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm"
+            value={properties.style?.bottom || ''}
+            onChange={(e) => updateStyle('bottom', e.target.value)}
+            placeholder="auto"
+          />
+        </label>
+        <label className="block text-xs font-semibold text-slate-700">
+          {t('editor.styles.left')}
+          <input
+            className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm"
+            value={properties.style?.left || ''}
+            onChange={(e) => updateStyle('left', e.target.value)}
+            placeholder="auto"
+          />
+        </label>
+      </div>
+    </div>
+  );
+
 
   const renderPropertiesTab = () => (
     <div className="space-y-4">
@@ -475,6 +678,39 @@ export function FlowDrawer({
           placeholder={t('editor.textPlaceholder')}
         />
       </label>
+      {properties.type === 'button' && (
+        <label className="block text-xs font-semibold text-slate-700">
+          {t('editor.actionFlowLabel')}
+          <div className="mt-1 flex flex-col gap-2 sm:flex-row sm:items-center sm:gap-3">
+            <select
+              className="flex-1 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm"
+              value={properties.actionFlowId || ''}
+              onChange={(event) =>
+                setProperties((prev) => ({
+                  ...prev,
+                  actionFlowId: event.target.value || '',
+                }))
+              }
+            >
+              <option value="">{t('flow.library.empty')}</option>
+              {flows.map((flow) => (
+                <option key={flow.id} value={flow.id}>
+                  {flow.name || flow.id}
+                </option>
+              ))}
+            </select>
+            <button
+              type="button"
+              className="inline-flex items-center justify-center rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-700 shadow-sm transition hover:bg-slate-100"
+              onClick={onCreateFlowShortcut}
+              disabled={busyAction}
+            >
+              {t('flow.library.createAction')}
+            </button>
+          </div>
+          <p className="mt-1 text-[11px] text-slate-500">{t('editor.actionFlowDescription')}</p>
+        </label>
+      )}
       <div className="space-y-1">
         <label className="block text-xs font-semibold text-slate-700">{t('editor.selectorLabel')}</label>
         <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:gap-3">
@@ -486,7 +722,7 @@ export function FlowDrawer({
           />
           <button
             type="button"
-            className="inline-flex items-center justify-center rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-700 shadow-sm transition hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-60"
+            className={`${btnSecondary} text-xs px-3 py-2`}
             onClick={() => handlePickSelector({ kind: 'property' })}
             disabled={busyAction}
           >
@@ -508,13 +744,43 @@ export function FlowDrawer({
           />
           <button
             type="button"
-            className="inline-flex items-center justify-center rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-700 shadow-sm transition hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-60"
+            className={`${btnSecondary} text-xs px-3 py-2`}
             onClick={() => handlePickSelector({ kind: 'action' })}
             disabled={busyAction}
           >
             {t('editor.actionPick')}
           </button>
         </div>
+      </div>
+      <label className="block text-xs font-semibold text-slate-700">
+        {t('editor.positionLabel')}
+        <select
+          className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm"
+          value={properties.position || 'append'}
+          onChange={(event) => setProperties((prev) => ({ ...prev, position: event.target.value }))}
+        >
+          <option value="append">{t('position.append')}</option>
+          <option value="prepend">{t('position.prepend')}</option>
+          <option value="before">{t('position.before')}</option>
+          <option value="after">{t('position.after')}</option>
+        </select>
+      </label>
+      {properties.type === 'area' && (
+        <label className="block text-xs font-semibold text-slate-700">
+          {t('editor.areaLayoutLabel')}
+          <select
+            className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm"
+            value={properties.layout || 'row'}
+            onChange={(event) => setProperties((prev) => ({ ...prev, layout: event.target.value }))}
+          >
+            <option value="row">{t('editor.areaLayout.horizontal')}</option>
+            <option value="column">{t('editor.areaLayout.vertical')}</option>
+          </select>
+        </label>
+      )}
+      <div className="space-y-2 rounded-2xl border border-slate-200 bg-slate-50 p-3">
+        <p className="text-xs font-semibold text-slate-700">{t('editor.stylesLegend')}</p>
+        {renderStyleControls()}
       </div>
       <label className="block text-xs font-semibold text-slate-700">
         {t('editor.hrefLabel')}
@@ -592,27 +858,11 @@ export function FlowDrawer({
                 {t('flow.drawer.title')} · {item?.text || t('flow.drawer.untitled')}
               </h3>
               <p className="text-xs text-slate-500">{t('flow.drawer.subtitle', { status: statusLabel })}</p>
-              <div className="mt-1 inline-flex gap-2 rounded-full bg-slate-100 p-1 text-xs font-semibold text-slate-700">
-                <button
-                  type="button"
-                  className={`rounded-full px-3 py-1 transition ${activeTab === 'properties' ? 'bg-white shadow-sm' : ''}`}
-                  onClick={() => setActiveTab('properties')}
-                >
-                  {t('editor.title')}
-                </button>
-                <button
-                  type="button"
-                  className={`rounded-full px-3 py-1 transition ${activeTab === 'flow' ? 'bg-white shadow-sm' : ''}`}
-                  onClick={() => setActiveTab('flow')}
-                >
-                  {t('flow.drawer.title')}
-                </button>
-              </div>
             </div>
             <div className="flex items-center gap-2">
               <button
                 type="button"
-                className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-700 shadow-sm transition hover:bg-slate-100"
+                className={`${btnSecondary} text-xs px-3 py-2`}
                 onClick={onRefreshSession}
                 disabled={busyAction}
               >
@@ -620,7 +870,7 @@ export function FlowDrawer({
               </button>
               <button
                 type="button"
-                className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-700 shadow-sm transition hover:bg-slate-100"
+                className={`${btnSecondary} text-xs px-3 py-2`}
                 onClick={onClose}
               >
                 {t('flow.actions.close')}
@@ -695,7 +945,7 @@ export function FlowDrawer({
               <div className="flex flex-wrap items-center gap-2">
                 <button
                   type="button"
-                  className="inline-flex items-center gap-1 rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-700 shadow-sm transition hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-60"
+                  className="inline-flex items-center gap-1 rounded-full border border-slate-200 bg-white px-4 py-2 text-xs font-semibold text-slate-700 shadow-sm transition hover:shadow-md disabled:cursor-not-allowed disabled:opacity-60"
                   onClick={handleSave}
                   disabled={busyAction}
                 >
@@ -703,7 +953,7 @@ export function FlowDrawer({
                 </button>
                 <button
                   type="button"
-                  className="inline-flex items-center gap-1 rounded-xl bg-indigo-600 px-3 py-2 text-xs font-semibold text-white shadow-sm transition hover:bg-indigo-700 disabled:cursor-not-allowed disabled:opacity-60"
+                  className="inline-flex items-center gap-1 rounded-full bg-gradient-to-r from-blue-600 to-indigo-500 px-4 py-2 text-xs font-semibold text-white shadow-md transition hover:shadow-lg disabled:cursor-not-allowed disabled:opacity-60"
                   onClick={handleRun}
                   disabled={busyAction}
                 >
@@ -712,7 +962,7 @@ export function FlowDrawer({
                 </button>
                 <button
                   type="button"
-                  className="inline-flex items-center gap-1 rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-700 shadow-sm transition hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-60"
+                  className="inline-flex items-center gap-1 rounded-full border border-slate-200 bg-white px-4 py-2 text-xs font-semibold text-slate-700 shadow-sm transition hover:shadow-md disabled:cursor-not-allowed disabled:opacity-60"
                   onClick={handlePause}
                   disabled={busyAction}
                 >
@@ -721,7 +971,7 @@ export function FlowDrawer({
                 </button>
                 <button
                   type="button"
-                  className="inline-flex items-center gap-1 rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-700 shadow-sm transition hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-60"
+                  className="inline-flex items-center gap-1 rounded-full border border-slate-200 bg-white px-4 py-2 text-xs font-semibold text-slate-700 shadow-sm transition hover:shadow-md disabled:cursor-not-allowed disabled:opacity-60"
                   onClick={handleResume}
                   disabled={busyAction}
                 >
@@ -730,7 +980,7 @@ export function FlowDrawer({
                 </button>
                 <button
                   type="button"
-                  className="inline-flex items-center gap-1 rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-xs font-semibold text-rose-700 shadow-sm transition hover:bg-rose-100 disabled:cursor-not-allowed disabled:opacity-60"
+                  className="inline-flex items-center gap-1 rounded-full border border-rose-200 bg-rose-50 px-4 py-2 text-xs font-semibold text-rose-700 shadow-sm transition hover:bg-rose-100 disabled:cursor-not-allowed disabled:opacity-60"
                   onClick={handleStop}
                   disabled={busyAction}
                 >

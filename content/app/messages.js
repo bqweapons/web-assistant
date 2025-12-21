@@ -12,6 +12,7 @@ import { MessageType, sendMessage } from '../common/messaging.js';
 import { executeActionFlow } from '../injection/core/flow-runner.js';
 import { showHUD } from './hud.js';
 import { getMessage } from './i18n.js';
+import { applyHiddenRules } from './hidden.js';
 
 let executorRegistered = false;
 
@@ -28,6 +29,15 @@ async function registerExecutor() {
   } catch (error) {
     // registration may fail if background not ready; ignore and retry later
     executorRegistered = false;
+  }
+}
+
+async function hydrateHiddenRules() {
+  try {
+    const rules = await sendMessage(MessageType.LIST_HIDDEN_RULES, { pageUrl: runtime.pageUrl, effective: true });
+    applyHiddenRules(Array.isArray(rules) ? rules : []);
+  } catch (_error) {
+    // ignore
   }
 }
 
@@ -106,6 +116,7 @@ async function handleRunStep(message) {
 
 export function setupMessageBridge() {
   registerExecutor();
+  hydrateHiddenRules();
   chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     if (!message?.type) {
       return;
@@ -176,6 +187,12 @@ export function setupMessageBridge() {
       }
       case MessageType.SET_EDIT_MODE: {
         applyEditingMode(Boolean(message.data?.enabled));
+        sendResponse?.({ ok: true });
+        break;
+      }
+      case MessageType.APPLY_HIDDEN_RULES: {
+        const rules = message?.data?.rules || [];
+        applyHiddenRules(Array.isArray(rules) ? rules : []);
         sendResponse?.({ ok: true });
         break;
       }

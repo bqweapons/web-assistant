@@ -424,4 +424,53 @@ mergeMessages(messages, {
   },
 });
 
+mergeMessages(messages, {
+  flow: {
+    library: {
+      heading: 'Action flows',
+      description: '再利用可能なフローを作成し、ボタンに紐付けます。',
+      createAction: '新規フロー',
+      createTitle: 'フローを作成',
+      editTitle: 'フローを編集',
+      subtitle: '一度作って何度も使う。',
+      name: '名前',
+      namePlaceholder: 'マイフロー',
+      descriptionField: '説明',
+      descriptionPlaceholder: 'このフローが行うこと',
+      summary: '概要',
+      stepsCount: '{count} ステップ',
+      saveAndRun: '保存して実行',
+      errorName: '名前を入力してください。',
+      noDescription: '説明なし',
+      empty: 'フローがまだありません。まずは作成してください。',
+    },
+  },
+  hidden: {
+    heading: '非表示要素',
+    description: 'ページやサイトで表示したくない要素を隠します。',
+    add: 'ルールを追加',
+    cancel: 'キャンセル',
+    save: 'ルールを保存',
+    enabled: '有効',
+    disabled: '無効',
+    empty: '非表示ルールはありません。',
+    defaultName: '非表示ルール',
+    notePlaceholder: 'メモ（任意）',
+    error: {
+      selector: '非表示にするセレクターを入力してください。',
+    },
+    form: {
+      name: '名前',
+      selector: 'セレクター',
+      scope: 'スコープ',
+      note: 'メモ',
+    },
+    scope: {
+      page: 'ページ',
+      site: 'サイト',
+      global: 'グローバル',
+    },
+  },
+});
+
 export default messages;

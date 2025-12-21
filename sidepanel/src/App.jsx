@@ -9,6 +9,11 @@ import { OverviewSection } from './components/OverviewSection.jsx';
 import { useI18n } from './hooks/useI18n.js';
 import { createMessage, formatPreview } from './utils/messages.js';
 import { FlowDrawer } from './components/FlowDrawer.jsx';
+import { ElementDrawer } from './components/ElementDrawer.jsx';
+import { ActionFlowsSection } from './components/ActionFlowsSection.jsx';
+import { FlowLibraryDrawer } from './components/FlowLibraryDrawer.jsx';
+import { HiddenRulesSection } from './components/HiddenRulesSection.jsx';
+import { btnPrimary, btnSecondary } from './styles/buttons.js';
 
 const initialContextState = { kind: 'message', key: 'context.loading' };
 
@@ -31,9 +36,18 @@ export default function App() {
   const [flowSteps, setFlowSteps] = useState([]);
   const [flowSession, setFlowSession] = useState(null);
   const [flowBusy, setFlowBusy] = useState(false);
+  const [flowLibraryBusy, setFlowLibraryBusy] = useState(false);
+  const [flows, setFlows] = useState([]);
+  const [flowLibraryOpen, setFlowLibraryOpen] = useState(false);
+  const [flowEditing, setFlowEditing] = useState(null);
   const [flowPickerTarget, setFlowPickerTarget] = useState(null);
   const [flowPickerSelection, setFlowPickerSelection] = useState(null);
   const [flowPickerError, setFlowPickerError] = useState('');
+  const [hiddenRules, setHiddenRules] = useState([]);
+  const [hiddenBusy, setHiddenBusy] = useState(false);
+  const [homeSubTab, setHomeSubTab] = useState('add');
+  const [elementDrawerOpen, setElementDrawerOpen] = useState(false);
+  const [elementTargetId, setElementTargetId] = useState(null);
   const importInputRef = useRef(null);
   const editingModeRef = useRef(false);
   const flowPollRef = useRef(null);
@@ -79,10 +93,15 @@ export default function App() {
   );
 
   const flowTarget = useMemo(() => items.find((item) => item.id === flowTargetId) || null, [items, flowTargetId]);
+  const elementTarget = useMemo(
+    () => items.find((item) => item.id === elementTargetId) || null,
+    [items, elementTargetId],
+  );
 
   const tabs = useMemo(
     () => [
       { id: 'home', label: t('navigation.home') },
+      { id: 'flows', label: t('flow.library.heading') },
       { id: 'overview', label: t('navigation.overview') },
       { id: 'settings', label: t('navigation.settings') },
     ],
@@ -134,6 +153,34 @@ export default function App() {
       } catch (error) {
         console.error('Failed to load elements', error);
         setCreationMessage(createMessage('manage.loadError', { error: error.message }));
+      }
+    },
+    [pageUrl],
+  );
+
+  const refreshFlows = useCallback(
+    async () => {
+      try {
+        const list = await sendMessage(MessageType.LIST_FLOWS, { scope: 'global', pageUrl });
+        setFlows(Array.isArray(list) ? list : []);
+      } catch (error) {
+        console.error('Failed to load flows', error);
+      }
+    },
+    [pageUrl],
+  );
+
+  const refreshHiddenRules = useCallback(
+    async () => {
+      if (!pageUrl) {
+        setHiddenRules([]);
+        return;
+      }
+      try {
+        const list = await sendMessage(MessageType.LIST_HIDDEN_RULES, { pageUrl, effective: true });
+        setHiddenRules(Array.isArray(list) ? list : []);
+      } catch (error) {
+        console.error('Failed to load hidden rules', error);
       }
     },
     [pageUrl],
@@ -214,7 +261,9 @@ export default function App() {
       return;
     }
     refreshItems(pageUrl);
-  }, [pageUrl, refreshItems]);
+    refreshFlows();
+    refreshHiddenRules();
+  }, [pageUrl, refreshItems, refreshFlows, refreshHiddenRules]);
 
   useEffect(() => {
     const handleKeyDown = (event) => {
@@ -448,6 +497,87 @@ export default function App() {
     [pageUrl, tabId],
   );
 
+  const openFlowLibraryCreate = useCallback(() => {
+    setFlowEditing(null);
+    setFlowLibraryOpen(true);
+  }, []);
+
+  const openFlowLibraryEdit = useCallback((flow) => {
+    setFlowEditing(flow || null);
+    setFlowLibraryOpen(true);
+  }, []);
+
+  const handleSaveLibraryFlow = useCallback(
+    async (payload, options = {}) => {
+      setFlowLibraryBusy(true);
+      try {
+        const list = await sendMessage(MessageType.UPSERT_FLOW, { flow: payload, scope: 'global', pageUrl });
+        setFlows(Array.isArray(list) ? list : []);
+        setCreationMessage(createMessage('flow.messages.saveSuccess'));
+        if (options.runAfterSave) {
+          const created = Array.isArray(list) ? list.find((f) => f.id === payload.id || f.name === payload.name) : null;
+          await sendMessage(MessageType.RUN_FLOW, {
+            flowId: created?.id || payload.id,
+            steps: payload.steps,
+            tabId,
+            pageKey: pageUrl,
+            pageUrl,
+          });
+        }
+        setFlowLibraryOpen(false);
+      } catch (error) {
+        setCreationMessage(createMessage('flow.messages.saveError', { error: error.message }));
+      } finally {
+        setFlowLibraryBusy(false);
+      }
+    },
+    [pageUrl, tabId],
+  );
+
+  const handleRunLibraryFlow = useCallback(
+    async (flow) => {
+      if (!tabId || !pageUrl) {
+        setCreationMessage(createMessage('flow.messages.runPrereq'));
+        return;
+      }
+      setFlowLibraryBusy(true);
+      try {
+        await sendMessage(MessageType.RUN_FLOW, {
+          flowId: flow.id,
+          steps: flow.steps,
+          tabId,
+          pageKey: pageUrl,
+          pageUrl,
+        });
+        setCreationMessage(createMessage('flow.messages.runStarted'));
+      } catch (error) {
+        setCreationMessage(createMessage('flow.messages.runError', { error: error.message }));
+      } finally {
+        setFlowLibraryBusy(false);
+      }
+    },
+    [pageUrl, tabId],
+  );
+
+  const handleDeleteLibraryFlow = useCallback(
+    async (flow) => {
+      if (!window.confirm(t('manage.delete.confirm'))) {
+        return;
+      }
+      setFlowLibraryBusy(true);
+      try {
+        const list = await sendMessage(MessageType.DELETE_FLOW, { id: flow.id, scope: 'global', pageUrl });
+        setFlows(Array.isArray(list) ? list : []);
+        setCreationMessage(createMessage('manage.delete.success'));
+      } catch (error) {
+        setCreationMessage(createMessage('manage.delete.error', { error: error.message }));
+      } finally {
+        setFlowLibraryBusy(false);
+      }
+    },
+    [pageUrl, t],
+  );
+
   const focusElement = useCallback(
     async (id) => {
       if (!tabId || !pageUrl) {
@@ -497,6 +627,20 @@ export default function App() {
 
   const parseFlowSteps = useCallback((source) => builderStepsFromSource(source), []);
 
+  const openElementDrawer = useCallback(
+    (id) => {
+      const target = items.find((item) => item.id === id);
+      if (!target) {
+        setCreationMessage(createMessage('flow.messages.missingTarget'));
+        return;
+      }
+      setElementTargetId(id);
+      setElementDrawerOpen(true);
+      setFlowDrawerOpen(false);
+    },
+    [items],
+  );
+
   const openFlowDrawer = useCallback(
     async (id) => {
       const target = items.find((item) => item.id === id);
@@ -506,6 +650,7 @@ export default function App() {
       }
       setFlowTargetId(id);
       setFlowDrawerOpen(true);
+      setElementDrawerOpen(false);
       setFlowSession(null);
       stopFlowPolling();
       setFlowSteps(parseFlowSteps(target.actionFlow));
@@ -526,6 +671,14 @@ export default function App() {
     }
     stopFlowPolling();
   }, [pageUrl, stopFlowPolling, tabId]);
+
+  const closeElementDrawer = useCallback(() => {
+    setElementDrawerOpen(false);
+    setElementTargetId(null);
+    if (tabId && pageUrl) {
+      sendMessage(MessageType.CANCEL_PICKER, { tabId, pageUrl }).catch(() => {});
+    }
+  }, [pageUrl, tabId]);
 
   const handleSaveFlow = useCallback(
     async (steps, properties = null) => {
@@ -556,16 +709,41 @@ export default function App() {
     [flowTargetId, items, pageUrl],
   );
 
+  const handleSaveElement = useCallback(
+    async (properties) => {
+      const target = items.find((item) => item.id === elementTargetId);
+      if (!target || !pageUrl) {
+        setCreationMessage(createMessage('flow.messages.missingTarget'));
+        return;
+      }
+      try {
+        const list = await sendMessage(MessageType.UPDATE, {
+          ...target,
+          ...properties,
+          pageUrl,
+          siteUrl: target.siteUrl,
+        });
+        setItems(Array.isArray(list) ? list : items);
+        setCreationMessage(createMessage('flow.messages.saveSuccess'));
+      } catch (error) {
+        setCreationMessage(createMessage('flow.messages.saveError', { error: error.message }));
+      }
+    },
+    [elementTargetId, items, pageUrl],
+  );
+
   const handleRunFlow = useCallback(
-    async (steps) => {
+    async (steps, properties = null) => {
       if (!flowTargetId || !tabId || !pageUrl) {
         setCreationMessage(createMessage('flow.messages.runPrereq'));
         return;
       }
       setFlowBusy(true);
       try {
+        const target = items.find((item) => item.id === flowTargetId);
+        const flowIdToUse = properties?.actionFlowId || target?.actionFlowId || flowTargetId;
         const session = await sendMessage(MessageType.RUN_FLOW, {
-          flowId: flowTargetId,
+          flowId: flowIdToUse,
           steps,
           tabId,
           pageKey: pageUrl,
@@ -581,7 +759,7 @@ export default function App() {
         setFlowBusy(false);
       }
     },
-    [flowTargetId, pageUrl, refreshFlowSession, stopFlowPolling, tabId],
+    [flowTargetId, pageUrl, refreshFlowSession, stopFlowPolling, tabId, items],
   );
 
   const handlePauseFlow = useCallback(async () => {
@@ -683,6 +861,74 @@ export default function App() {
     }
   }, []);
 
+  const handleCreateHiddenRule = useCallback(
+    async (rule) => {
+      if (!pageUrl) {
+        setCreationMessage(createMessage('context.pageUrlUnavailable'));
+        return;
+      }
+      setHiddenBusy(true);
+      try {
+        const list = await sendMessage(MessageType.UPSERT_HIDDEN_RULE, {
+          rule: { ...rule, pageUrl },
+          scope: rule.scope || 'page',
+          pageUrl,
+          tabId,
+        });
+        setHiddenRules(Array.isArray(list) ? list : []);
+        setCreationMessage(createMessage('manage.creation.started'));
+      } catch (error) {
+        setCreationMessage(createMessage('manage.creation.error', { error: error.message }));
+      } finally {
+        setHiddenBusy(false);
+      }
+    },
+    [pageUrl, tabId],
+  );
+
+  const handleDeleteHiddenRule = useCallback(
+    async (rule) => {
+      if (!pageUrl) return;
+      setHiddenBusy(true);
+      try {
+        const list = await sendMessage(MessageType.DELETE_HIDDEN_RULE, {
+          id: rule.id,
+          scope: rule.scope || 'page',
+          pageUrl,
+          tabId,
+        });
+        setHiddenRules(Array.isArray(list) ? list : []);
+      } catch (error) {
+        setCreationMessage(createMessage('manage.delete.error', { error: error.message }));
+      } finally {
+        setHiddenBusy(false);
+      }
+    },
+    [pageUrl, tabId],
+  );
+
+  const handleToggleHiddenRule = useCallback(
+    async (rule, enabled) => {
+      if (!pageUrl) return;
+      setHiddenBusy(true);
+      try {
+        const list = await sendMessage(MessageType.SET_HIDDEN_RULE_ENABLED, {
+          id: rule.id,
+          enabled,
+          scope: rule.scope || 'page',
+          pageUrl,
+          tabId,
+        });
+        setHiddenRules(Array.isArray(list) ? list : []);
+      } catch (error) {
+        setCreationMessage(createMessage('manage.creation.error', { error: error.message }));
+      } finally {
+        setHiddenBusy(false);
+      }
+    },
+    [pageUrl, tabId],
+  );
+
   const handleShareOpen = useCallback(() => {
     try {
       chrome.tabs.create({ url: storeUrl, active: true });
@@ -731,17 +977,43 @@ export default function App() {
         </section>
       )}
 
-      {activeTab === 'home' && (
-        <>
-          <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-brand">
-            <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
-              <div className="space-y-1">
-                <h2 className="text-lg font-semibold text-slate-900">{t('manage.sections.add.title')}</h2>
-                <p className="text-xs text-slate-500">{t('manage.sections.add.description')}</p>
-              </div>
-              <div className="flex flex-col gap-2 md:flex-row md:items-center md:gap-3">
-                <label className="flex flex-col gap-2 text-xs font-semibold uppercase tracking-wide text-slate-500">
-                  {t('manage.sections.add.typeLabel')}
+          {activeTab === 'home' && (
+            <>
+              <section className="mb-4 flex rounded-2xl border border-slate-200 bg-white p-1 shadow-brand">
+                <button
+                  type="button"
+              className={`flex-1 rounded-xl px-4 py-2 text-sm font-semibold transition ${
+                homeSubTab === 'add'
+                  ? 'bg-slate-900 text-white shadow-sm'
+                  : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900'
+              }`}
+              onClick={() => setHomeSubTab('add')}
+            >
+              {t('manage.actions.addElement')}
+            </button>
+            <button
+              type="button"
+              className={`flex-1 rounded-xl px-4 py-2 text-sm font-semibold transition ${
+                homeSubTab === 'hide'
+                  ? 'bg-slate-900 text-white shadow-sm'
+                  : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900'
+              }`}
+              onClick={() => setHomeSubTab('hide')}
+            >
+              {t('hidden.heading')}
+            </button>
+          </section>
+
+          {homeSubTab === 'add' && (
+            <>
+              <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-brand space-y-4">
+                <div className="space-y-1">
+                  <h2 className="text-sm font-semibold text-slate-900">
+                    {t('manage.sections.add.description')}
+                  </h2>
+                  <p className="text-xs text-slate-500">{t('manage.sections.add.title')}</p>
+                </div>
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
                   <select
                     className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-700 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-100"
                     value={creationType}
@@ -752,99 +1024,56 @@ export default function App() {
                     <option value="tooltip">{t('type.tooltip')}</option>
                     <option value="area">{t('type.area')}</option>
                   </select>
-                </label>
-                <button
-                  type="button"
-                  className="rounded-xl bg-gradient-to-r from-blue-600 to-violet-500 px-4 py-2 text-sm font-semibold text-white shadow-lg transition hover:shadow-xl"
-                  onClick={handleStartCreation}
-                >
-                  {t('manage.actions.addElement')}
-                </button>
-              </div>
-              </div>
-            </section>
+                  <button type="button" className={btnPrimary} onClick={handleStartCreation}>
+                    {t('manage.actions.addElement')}
+                  </button>
+                </div>
+              </section>
 
-            <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-brand">
-              <div className="flex flex-wrap items-center gap-3">
+              <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-brand space-y-3">
                 <button
                   type="button"
                   aria-pressed={editingMode}
-                  className={`rounded-xl px-4 py-2 text-sm font-semibold transition focus:outline-none focus:ring-2 focus:ring-blue-100 ${
-                    editingMode
-                      ? 'bg-emerald-500 text-white shadow-lg hover:bg-emerald-600'
-                      : 'border border-slate-200 bg-white text-slate-700 shadow-sm hover:bg-slate-100'
-                  } disabled:cursor-not-allowed disabled:opacity-60`}
+                  className={editingMode ? btnPrimary : btnSecondary}
                   onClick={toggleEditingMode}
                   disabled={!tabId}
                 >
                   {editingMode ? t('manage.actions.editModeDisable') : t('manage.actions.editModeEnable')}
                 </button>
-                <span className="text-sm text-slate-500">{t('manage.editMode.hint')}</span>
-              </div>
-            </section>
+                <p className="text-xs text-slate-500">{t('manage.editMode.hint')}</p>
+              </section>
 
-          <section className="flex flex-col gap-3 rounded-2xl border border-slate-200 bg-white p-5 shadow-brand md:flex-row md:items-end md:justify-between">
-            <label className="flex w-full flex-col gap-2 text-sm text-slate-700 md:max-w-md">
-              {t('manage.sections.filters.searchLabel')}
-              <input
-                className="rounded-lg border border-slate-200 bg-white p-2 text-sm shadow-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-100"
-                type="search"
-                placeholder={t('manage.sections.filters.searchPlaceholder')}
-                value={filterText}
-                onChange={(event) => setFilterText(event.target.value)}
-              />
-            </label>
-            <label className="flex flex-col gap-2 text-sm text-slate-700 md:w-48">
-              {t('manage.sections.filters.filterLabel')}
-              <select
-                className="rounded-lg border border-slate-200 bg-white p-2 text-sm shadow-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-100"
-                value={filterType}
-                onChange={(event) => setFilterType(event.target.value)}
-              >
-                <option value="all">{t('manage.sections.filters.options.all')}</option>
-                <option value="button">{t('manage.sections.filters.options.button')}</option>
-                <option value="link">{t('manage.sections.filters.options.link')}</option>
-                <option value="tooltip">{t('manage.sections.filters.options.tooltip')}</option>
-                <option value="area">{t('manage.sections.filters.options.area')}</option>
-              </select>
-            </label>
-          </section>
+              <section className="flex flex-col gap-3 rounded-2xl border border-slate-200 bg-white p-5 shadow-brand md:flex-row md:items-end md:justify-between">
+                <label className="flex w-full flex-col gap-2 text-sm text-slate-700 md:max-w-md">
+                  {t('manage.sections.filters.searchLabel')}
+                  <input
+                    className="rounded-lg border border-slate-200 bg-white p-2 text-sm shadow-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-100"
+                    type="search"
+                    placeholder={t('manage.sections.filters.searchPlaceholder')}
+                    value={filterText}
+                    onChange={(event) => setFilterText(event.target.value)}
+                  />
+                </label>
+                <label className="flex flex-col gap-2 text-sm text-slate-700 md:w-48">
+                  {t('manage.sections.filters.filterLabel')}
+                  <select
+                    className="rounded-lg border border-slate-200 bg-white p-2 text-sm shadow-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-100"
+                    value={filterType}
+                    onChange={(event) => setFilterType(event.target.value)}
+                  >
+                    <option value="all">{t('manage.sections.filters.options.all')}</option>
+                    <option value="button">{t('manage.sections.filters.options.button')}</option>
+                    <option value="link">{t('manage.sections.filters.options.link')}</option>
+                    <option value="tooltip">{t('manage.sections.filters.options.tooltip')}</option>
+                    <option value="area">{t('manage.sections.filters.options.area')}</option>
+                  </select>
+                </label>
+              </section>
 
-          <section className="grid gap-4">
-            {groupedByPageUrl.length === 0 ? (
-              <ItemList
-                items={[]}
-                t={t}
-                typeLabels={typeLabels}
-                formatTimestamp={formatTimestamp}
-                formatFrameSummary={formatFrameSummary}
-                formatTooltipPosition={formatTooltipPosition}
-                formatTooltipMode={formatTooltipMode}
-                onFocus={focusElement}
-                onOpenFlow={openFlowDrawer}
-                onDelete={deleteElement}
-                showActions
-              />
-            ) : (
-              groupedByPageUrl.map(([groupPageUrl, groupItems]) => (
-                <article key={groupPageUrl} className="space-y-3 rounded-2xl border border-slate-200 bg-white p-4 shadow-brand">
-                  <header className="flex items-center justify-between gap-2">
-                    <div className="min-w-0 space-y-1">
-                      <h3 className="break-all text-sm font-semibold text-slate-900">{groupPageUrl}</h3>
-                      <p className="text-xs text-slate-500">
-                        {t('overview.pageSummary', { count: groupItems.length })}
-                      </p>
-                    </div>
-                    <button
-                      type="button"
-                      className="mt-1 rounded-lg bg-blue-50 px-3 py-1.5 text-xs font-semibold text-blue-700 transition hover:bg-blue-100 md:mt-0"
-                      onClick={() => openPageUrl(groupPageUrl)}
-                    >
-                      {t('overview.openPage')}
-                    </button>
-                  </header>
+              <section className="grid gap-4">
+                {groupedByPageUrl.length === 0 ? (
                   <ItemList
-                    items={groupItems}
+                    items={[]}
                     t={t}
                     typeLabels={typeLabels}
                     formatTimestamp={formatTimestamp}
@@ -852,15 +1081,73 @@ export default function App() {
                     formatTooltipPosition={formatTooltipPosition}
                     formatTooltipMode={formatTooltipMode}
                     onFocus={focusElement}
-                    onOpenFlow={openFlowDrawer}
+        onOpenFlow={openElementDrawer}
                     onDelete={deleteElement}
                     showActions
                   />
-                </article>
-              ))
-            )}
-          </section>
+                ) : (
+                  groupedByPageUrl.map(([groupPageUrl, groupItems]) => (
+                    <article
+                      key={groupPageUrl}
+                      className="space-y-3 rounded-2xl border border-slate-200 bg-white p-4 shadow-brand"
+                    >
+                      <header className="flex items-center justify-between gap-2">
+                        <div className="min-w-0 space-y-1">
+                          <h3 className="break-all text-sm font-semibold text-slate-900">{groupPageUrl}</h3>
+                          <p className="text-xs text-slate-500">
+                            {t('overview.pageSummary', { count: groupItems.length })}
+                          </p>
+                        </div>
+                        <button
+                          type="button"
+                          className="mt-1 rounded-lg bg-blue-50 px-3 py-1.5 text-xs font-semibold text-blue-700 transition hover:bg-blue-100 md:mt-0"
+                          onClick={() => openPageUrl(groupPageUrl)}
+                        >
+                          {t('overview.openPage')}
+                        </button>
+                      </header>
+                      <ItemList
+                        items={groupItems}
+                        t={t}
+                        typeLabels={typeLabels}
+                        formatTimestamp={formatTimestamp}
+                        formatFrameSummary={formatFrameSummary}
+                        formatTooltipPosition={formatTooltipPosition}
+                        formatTooltipMode={formatTooltipMode}
+                        onFocus={focusElement}
+                        onOpenFlow={openElementDrawer}
+                        onDelete={deleteElement}
+                        showActions
+                      />
+                    </article>
+                  ))
+                )}
+              </section>
+            </>
+          )}
+
+          {homeSubTab === 'hide' && (
+            <HiddenRulesSection
+              rules={hiddenRules}
+              onCreate={handleCreateHiddenRule}
+              onDelete={handleDeleteHiddenRule}
+              onToggle={handleToggleHiddenRule}
+              busy={hiddenBusy}
+              t={t}
+            />
+          )}
         </>
+      )}
+
+      {activeTab === 'flows' && (
+        <ActionFlowsSection
+          flows={flows}
+          onCreate={openFlowLibraryCreate}
+          onEdit={openFlowLibraryEdit}
+          onDelete={handleDeleteLibraryFlow}
+          onRun={handleRunLibraryFlow}
+          t={t}
+        />
       )}
 
       {activeTab === 'overview' && (
@@ -981,6 +1268,42 @@ export default function App() {
         pickerSelection={flowPickerSelection}
         onPickerSelectionHandled={() => setFlowPickerSelection(null)}
         pickerError={flowPickerError}
+        flows={flows}
+        onCreateFlowShortcut={openFlowLibraryCreate}
+        onSwitchToElement={() => {
+          setFlowDrawerOpen(false);
+          if (flowTargetId) {
+            openElementDrawer(flowTargetId);
+          }
+        }}
+        t={t}
+      />
+      <ElementDrawer
+        open={elementDrawerOpen}
+        onClose={closeElementDrawer}
+        item={elementTarget}
+        onSave={handleSaveElement}
+        onPickSelector={(target) => startFlowPicker(target, target?.stepType === 'input' ? 'input' : 'selector')}
+        pickerSelection={flowPickerSelection}
+        onPickerSelectionHandled={() => setFlowPickerSelection(null)}
+        pickerError={flowPickerError}
+        busyAction={flowBusy}
+        onSwitchToFlow={() => {
+          setElementDrawerOpen(false);
+          if (elementTargetId) {
+            openFlowDrawer(elementTargetId);
+          }
+        }}
+        t={t}
+      />
+      <FlowLibraryDrawer
+        open={flowLibraryOpen}
+        flow={flowEditing}
+        onClose={() => setFlowLibraryOpen(false)}
+        onSave={handleSaveLibraryFlow}
+        onRun={handleRunLibraryFlow}
+        onPickSelector={(target) => startFlowPicker(target, target?.stepType === 'input' ? 'input' : 'selector')}
+        busyAction={flowLibraryBusy}
         t={t}
       />
     </>

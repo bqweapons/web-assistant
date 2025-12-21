@@ -7,6 +7,8 @@ import { addAsyncMessageListener, MessageType } from './common/messaging.js';
 import { openSidePanelOrTab } from './common/compat.js';
 import { parseActionFlowDefinition } from './common/flows.js';
 import { normalizePageUrl, normalizePageLocation } from './common/url.js';
+import { listFlows, upsertFlow, deleteFlow, findFlowById } from './common/flow-store.js';
+import { listHiddenRules, upsertHiddenRule, deleteHiddenRule, getEffectiveRules, setHiddenRuleEnabled } from './common/hidden-store.js';
 
 const TOOLTIP_POSITIONS = new Set(['top', 'right', 'bottom', 'left']);
 const ELEMENT_TYPES = new Set(['button', 'link', 'tooltip', 'area']);
@@ -357,8 +359,14 @@ addAsyncMessageListener(async (message, sender) => {
       if (!flowExecutors.has(targetTabId)) {
         throw new Error(`No executor registered for tab ${targetTabId}.`);
       }
-      const normalizedSteps = normalizeFlowSteps(steps || definition || flowSource);
-      if (!normalizedSteps || normalizedSteps.length === 0) {
+      let resolvedSteps = normalizeFlowSteps(steps || definition || flowSource);
+      if ((!resolvedSteps || resolvedSteps.length === 0) && flowId) {
+        const { flow } = await findFlowById(flowId);
+        if (flow && Array.isArray(flow.steps)) {
+          resolvedSteps = normalizeFlowSteps(flow.steps);
+        }
+      }
+      if (!resolvedSteps || resolvedSteps.length === 0) {
         throw new Error('No steps to run.');
       }
       const resolvedPageKey =
@@ -372,7 +380,7 @@ addAsyncMessageListener(async (message, sender) => {
         currentIndex: 0,
         currentStepId: null,
         resumeToken,
-        steps: normalizedSteps,
+        steps: resolvedSteps,
         result: undefined,
         error: undefined,
         waitingForNavigation: false,
@@ -456,6 +464,20 @@ addAsyncMessageListener(async (message, sender) => {
       }
       return flowSessions.get(flowId) || null;
     }
+    case MessageType.LIST_FLOWS: {
+      const { scope = 'global', pageUrl } = message.data || {};
+      return listFlows({ scope, pageUrl });
+    }
+    case MessageType.UPSERT_FLOW: {
+      const { flow, scope = 'global', pageUrl } = message.data || {};
+      const list = await upsertFlow({ flow, scope, pageUrl });
+      return list;
+    }
+    case MessageType.DELETE_FLOW: {
+      const { id, scope = 'global', pageUrl } = message.data || {};
+      const list = await deleteFlow({ id, scope, pageUrl });
+      return list;
+    }
     case MessageType.LIST_BY_URL: {
       const { pageUrl } = message.data || {};
       if (!pageUrl) {
@@ -519,6 +541,47 @@ addAsyncMessageListener(async (message, sender) => {
       delete forwarded.pageUrl;
       await sendMessageToFrames(targetTabId, { type: MessageType.START_PICKER, pageUrl, data: forwarded });
       return true;
+    }
+    case MessageType.LIST_HIDDEN_RULES: {
+      const { pageUrl, scope = 'page', effective = true } = message.data || {};
+      if (!pageUrl && scope !== 'global') {
+        throw new Error('Missing pageUrl for hidden rules.');
+      }
+      if (effective) {
+        return getEffectiveRules(pageUrl || '');
+      }
+      return listHiddenRules({ scope, pageUrl });
+    }
+    case MessageType.UPSERT_HIDDEN_RULE: {
+      const { rule, scope = 'page', pageUrl, tabId } = message.data || {};
+      if (scope !== 'global' && !pageUrl) {
+        throw new Error('Missing pageUrl for hidden rule.');
+      }
+      const list = await upsertHiddenRule({ rule, scope, pageUrl });
+      const targetTabId = tabId ?? sender.tab?.id;
+      if (targetTabId && (pageUrl || sender.tab?.url)) {
+        const targetUrl = pageUrl || sender.tab?.url;
+        await pushHiddenRulesToTab(targetTabId, targetUrl);
+      }
+      return list;
+    }
+    case MessageType.DELETE_HIDDEN_RULE: {
+      const { id, scope = 'page', pageUrl, tabId } = message.data || {};
+      const list = await deleteHiddenRule({ id, scope, pageUrl });
+      const targetTabId = tabId ?? sender.tab?.id;
+      if (targetTabId && (pageUrl || sender.tab?.url)) {
+        await pushHiddenRulesToTab(targetTabId, pageUrl || sender.tab?.url);
+      }
+      return list;
+    }
+    case MessageType.SET_HIDDEN_RULE_ENABLED: {
+      const { id, enabled, scope = 'page', pageUrl, tabId } = message.data || {};
+      const list = await setHiddenRuleEnabled({ id, enabled, scope, pageUrl });
+      const targetTabId = tabId ?? sender.tab?.id;
+      if (targetTabId && (pageUrl || sender.tab?.url)) {
+        await pushHiddenRulesToTab(targetTabId, pageUrl || sender.tab?.url);
+      }
+      return list;
     }
     case MessageType.INIT_CREATE: {
       const { tabId, pageUrl } = message.data || {};
@@ -918,6 +981,16 @@ function validateElementPayload(payload) {
     } else {
       delete element.actionFlowLocked;
     }
+    if (typeof element.actionFlowId === 'string') {
+      const trimmedId = element.actionFlowId.trim();
+      if (trimmedId) {
+        element.actionFlowId = trimmedId;
+      } else {
+        delete element.actionFlowId;
+      }
+    } else {
+      delete element.actionFlowId;
+    }
     if (typeof element.actionSelector === 'string') {
       const trimmedSelector = element.actionSelector.trim();
       if (trimmedSelector) {
@@ -954,11 +1027,12 @@ function validateElementPayload(payload) {
         delete element.href;
       }
     }
-    if (element.href && !element.actionFlow && !element.actionSelector) {
+    if (element.href && !element.actionFlow && !element.actionSelector && !element.actionFlowId) {
       throw new Error('Buttons with a URL need an action flow.');
     }
   } else if (element.type === 'area') {
     delete element.actionFlowLocked;
+    delete element.actionFlowId;
     delete element.actionSelector;
     delete element.actionFlow;
     delete element.href;
@@ -966,6 +1040,7 @@ function validateElementPayload(payload) {
     delete element.containerId;
   } else {
     delete element.actionFlowLocked;
+    delete element.actionFlowId;
     delete element.actionSelector;
     delete element.actionFlow;
   }
@@ -1136,6 +1211,21 @@ async function sendMessageToFrames(tabId, message) {
     await Promise.allSettled(frames.map((frame) => safeSendMessage(tabId, message, frame.frameId)));
   } catch (error) {
     await safeSendMessage(tabId, message);
+  }
+}
+
+async function pushHiddenRulesToTab(tabId, pageUrl) {
+  if (!tabId || !pageUrl) return [];
+  try {
+    const rules = await getEffectiveRules(pageUrl);
+    await sendMessageToFrames(tabId, {
+      type: MessageType.APPLY_HIDDEN_RULES,
+      pageUrl: normalizePageUrl(pageUrl),
+      data: { rules },
+    });
+    return rules;
+  } catch (_error) {
+    return [];
   }
 }
 

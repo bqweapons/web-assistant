@@ -11,6 +11,7 @@
  * @property {'same-tab' | 'new-tab' | undefined} [linkTarget]
  * @property {string | undefined} actionSelector
  * @property {string | undefined} actionFlow
+ * @property {string | undefined} actionFlowId
  * @property {boolean | undefined} [actionFlowLocked]
  * @property {string} selector
  * @property {string[] | undefined} [frameSelectors]

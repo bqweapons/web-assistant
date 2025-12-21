@@ -422,4 +422,53 @@ mergeMessages(messages, {
   },
 });
 
+mergeMessages(messages, {
+  flow: {
+    library: {
+      heading: 'Action flows',
+      description: '创建可复用的 Flow 并绑定到按钮。',
+      createAction: '新建 Flow',
+      createTitle: '创建 Flow',
+      editTitle: '编辑 Flow',
+      subtitle: '一次配置，多处复用。',
+      name: '名称',
+      namePlaceholder: '我的 Flow',
+      descriptionField: '描述',
+      descriptionPlaceholder: '这个 Flow 要做什么',
+      summary: '概览',
+      stepsCount: '{count} 个步骤',
+      saveAndRun: '保存并运行',
+      errorName: '请填写名称。',
+      noDescription: '暂无描述',
+      empty: '还没有 Flow，先创建一个吧。',
+    },
+  },
+  hidden: {
+    heading: '隐藏元素',
+    description: '在当前页面或站点隐藏不想看到的元素。',
+    add: '添加规则',
+    cancel: '取消',
+    save: '保存规则',
+    enabled: '已启用',
+    disabled: '已禁用',
+    empty: '暂无隐藏规则。',
+    defaultName: '隐藏规则',
+    notePlaceholder: '备注（可选）',
+    error: {
+      selector: '请填写要隐藏的选择器。',
+    },
+    form: {
+      name: '名称',
+      selector: '选择器',
+      scope: '作用域',
+      note: '备注',
+    },
+    scope: {
+      page: '当前页',
+      site: '站点',
+      global: '全局',
+    },
+  },
+});
+
 export default messages;

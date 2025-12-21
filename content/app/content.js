@@ -6,6 +6,8 @@ import { hydrateElements } from './hydration.js';
 import { setupMessageBridge } from './messages.js';
 import { setupMutationWatcher } from './mutation-watcher.js';
 import { setupAutosave } from './autosave.js';
+import { MessageType, sendMessage } from '../common/messaging.js';
+import { applyHiddenRules } from './hidden.js';
 
 function setupSpaNavigationWatcher(onChange) {
   if (typeof onChange !== 'function') {
@@ -63,9 +65,21 @@ function setupSpaNavigationWatcher(onChange) {
     }
     initRuntime({ frameContext, siteKey: nextSiteKey, pageKey: nextPageKey, pageUrl: nextSiteKey });
     await hydrateElements();
+    try {
+      const rules = await sendMessage(MessageType.LIST_HIDDEN_RULES, { pageUrl: nextSiteKey, effective: true });
+      applyHiddenRules(Array.isArray(rules) ? rules : []);
+    } catch (_error) {
+      // ignore
+    }
   });
   setupMessageBridge();
   setupMutationWatcher();
   setupAutosave();
+  try {
+    const rules = await sendMessage(MessageType.LIST_HIDDEN_RULES, { pageUrl: runtime.pageUrl, effective: true });
+    applyHiddenRules(Array.isArray(rules) ? rules : []);
+  } catch (_error) {
+    // ignore
+  }
 })();
 
