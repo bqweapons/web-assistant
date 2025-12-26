@@ -1,5 +1,6 @@
 import { parseActionFlowDefinition } from '../../../common/flows.js';
-import { forwardClick, resolveSelector, sanitizeUrl, executeActionFlow } from '../core/index.js';
+import { sendMessage, MessageType } from '../../common/messaging.js';
+import { forwardClick, resolveSelector, sanitizeUrl } from '../core/index.js';
 
 /**
  * ボタン要素へクリック時の遷移・セレクター操作・フロー実行を組み込む。
@@ -8,8 +9,10 @@ import { forwardClick, resolveSelector, sanitizeUrl, executeActionFlow } from '.
  * @param {string | undefined} href
  * @param {string | undefined} actionSelector
  * @param {string | undefined} actionFlow
+ * @param {string | undefined} actionFlowId
+ * @param {string | undefined} elementId
  */
-export function applyButtonBehavior(node, href, actionSelector, actionFlow) {
+export function applyButtonBehavior(node, href, actionSelector, actionFlow, actionFlowId, elementId) {
   if (!(node instanceof HTMLButtonElement)) {
     return;
   }
@@ -55,8 +58,23 @@ export function applyButtonBehavior(node, href, actionSelector, actionFlow) {
     event.stopPropagation();
     let handled = false;
     if (parsedFlow) {
+      const flowSteps = selector
+        ? [...parsedFlow.steps, { type: 'click', selector, all: false }]
+        : parsedFlow.steps;
+      const flowId =
+        typeof actionFlowId === 'string' && actionFlowId.trim()
+          ? actionFlowId.trim()
+          : elementId
+            ? `element-flow-${elementId}`
+            : `inline-flow-${Date.now()}`;
       try {
-        handled = await executeActionFlow(node, parsedFlow);
+        await sendMessage(MessageType.RUN_FLOW, {
+          flowId,
+          steps: flowSteps,
+          pageKey: window.location.href,
+          pageUrl: window.location.href,
+        });
+        handled = true;
       } catch (error) {
         console.error('[Ladybrid] Failed to execute flow', error);
       }

@@ -58,6 +58,21 @@ async function handleRunStep(message) {
     await sendMessage(MessageType.STEP_ERROR, { flowId, stepId, ...error });
     return { ok: false, error };
   }
+  try {
+    console.log('[Flow] running step', {
+      flowId,
+      stepId,
+      type: payload.type,
+      selector: payload.selector,
+      url: payload.url,
+      target: payload.target,
+      value: payload.value,
+      timeout: payload.timeout ?? payload.timeoutMs,
+      retry: payload.retry,
+    });
+  } catch (_error) {
+    // ignore log failures
+  }
   const host = document.body || document.documentElement;
   const timeoutValue = Number(timeout ?? timeoutMs ?? stepPayload?.timeout ?? stepPayload?.timeoutMs ?? 0);
   const retries = Math.max(0, Number.isFinite(Number(stepPayload?.retry)) ? Number(stepPayload.retry) : 0);
@@ -94,6 +109,11 @@ async function handleRunStep(message) {
     }
     const result = { performed };
     try {
+      console.log('[Flow] step done', { flowId, stepId, performed });
+    } catch (_error) {
+      // ignore log failures
+    }
+    try {
       await sendMessage(MessageType.STEP_DONE, { flowId, stepId, result, status: 'running' });
     } catch (_error) {
       // background may be unreachable; ignore
@@ -104,6 +124,11 @@ async function handleRunStep(message) {
       error?.code ||
       (error?.message === 'Step timeout exceeded' ? 'STEP_TIMEOUT' : error?.message ? 'EXECUTION_FAILED' : 'EXECUTION_FAILED');
     const detail = { message: error?.message || String(error), code };
+    try {
+      console.log('[Flow] step error', { flowId, stepId, ...detail });
+    } catch (_error) {
+      // ignore log failures
+    }
     try {
       await sendMessage(MessageType.STEP_ERROR, {
         flowId,

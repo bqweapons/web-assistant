@@ -40,6 +40,9 @@ export default function App() {
   const [flowPickerTarget, setFlowPickerTarget] = useState(null);
   const [flowPickerSelection, setFlowPickerSelection] = useState(null);
   const [flowPickerError, setFlowPickerError] = useState('');
+  const [hiddenPickerActive, setHiddenPickerActive] = useState(false);
+  const [hiddenPickerSelection, setHiddenPickerSelection] = useState(null);
+  const [hiddenPickerError, setHiddenPickerError] = useState('');
   const [hiddenRules, setHiddenRules] = useState([]);
   const [hiddenBusy, setHiddenBusy] = useState(false);
   const [homeSubTab, setHomeSubTab] = useState('add');
@@ -110,7 +113,7 @@ export default function App() {
         description,
         steps,
       };
-      const list = await sendMessage(MessageType.UPSERT_FLOW, { flow, scope: 'global', pageUrl });
+      const list = await sendMessage(MessageType.UPSERT_FLOW, { flow, scope: 'site', pageUrl });
       setFlows(Array.isArray(list) ? list : []);
       return flowId;
     },
@@ -187,7 +190,7 @@ export default function App() {
   const refreshFlows = useCallback(
     async () => {
       try {
-        const list = await sendMessage(MessageType.LIST_FLOWS, { scope: 'global', pageUrl });
+        const list = await sendMessage(MessageType.LIST_FLOWS, { scope: 'site', pageUrl });
         setFlows(Array.isArray(list) ? list : []);
       } catch (error) {
         console.error('Failed to load flows', error);
@@ -465,6 +468,29 @@ export default function App() {
     [pageUrl, tabId],
   );
 
+  const startHiddenPicker = useCallback(async () => {
+    if (!tabId || !pageUrl) {
+      setCreationMessage(createMessage('context.tabUnavailable'));
+      return;
+    }
+    setHiddenPickerActive(true);
+    setHiddenPickerSelection(null);
+    setHiddenPickerError('');
+    try {
+      await sendMessage(MessageType.START_PICKER, {
+        tabId,
+        pageUrl,
+        targetType: 'selector',
+        source: 'hidden-rules',
+        accept: 'selector',
+        mode: 'select',
+      });
+    } catch (error) {
+      setCreationMessage(createMessage('manage.picker.startError', { error: error.message }));
+      setHiddenPickerActive(false);
+    }
+  }, [pageUrl, tabId]);
+
   const openFlowLibraryCreate = useCallback(() => {
     setFlowLibraryMode('library');
     setFlowLibraryElementId(null);
@@ -524,7 +550,7 @@ export default function App() {
                   : selectedFlow.description || '',
               steps,
             };
-            const list = await sendMessage(MessageType.UPSERT_FLOW, { flow: updatedFlow, scope: 'global', pageUrl });
+            const list = await sendMessage(MessageType.UPSERT_FLOW, { flow: updatedFlow, scope: 'site', pageUrl });
             setFlows(Array.isArray(list) ? list : []);
             const nextElement = {
               ...target,
@@ -580,7 +606,7 @@ export default function App() {
           closeFlowLibraryDrawer();
           return;
         }
-        const list = await sendMessage(MessageType.UPSERT_FLOW, { flow: payload, scope: 'global', pageUrl });
+        const list = await sendMessage(MessageType.UPSERT_FLOW, { flow: payload, scope: 'site', pageUrl });
         setFlows(Array.isArray(list) ? list : []);
         setCreationMessage(createMessage('flow.messages.saveSuccess'));
         if (options.runAfterSave) {
@@ -646,7 +672,7 @@ export default function App() {
       }
       setFlowLibraryBusy(true);
       try {
-        const list = await sendMessage(MessageType.DELETE_FLOW, { id: flow.id, scope: 'global', pageUrl });
+        const list = await sendMessage(MessageType.DELETE_FLOW, { id: flow.id, scope: 'site', pageUrl });
         setFlows(Array.isArray(list) ? list : []);
         setCreationMessage(createMessage('manage.delete.success'));
       } catch (error) {
@@ -713,7 +739,11 @@ export default function App() {
       if (!message?.type) {
         return;
       }
-      if (message.pageUrl && message.pageUrl !== pageUrl && !(flowPickerTarget && message.type === MessageType.PICKER_RESULT)) {
+      if (
+        message.pageUrl &&
+        message.pageUrl !== pageUrl &&
+        !((flowPickerTarget || hiddenPickerActive) && message.type === MessageType.PICKER_RESULT)
+      ) {
         return;
       }
       switch (message.type) {
@@ -747,6 +777,11 @@ export default function App() {
             setFlowPickerTarget(null);
             setFlowPickerError('');
           }
+          if (hiddenPickerActive && message.data?.selector) {
+            setHiddenPickerSelection({ selector: message.data.selector });
+            setHiddenPickerActive(false);
+            setHiddenPickerError('');
+          }
           break;
         }
         case MessageType.OPEN_ELEMENT_DRAWER: {
@@ -764,6 +799,10 @@ export default function App() {
           if (flowPickerTarget) {
             setFlowPickerError(message.data?.error || t('manage.picker.cancelled'));
             setFlowPickerTarget(null);
+          }
+          if (hiddenPickerActive) {
+            setHiddenPickerError(message.data?.error || t('manage.picker.cancelled'));
+            setHiddenPickerActive(false);
           }
           break;
         case MessageType.REHYDRATE:
@@ -798,7 +837,7 @@ export default function App() {
     return () => {
       chrome.runtime.onMessage.removeListener(listener);
     };
-  }, [pageUrl, t, flowPickerTarget, openElementDrawer]);
+  }, [pageUrl, t, flowPickerTarget, hiddenPickerActive, openElementDrawer]);
 
   const openFlowLibraryForElement = useCallback(
     (id) => {
@@ -1207,6 +1246,10 @@ export default function App() {
               onCreate={handleCreateHiddenRule}
               onDelete={handleDeleteHiddenRule}
               onToggle={handleToggleHiddenRule}
+              onPickSelector={startHiddenPicker}
+              pickerSelection={hiddenPickerSelection}
+              onPickerSelectionHandled={() => setHiddenPickerSelection(null)}
+              pickerError={hiddenPickerError}
               busy={hiddenBusy}
               t={t}
             />

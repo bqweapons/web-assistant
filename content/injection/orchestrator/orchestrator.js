@@ -419,7 +419,14 @@ function hydrateNode(node, element) {
     preserveResizeHandlesDuring(node, () => {
       node.textContent = element.text;
     });
-    applyButtonBehavior(node, element.href, element.actionSelector, element.actionFlow);
+    applyButtonBehavior(
+      node,
+      element.href,
+      element.actionSelector,
+      element.actionFlow,
+      element.actionFlowId,
+      element.id,
+    );
     attachDragBehavior(node, element, getFloatingDragDeps());
     bindEditingEnhancements(node, element);
   } else if (element.type === 'tooltip') {

@@ -111,8 +111,17 @@ async function runFlowStep(step, context, depth) {
     case 'navigate': {
       const sanitized = sanitizeUrl(step.url);
       if (sanitized) {
-        const target = step.target || '_blank';
-        window.open(sanitized, target, 'noopener');
+        const target = typeof step.target === 'string' ? step.target.trim() : '';
+        if (!target || target === '_self') {
+          const resolved = new URL(sanitized, window.location.href);
+          if (resolved.origin === window.location.origin) {
+            window.location.assign(resolved.href);
+          } else {
+            window.open(resolved.href, '_blank', 'noopener');
+          }
+        } else {
+          window.open(sanitized, target, 'noopener');
+        }
         context.performed = true;
       }
       break;

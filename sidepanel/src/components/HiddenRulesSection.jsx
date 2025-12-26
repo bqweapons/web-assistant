@@ -1,12 +1,34 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
+import { PlusIcon, CloseIcon, TrashIcon } from './Icons.jsx';
+import { btnIconPrimary, btnIconDanger, btnSecondary, btnPrimary } from '../styles/buttons.js';
 
-export function HiddenRulesSection({ rules, onCreate, onDelete, onToggle, busy, t }) {
+export function HiddenRulesSection({
+  rules,
+  onCreate,
+  onDelete,
+  onToggle,
+  onPickSelector,
+  pickerSelection,
+  onPickerSelectionHandled,
+  pickerError,
+  busy,
+  t,
+}) {
   const [formOpen, setFormOpen] = useState(false);
   const [name, setName] = useState('');
   const [selector, setSelector] = useState('');
   const [scope, setScope] = useState('page');
   const [note, setNote] = useState('');
   const [error, setError] = useState('');
+
+  useEffect(() => {
+    if (!pickerSelection?.selector) {
+      return;
+    }
+    setSelector(pickerSelection.selector);
+    setError('');
+    onPickerSelectionHandled?.();
+  }, [pickerSelection, onPickerSelectionHandled]);
 
   const handleSubmit = () => {
     if (!selector.trim()) {
@@ -37,10 +59,12 @@ export function HiddenRulesSection({ rules, onCreate, onDelete, onToggle, busy, 
         </div>
         <button
           type="button"
-          className="inline-flex items-center justify-center rounded-full bg-gradient-to-r from-blue-600 to-indigo-500 px-4 py-2 text-xs font-semibold text-white shadow-md transition hover:shadow-lg"
+          className={btnIconPrimary}
           onClick={() => setFormOpen((v) => !v)}
+          aria-label={formOpen ? t('hidden.cancel') : t('hidden.add')}
+          title={formOpen ? t('hidden.cancel') : t('hidden.add')}
         >
-          {formOpen ? t('hidden.cancel') : t('hidden.add')}
+          {formOpen ? <CloseIcon className="h-4 w-4" /> : <PlusIcon className="h-4 w-4" />}
         </button>
       </header>
       {formOpen && (
@@ -48,12 +72,23 @@ export function HiddenRulesSection({ rules, onCreate, onDelete, onToggle, busy, 
           <div className="space-y-2">
             <label className="block text-xs font-semibold text-slate-700">
               {t('hidden.form.selector')}
-              <input
-                className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm"
-                value={selector}
-                onChange={(e) => setSelector(e.target.value)}
-                placeholder="main article"
-              />
+              <div className="mt-1 flex flex-col gap-2 sm:flex-row sm:items-center sm:gap-3">
+                <input
+                  className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm"
+                  value={selector}
+                  onChange={(e) => setSelector(e.target.value)}
+                  placeholder="main article"
+                />
+                <button
+                  type="button"
+                  className={`${btnSecondary} text-xs px-3 py-2`}
+                  onClick={() => onPickSelector?.()}
+                  aria-label={t('editor.actionPick')}
+                  title={t('editor.actionPick')}
+                >
+                  {t('editor.actionPick')}
+                </button>
+              </div>
             </label>
             <label className="block text-xs font-semibold text-slate-700">
               {t('hidden.form.name')}
@@ -90,13 +125,16 @@ export function HiddenRulesSection({ rules, onCreate, onDelete, onToggle, busy, 
             </label>
             <button
               type="button"
-              className="mt-2 w-full rounded-full bg-gradient-to-r from-blue-600 to-indigo-500 px-4 py-2 text-xs font-semibold text-white shadow-md transition hover:shadow-lg disabled:opacity-60 disabled:cursor-not-allowed"
+              className={btnPrimary}
               onClick={handleSubmit}
               disabled={busy}
+              aria-label={t('hidden.save')}
+              title={t('hidden.save')}
             >
               {t('hidden.save')}
             </button>
             {error && <p className="text-[11px] text-rose-600">{error}</p>}
+            {pickerError && <p className="text-[11px] text-rose-600">{pickerError}</p>}
           </div>
         </div>
       )}
@@ -135,11 +173,13 @@ export function HiddenRulesSection({ rules, onCreate, onDelete, onToggle, busy, 
                 </label>
                 <button
                   type="button"
-                  className="rounded-full border border-rose-200 bg-rose-50 px-4 py-2 font-semibold text-rose-700 shadow-sm transition hover:bg-rose-100 disabled:opacity-60"
+                  className={btnIconDanger}
                   onClick={() => onDelete?.(rule)}
                   disabled={busy}
+                  aria-label={t('manage.delete.confirm')}
+                  title={t('manage.delete.confirm')}
                 >
-                  {t('manage.delete.confirm')}
+                  <TrashIcon className="h-4 w-4" />
                 </button>
               </div>
             </div>
