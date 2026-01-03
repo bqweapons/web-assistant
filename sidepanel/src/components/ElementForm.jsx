@@ -1,6 +1,6 @@
 import React, { useMemo, useState } from 'react';
 import { summarizeFlow } from '../utils/messages.js';
-import { STYLE_PALETTE, STYLE_PRESETS, buildStyleState, detectStylePreset, getStyleFieldConfigs } from '../utils/element-form.js';
+import { STYLE_PALETTE, STYLE_PRESETS, buildStyleState, detectStylePreset, getStyleFieldConfigs } from '../element-form.js';
 
 const FORM_CONTAINER_STYLE = {
   display: 'flex',

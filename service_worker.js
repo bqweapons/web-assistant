@@ -1023,25 +1023,6 @@ addAsyncMessageListener(async (message, sender) => {
       });
       return true;
     }
-    case MessageType.OPEN_EDITOR: {
-      const { id, tabId, pageUrl } = message.data || {};
-      const targetTabId = tabId ?? sender.tab?.id;
-      if (!targetTabId || !id) {
-        throw new Error('Missing tabId or element id.');
-      }
-      const siteUrl = normalizePageUrl(pageUrl);
-      const element = siteUrl && id ? await findElement(siteUrl, id) : null;
-      await sendMessageToFrames(targetTabId, {
-        type: MessageType.OPEN_EDITOR,
-        pageUrl: siteUrl,
-        data: {
-          id,
-          frameSelectors: element?.frameSelectors || [],
-          frameUrl: element?.frameUrl,
-        },
-      });
-      return true;
-    }
     case MessageType.SET_EDIT_MODE: {
       const { enabled, tabId, pageUrl } = message.data || {};
       const targetTabId = tabId ?? sender.tab?.id;

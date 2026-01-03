@@ -224,58 +224,28 @@ function beginClickPlacement(requestedType, scope = 'page', options = {}) {
       injectModule.focusElement(draft.id);
       return;
     }
-    const host = injectModule.getHost(draft.id);
-    if (!host) {
-      cancelCreationDraft();
-      return;
-    }
-    const session = selectorModule.openElementEditor({
-      mode: 'create',
-      target: host,
+    injectModule.setEditingElement(draft.id, false);
+    state.creationElementId = null;
+    state.activeEditorElementId = null;
+    state.editorSession = null;
+    const payload = {
+      ...draft,
+      id: draft.id,
+      siteUrl: runtime.siteKey || runtime.pageUrl,
+      pageUrl: draft.pageUrl || runtime.pageKey || runtime.pageUrl,
       selector: draft.selector,
-      values: draft,
-      onPreview(updated) {
-        // Live preview on the host (reflects text, href, styles, etc.)
-        injectModule.previewElement(draft.id, updated || {});
-      },
-      onSubmit(updated) {
-        injectModule.previewElement(draft.id, updated || {});
-        injectModule.setEditingElement(draft.id, false);
-        state.creationElementId = null;
-        state.activeEditorElementId = null;
-        state.editorSession = null;
-        const payload = {
-          ...draft,
-          ...updated,
-          id: draft.id,
-          siteUrl: (updated && updated.siteUrl) || runtime.siteKey || runtime.pageUrl,
-          pageUrl: (updated && updated.pageUrl) || draft.pageUrl || runtime.pageKey || runtime.pageUrl,
-          selector: draft.selector,
-          position: draft.position,
-          frameSelectors: Array.isArray(runtime.frameContext?.frameSelectors)
-            ? runtime.frameContext.frameSelectors.slice()
-            : [],
-          frameLabel: runtime.frameContext?.frameLabel,
-          frameUrl: runtime.frameContext?.frameUrl,
-          createdAt: draft.createdAt,
-          updatedAt: Date.now(),
-        };
-        sendMessage(MessageType.CREATE, payload).catch((error) =>
-          console.error('[Ladybrid] Failed to save new element', error),
-        );
-      },
-      onCancel() {
-        injectModule.setEditingElement(draft.id, false);
-        cancelCreationDraft();
-        state.editorSession = null;
-        try {
-          chrome.runtime.sendMessage({ type: MessageType.PICKER_CANCELLED, pageUrl: runtime.pageUrl });
-        } catch (_error) {
-          // ignore notification errors
-        }
-      },
-    });
-    state.editorSession = session;
+      position: draft.position,
+      frameSelectors: Array.isArray(runtime.frameContext?.frameSelectors)
+        ? runtime.frameContext.frameSelectors.slice()
+        : [],
+      frameLabel: runtime.frameContext?.frameLabel,
+      frameUrl: runtime.frameContext?.frameUrl,
+      createdAt: draft.createdAt,
+      updatedAt: Date.now(),
+    };
+    sendMessage(MessageType.CREATE, payload).catch((error) =>
+      console.error('[Ladybrid] Failed to save new element', error),
+    );
     injectModule.focusElement(draft.id);
   };
 
@@ -355,57 +325,28 @@ export function beginCreationSession(options = {}) {
         injectModule.focusElement(draft.id);
         return;
       }
-      const host = injectModule.getHost(draft.id);
-      if (!host) {
-        cancelCreationDraft();
-        return;
-      }
-      const session = selectorModule.openElementEditor({
-        mode: 'create',
-        target: host,
+      injectModule.setEditingElement(draft.id, false);
+      state.creationElementId = null;
+      state.activeEditorElementId = null;
+      state.editorSession = null;
+      const payload = {
+        ...draft,
+        id: draft.id,
+        siteUrl: runtime.siteKey || runtime.pageUrl,
+        pageUrl: draft.pageUrl || runtime.pageKey || runtime.pageUrl,
         selector: draft.selector,
-        values: draft,
-        onPreview(updated) {
-          injectModule.previewElement(draft.id, updated || {});
-        },
-        onSubmit(updated) {
-          injectModule.previewElement(draft.id, updated || {});
-          injectModule.setEditingElement(draft.id, false);
-          state.creationElementId = null;
-          state.activeEditorElementId = null;
-          state.editorSession = null;
-          const payload = {
-            ...draft,
-            ...updated,
-            id: draft.id,
-            siteUrl: (updated && updated.siteUrl) || runtime.siteKey || runtime.pageUrl,
-            pageUrl: (updated && updated.pageUrl) || draft.pageUrl || runtime.pageKey || runtime.pageUrl,
-            selector: draft.selector,
-            position: draft.position,
-            frameSelectors: Array.isArray(runtime.frameContext?.frameSelectors)
-              ? runtime.frameContext.frameSelectors.slice()
-              : [],
-            frameLabel: runtime.frameContext?.frameLabel,
-            frameUrl: runtime.frameContext?.frameUrl,
-            createdAt: draft.createdAt,
-            updatedAt: Date.now(),
-          };
-          sendMessage(MessageType.CREATE, payload).catch((error) =>
-            console.error('[Ladybrid] Failed to save new element', error),
-          );
-        },
-        onCancel() {
-          injectModule.setEditingElement(draft.id, false);
-          cancelCreationDraft();
-          state.editorSession = null;
-          try {
-            chrome.runtime.sendMessage({ type: MessageType.PICKER_CANCELLED, pageUrl: runtime.pageUrl });
-          } catch (_error) {
-            // ignore notification errors
-          }
-        },
-      });
-      state.editorSession = session;
+        position: draft.position,
+        frameSelectors: Array.isArray(runtime.frameContext?.frameSelectors)
+          ? runtime.frameContext.frameSelectors.slice()
+          : [],
+        frameLabel: runtime.frameContext?.frameLabel,
+        frameUrl: runtime.frameContext?.frameUrl,
+        createdAt: draft.createdAt,
+        updatedAt: Date.now(),
+      };
+      sendMessage(MessageType.CREATE, payload).catch((error) =>
+        console.error('[Ladybrid] Failed to save new element', error),
+      );
       injectModule.focusElement(draft.id);
     },
     onCancel() {

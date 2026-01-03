@@ -1,10 +1,10 @@
-import { ALLOWED_STYLE_KEYS, NODE_CLASS, TOOLTIP_POSITIONS, kebabCase } from '../core/index.js';
+import { ALLOWED_STYLE_KEYS, NODE_CLASS, TOOLTIP_POSITIONS, kebabCase } from './core/index.js';
 import {
   DEFAULT_BUTTON_STYLE,
   DEFAULT_LINK_STYLE,
   DEFAULT_AREA_STYLE,
   DEFAULT_TOOLTIP_STYLE,
-} from '../../bubble/styles/style-presets.js';
+} from '../bubble/styles/style-presets.js';
 
 export function applyStyle(node, style) {
   if (!(node instanceof HTMLElement)) {
@@ -117,6 +117,5 @@ export function normalizeTooltipPosition(position) {
   }
   return 'top';
 }
-
 
 

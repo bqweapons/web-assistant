@@ -3,7 +3,7 @@ import { MessageType, sendMessage } from '../../../common/messaging.js';
 import { SaveIcon, CloseIcon } from './Icons.jsx';
 import { ElementForm } from './ElementForm.jsx';
 import { useBodyScrollLock } from '../hooks/useBodyScrollLock.js';
-import { initializeProperties, normalizePropertiesForSave } from '../utils/element-form.js';
+import { initializeProperties, normalizePropertiesForSave } from '../element-form.js';
 
 export function ElementDrawer({ open, onClose, item, onSave, busyAction, onSwitchToFlow, t, tabId, pageUrl }) {
   const [properties, setProperties] = useState(() => initializeProperties(item, t));

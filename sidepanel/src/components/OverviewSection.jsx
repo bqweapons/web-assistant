@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { MessageType, sendMessage } from '../../../common/messaging.js';
 import { createMessage } from '../utils/messages.js';
-import { ensureTab, findTabByPageUrl } from '../utils/tabs.js';
+import { findTabByPageUrl } from '../utils/tabs.js';
 import { ItemList } from './ItemList.jsx';
 import { RefreshIcon, ClearPageIcon } from './Icons.jsx';
 
@@ -140,24 +140,6 @@ export function OverviewSection({
     [t],
   );
 
-  const handleEditItem = useCallback(
-    async (pageUrl, id) => {
-      const tab = await ensureTab(pageUrl);
-      if (!tab?.id) {
-        return;
-      }
-      await chrome.tabs.update(tab.id, { active: true });
-      if (chrome.sidePanel?.open) {
-        await chrome.sidePanel.open({ windowId: tab.windowId });
-      }
-      try {
-        await sendMessage(MessageType.OPEN_EDITOR, { pageUrl, id, tabId: tab.id });
-      } catch (error) {
-        alert(t('overview.openBubbleError', { error: error.message }));
-      }
-    },
-    [t],
-  );
 
   const statusMessage = status ? t(status.key, status.values) : '';
   const isSiteCollapsed = useCallback(
@@ -281,7 +263,6 @@ export function OverviewSection({
                             formatTooltipPosition={formatTooltipPosition}
                             formatTooltipMode={formatTooltipMode}
                             onFocus={(id) => handleFocusItem(siteKey, id)}
-                            onOpenEditor={(id) => handleEditItem(siteKey, id)}
                             onDelete={(id) => handleDeleteItem(siteKey, id)}
                             showActions={false}
                           />

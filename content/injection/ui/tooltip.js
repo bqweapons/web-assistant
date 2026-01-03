@@ -1,5 +1,5 @@
 import { NODE_CLASS, TOOLTIP_POSITIONS } from '../core/constants.js';
-import { normalizeTooltipPosition } from '../ui/style.js';
+import { normalizeTooltipPosition } from '../style.js';
 
 /**
  * Creates a fresh tooltip container element and applies base appearance.

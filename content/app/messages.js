@@ -8,7 +8,6 @@ import {
   finalizeDraftElement,
 } from './creation.js';
 import { stopPicker } from './picker.js';
-import { openEditorBubble } from './editor.js';
 import { applyEditingMode } from './editing-mode.js';
 import { matchesFrameSelectors, elementMatchesFrame } from './frame.js';
 import { synchronizeElements } from './hydration.js';
@@ -262,13 +261,6 @@ export function setupMessageBridge() {
       case MessageType.CANCEL_PICKER: {
         stopPicker();
         sendResponse?.({ ok: true });
-        break;
-      }
-      case MessageType.OPEN_EDITOR: {
-        if (message.data?.id && matchesFrameSelectors(message.data.frameSelectors)) {
-          const opened = openEditorBubble(message.data.id);
-          sendResponse?.({ ok: opened });
-        }
         break;
       }
       case MessageType.SET_EDIT_MODE: {

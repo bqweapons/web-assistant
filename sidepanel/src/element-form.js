@@ -4,15 +4,15 @@ import {
   DEFAULT_LINK_STYLE,
   DEFAULT_TOOLTIP_STYLE,
   STYLE_PRESETS,
-} from '../../../content/bubble/styles/style-presets.js';
-import { getStyleFieldConfigs } from '../../../content/bubble/editor/field-config.js';
+} from '../../content/bubble/styles/style-presets.js';
+import { getStyleFieldConfigs } from '../../content/bubble/editor/field-config.js';
 import {
   getDefaultElementValues,
   resolvePosition,
   resolveTooltipPosition,
-} from '../../../content/bubble/editor/defaults.js';
-import { normalizeStyleState } from '../../../content/bubble/styles/style-normalize.js';
-import { normalizePageLocation, normalizeSiteUrl } from '../../../common/url.js';
+} from '../../content/bubble/editor/defaults.js';
+import { normalizeStyleState } from '../../content/bubble/styles/style-normalize.js';
+import { normalizePageLocation, normalizeSiteUrl } from '../../common/url.js';
 
 export const STYLE_PALETTE = [
   '#2563eb',
