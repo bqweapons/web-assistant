@@ -1,0 +1,46 @@
+{
+  "extensionName": {
+    "message": "Ladybird: no-code buttons, links and tooltips",
+    "description": "Extension name for listings and toolbar surfaces"
+  },
+  "extensionDescription": {
+    "message": "Create no-code buttons, links and tooltips on any page, personalize calls-to-action, and manage everything from a unified side panel",
+    "description": "Description for the Chrome Web Store and manifest"
+  },
+  "actionDefaultTitle": {
+    "message": "Open Ladybird",
+    "description": "Default title for the browser action"
+  },
+  "hud_running_step": {
+    "message": "Running flow step",
+    "description": "HUD status when running a step"
+  },
+  "hud_waiting_navigation": {
+    "message": "Waiting for navigation…",
+    "description": "HUD status when waiting for navigation"
+  },
+  "hud_flow_paused": {
+    "message": "Flow paused",
+    "description": "HUD status when flow is paused"
+  },
+  "hud_flow_resumed": {
+    "message": "Flow resumed",
+    "description": "HUD status when flow is resumed"
+  },
+  "hud_flow_stopped": {
+    "message": "Flow stopped",
+    "description": "HUD status when flow is stopped"
+  },
+  "hud_flow_finished": {
+    "message": "Flow finished",
+    "description": "HUD status when flow is finished"
+  },
+  "hud_step_completed": {
+    "message": "Step completed",
+    "description": "HUD status when a step completes"
+  },
+  "hud_rejoin_waiting": {
+    "message": "Restored flow; waiting for navigation…",
+    "description": "HUD status when rejoining a waiting flow"
+  }
+}

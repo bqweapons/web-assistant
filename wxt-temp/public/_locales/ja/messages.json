@@ -1,0 +1,46 @@
+{
+  "extensionName": {
+    "message": "Ladybird: ノーコードでボタン・リンク・ツールチップを追加",
+    "description": "Chrome ウェブストア向けの拡張機能名"
+  },
+  "extensionDescription": {
+    "message": "あらゆるページにノーコードでボタン・リンク・ツールチップを追加し、すべてのCTAをサイドパネルからまとめて管理します。",
+    "description": "Chrome ウェブストアとマニフェストの説明文"
+  },
+  "actionDefaultTitle": {
+    "message": "Ladybird を開く",
+    "description": "ブラウザアクションのデフォルトタイトル"
+  },
+  "hud_running_step": {
+    "message": "フローステップを実行中",
+    "description": "HUD ステータス: 実行中"
+  },
+  "hud_waiting_navigation": {
+    "message": "ナビゲーション待機中…",
+    "description": "HUD ステータス: ナビゲーション待ち"
+  },
+  "hud_flow_paused": {
+    "message": "フローを一時停止しました",
+    "description": "HUD ステータス: 一時停止"
+  },
+  "hud_flow_resumed": {
+    "message": "フローを再開しました",
+    "description": "HUD ステータス: 再開"
+  },
+  "hud_flow_stopped": {
+    "message": "フローを停止しました",
+    "description": "HUD ステータス: 停止"
+  },
+  "hud_flow_finished": {
+    "message": "フローが完了しました",
+    "description": "HUD ステータス: 完了"
+  },
+  "hud_step_completed": {
+    "message": "ステップを完了しました",
+    "description": "HUD ステータス: ステップ完了"
+  },
+  "hud_rejoin_waiting": {
+    "message": "フローを復元しました。ナビゲーション待ち…",
+    "description": "HUD ステータス: 待機復元"
+  }
+}
