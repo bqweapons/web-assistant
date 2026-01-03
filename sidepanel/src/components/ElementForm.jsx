@@ -8,7 +8,6 @@ const FORM_CONTAINER_STYLE = {
   gap: '6px',
   flex: '1 1 auto',
   minHeight: '0px',
-  overflowY: 'auto',
   padding: '4px 2px 2px',
 };
 
@@ -471,7 +470,7 @@ export function ElementForm({
                   }}
                   disabled={value?.actionFlowLocked}
                 >
-                  {t('editor.actionBuilder.modify')}
+                  {t('editor.actionFlowConfigure')}
                 </button>
               </div>
             </label>

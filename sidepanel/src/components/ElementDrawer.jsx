@@ -1,7 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { MessageType, sendMessage } from '../../../common/messaging.js';
 import { SaveIcon, CloseIcon } from './Icons.jsx';
-import { btnIconPrimary, btnIconSecondary } from '../styles/buttons.js';
 import { ElementForm } from './ElementForm.jsx';
 import { useBodyScrollLock } from '../hooks/useBodyScrollLock.js';
 import { initializeProperties, normalizePropertiesForSave } from '../utils/element-form.js';
@@ -82,7 +81,7 @@ export function ElementDrawer({ open, onClose, item, onSave, busyAction, onSwitc
             <div className="flex items-center gap-2">
               <button
                 type="button"
-                className={btnIconPrimary}
+                className="btn-primary inline-flex h-9 w-9 items-center justify-center p-0 disabled:cursor-not-allowed disabled:opacity-60"
                 onClick={handleSave}
                 disabled={busyAction}
                 aria-label={t('flow.actions.save')}
@@ -92,7 +91,7 @@ export function ElementDrawer({ open, onClose, item, onSave, busyAction, onSwitc
               </button>
               <button
                 type="button"
-                className={btnIconSecondary}
+                className="btn-secondary inline-flex h-9 w-9 items-center justify-center p-0"
                 onClick={onClose}
                 aria-label={t('flow.actions.close')}
                 title={t('flow.actions.close')}
@@ -102,15 +101,17 @@ export function ElementDrawer({ open, onClose, item, onSave, busyAction, onSwitc
             </div>
           </header>
 
-          <div className="relative px-5 py-4 space-y-4">
-            <div className="flex max-h-[60vh] min-h-0 flex-col pr-1">
-              <ElementForm
-                value={properties}
-                onChange={setProperties}
-                t={t}
-                onEditFlow={onSwitchToFlow}
-                actionFlowSource={item?.actionFlow}
-              />
+          <div className="relative py-4 space-y-4">
+            <div className="max-h-[60vh] min-h-0 overflow-y-auto">
+              <div className="px-5">
+                <ElementForm
+                  value={properties}
+                  onChange={setProperties}
+                  t={t}
+                  onEditFlow={onSwitchToFlow}
+                  actionFlowSource={item?.actionFlow}
+                />
+              </div>
             </div>
 
             <div className="h-2" />

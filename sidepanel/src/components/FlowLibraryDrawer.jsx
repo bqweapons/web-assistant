@@ -30,11 +30,6 @@ export function FlowLibraryDrawer({
 
   const defaultLabel = typeof seed?.defaultLabel === 'string' ? seed.defaultLabel : '';
   const seedTemplateId = typeof seed?.templateId === 'string' ? seed.templateId : '';
-  const baseSteps = useMemo(
-    () => normalizeBuilderSteps(Array.isArray(seed?.baseSteps) ? seed.baseSteps : []),
-    [seed?.baseSteps],
-  );
-
   const templateOptions = useMemo(
     () =>
       (templates || [])
@@ -42,13 +37,17 @@ export function FlowLibraryDrawer({
         .sort((a, b) => (a?.name || '').localeCompare(b?.name || '')),
     [templates],
   );
+  const selectedTemplate = useMemo(
+    () => templateOptions.find((option) => option?.id === templateId) || null,
+    [templateId, templateOptions],
+  );
 
   useEffect(() => {
-    const fallbackLabel = isElementMode ? defaultLabel : '';
+    const fallbackLabel = isElementMode ? '' : defaultLabel;
     let nextTemplateId = isElementMode ? seedTemplateId : '';
     let nextName = flow?.name || fallbackLabel;
     let nextDescription = flow?.description || fallbackLabel;
-    let nextSteps = flow?.steps ? normalizeBuilderSteps(flow.steps) : isElementMode ? baseSteps : [];
+    let nextSteps = flow?.steps ? normalizeBuilderSteps(flow.steps) : isElementMode ? [] : [];
 
     if (isElementMode && nextTemplateId) {
       const selected = templateOptions.find((option) => option?.id === nextTemplateId);
@@ -58,6 +57,9 @@ export function FlowLibraryDrawer({
         nextSteps = normalizeBuilderSteps(selected.steps || []);
       } else {
         nextTemplateId = '';
+        nextName = '';
+        nextDescription = '';
+        nextSteps = [];
       }
     }
 
@@ -66,7 +68,7 @@ export function FlowLibraryDrawer({
     setSteps(nextSteps);
     setTemplateId(nextTemplateId);
     setError('');
-  }, [flow?.id, open, isElementMode, defaultLabel, baseSteps, seedTemplateId, templateOptions]);
+  }, [flow?.id, open, isElementMode, defaultLabel, seedTemplateId, templateOptions]);
 
   useEffect(() => {
     if (!open || !pickerSelection || !pickerSelection.selector) {
@@ -90,6 +92,15 @@ export function FlowLibraryDrawer({
   const validation = useMemo(() => validateBuilderSteps(steps), [steps]);
 
   const handleSave = (runAfterSave = false) => {
+    if (isElementMode) {
+      if (!templateId) {
+        setError(t('flow.library.errorSelect'));
+        return;
+      }
+      setError('');
+      onSave?.({ templateId }, { runAfterSave });
+      return;
+    }
     if (!name.trim()) {
       setError(t('flow.library.errorName'));
       return;
@@ -125,10 +136,9 @@ export function FlowLibraryDrawer({
     setError('');
     if (!nextId) {
       if (isElementMode) {
-        setSteps(baseSteps);
-        const fallbackLabel = defaultLabel;
-        setName(fallbackLabel);
-        setDescription(fallbackLabel);
+        setSteps([]);
+        setName('');
+        setDescription('');
       }
       return;
     }
@@ -139,6 +149,14 @@ export function FlowLibraryDrawer({
       setDescription(selected.description || '');
     }
   };
+
+  const elementActionsDisabled = isElementMode && !templateId;
+  const headerTitle = isElementMode
+    ? t('editor.actionFlowTitle')
+    : flow?.id
+      ? t('flow.library.editTitle')
+      : t('flow.library.createTitle');
+  const headerSubtitle = isElementMode ? t('editor.actionFlowDescription') : t('flow.library.subtitle');
 
   return (
     <>
@@ -158,14 +176,12 @@ export function FlowLibraryDrawer({
         <div className="mx-auto max-w-5xl rounded-t-3xl border border-slate-200 bg-white shadow-2xl">
           <header className="flex items-center justify-between gap-3 border-b border-slate-200 px-5 py-4">
             <div className="flex flex-col gap-1">
-              <h3 className="text-base font-semibold text-slate-900">
-                {flow?.id ? t('flow.library.editTitle') : t('flow.library.createTitle')}
-              </h3>
-              <p className="text-xs text-slate-500">{t('flow.library.subtitle')}</p>
+              <h3 className="text-base font-semibold text-slate-900">{headerTitle}</h3>
+              <p className="text-xs text-slate-500">{headerSubtitle}</p>
             </div>
             <button
               type="button"
-              className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-700 shadow-sm transition hover:bg-slate-100"
+              className="btn-secondary inline-flex items-center justify-center px-3 py-2 text-xs"
               onClick={onClose}
             >
               {t('flow.actions.close')}
@@ -191,27 +207,36 @@ export function FlowLibraryDrawer({
                   </select>
                 </label>
               )}
-              <label className="block text-xs font-semibold text-slate-700">
-                {t('flow.library.name')}
-                <input
-                  className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm"
-                  value={name}
-                  onChange={(event) => setName(event.target.value)}
-                  placeholder={t('flow.library.namePlaceholder')}
-                />
-              </label>
-              <label className="block text-xs font-semibold text-slate-700">
-                {t('flow.library.descriptionField')}
-                <textarea
-                  className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm"
-                  rows={3}
-                  value={description}
-                  onChange={(event) => setDescription(event.target.value)}
-                  placeholder={t('flow.library.descriptionPlaceholder')}
-                />
-              </label>
-              <FlowBuilder value={steps} onChange={setSteps} onPickSelector={onPickSelector} t={t} />
-              {pickerError && <p className="text-xs text-rose-600">{pickerError}</p>}
+              {!isElementMode && (
+                <>
+                  <label className="block text-xs font-semibold text-slate-700">
+                    {t('flow.library.name')}
+                    <input
+                      className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm"
+                      value={name}
+                      onChange={(event) => setName(event.target.value)}
+                      placeholder={t('flow.library.namePlaceholder')}
+                    />
+                  </label>
+                  <label className="block text-xs font-semibold text-slate-700">
+                    {t('flow.library.descriptionField')}
+                    <textarea
+                      className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm"
+                      rows={3}
+                      value={description}
+                      onChange={(event) => setDescription(event.target.value)}
+                      placeholder={t('flow.library.descriptionPlaceholder')}
+                    />
+                  </label>
+                  <FlowBuilder value={steps} onChange={setSteps} onPickSelector={onPickSelector} t={t} />
+                  {pickerError && <p className="text-xs text-rose-600">{pickerError}</p>}
+                </>
+              )}
+              {isElementMode && selectedTemplate?.description ? (
+                <p className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-600">
+                  {selectedTemplate.description}
+                </p>
+              ) : null}
             </div>
             <aside className="flex flex-col gap-3 rounded-2xl border border-slate-200 bg-slate-50 p-4">
               <p className="text-xs font-semibold text-slate-700">{t('flow.library.summary')}</p>
@@ -221,9 +246,9 @@ export function FlowLibraryDrawer({
               <div className="flex flex-wrap items-center gap-2">
                 <button
                   type="button"
-                  className="inline-flex items-center gap-1 rounded-full border border-slate-200 bg-white px-4 py-2 text-xs font-semibold text-slate-700 shadow-sm transition hover:shadow-md disabled:cursor-not-allowed disabled:opacity-60"
+                  className="btn-primary inline-flex items-center justify-center gap-1 text-xs disabled:cursor-not-allowed disabled:opacity-60"
                   onClick={() => handleSave(false)}
-                  disabled={busyAction}
+                  disabled={busyAction || elementActionsDisabled}
                 >
                   <SaveIcon className="h-4 w-4" />
                   {t('flow.actions.save')}
@@ -231,7 +256,7 @@ export function FlowLibraryDrawer({
                 {!isElementMode && (
                   <button
                     type="button"
-                    className="inline-flex items-center gap-1 rounded-full border border-slate-200 bg-white px-4 py-2 text-xs font-semibold text-slate-700 shadow-sm transition hover:shadow-md disabled:cursor-not-allowed disabled:opacity-60"
+                    className="btn-primary inline-flex items-center justify-center gap-1 text-xs disabled:cursor-not-allowed disabled:opacity-60"
                     onClick={() => handleSave(true)}
                     disabled={busyAction}
                   >
@@ -241,9 +266,9 @@ export function FlowLibraryDrawer({
                 )}
                 <button
                   type="button"
-                  className="inline-flex items-center gap-1 rounded-full bg-gradient-to-r from-blue-600 to-indigo-500 px-4 py-2 text-xs font-semibold text-white shadow-md transition hover:shadow-lg disabled:cursor-not-allowed disabled:opacity-60"
+                  className="btn-primary inline-flex items-center justify-center gap-1 text-xs disabled:cursor-not-allowed disabled:opacity-60"
                   onClick={isElementMode ? () => handleSave(true) : handleRun}
-                  disabled={busyAction}
+                  disabled={busyAction || elementActionsDisabled}
                 >
                   <PlayIcon className="h-4 w-4" />
                   {t('flow.actions.run')}

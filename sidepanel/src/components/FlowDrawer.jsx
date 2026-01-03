@@ -2,7 +2,6 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { normalizeBuilderSteps, validateBuilderSteps } from '../../../common/flow-builder.js';
 import { CloseIcon, EditIcon, PauseIcon, PlayIcon, RefreshIcon, StopIcon } from './Icons.jsx';
 import { FlowBuilder } from './FlowBuilder.jsx';
-import { btnIconSecondary } from '../styles/buttons.js';
 import { useBodyScrollLock } from '../hooks/useBodyScrollLock.js';
 
 export function FlowDrawer({
@@ -163,7 +162,7 @@ export function FlowDrawer({
               {onSwitchToElement && (
                 <button
                   type="button"
-                  className={btnIconSecondary}
+                  className="btn-secondary inline-flex h-9 w-9 items-center justify-center p-0"
                   onClick={onSwitchToElement}
                   aria-label={t('editor.title')}
                   title={t('editor.title')}
@@ -173,7 +172,7 @@ export function FlowDrawer({
               )}
               <button
                 type="button"
-                className={btnIconSecondary}
+                className="btn-secondary inline-flex h-9 w-9 items-center justify-center p-0"
                 onClick={onRefreshSession}
                 disabled={busyAction}
                 aria-label={t('flow.actions.refresh')}
@@ -183,7 +182,7 @@ export function FlowDrawer({
               </button>
               <button
                 type="button"
-                className={btnIconSecondary}
+                className="btn-secondary inline-flex h-9 w-9 items-center justify-center p-0"
                 onClick={onClose}
                 aria-label={t('flow.actions.close')}
                 title={t('flow.actions.close')}
@@ -193,24 +192,26 @@ export function FlowDrawer({
             </div>
           </header>
 
-          <div className="relative px-5 py-4 space-y-4">
-            <div className="space-y-3 overflow-y-auto pr-1 max-h-[60vh]">
-              <FlowBuilder value={steps} onChange={setSteps} t={t} onPickSelector={handlePickSelector} />
-              {pickerError && <p className="text-[11px] text-rose-600">{pickerError}</p>}
-              {flowDirty && <p className="text-[11px] text-amber-600">{t('flow.drawer.noteText')}</p>}
+          <div className="relative py-4 space-y-4">
+            <div className="max-h-[60vh] overflow-y-auto">
+              <div className="px-5 space-y-3">
+                <FlowBuilder value={steps} onChange={setSteps} t={t} onPickSelector={handlePickSelector} />
+                {pickerError && <p className="text-[11px] text-rose-600">{pickerError}</p>}
+                {flowDirty && <p className="text-[11px] text-amber-600">{t('flow.drawer.noteText')}</p>}
+              </div>
             </div>
 
             {session?.error && (
-              <div className="rounded-xl border border-rose-200 bg-rose-50 p-3 text-xs text-rose-700">
+              <div className="mx-5 rounded-xl border border-rose-200 bg-rose-50 p-3 text-xs text-rose-700">
                 {sessionErrorMessage}
               </div>
             )}
 
-            <div className="sticky bottom-0 left-0 right-0 rounded-2xl border border-slate-200 bg-white/95 px-4 py-3 shadow-[0_-6px_24px_rgba(15,23,42,0.08)] backdrop-blur">
+            <div className="sticky bottom-0 mx-5 rounded-2xl border border-slate-200 bg-white/95 px-4 py-3 shadow-[0_-6px_24px_rgba(15,23,42,0.08)] backdrop-blur">
               <div className="flex flex-wrap items-center gap-2">
                 <button
                   type="button"
-                  className="inline-flex items-center gap-1 rounded-full border border-slate-200 bg-white px-4 py-2 text-xs font-semibold text-slate-700 shadow-sm transition hover:shadow-md disabled:cursor-not-allowed disabled:opacity-60"
+                  className="btn-primary inline-flex items-center justify-center gap-1 text-xs disabled:cursor-not-allowed disabled:opacity-60"
                   onClick={handleSave}
                   disabled={busyAction}
                 >
@@ -218,7 +219,7 @@ export function FlowDrawer({
                 </button>
                 <button
                   type="button"
-                  className="inline-flex items-center gap-1 rounded-full bg-gradient-to-r from-blue-600 to-indigo-500 px-4 py-2 text-xs font-semibold text-white shadow-md transition hover:shadow-lg disabled:cursor-not-allowed disabled:opacity-60"
+                  className="btn-primary inline-flex items-center justify-center gap-1 text-xs disabled:cursor-not-allowed disabled:opacity-60"
                   onClick={handleRun}
                   disabled={busyAction}
                 >
@@ -227,7 +228,7 @@ export function FlowDrawer({
                 </button>
                 <button
                   type="button"
-                  className="inline-flex items-center gap-1 rounded-full border border-slate-200 bg-white px-4 py-2 text-xs font-semibold text-slate-700 shadow-sm transition hover:shadow-md disabled:cursor-not-allowed disabled:opacity-60"
+                  className="btn-secondary inline-flex items-center justify-center gap-1 text-xs"
                   onClick={handlePause}
                   disabled={busyAction}
                 >
@@ -236,7 +237,7 @@ export function FlowDrawer({
                 </button>
                 <button
                   type="button"
-                  className="inline-flex items-center gap-1 rounded-full border border-slate-200 bg-white px-4 py-2 text-xs font-semibold text-slate-700 shadow-sm transition hover:shadow-md disabled:cursor-not-allowed disabled:opacity-60"
+                  className="btn-secondary inline-flex items-center justify-center gap-1 text-xs"
                   onClick={handleResume}
                   disabled={busyAction}
                 >
@@ -245,7 +246,7 @@ export function FlowDrawer({
                 </button>
                 <button
                   type="button"
-                  className="inline-flex items-center gap-1 rounded-full border border-rose-200 bg-rose-50 px-4 py-2 text-xs font-semibold text-rose-700 shadow-sm transition hover:bg-rose-100 disabled:cursor-not-allowed disabled:opacity-60"
+                  className="btn-secondary inline-flex items-center justify-center gap-1 text-xs"
                   onClick={handleStop}
                   disabled={busyAction}
                 >

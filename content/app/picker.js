@@ -24,7 +24,13 @@ export function beginPicker(options = {}) {
         frameLabel: metadata.frameLabel,
         frameUrl: metadata.frameUrl,
         preview: describeElement(target),
-      }).catch((error) => console.error('[Ladybrid] Failed to send picker result', error));
+      })
+        .catch((error) => console.error('[Ladybrid] Failed to send picker result', error))
+        .finally(() => {
+          if (selectionOnly) {
+            stopPicker();
+          }
+        });
     },
     onSubmit(payload) {
       // Flow drawer only needs the selector; do not create elements.

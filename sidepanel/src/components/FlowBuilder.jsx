@@ -1,7 +1,6 @@
 import React, { useMemo, useState } from 'react';
 import { BUILDER_STEP_TYPES, createDefaultStep, normalizeBuilderSteps, validateBuilderSteps } from '../../../common/flow-builder.js';
-import { PlusIcon } from './Icons.jsx';
-import { btnSecondary } from '../styles/buttons.js';
+import { PlusIcon, TrashIcon } from './Icons.jsx';
 
 function StepEditor({ index, step, onChange, onDelete, onPick, t }) {
   const update = (patch) => onChange({ ...step, ...patch });
@@ -23,7 +22,7 @@ function StepEditor({ index, step, onChange, onDelete, onPick, t }) {
                 {onPick && (
                   <button
                     type="button"
-                    className={`${btnSecondary} text-xs px-3 py-2`}
+                    className="btn-primary text-xs px-3 py-2"
                     onClick={() => onPick(index)}
                   >
                     {t('editor.actionPick')}
@@ -57,7 +56,7 @@ function StepEditor({ index, step, onChange, onDelete, onPick, t }) {
                 {onPick && (
                   <button
                     type="button"
-                    className={`${btnSecondary} text-xs px-3 py-2`}
+                    className="btn-primary text-xs px-3 py-2"
                     onClick={() => onPick(index)}
                   >
                     {t('editor.actionPick')}
@@ -146,7 +145,7 @@ function StepEditor({ index, step, onChange, onDelete, onPick, t }) {
                 {onPick && (
                   <button
                     type="button"
-                    className={`${btnSecondary} text-xs px-3 py-2`}
+                    className="btn-primary text-xs px-3 py-2"
                     onClick={() => onPick(index)}
                   >
                     {t('editor.actionPick')}
@@ -194,8 +193,14 @@ function StepEditor({ index, step, onChange, onDelete, onPick, t }) {
             ))}
           </select>
         </div>
-        <button type="button" className="text-xs font-semibold text-rose-500 hover:text-rose-600" onClick={onDelete}>
-          {t('flow.actions.deleteStep')}
+        <button
+          type="button"
+          className="btn-secondary inline-flex h-7 w-7 items-center justify-center p-0 text-rose-500 hover:text-rose-600 bg-transparent border-transparent shadow-none"
+          onClick={onDelete}
+          aria-label={t('flow.actions.deleteStep')}
+          title={t('flow.actions.deleteStep')}
+        >
+          <TrashIcon className="h-4 w-4" />
         </button>
       </div>
 
@@ -289,7 +294,7 @@ export function FlowBuilder({ value, onChange, t, onPickSelector }) {
 
       <button
         type="button"
-        className="mt-2 inline-flex items-center justify-center gap-2 rounded-xl border border-dashed border-slate-300 bg-slate-50 px-4 py-2 text-xs font-semibold text-slate-700 transition hover:border-indigo-200 hover:bg-white"
+        className="btn-secondary mt-2 inline-flex items-center justify-center gap-2 border-dashed border-slate-300 bg-slate-50 text-xs hover:border-indigo-200 hover:bg-white"
         onClick={handleAdd}
       >
         <PlusIcon className="h-4 w-4" />

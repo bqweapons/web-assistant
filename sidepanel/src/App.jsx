@@ -1,18 +1,19 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { MessageType, sendMessage } from '../../common/messaging.js';
+import { buildExportPayload } from '../../common/transfer/index.js';
 import { getActiveTab } from '../../common/compat.js';
 import { normalizePageUrl } from '../../common/url.js';
 import { formatDateTime } from '../../common/i18n.js';
 import { serializeBuilderSteps, builderStepsFromSource } from '../../common/flow-builder.js';
 import { ItemList } from './components/ItemList.jsx';
 import { OverviewSection } from './components/OverviewSection.jsx';
+import { PlusIcon } from './components/Icons.jsx';
 import { useI18n } from './hooks/useI18n.js';
 import { createMessage, formatPreview } from './utils/messages.js';
 import { ElementDrawer } from './components/ElementDrawer.jsx';
 import { ActionFlowsSection } from './components/ActionFlowsSection.jsx';
 import { FlowLibraryDrawer } from './components/FlowLibraryDrawer.jsx';
 import { HiddenRulesSection } from './components/HiddenRulesSection.jsx';
-import { btnPrimary, btnSecondary } from './styles/buttons.js';
 
 const initialContextState = { kind: 'message', key: 'context.loading' };
 
@@ -52,6 +53,7 @@ export default function App() {
   const importInputRef = useRef(null);
   const editingModeRef = useRef(false);
   const lastPageUrlRef = useRef('');
+  const flowMigrationRef = useRef(new Set());
 
   useEffect(() => {
     editingModeRef.current = editingMode;
@@ -113,12 +115,64 @@ export default function App() {
         description,
         steps,
       };
-      const list = await sendMessage(MessageType.UPSERT_FLOW, { flow, scope: 'site', pageUrl });
+      const list = await sendMessage(MessageType.UPSERT_FLOW, { flow, pageUrl });
       setFlows(Array.isArray(list) ? list : []);
       return flowId;
     },
     [pageUrl, resolveFlowName],
   );
+
+  const linkLegacyFlowForElement = useCallback(
+    async (item) => {
+      if (!item || item.type !== 'button' || !item.actionFlow || item.actionFlowId) {
+        return item;
+      }
+      if (flowMigrationRef.current.has(item.id)) {
+        return item;
+      }
+      flowMigrationRef.current.add(item.id);
+      try {
+        const steps = parseFlowSteps(item.actionFlow);
+        if (!Array.isArray(steps) || steps.length === 0) {
+          return item;
+        }
+        const flowId = await createNamedFlow(item, steps);
+        if (!flowId) {
+          return item;
+        }
+        const nextElement = {
+          ...item,
+          actionFlowId: flowId,
+          pageUrl: item.pageUrl || pageUrl,
+          siteUrl: item.siteUrl || pageUrl,
+        };
+        const list = await sendMessage(MessageType.UPDATE, nextElement);
+        setItems(Array.isArray(list) ? list : items);
+        return { ...nextElement, actionFlowId: flowId };
+      } catch (error) {
+        console.warn('Failed to link legacy action flow', error);
+        return item;
+      } finally {
+        flowMigrationRef.current.delete(item.id);
+      }
+    },
+    [createNamedFlow, items, pageUrl, parseFlowSteps],
+  );
+
+  const ensureElementFlowLinks = useCallback(async () => {
+    if (!pageUrl || items.length === 0) {
+      return;
+    }
+    const pending = items.filter(
+      (item) => item && item.type === 'button' && item.actionFlow && !item.actionFlowId,
+    );
+    if (pending.length === 0) {
+      return;
+    }
+    for (const item of pending) {
+      await linkLegacyFlowForElement(item);
+    }
+  }, [items, linkLegacyFlowForElement, pageUrl]);
 
   const elementTarget = useMemo(() => {
     if (draftElement && draftElement.id === elementTargetId) {
@@ -190,7 +244,7 @@ export default function App() {
   const refreshFlows = useCallback(
     async () => {
       try {
-        const list = await sendMessage(MessageType.LIST_FLOWS, { scope: 'site', pageUrl });
+      const list = await sendMessage(MessageType.LIST_FLOWS, { pageUrl });
         setFlows(Array.isArray(list) ? list : []);
       } catch (error) {
         console.error('Failed to load flows', error);
@@ -295,6 +349,10 @@ export default function App() {
   }, [pageUrl, refreshItems, refreshFlows, refreshHiddenRules]);
 
   useEffect(() => {
+    ensureElementFlowLinks();
+  }, [ensureElementFlowLinks]);
+
+  useEffect(() => {
     const handleKeyDown = (event) => {
       if (event.key === 'Escape' && tabId && pageUrl) {
         sendMessage(MessageType.CANCEL_PICKER, { tabId, pageUrl }).catch(() => {});
@@ -347,8 +405,17 @@ export default function App() {
   const handleExport = useCallback(async () => {
     setExporting(true);
     try {
-      const store = await sendMessage(MessageType.LIST_ALL);
-      const serialized = JSON.stringify(store || {}, null, 2);
+      const [store, flows, hidden] = await Promise.all([
+        sendMessage(MessageType.LIST_ALL),
+        sendMessage(MessageType.LIST_FLOW_STORE),
+        sendMessage(MessageType.LIST_HIDDEN_STORE),
+      ]);
+      const payload = buildExportPayload({
+        elementsStore: store || {},
+        flowStore: flows || {},
+        hiddenStore: hidden || {},
+      });
+      const serialized = JSON.stringify(payload, null, 2);
       const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
       const filename = `page-augmentor-export-${timestamp}.json`;
       const blob = new Blob([serialized], { type: 'application/json' });
@@ -363,7 +430,7 @@ export default function App() {
       window.setTimeout(() => URL.revokeObjectURL(url), 1000);
       setCreationMessage(createMessage('manage.export.success', { filename }));
     } catch (error) {
-      console.error('Failed to export elements', error);
+      console.error('Failed to export data', error);
       setCreationMessage(createMessage('manage.export.error', { error: error.message }));
     } finally {
       setExporting(false);
@@ -398,15 +465,17 @@ export default function App() {
         const elements = result?.elementCount ?? 0;
         setCreationMessage(createMessage('manage.import.success', { pages, elements }));
         await refreshItems(pageUrl);
+        await refreshFlows();
+        await refreshHiddenRules();
       } catch (error) {
-        console.error('Failed to import elements', error);
+        console.error('Failed to import data', error);
         setCreationMessage(createMessage('manage.import.error', { error: error.message }));
       } finally {
         setImporting(false);
         input.value = '';
       }
     },
-    [pageUrl, refreshItems],
+    [pageUrl, refreshItems, refreshFlows, refreshHiddenRules],
   );
 
   const cancelDraftElement = useCallback(() => {
@@ -533,70 +602,30 @@ export default function App() {
           if (!target) {
             throw new Error('Missing target element for flow.');
           }
-          const steps = Array.isArray(payload?.steps) ? payload.steps : [];
-          const actionFlow = serializeBuilderSteps(steps);
           const selectedTemplateId = typeof payload?.templateId === 'string' ? payload.templateId.trim() : '';
-          if (selectedTemplateId) {
-            const selectedFlow = flows.find((flow) => flow.id === selectedTemplateId);
-            if (!selectedFlow) {
-              throw new Error('Missing flow template.');
-            }
-            const updatedFlow = {
-              ...selectedFlow,
-              name: typeof payload?.name === 'string' && payload.name.trim() ? payload.name.trim() : selectedFlow.name,
-              description:
-                typeof payload?.description === 'string' && payload.description.trim()
-                  ? payload.description.trim()
-                  : selectedFlow.description || '',
-              steps,
-            };
-            const list = await sendMessage(MessageType.UPSERT_FLOW, { flow: updatedFlow, scope: 'site', pageUrl });
-            setFlows(Array.isArray(list) ? list : []);
-            const nextElement = {
-              ...target,
-              actionFlow,
-              actionFlowId: selectedFlow.id,
-              actionSelector: '',
-              pageUrl,
-              siteUrl: target.siteUrl,
-            };
-            const elementList = await sendMessage(MessageType.UPDATE, nextElement);
-            setItems(Array.isArray(elementList) ? elementList : items);
-            setCreationMessage(createMessage('flow.messages.saveSuccess'));
-            if (options.runAfterSave) {
-              await sendMessage(MessageType.RUN_FLOW, {
-                flowId: selectedFlow.id,
-                steps,
-                tabId,
-                pageKey: pageUrl,
-                pageUrl,
-              });
-            }
-            closeFlowLibraryDrawer();
-            return;
+          if (!selectedTemplateId) {
+            throw new Error(t('flow.library.errorSelect'));
           }
-          const fallbackLabel = flowLibrarySeed.defaultLabel || resolveFlowName(target);
-          const name = typeof payload?.name === 'string' && payload.name.trim() ? payload.name.trim() : fallbackLabel;
-          const description =
-            typeof payload?.description === 'string' && payload.description.trim() ? payload.description.trim() : fallbackLabel;
-          const flowId = await createNamedFlow(target, steps, { name, description });
-          if (!flowId) {
-            throw new Error('Failed to create flow.');
+          const selectedFlow = flows.find((flow) => flow.id === selectedTemplateId);
+          if (!selectedFlow) {
+            throw new Error('Missing flow template.');
           }
+          const steps = Array.isArray(selectedFlow.steps) ? selectedFlow.steps : [];
+          const actionFlow = serializeBuilderSteps(steps);
           const nextElement = {
             ...target,
             actionFlow,
-            actionFlowId: flowId,
+            actionFlowId: selectedFlow.id,
             actionSelector: '',
             pageUrl,
             siteUrl: target.siteUrl,
           };
-          const list = await sendMessage(MessageType.UPDATE, nextElement);
-          setItems(Array.isArray(list) ? list : items);
+          const elementList = await sendMessage(MessageType.UPDATE, nextElement);
+          setItems(Array.isArray(elementList) ? elementList : items);
           setCreationMessage(createMessage('flow.messages.saveSuccess'));
           if (options.runAfterSave) {
             await sendMessage(MessageType.RUN_FLOW, {
-              flowId,
+              flowId: selectedFlow.id,
               steps,
               tabId,
               pageKey: pageUrl,
@@ -606,7 +635,7 @@ export default function App() {
           closeFlowLibraryDrawer();
           return;
         }
-        const list = await sendMessage(MessageType.UPSERT_FLOW, { flow: payload, scope: 'site', pageUrl });
+        const list = await sendMessage(MessageType.UPSERT_FLOW, { flow: payload, pageUrl });
         setFlows(Array.isArray(list) ? list : []);
         setCreationMessage(createMessage('flow.messages.saveSuccess'));
         if (options.runAfterSave) {
@@ -626,18 +655,7 @@ export default function App() {
         setFlowLibraryBusy(false);
       }
     },
-    [
-      closeFlowLibraryDrawer,
-      createNamedFlow,
-      flowLibraryElementId,
-      flowLibraryMode,
-      flowLibrarySeed.defaultLabel,
-      flows,
-      items,
-      pageUrl,
-      resolveFlowName,
-      tabId,
-    ],
+    [closeFlowLibraryDrawer, flowLibraryElementId, flowLibraryMode, flows, items, pageUrl, t, tabId],
   );
 
   const handleRunLibraryFlow = useCallback(
@@ -672,7 +690,7 @@ export default function App() {
       }
       setFlowLibraryBusy(true);
       try {
-        const list = await sendMessage(MessageType.DELETE_FLOW, { id: flow.id, scope: 'site', pageUrl });
+        const list = await sendMessage(MessageType.DELETE_FLOW, { id: flow.id, pageUrl });
         setFlows(Array.isArray(list) ? list : []);
         setCreationMessage(createMessage('manage.delete.success'));
       } catch (error) {
@@ -840,13 +858,16 @@ export default function App() {
   }, [pageUrl, t, flowPickerTarget, hiddenPickerActive, openElementDrawer]);
 
   const openFlowLibraryForElement = useCallback(
-    (id) => {
+    async (id) => {
       const target = items.find((item) => item.id === id);
       if (!target) {
         setCreationMessage(createMessage('flow.messages.missingTarget'));
         return;
       }
-      const linkedFlow = target.actionFlowId ? flows.find((flow) => flow.id === target.actionFlowId) : null;
+      const resolvedTarget = await linkLegacyFlowForElement(target);
+      const linkedFlow = resolvedTarget.actionFlowId
+        ? flows.find((flow) => flow.id === resolvedTarget.actionFlowId)
+        : null;
       if (elementTargetId && tabId && pageUrl) {
         sendMessage(MessageType.SET_EDITING_ELEMENT, { id: elementTargetId, enabled: false, tabId, pageUrl }).catch(
           () => {},
@@ -857,17 +878,27 @@ export default function App() {
       setElementDrawerOpen(false);
       setFlowLibraryMode('element');
       setFlowLibraryElementId(id);
-      const baseSteps = target.actionFlow
-        ? parseFlowSteps(target.actionFlow)
+      const baseSteps = resolvedTarget.actionFlow
+        ? parseFlowSteps(resolvedTarget.actionFlow)
         : Array.isArray(linkedFlow?.steps)
           ? linkedFlow.steps
           : [];
-      const defaultLabel = resolveFlowName(target);
+      const defaultLabel = resolveFlowName(resolvedTarget);
       setFlowLibrarySeed({ baseSteps, defaultLabel, templateId: linkedFlow?.id || '' });
       setFlowEditing(null);
       setFlowLibraryOpen(true);
     },
-    [cancelDraftElement, elementTargetId, flows, items, pageUrl, parseFlowSteps, resolveFlowName, tabId],
+    [
+      cancelDraftElement,
+      elementTargetId,
+      flows,
+      items,
+      linkLegacyFlowForElement,
+      pageUrl,
+      parseFlowSteps,
+      resolveFlowName,
+      tabId,
+    ],
   );
 
   const closeElementDrawer = useCallback((options = {}) => {
@@ -1071,191 +1102,201 @@ export default function App() {
           {statusMessageText}
         </div>
       )}
-      <main className="flex min-h-screen flex-col gap-6 bg-slate-50 p-6">
+      <main className="flex min-h-screen flex-col gap-4 bg-slate-50 p-6">
+        <nav className="flex gap-2 rounded-2xl border border-slate-200 bg-white p-1 shadow-brand">
+          {tabs.map((tab) => {
+            const isActive = tab.id === activeTab;
+            return (
+              <button
+                key={tab.id}
+                type="button"
+                className={`btn-secondary flex-1 ${
+                  isActive
+                    ? 'bg-slate-900 text-white shadow-sm hover:bg-slate-900 hover:text-white'
+                    : 'border-transparent text-slate-600 hover:text-slate-900'
+                }`}
+                onClick={() => setActiveTab(tab.id)}
+              >
+                {tab.label}
+              </button>
+            );
+          })}
+        </nav>
 
-      <nav className="flex gap-2 rounded-2xl border border-slate-200 bg-white p-1 shadow-brand">
-        {tabs.map((tab) => {
-          const isActive = tab.id === activeTab;
-          return (
-            <button
-              key={tab.id}
-              type="button"
-              className={`flex-1 rounded-xl px-4 py-2 text-sm font-semibold transition ${
-                isActive ? 'bg-slate-900 text-white shadow-sm' : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900'
-              }`}
-              onClick={() => setActiveTab(tab.id)}
-            >
-              {tab.label}
-            </button>
-          );
-        })}
-      </nav>
+        {activeTab === 'home' && (
+          <div className="flex flex-col gap-4">
+            <section className="flex rounded-2xl border border-slate-200 bg-white p-1 shadow-brand">
+              <button
+                type="button"
+                className={`btn-secondary flex-1 ${
+                  homeSubTab === 'add'
+                    ? 'bg-slate-900 text-white shadow-sm hover:bg-slate-900 hover:text-white'
+                    : 'border-transparent text-slate-600 hover:text-slate-900'
+                }`}
+                onClick={() => setHomeSubTab('add')}
+              >
+                {t('manage.actions.addElement')}
+              </button>
+              <button
+                type="button"
+                className={`btn-secondary flex-1 ${
+                  homeSubTab === 'hide'
+                    ? 'bg-slate-900 text-white shadow-sm hover:bg-slate-900 hover:text-white'
+                    : 'border-transparent text-slate-600 hover:text-slate-900'
+                }`}
+                onClick={() => setHomeSubTab('hide')}
+              >
+                {t('hidden.heading')}
+              </button>
+            </section>
 
-          {activeTab === 'home' && (
-            <>
-              <section className="flex rounded-2xl border border-slate-200 bg-white p-1 shadow-brand">
-                <button
-                  type="button"
-              className={`flex-1 rounded-xl px-4 py-2 text-sm font-semibold transition ${
-                homeSubTab === 'add'
-                  ? 'bg-slate-900 text-white shadow-sm'
-                  : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900'
-              }`}
-              onClick={() => setHomeSubTab('add')}
-            >
-              {t('manage.actions.addElement')}
-            </button>
-            <button
-              type="button"
-              className={`flex-1 rounded-xl px-4 py-2 text-sm font-semibold transition ${
-                homeSubTab === 'hide'
-                  ? 'bg-slate-900 text-white shadow-sm'
-                  : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900'
-              }`}
-              onClick={() => setHomeSubTab('hide')}
-            >
-              {t('hidden.heading')}
-            </button>
-          </section>
-
-          {homeSubTab === 'add' && (
-            <>
-              <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-brand space-y-4">
-                <div className="space-y-1">
-                  <h2 className="text-sm font-semibold text-slate-900">
-                    {t('manage.sections.add.description')}
-                  </h2>
-                  <p className="text-xs text-slate-500">{t('manage.sections.add.title')}</p>
-                </div>
-                <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
-                  <select
-                    className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-700 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-100"
-                    value={creationType}
-                    onChange={(event) => setCreationType(event.target.value)}
-                  >
-                    <option value="button">{t('type.button')}</option>
-                    <option value="link">{t('type.link')}</option>
-                    <option value="tooltip">{t('type.tooltip')}</option>
-                    <option value="area">{t('type.area')}</option>
-                  </select>
-                  <button type="button" className={btnPrimary} onClick={handleStartCreation}>
-                    {t('manage.actions.addElement')}
-                  </button>
-                </div>
-              </section>
-
-              <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-brand space-y-3">
-                <button
-                  type="button"
-                  aria-pressed={editingMode}
-                  className={editingMode ? btnPrimary : btnSecondary}
-                  onClick={toggleEditingMode}
-                  disabled={!tabId}
-                >
-                  {editingMode ? t('manage.actions.editModeDisable') : t('manage.actions.editModeEnable')}
-                </button>
-                <p className="text-xs text-slate-500">{t('manage.editMode.hint')}</p>
-              </section>
-
-              <section className="flex flex-col gap-3 rounded-2xl border border-slate-200 bg-white p-5 shadow-brand md:flex-row md:items-end md:justify-between">
-                <label className="flex w-full flex-col gap-2 text-sm text-slate-700 md:max-w-md">
-                  {t('manage.sections.filters.searchLabel')}
-                  <input
-                    className="rounded-lg border border-slate-200 bg-white p-2 text-sm shadow-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-100"
-                    type="search"
-                    placeholder={t('manage.sections.filters.searchPlaceholder')}
-                    value={filterText}
-                    onChange={(event) => setFilterText(event.target.value)}
-                  />
-                </label>
-                <label className="flex flex-col gap-2 text-sm text-slate-700 md:w-48">
-                  {t('manage.sections.filters.filterLabel')}
-                  <select
-                    className="rounded-lg border border-slate-200 bg-white p-2 text-sm shadow-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-100"
-                    value={filterType}
-                    onChange={(event) => setFilterType(event.target.value)}
-                  >
-                    <option value="all">{t('manage.sections.filters.options.all')}</option>
-                    <option value="button">{t('manage.sections.filters.options.button')}</option>
-                    <option value="link">{t('manage.sections.filters.options.link')}</option>
-                    <option value="tooltip">{t('manage.sections.filters.options.tooltip')}</option>
-                    <option value="area">{t('manage.sections.filters.options.area')}</option>
-                  </select>
-                </label>
-              </section>
-
-              <section className="grid gap-4">
-                {groupedByPageUrl.length === 0 ? (
-                  <ItemList
-                    items={[]}
-                    t={t}
-                    typeLabels={typeLabels}
-                    formatTimestamp={formatTimestamp}
-                    formatFrameSummary={formatFrameSummary}
-                    formatTooltipPosition={formatTooltipPosition}
-                    formatTooltipMode={formatTooltipMode}
-                    onFocus={focusElement}
-        onOpenFlow={openElementDrawer}
-                    onDelete={deleteElement}
-                    showActions
-                  />
-                ) : (
-                  groupedByPageUrl.map(([groupPageUrl, groupItems]) => (
-                    <article
-                      key={groupPageUrl}
-                      className="space-y-3 rounded-2xl border border-slate-200 bg-white p-4 shadow-brand"
+            {homeSubTab === 'add' && (
+              <div className="flex flex-col gap-4">
+                <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-brand space-y-4">
+                  <div className="space-y-1">
+                    <h2 className="text-sm font-semibold text-slate-900">
+                      {t('manage.sections.add.description')}
+                    </h2>
+                    <p className="text-xs text-slate-500">{t('manage.sections.add.title')}</p>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <select
+                      className="flex-1 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-700 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-100"
+                      value={creationType}
+                      onChange={(event) => setCreationType(event.target.value)}
                     >
-                      <header className="flex items-center justify-between gap-2">
-                        <div className="min-w-0 space-y-1">
-                          <h3 className="break-all text-sm font-semibold text-slate-900">{groupPageUrl}</h3>
-                          <p className="text-xs text-slate-500">
-                            {t('overview.pageSummary', { count: groupItems.length })}
-                          </p>
-                        </div>
-                        <button
-                          type="button"
-                          className="mt-1 rounded-lg bg-blue-50 px-3 py-1.5 text-xs font-semibold text-blue-700 transition hover:bg-blue-100 md:mt-0"
-                          onClick={() => openPageUrl(groupPageUrl)}
-                        >
-                          {t('overview.openPage')}
-                        </button>
-                      </header>
-                      <ItemList
-                        items={groupItems}
-                        t={t}
-                        typeLabels={typeLabels}
-                        formatTimestamp={formatTimestamp}
-                        formatFrameSummary={formatFrameSummary}
-                        formatTooltipPosition={formatTooltipPosition}
-                        formatTooltipMode={formatTooltipMode}
-                        onFocus={focusElement}
-                        onOpenFlow={openElementDrawer}
-                        onDelete={deleteElement}
-                        showActions
-                      />
-                    </article>
-                  ))
-                )}
-              </section>
-            </>
-          )}
+                      <option value="button">{t('type.button')}</option>
+                      <option value="link">{t('type.link')}</option>
+                      <option value="tooltip">{t('type.tooltip')}</option>
+                      <option value="area">{t('type.area')}</option>
+                    </select>
+                    <button
+                      type="button"
+                      className="btn-primary inline-flex h-9 w-9 items-center justify-center p-0"
+                      onClick={handleStartCreation}
+                      aria-label={t('manage.actions.addElement')}
+                      title={t('manage.actions.addElement')}
+                    >
+                      <PlusIcon className="h-5 w-5" />
+                      <span className="sr-only">{t('manage.actions.addElement')}</span>
+                    </button>
+                  </div>
+                </section>
 
-          {homeSubTab === 'hide' && (
-            <HiddenRulesSection
-              rules={hiddenRules}
-              onCreate={handleCreateHiddenRule}
-              onDelete={handleDeleteHiddenRule}
-              onToggle={handleToggleHiddenRule}
-              onPickSelector={startHiddenPicker}
-              pickerSelection={hiddenPickerSelection}
-              onPickerSelectionHandled={() => setHiddenPickerSelection(null)}
-              pickerError={hiddenPickerError}
-              busy={hiddenBusy}
-              t={t}
-            />
-          )}
-        </>
-      )}
+                <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-brand space-y-3">
+                  <button
+                    type="button"
+                    aria-pressed={editingMode}
+                    className={`btn-secondary ${
+                      editingMode ? 'bg-slate-900 text-white shadow-sm hover:bg-slate-900 hover:text-white' : ''
+                    }`}
+                    onClick={toggleEditingMode}
+                    disabled={!tabId}
+                  >
+                    {editingMode ? t('manage.actions.editModeDisable') : t('manage.actions.editModeEnable')}
+                  </button>
+                  <p className="text-xs text-slate-500">{t('manage.editMode.hint')}</p>
+                </section>
+
+                <section className="flex flex-col gap-3 rounded-2xl border border-slate-200 bg-white p-5 shadow-brand md:flex-row md:items-end md:justify-between">
+                  <label className="flex w-full flex-col gap-2 text-sm text-slate-700 md:max-w-md">
+                    {t('manage.sections.filters.searchLabel')}
+                    <input
+                      className="rounded-lg border border-slate-200 bg-white p-2 text-sm shadow-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-100"
+                      type="search"
+                      placeholder={t('manage.sections.filters.searchPlaceholder')}
+                      value={filterText}
+                      onChange={(event) => setFilterText(event.target.value)}
+                    />
+                  </label>
+                  <label className="flex flex-col gap-2 text-sm text-slate-700 md:w-48">
+                    {t('manage.sections.filters.filterLabel')}
+                    <select
+                      className="rounded-lg border border-slate-200 bg-white p-2 text-sm shadow-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-100"
+                      value={filterType}
+                      onChange={(event) => setFilterType(event.target.value)}
+                    >
+                      <option value="all">{t('manage.sections.filters.options.all')}</option>
+                      <option value="button">{t('manage.sections.filters.options.button')}</option>
+                      <option value="link">{t('manage.sections.filters.options.link')}</option>
+                      <option value="tooltip">{t('manage.sections.filters.options.tooltip')}</option>
+                      <option value="area">{t('manage.sections.filters.options.area')}</option>
+                    </select>
+                  </label>
+                </section>
+
+                <section className="grid gap-4">
+                  {groupedByPageUrl.length === 0 ? (
+                    <ItemList
+                      items={[]}
+                      t={t}
+                      typeLabels={typeLabels}
+                      formatTimestamp={formatTimestamp}
+                      formatFrameSummary={formatFrameSummary}
+                      formatTooltipPosition={formatTooltipPosition}
+                      formatTooltipMode={formatTooltipMode}
+                      onFocus={focusElement}
+                      onOpenFlow={openElementDrawer}
+                      onDelete={deleteElement}
+                      showActions
+                    />
+                  ) : (
+                    groupedByPageUrl.map(([groupPageUrl, groupItems]) => (
+                      <article
+                        key={groupPageUrl}
+                        className="space-y-3 rounded-2xl border border-slate-200 bg-white p-4 shadow-brand"
+                      >
+                        <header className="flex items-center justify-between gap-2">
+                          <div className="min-w-0 space-y-1">
+                            <h3 className="break-all text-sm font-semibold text-slate-900">{groupPageUrl}</h3>
+                            <p className="text-xs text-slate-500">
+                              {t('overview.pageSummary', { count: groupItems.length })}
+                            </p>
+                          </div>
+                          <button
+                            type="button"
+                            className="btn-secondary mt-1 px-3 py-1.5 text-xs md:mt-0"
+                            onClick={() => openPageUrl(groupPageUrl)}
+                          >
+                            {t('overview.openPage')}
+                          </button>
+                        </header>
+                        <ItemList
+                          items={groupItems}
+                          t={t}
+                          typeLabels={typeLabels}
+                          formatTimestamp={formatTimestamp}
+                          formatFrameSummary={formatFrameSummary}
+                          formatTooltipPosition={formatTooltipPosition}
+                          formatTooltipMode={formatTooltipMode}
+                          onFocus={focusElement}
+                          onOpenFlow={openElementDrawer}
+                          onDelete={deleteElement}
+                          showActions
+                        />
+                      </article>
+                    ))
+                  )}
+                </section>
+              </div>
+            )}
+
+            {homeSubTab === 'hide' && (
+              <HiddenRulesSection
+                rules={hiddenRules}
+                onCreate={handleCreateHiddenRule}
+                onDelete={handleDeleteHiddenRule}
+                onToggle={handleToggleHiddenRule}
+                onPickSelector={startHiddenPicker}
+                pickerSelection={hiddenPickerSelection}
+                onPickerSelectionHandled={() => setHiddenPickerSelection(null)}
+                pickerError={hiddenPickerError}
+                busy={hiddenBusy}
+                t={t}
+              />
+            )}
+          </div>
+        )}
 
       {activeTab === 'flows' && (
         <ActionFlowsSection
@@ -1301,7 +1342,7 @@ export default function App() {
               />
               <button
                 type="button"
-                className="rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700 shadow-sm transition hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-60"
+                className="btn-secondary"
                 onClick={handleImportClick}
                 disabled={importing}
               >
@@ -1309,7 +1350,7 @@ export default function App() {
               </button>
               <button
                 type="button"
-                className="rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700 shadow-sm transition hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-60"
+                className="btn-secondary"
                 onClick={handleExport}
                 disabled={exporting}
               >
@@ -1351,14 +1392,14 @@ export default function App() {
             <div className="mt-4 flex flex-wrap gap-3">
               <button
                 type="button"
-                className="rounded-xl bg-white px-4 py-2 text-sm font-semibold text-slate-900 shadow-sm transition hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-60"
+                className="btn-secondary"
                 onClick={handleShareCopy}
               >
                 {t('settings.actions.shareCopy')}
               </button>
               <button
                 type="button"
-                className="rounded-xl border border-slate-400 bg-transparent px-4 py-2 text-sm font-semibold text-slate-100 shadow-sm transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-60"
+                className="btn-secondary"
                 onClick={handleShareOpen}
               >
                 {t('settings.actions.shareOpen')}

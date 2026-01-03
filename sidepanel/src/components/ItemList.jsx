@@ -43,7 +43,7 @@ export function ItemList({
                 <div className="flex gap-1.5">
                   <button
                     type="button"
-                    className="inline-flex h-7 w-7 items-center justify-center rounded-full text-blue-600 transition hover:bg-slate-100 hover:text-blue-700"
+                    className="btn-secondary inline-flex h-7 w-7 items-center justify-center p-0"
                     aria-label={t('manage.item.focus')}
                     onClick={(event) => {
                       event.stopPropagation();
@@ -55,7 +55,7 @@ export function ItemList({
                   </button>
                   <button
                     type="button"
-                    className="inline-flex h-7 w-7 items-center justify-center rounded-full text-rose-500 transition hover:bg-slate-100 hover:text-rose-600"
+                    className="btn-secondary inline-flex h-7 w-7 items-center justify-center p-0 text-rose-500 hover:text-rose-600"
                     aria-label={t('manage.item.delete')}
                     onClick={(event) => {
                       event.stopPropagation();

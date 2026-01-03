@@ -1,6 +1,5 @@
 import React, { useEffect, useState } from 'react';
 import { PlusIcon, CloseIcon, TrashIcon } from './Icons.jsx';
-import { btnIconPrimary, btnIconDanger, btnSecondary, btnPrimary } from '../styles/buttons.js';
 
 export function HiddenRulesSection({
   rules,
@@ -59,7 +58,7 @@ export function HiddenRulesSection({
         </div>
         <button
           type="button"
-          className={btnIconPrimary}
+          className="btn-secondary inline-flex h-9 w-9 items-center justify-center p-0"
           onClick={() => setFormOpen((v) => !v)}
           aria-label={formOpen ? t('hidden.cancel') : t('hidden.add')}
           title={formOpen ? t('hidden.cancel') : t('hidden.add')}
@@ -81,7 +80,7 @@ export function HiddenRulesSection({
                 />
                 <button
                   type="button"
-                  className={`${btnSecondary} text-xs px-3 py-2`}
+                  className="btn-primary text-xs px-3 py-2"
                   onClick={() => onPickSelector?.()}
                   aria-label={t('editor.actionPick')}
                   title={t('editor.actionPick')}
@@ -125,7 +124,7 @@ export function HiddenRulesSection({
             </label>
             <button
               type="button"
-              className={btnPrimary}
+              className="btn-primary disabled:cursor-not-allowed disabled:opacity-60"
               onClick={handleSubmit}
               disabled={busy}
               aria-label={t('hidden.save')}
@@ -173,7 +172,7 @@ export function HiddenRulesSection({
                 </label>
                 <button
                   type="button"
-                  className={btnIconDanger}
+                  className="btn-secondary inline-flex h-9 w-9 items-center justify-center p-0 text-rose-500 hover:text-rose-600"
                   onClick={() => onDelete?.(rule)}
                   disabled={busy}
                   aria-label={t('manage.delete.confirm')}
