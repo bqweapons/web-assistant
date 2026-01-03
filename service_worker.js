@@ -7,8 +7,17 @@ import { addAsyncMessageListener, MessageType } from './common/messaging.js';
 import { openSidePanelOrTab } from './common/compat.js';
 import { parseActionFlowDefinition } from './common/flows.js';
 import { normalizePageUrl, normalizePageLocation } from './common/url.js';
-import { listFlows, upsertFlow, deleteFlow, findFlowById } from './common/flow-store.js';
-import { listHiddenRules, upsertHiddenRule, deleteHiddenRule, getEffectiveRules, setHiddenRuleEnabled } from './common/hidden-store.js';
+import { listFlows, upsertFlow, deleteFlow, findFlowById, getFullFlowStore, replaceFlowStore } from './common/flow-store.js';
+import {
+  listHiddenRules,
+  upsertHiddenRule,
+  deleteHiddenRule,
+  getEffectiveRules,
+  setHiddenRuleEnabled,
+  getFullHiddenStore,
+  replaceHiddenStore,
+} from './common/hidden-store.js';
+import { parseTransferPayload } from './common/transfer/index.js';
 
 const TOOLTIP_POSITIONS = new Set(['top', 'right', 'bottom', 'left']);
 const ELEMENT_TYPES = new Set(['button', 'link', 'tooltip', 'area']);
@@ -504,17 +513,17 @@ addAsyncMessageListener(async (message, sender) => {
       return flowSessions.get(flowId) || null;
     }
     case MessageType.LIST_FLOWS: {
-      const { scope = 'global', pageUrl } = message.data || {};
-      return listFlows({ scope, pageUrl });
+      const { pageUrl } = message.data || {};
+      return listFlows({ pageUrl });
     }
     case MessageType.UPSERT_FLOW: {
-      const { flow, scope = 'global', pageUrl } = message.data || {};
-      const list = await upsertFlow({ flow, scope, pageUrl });
+      const { flow, pageUrl } = message.data || {};
+      const list = await upsertFlow({ flow, pageUrl });
       return list;
     }
     case MessageType.DELETE_FLOW: {
-      const { id, scope = 'global', pageUrl } = message.data || {};
-      const list = await deleteFlow({ id, scope, pageUrl });
+      const { id, pageUrl } = message.data || {};
+      const list = await deleteFlow({ id, pageUrl });
       return list;
     }
     case MessageType.LIST_BY_URL: {
@@ -529,6 +538,14 @@ addAsyncMessageListener(async (message, sender) => {
     }
     case MessageType.LIST_ALL: {
       const store = await getFullStore();
+      return store;
+    }
+    case MessageType.LIST_FLOW_STORE: {
+      const store = await getFullFlowStore();
+      return store;
+    }
+    case MessageType.LIST_HIDDEN_STORE: {
+      const store = await getFullHiddenStore();
       return store;
     }
     case MessageType.IMPORT_STORE: {
@@ -1453,51 +1470,93 @@ async function notifyPickerResult(type, payload) {
  * @returns {Promise<{ pageCount: number; elementCount: number }>}
  */
 async function importStorePayload(rawStore) {
-  if (!rawStore || typeof rawStore !== 'object' || Array.isArray(rawStore)) {
-    throw new Error('Import payload must be an object.');
-  }
+  const parsed = parseTransferPayload(rawStore);
   const normalizedStore = {};
+  const flowStore = {};
+  const hiddenStore = {};
   let elementCount = 0;
-  for (const [key, list] of Object.entries(rawStore)) {
-    if (typeof key !== 'string' || !key.trim()) {
-      throw new Error('Import payload contains an invalid pageUrl.');
+  const includesFlows = Boolean(parsed?.includes?.flows);
+  const includesHidden = Boolean(parsed?.includes?.hidden);
+
+  for (const [siteKey, siteData] of Object.entries(parsed.sites || {})) {
+    if (!siteData || typeof siteData !== 'object') {
+      continue;
     }
-    if (!Array.isArray(list)) {
-      throw new Error(`Invalid element list for ${key}.`);
-    }
-    const siteUrl = normalizePageUrl(key).trim();
-    if (!siteUrl) {
-      throw new Error(`Import payload contains an invalid pageUrl: ${key}`);
-    }
-    const sanitized = [];
-    for (const entry of list) {
-      if (!entry || typeof entry !== 'object') {
-        throw new Error(`Invalid element entry for ${key}.`);
+    if (siteKey !== 'global') {
+      const elements = Array.isArray(siteData.elements) ? siteData.elements : [];
+      const sanitized = [];
+      for (const entry of elements) {
+        if (!entry || typeof entry !== 'object') {
+          throw new Error(`Invalid element entry for ${siteKey}.`);
+        }
+        const providedPage = typeof entry.pageUrl === 'string' ? entry.pageUrl : '';
+        const normalizedEntryUrl = providedPage ? normalizePageLocation(providedPage, siteKey).trim() : '';
+        const payload = {
+          ...entry,
+          siteUrl: siteKey,
+          pageUrl:
+            providedPage && normalizePageUrl(providedPage) === siteKey && providedPage === siteKey
+              ? siteKey
+              : normalizedEntryUrl || siteKey,
+        };
+        try {
+          const validated = validateElementPayload(payload);
+          validated.siteUrl = siteKey;
+          sanitized.push(validated);
+        } catch (error) {
+          throw new Error(`Invalid element for ${siteKey}: ${error.message}`);
+        }
       }
-      const providedPage = typeof entry.pageUrl === 'string' ? entry.pageUrl : '';
-      const normalizedEntryUrl = providedPage ? normalizePageLocation(providedPage, key).trim() : '';
-      const payload = {
-        ...entry,
-        siteUrl,
-        pageUrl:
-          providedPage && normalizePageUrl(providedPage) === siteUrl && providedPage === siteUrl
-            ? siteUrl
-            : normalizedEntryUrl || siteUrl,
-      };
-      try {
-        const validated = validateElementPayload(payload);
-        validated.siteUrl = siteUrl;
-        sanitized.push(validated);
-      } catch (error) {
-        throw new Error(`Invalid element for ${key}: ${error.message}`);
+      if (sanitized.length > 0) {
+        normalizedStore[siteKey] = sanitized;
+        elementCount += sanitized.length;
       }
     }
-    if (sanitized.length > 0) {
-      normalizedStore[siteUrl] = sanitized;
-      elementCount += sanitized.length;
+
+    if (includesFlows && siteKey !== 'global') {
+      const flows = Array.isArray(siteData.flows) ? siteData.flows : [];
+      if (flows.length > 0) {
+        flowStore[siteKey] = flows.map((flow) => {
+          if (!flow || typeof flow !== 'object') {
+            return flow;
+          }
+          return { ...flow, pageUrl: siteKey };
+        });
+      }
+    }
+
+    if (includesHidden) {
+      const hiddenRules = Array.isArray(siteData.hidden) ? siteData.hidden : [];
+      hiddenRules.forEach((rule) => {
+        const scope = rule?.scope;
+        const providedPage = typeof rule?.pageUrl === 'string' ? rule.pageUrl : '';
+        if (siteKey === 'global' || scope === 'global') {
+          hiddenStore.global = hiddenStore.global || [];
+          hiddenStore.global.push({ ...rule, scope: 'global' });
+          return;
+        }
+        if (scope === 'page') {
+          const pageUrl = normalizePageUrl(providedPage || siteKey) || siteKey;
+          const key = `page:${pageUrl}`;
+          hiddenStore[key] = hiddenStore[key] || [];
+          hiddenStore[key].push({ ...rule, scope: 'page', pageUrl });
+          return;
+        }
+        const siteUrl = normalizePageUrl(providedPage || siteKey) || siteKey;
+        const key = `site:${siteUrl}`;
+        hiddenStore[key] = hiddenStore[key] || [];
+        hiddenStore[key].push({ ...rule, scope: 'site', pageUrl: siteUrl });
+      });
     }
   }
+
   await replaceStore(normalizedStore);
+  if (includesFlows) {
+    await replaceFlowStore(flowStore);
+  }
+  if (includesHidden) {
+    await replaceHiddenStore(hiddenStore);
+  }
   return {
     pageCount: Object.keys(normalizedStore).length,
     elementCount,

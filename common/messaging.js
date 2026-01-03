@@ -9,6 +9,8 @@ import { noop } from './types.js';
 export const MessageType = {
   LIST_BY_URL: 'LIST_BY_URL',
   LIST_ALL: 'LIST_ALL',
+  LIST_FLOW_STORE: 'LIST_FLOW_STORE',
+  LIST_HIDDEN_STORE: 'LIST_HIDDEN_STORE',
   CREATE: 'CREATE',
   UPDATE: 'UPDATE',
   DELETE: 'DELETE',

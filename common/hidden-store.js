@@ -39,6 +39,90 @@ function keyForScope(scope, pageUrl) {
   return 'global';
 }
 
+function normalizeScopeKey(rawKey) {
+  const key = typeof rawKey === 'string' ? rawKey.trim() : '';
+  if (!key) {
+    throw new Error('Hidden rules store contains an invalid scope key.');
+  }
+  if (key === 'global') {
+    return key;
+  }
+  const isSite = key.startsWith('site:');
+  const isPage = key.startsWith('page:');
+  if (!isSite && !isPage) {
+    throw new Error(`Invalid hidden rules scope key: ${key}`);
+  }
+  const prefix = isSite ? 'site:' : 'page:';
+  const rawUrl = key.slice(prefix.length);
+  const normalizedUrl = isSite ? normalizeSiteUrl(rawUrl) : normalizePageUrl(rawUrl);
+  if (!normalizedUrl) {
+    throw new Error(`Invalid hidden rules scope key: ${key}`);
+  }
+  return `${prefix}${normalizedUrl}`;
+}
+
+function scopeDefaultsFromKey(scopeKey) {
+  if (scopeKey === 'global') {
+    return { scope: 'global', pageUrl: undefined };
+  }
+  if (scopeKey.startsWith('site:')) {
+    return { scope: 'site', pageUrl: scopeKey.slice('site:'.length) };
+  }
+  if (scopeKey.startsWith('page:')) {
+    return { scope: 'page', pageUrl: scopeKey.slice('page:'.length) };
+  }
+  return { scope: 'global', pageUrl: undefined };
+}
+
+function normalizeHiddenRule(rule, defaults) {
+  if (!rule || typeof rule !== 'object') {
+    throw new Error('Hidden rule entry is invalid.');
+  }
+  const id = typeof rule.id === 'string' && rule.id.trim() ? rule.id.trim() : '';
+  if (!id) {
+    throw new Error('Hidden rule entry is missing an id.');
+  }
+  const selector = typeof rule.selector === 'string' ? rule.selector.trim() : '';
+  if (!selector) {
+    throw new Error(`Hidden rule ${id} is missing a selector.`);
+  }
+  const now = Date.now();
+  const scope =
+    rule.scope === 'global' || rule.scope === 'site' || rule.scope === 'page' ? rule.scope : defaults.scope;
+  const pageUrl = typeof rule.pageUrl === 'string' && rule.pageUrl.trim() ? rule.pageUrl : defaults.pageUrl;
+  return {
+    id,
+    name: typeof rule.name === 'string' && rule.name.trim() ? rule.name.trim() : 'Hidden rule',
+    selector,
+    scope,
+    pageUrl,
+    frameSelectors: Array.isArray(rule.frameSelectors) ? rule.frameSelectors.map((s) => String(s)) : undefined,
+    enabled: rule.enabled !== false,
+    note: typeof rule.note === 'string' ? rule.note : '',
+    createdAt: typeof rule.createdAt === 'number' ? rule.createdAt : now,
+    updatedAt: typeof rule.updatedAt === 'number' ? rule.updatedAt : now,
+  };
+}
+
+export function normalizeHiddenStore(value) {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) {
+    throw new Error('Hidden rules store must be an object.');
+  }
+  const payload = {};
+  for (const [rawKey, list] of Object.entries(value)) {
+    const scopeKey = normalizeScopeKey(rawKey);
+    if (!Array.isArray(list)) {
+      throw new Error(`Invalid hidden rules list for ${rawKey}.`);
+    }
+    if (list.length === 0) {
+      continue;
+    }
+    const defaults = scopeDefaultsFromKey(scopeKey);
+    payload[scopeKey] = list.map((rule) => normalizeHiddenRule(rule, defaults));
+  }
+  return payload;
+}
+
 /**
  * Lists rules for a scope key.
  * @param {{ scope?: 'global' | 'site' | 'page'; pageUrl?: string }} params
@@ -49,6 +133,32 @@ export async function listHiddenRules(params = {}) {
   const store = await readStore();
   const key = keyForScope(scope, pageUrl);
   return cloneList(store[key] || []);
+}
+
+/**
+ * Retrieves the full hidden rules store.
+ * @returns {Promise<Record<string, any[]>>}
+ */
+export async function getFullHiddenStore() {
+  const store = await readStore();
+  const cloneStore = {};
+  for (const [scopeKey, list] of Object.entries(store)) {
+    if (!Array.isArray(list)) {
+      continue;
+    }
+    cloneStore[scopeKey] = cloneList(list);
+  }
+  return cloneStore;
+}
+
+/**
+ * Replaces the entire hidden rules store with a new payload.
+ * @param {Record<string, any[]>} value
+ * @returns {Promise<void>}
+ */
+export async function replaceHiddenStore(value) {
+  const payload = normalizeHiddenStore(value);
+  await writeStore(payload);
 }
 
 /**
