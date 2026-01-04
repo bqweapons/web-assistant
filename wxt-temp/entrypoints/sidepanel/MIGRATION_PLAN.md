@@ -63,19 +63,49 @@ This plan focuses on WXT migration with a modern, easy-to-use UI.
    - Define a stable key format for UI (e.g. `overview.pageSummary` -> `overview_pageSummary`).  
    - 统一键名格式（例如 `overview.pageSummary` -> `overview_pageSummary`）。  
    - Update i18n helper to read from `chrome.i18n.getMessage` (or fetch `/_locales`).  
-   - i18n 工具函数改为读取 `chrome.i18n`（或 fetch `/_locales`）。  
+   - i18n 工具函数改为读取 `chrome.i18n`（或 fetch `/_locales`）。
 
 7) Validation / 验证  
    - Check main flows, empty states, errors, and i18n coverage.  
    - 验证主要流程、空态、错误态与多语言覆盖。
 
+## UI Draft / UI 结构草案
+- Header: brand + page context + quick actions.  
+  顶部：品牌 + 页面上下文 + 快捷操作。  
+- Tabs: Elements / Flows / Overview.  
+  主导航：Elements / Flows / Overview。  
+- Elements: Create + Hidden rules split into tabs; create includes filters and list.  
+  Elements：Create 与 Hidden rules 分 tab；Create 内包含筛选与列表。  
+- Flows: list + create/edit/run actions.  
+  Flows：列表 + 创建/编辑/运行操作。  
+- Overview: summary cards only (Elements / Flows / Hidden counts).  
+  Overview：仅显示统计卡片（Elements / Flows / Hidden 数量），不显示分组列表。  
+- Settings: gear icon opens a popover panel (data, language, share).  
+  Settings：右上角齿轮打开弹出面板（数据管理、语言、分享）。  
+
+## Icon Plan (lucide-react) / 图标清单（lucide-react）
+- Global/Nav: `LayoutDashboard`, `Layers`, `Workflow`, `Settings`, `PanelRightOpen` (optional).  
+  全局/导航：`LayoutDashboard`, `Layers`, `Workflow`, `Settings`, `PanelRightOpen`（可选）。
+- Common actions: `Plus`, `Search`, `Filter`, `RefreshCw`, `X`, `Check`, `CheckCircle2`.  
+  通用操作：`Plus`, `Search`, `Filter`, `RefreshCw`, `X`, `Check`, `CheckCircle2`。
+- Elements: `MousePointer2`, `Crosshair`, `Pencil`, `Trash2`, `ExternalLink`, `Eye`, `EyeOff`.  
+  Elements：`MousePointer2`, `Crosshair`, `Pencil`, `Trash2`, `ExternalLink`, `Eye`, `EyeOff`。
+- Edit mode/Status: `Wand2`, `Scan` (optional), `AlertTriangle`.  
+  编辑/状态：`Wand2`, `Scan`（可选）, `AlertTriangle`。
+- Flows: `Play`, `Pause`, `Square`, `ListChecks`, `Timer`, `CheckCircle`.  
+  Flows：`Play`, `Pause`, `Square`, `ListChecks`, `Timer`, `CheckCircle`。
+- Settings/Share: `Download`, `Upload`, `Languages`, `Share2`, `Copy`, `Globe`.  
+  设置/分享：`Download`, `Upload`, `Languages`, `Share2`, `Copy`, `Globe`。
+- Disclosure: `ChevronDown`, `ChevronRight`, `ChevronLeft`.  
+  折叠/导航：`ChevronDown`, `ChevronRight`, `ChevronLeft`。
+
 ## Modern UI Direction / 现代 UI 方向
 - Typography: clear headers, compact body, consistent scale.  
-- 排版：标题清晰、正文紧凑、统一字号比例。
+- 排版：标题清晰、正文紧凑、统一字号比例。  
 - Color: neutral base with a single action accent.  
-- 色彩：中性色为主，关键操作统一强调色。
+- 色彩：中性色为主，关键操作统一强调色。  
 - Layout: card-based sections, strong spacing rhythm.  
-- 布局：卡片化分区，节奏感明确。
+- 布局：卡片化分区，节奏感明确。  
 - Feedback: explicit loading/empty/confirm states.  
 - 反馈：明确的加载/空态/确认反馈。
 
@@ -88,7 +118,7 @@ This plan focuses on WXT migration with a modern, easy-to-use UI.
 - New sidepanel UI structure in `ui/sidepanel/`.  
 - WXT sidepanel entry that mounts the new UI.  
 - Updated Tailwind scan paths.  
-- All translations managed in `public/_locales`.  
+- All translations managed in `public/_locales`.
 
 ## Risks / 风险
 - Some shared modules may need path aliasing or relocation.  
