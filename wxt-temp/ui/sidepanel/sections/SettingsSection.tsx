@@ -1,10 +1,12 @@
+import Card from '../components/Card';
+
 export default function SettingsSection() {
   return (
-    <section className="flex flex-col gap-4">
-      <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-        <h3 className="text-sm font-semibold text-slate-900">Data management</h3>
-        <p className="mt-1 text-xs text-slate-500">Import or export saved elements.</p>
-        <div className="mt-4 flex flex-wrap gap-2">
+    <section className="flex flex-col gap-2">
+      <Card>
+        <h3 className="text-sm font-semibold text-card-foreground">Data management</h3>
+        <p className="mt-2 text-xs text-muted-foreground">Import or export saved elements.</p>
+        <div className="mt-2 flex flex-wrap gap-2">
           <button type="button" className="btn-ghost">
             Import
           </button>
@@ -12,22 +14,22 @@ export default function SettingsSection() {
             Export
           </button>
         </div>
-      </div>
+      </Card>
 
-      <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-        <h3 className="text-sm font-semibold text-slate-900">Language</h3>
-        <p className="mt-1 text-xs text-slate-500">Pick the language for the side panel.</p>
-        <select className="input select mt-3 max-w-xs">
+      <Card>
+        <h3 className="text-sm font-semibold text-card-foreground">Language</h3>
+        <p className="mt-2 text-xs text-muted-foreground">Pick the language for the side panel.</p>
+        <select className="input select mt-2 max-w-xs">
           <option>English</option>
           <option>日本語</option>
           <option>简体中文</option>
         </select>
-      </div>
+      </Card>
 
-      <div className="rounded-2xl border border-slate-200 bg-slate-900 p-5 text-white shadow-sm">
+      <Card className="bg-primary text-primary-foreground">
         <h3 className="text-sm font-semibold">Share</h3>
-        <p className="mt-1 text-xs text-slate-300">Send the Chrome Web Store link to teammates.</p>
-        <div className="mt-4 flex flex-wrap gap-2">
+        <p className="mt-2 text-xs text-primary-foreground opacity-80">Send the Chrome Web Store link to teammates.</p>
+        <div className="mt-2 flex flex-wrap gap-2">
           <button type="button" className="btn-invert">
             Copy link
           </button>
@@ -35,7 +37,10 @@ export default function SettingsSection() {
             Open store
           </button>
         </div>
-      </div>
+      </Card>
     </section>
   );
 }
+
+
+

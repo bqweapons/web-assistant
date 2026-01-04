@@ -16,6 +16,7 @@ export type AppHeaderProps = {
 export type TabDefinition = {
   id: string;
   label: string;
+  icon?: ReactNode;
 };
 
 export type TabBarProps = {

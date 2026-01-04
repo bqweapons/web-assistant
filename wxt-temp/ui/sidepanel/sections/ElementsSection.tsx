@@ -1,79 +1,101 @@
-import { useMemo, useState } from 'react';
-import TabBar from '../components/TabBar';
-
-const ELEMENT_TABS = {
-  create: 'create',
-  hidden: 'hidden',
-};
+import { useState } from 'react';
+import { Crosshair, Trash2 } from 'lucide-react';
+import Card from '../components/Card';
+import Drawer from '../components/Drawer';
+import { mockElements } from '../utils/mockData';
 
 export default function ElementsSection() {
-  const tabs = useMemo(
-    () => [
-      { id: ELEMENT_TABS.create, label: 'Create' },
-      { id: ELEMENT_TABS.hidden, label: 'Hidden rules' },
-    ],
-    [],
-  );
-  const [activeTab, setActiveTab] = useState(ELEMENT_TABS.create);
+  const currentSite = mockElements[0]?.site ?? 'file://';
+  const elements = mockElements.filter((element) => element.site === currentSite);
+  const actionClass = 'btn-icon h-8 w-8';
+  const [activeElementId, setActiveElementId] = useState<string | null>(null);
+  const activeElement = elements.find((element) => element.id === activeElementId) ?? null;
 
   return (
-    <div className="flex flex-col gap-4">
-      <TabBar tabs={tabs} activeId={activeTab} onChange={setActiveTab} />
+    <div className="flex flex-col gap-2">
+      <div className="flex items-center justify-between gap-2">
+        <div>
+          <h2 className="text-base font-semibold text-card-foreground">Elements</h2>
+          <p className="text-xs text-muted-foreground">Site: {currentSite}</p>
+        </div>
+        <span className="text-xs text-muted-foreground">{elements.length}</span>
+      </div>
 
-      {activeTab === ELEMENT_TABS.create && (
-        <>
-          <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-            <div className="space-y-1">
-              <h2 className="text-base font-semibold text-slate-900">Create element</h2>
-              <p className="text-xs text-slate-500">Choose a type and place it on the page.</p>
-            </div>
-            <div className="mt-4 flex items-center gap-3">
-              <select className="input select flex-1">
-                <option>Button</option>
-                <option>Link</option>
-                <option>Tooltip</option>
-                <option>Area</option>
-              </select>
-              <button type="button" className="btn-primary">
-                Create
-              </button>
-            </div>
-          </section>
-
-          <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-            <div className="flex items-center justify-between gap-3">
-              <div>
-                <h3 className="text-sm font-semibold text-slate-900">Edit mode</h3>
-                <p className="text-xs text-slate-500">Highlight injected elements for quick edits.</p>
+      {elements.length === 0 ? (
+        <Card className="border-dashed bg-muted text-center text-sm text-muted-foreground">
+          No elements yet. Create your first element to get started.
+        </Card>
+      ) : (
+        <div className="grid gap-2">
+          {elements.map((element) => (
+            <Card
+              key={element.id}
+              className="p-4"
+              onClick={() => setActiveElementId(element.id)}
+            >
+              <div className="flex items-start justify-between gap-2">
+                <h3 className="text-sm font-semibold text-card-foreground">
+                  {element.label || `${element.type} element`}
+                </h3>
+                <div className="flex items-center gap-1">
+                  <button
+                    type="button"
+                    className={actionClass}
+                    aria-label="Locate element"
+                    onClick={(event) => event.stopPropagation()}
+                  >
+                    <Crosshair className="h-4 w-4" />
+                  </button>
+                  <button
+                    type="button"
+                    className={`${actionClass} btn-icon-danger`}
+                    aria-label="Delete element"
+                    onClick={(event) => event.stopPropagation()}
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </button>
+                </div>
               </div>
-              <button type="button" className="btn-ghost">
-                Disabled
-              </button>
-            </div>
-          </section>
-
-          <section className="rounded-2xl border border-dashed border-slate-200 bg-white p-6 text-center text-sm text-slate-500">
-            No elements yet. Create your first element to get started.
-          </section>
-        </>
+              <p className="mt-2 text-xs text-muted-foreground">{element.page}</p>
+              <div className="mt-1 flex items-center justify-between gap-2">
+                <p className="text-xs text-muted-foreground">{element.updatedAt}</p>
+                <span className="badge-pill">{element.type}</span>
+              </div>
+            </Card>
+          ))}
+        </div>
       )}
 
-      {activeTab === ELEMENT_TABS.hidden && (
-        <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-          <div className="flex items-center justify-between gap-3">
-            <div>
-              <h3 className="text-sm font-semibold text-slate-900">Hidden rules</h3>
-              <p className="text-xs text-slate-500">Hide elements on this page or site.</p>
+      <Drawer
+        open={Boolean(activeElement)}
+        title={activeElement?.label || `${activeElement?.type ?? 'Element'} details`}
+        description="Edit and inspect element data."
+        onClose={() => setActiveElementId(null)}
+      >
+        {activeElement ? (
+          <>
+            <div className="grid gap-2 text-xs text-muted-foreground">
+              <div className="flex items-center justify-between gap-2">
+                <span>Type</span>
+                <span className="text-foreground">{activeElement.type}</span>
+              </div>
+              <div className="flex items-center justify-between gap-2">
+                <span>Scope</span>
+                <span className="text-foreground">{activeElement.scope}</span>
+              </div>
+              <div className="flex items-center justify-between gap-2">
+                <span>Page</span>
+                <span className="text-foreground">{activeElement.page}</span>
+              </div>
+              <div className="flex items-center justify-between gap-2">
+                <span>Last updated</span>
+                <span className="text-foreground">{activeElement.updatedAt}</span>
+              </div>
             </div>
-            <button type="button" className="btn-ghost">
-              Add rule
-            </button>
-          </div>
-          <div className="mt-4 rounded-xl border border-dashed border-slate-200 bg-slate-50 p-4 text-xs text-slate-500">
-            No hidden rules yet.
-          </div>
-        </section>
-      )}
+            <p className="mt-3 text-xs text-muted-foreground">This is a placeholder drawer for future actions.</p>
+          </>
+        ) : null}
+      </Drawer>
     </div>
   );
 }
