@@ -9,7 +9,7 @@ export default function AppHeader({ title, context, actions }: AppHeaderProps) {
             <img
               src="/icon/128.png"
               alt={`${title} logo`}
-              className="h-9 w-9 rounded-theme object-cover"
+              className="h-9 w-9 rounded object-cover"
             />
             <div>
               <h1 className="text-xl font-semibold text-foreground">{title}</h1>

@@ -16,8 +16,13 @@ export default function Drawer({ open, title, description, onClose, children }: 
 
   return (
     <div className="fixed inset-0 z-50 flex items-end justify-center sm:items-center">
-      <button type="button" className="absolute inset-0 bg-overlay" onClick={onClose} aria-label="Close drawer" />
-      <div className="relative w-full max-w-md rounded-theme border border-border bg-card p-4 shadow-2xl sm:mb-6 sm:w-[min(420px,calc(100%-2rem))]">
+      <button
+        type="button"
+        className="absolute inset-0 bg-black/40"
+        onClick={onClose}
+        aria-label="Close drawer"
+      />
+      <div className="relative w-full max-w-md rounded border border-border bg-card text-card-foreground p-4 shadow-2xl sm:mb-6 sm:w-[min(420px,calc(100%-2rem))]">
         <div className="flex items-start justify-between gap-3">
           <div>
             <h3 className="text-base font-semibold text-card-foreground">{title}</h3>

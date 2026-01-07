@@ -14,7 +14,7 @@ export default function Card({ children, className = '', onClick }: CardProps) {
 
   return (
     <div
-      className={`rounded-theme border border-border bg-card p-4 shadow-sm ${interactiveClasses} ${className}`.trim()}
+      className={`min-w-0 rounded border border-border bg-card text-card-foreground p-4 shadow-sm ${interactiveClasses} ${className}`.trim()}
       role={isInteractive ? 'button' : undefined}
       tabIndex={isInteractive ? 0 : undefined}
       onClick={onClick}

@@ -33,8 +33,10 @@ export default function FlowsSection() {
               onClick={() => setActiveFlowId(flow.id)}
             >
               <div className="flex items-start justify-between gap-2">
-                <h3 className="text-sm font-semibold text-card-foreground">{flow.name}</h3>
-                <div className="flex items-center gap-1">
+                <h3 className="min-w-0 flex-1 truncate text-sm font-semibold text-card-foreground">
+                  {flow.name}
+                </h3>
+                <div className="flex shrink-0 items-center gap-1">
                   <button
                     type="button"
                     className={actionClass}

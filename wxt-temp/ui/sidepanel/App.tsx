@@ -70,25 +70,25 @@ export default function App() {
                   <ChevronDown className="h-4 w-4 transition group-open:rotate-180" />
                 </span>
               </summary>
-              <div className="absolute left-0 right-0 z-10 mt-2 rounded-theme border border-border bg-card p-2 shadow-md">
+              <div className="absolute left-0 right-0 z-10 mt-2 rounded border border-border bg-card p-2 shadow-md">
                 <div className="flex flex-col gap-1">
                   <button
                     type="button"
-                    className="flex items-center justify-between gap-2 rounded-theme px-3 py-2 text-left text-sm text-card-foreground transition hover:bg-muted"
+                    className="flex items-center justify-between gap-2 rounded px-3 py-2 text-left text-sm text-card-foreground transition hover:bg-muted"
                   >
                     <span>Area</span>
                     <span className="text-xs text-muted-foreground">Select a region</span>
                   </button>
                   <button
                     type="button"
-                    className="flex items-center justify-between gap-2 rounded-theme px-3 py-2 text-left text-sm text-card-foreground transition hover:bg-muted"
+                    className="flex items-center justify-between gap-2 rounded px-3 py-2 text-left text-sm text-card-foreground transition hover:bg-muted"
                   >
                     <span>Button</span>
                     <span className="text-xs text-muted-foreground">Insert a clickable button</span>
                   </button>
                   <button
                     type="button"
-                    className="flex items-center justify-between gap-2 rounded-theme px-3 py-2 text-left text-sm text-card-foreground transition hover:bg-muted"
+                    className="flex items-center justify-between gap-2 rounded px-3 py-2 text-left text-sm text-card-foreground transition hover:bg-muted"
                   >
                     <span>Tooltip</span>
                     <span className="text-xs text-muted-foreground">Show helper text on hover</span>
@@ -108,18 +108,18 @@ export default function App() {
                   <ChevronDown className="h-4 w-4 transition group-open:rotate-180" />
                 </span>
               </summary>
-              <div className="absolute left-0 right-0 z-10 mt-2 rounded-theme border border-border bg-card p-2 shadow-md">
+              <div className="absolute left-0 right-0 z-10 mt-2 rounded border border-border bg-card p-2 shadow-md">
                 <div className="flex flex-col gap-1">
                   <button
                     type="button"
-                    className="flex items-center justify-between gap-2 rounded-theme px-3 py-2 text-left text-sm text-card-foreground transition hover:bg-muted"
+                    className="flex items-center justify-between gap-2 rounded px-3 py-2 text-left text-sm text-card-foreground transition hover:bg-muted"
                   >
                     <span>This page</span>
                     <span className="text-xs text-muted-foreground">Hide on the current page</span>
                   </button>
                   <button
                     type="button"
-                    className="flex items-center justify-between gap-2 rounded-theme px-3 py-2 text-left text-sm text-card-foreground transition hover:bg-muted"
+                    className="flex items-center justify-between gap-2 rounded px-3 py-2 text-left text-sm text-card-foreground transition hover:bg-muted"
                   >
                     <span>This site</span>
                     <span className="text-xs text-muted-foreground">Hide across the site</span>
@@ -139,18 +139,18 @@ export default function App() {
                   <ChevronDown className="h-4 w-4 transition group-open:rotate-180" />
                 </span>
               </summary>
-              <div className="absolute left-0 right-0 z-10 mt-2 rounded-theme border border-border bg-card p-2 shadow-md">
+              <div className="absolute left-0 right-0 z-10 mt-2 rounded border border-border bg-card p-2 shadow-md">
                 <div className="flex flex-col gap-1">
                   <button
                     type="button"
-                    className="flex items-center justify-between gap-2 rounded-theme px-3 py-2 text-left text-sm text-card-foreground transition hover:bg-muted"
+                    className="flex items-center justify-between gap-2 rounded px-3 py-2 text-left text-sm text-card-foreground transition hover:bg-muted"
                   >
                     <span>Blank flow</span>
                     <span className="text-xs text-muted-foreground">Start from scratch</span>
                   </button>
                   <button
                     type="button"
-                    className="flex items-center justify-between gap-2 rounded-theme px-3 py-2 text-left text-sm text-card-foreground transition hover:bg-muted"
+                    className="flex items-center justify-between gap-2 rounded px-3 py-2 text-left text-sm text-card-foreground transition hover:bg-muted"
                   >
                     <span>From template</span>
                     <span className="text-xs text-muted-foreground">Use a preset sequence</span>
