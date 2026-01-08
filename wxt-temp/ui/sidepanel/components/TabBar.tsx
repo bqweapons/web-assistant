@@ -11,6 +11,7 @@ export default function TabBar({ tabs, activeId, onChange }: TabBarProps) {
             type="button"
             className={`btn-tab ${isActive ? 'btn-tab-active' : ''}`}
             onClick={() => onChange(tab.id)}
+            title={tab.tooltip ?? tab.label}
           >
             <span className="flex flex-col items-center justify-center gap-1">
               {tab.icon && <span className="text-base">{tab.icon}</span>}

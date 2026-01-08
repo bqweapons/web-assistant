@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { EyeOff, Trash2 } from 'lucide-react';
 import Card from '../components/Card';
 import Drawer from '../components/Drawer';
@@ -10,28 +10,50 @@ export default function HiddenRulesSection() {
     mockHiddenRules.find((rule) => rule.site === preferredSite)?.site ??
     mockHiddenRules[0]?.site ??
     'site';
-  const rules = mockHiddenRules.filter((rule) => rule.site === currentSite);
+  const [rules, setRules] = useState(mockHiddenRules);
+  const siteRules = rules.filter((rule) => rule.site === currentSite);
   const actionClass = 'btn-icon h-8 w-8';
   const [activeRuleId, setActiveRuleId] = useState<string | null>(null);
-  const activeRule = rules.find((rule) => rule.id === activeRuleId) ?? null;
+  const activeRule = siteRules.find((rule) => rule.id === activeRuleId) ?? null;
+  const [editRule, setEditRule] = useState(activeRule);
+
+  useEffect(() => {
+    if (!activeRule) {
+      setEditRule(null);
+      return;
+    }
+    setEditRule({
+      ...activeRule,
+      note: activeRule.note || '',
+      enabled: activeRule.enabled !== false,
+    });
+  }, [activeRule]);
+
+  const handleRuleSave = () => {
+    if (!editRule) {
+      return;
+    }
+    setRules((prev) => prev.map((item) => (item.id === editRule.id ? { ...item, ...editRule } : item)));
+    setActiveRuleId(null);
+  };
 
   return (
     <section className="flex flex-col gap-2">
       <div className="flex items-center justify-between gap-2">
         <div className="space-y-1">
           <h3 className="text-sm font-semibold text-card-foreground">Hidden rules</h3>
-          <p className="text-xs text-muted-foreground">Site: {currentSite}</p>
+          <p className="text-xs text-muted-foreground">Hide or suppress elements automatically.</p>
         </div>
-        <span className="text-xs text-muted-foreground">{rules.length}</span>
+        <span className="text-xs text-muted-foreground">{siteRules.length}</span>
       </div>
 
-      {rules.length === 0 ? (
+      {siteRules.length === 0 ? (
         <Card className="border-dashed bg-muted text-center text-xs text-muted-foreground">
           No hidden rules yet.
         </Card>
       ) : (
         <div className="grid gap-2">
-          {rules.map((rule) => (
+          {siteRules.map((rule) => (
             <Card
               key={rule.id}
               onClick={() => setActiveRuleId(rule.id)}
@@ -59,7 +81,7 @@ export default function HiddenRulesSection() {
                   </button>
                 </div>
               </div>
-              <p className="mt-2 text-xs text-muted-foreground">{rule.name}</p>
+              <p className="mt-2 text-xs text-muted-foreground">{rule.note || rule.name}</p>
               <div className="mt-1 flex items-center justify-between gap-2">
                 <p className="text-xs text-muted-foreground">{rule.updatedAt}</p>
                 <span className="badge-pill">{rule.scope}</span>
@@ -72,27 +94,78 @@ export default function HiddenRulesSection() {
       <Drawer
         open={Boolean(activeRule)}
         title={activeRule?.name ?? 'Hidden rule details'}
-        description="Check and tune this rule."
+        description="Edit the hidden rule details below."
         onClose={() => setActiveRuleId(null)}
       >
-        {activeRule ? (
-          <>
-            <div className="grid gap-2 text-xs text-muted-foreground">
-              <div className="flex items-center justify-between gap-2">
-                <span>Selector</span>
-                <span className="text-foreground">{activeRule.selector}</span>
-              </div>
-              <div className="flex items-center justify-between gap-2">
-                <span>Scope</span>
-                <span className="text-foreground">{activeRule.scope}</span>
-              </div>
-              <div className="flex items-center justify-between gap-2">
-                <span>Last updated</span>
-                <span className="text-foreground">{activeRule.updatedAt}</span>
-              </div>
+        {editRule ? (
+          <div className="grid gap-3 text-xs text-muted-foreground">
+            <label className="grid gap-1">
+              <span>Name</span>
+              <input
+                className="input"
+                value={editRule.name}
+                onChange={(event) => setEditRule({ ...editRule, name: event.target.value })}
+                placeholder="Hidden rule name"
+              />
+            </label>
+            <label className="grid gap-1">
+              <span>Selector</span>
+              <input
+                className="input"
+                value={editRule.selector}
+                onChange={(event) => setEditRule({ ...editRule, selector: event.target.value })}
+                placeholder="CSS selector"
+              />
+            </label>
+            <label className="grid gap-1">
+              <span>Note</span>
+              <textarea
+                className="input"
+                rows={2}
+                value={editRule.note}
+                onChange={(event) => setEditRule({ ...editRule, note: event.target.value })}
+                placeholder="Why this rule exists"
+              />
+            </label>
+            <label className="grid gap-1">
+              <span>Scope</span>
+              <select
+                className="input select"
+                value={editRule.scope}
+                onChange={(event) =>
+                  setEditRule({
+                    ...editRule,
+                    scope: event.target.value as 'page' | 'site' | 'global',
+                  })
+                }
+              >
+                <option value="page">Page</option>
+                <option value="site">Site</option>
+                <option value="global">Global</option>
+              </select>
+            </label>
+            <label className="inline-flex items-center gap-2 text-xs">
+              <input
+                type="checkbox"
+                className="h-4 w-4"
+                checked={editRule.enabled}
+                onChange={(event) => setEditRule({ ...editRule, enabled: event.target.checked })}
+              />
+              <span>Rule enabled</span>
+            </label>
+            <div className="grid gap-1">
+              <span>Last updated</span>
+              <p className="text-sm text-foreground">{editRule.updatedAt}</p>
             </div>
-            <p className="mt-3 text-xs text-muted-foreground">This is a placeholder drawer for future actions.</p>
-          </>
+            <div className="flex items-center justify-end gap-2 pt-2">
+              <button type="button" className="btn-ghost" onClick={() => setActiveRuleId(null)}>
+                Cancel
+              </button>
+              <button type="button" className="btn-primary" onClick={handleRuleSave}>
+                Save changes
+              </button>
+            </div>
+          </div>
         ) : null}
       </Drawer>
     </section>

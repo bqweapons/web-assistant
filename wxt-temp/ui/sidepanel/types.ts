@@ -17,6 +17,7 @@ export type TabDefinition = {
   id: string;
   label: string;
   icon?: ReactNode;
+  tooltip?: string;
 };
 
 export type TabBarProps = {

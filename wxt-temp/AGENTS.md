@@ -19,3 +19,14 @@
 - `wxt-temp/components/`：示例组件目录（可后续清理/替换）。
 - `wxt-temp/wxt.config.ts`：WXT 配置与 manifest 内容。
 - `wxt-temp/postcss.config.cjs` / `wxt-temp/tailwind.config.cjs`：Tailwind/PostCSS 配置。
+
+## Theme (Tailwind v4)
+- Theme tokens live in `wxt-temp/ui/sidepanel/styles/theme.css`.
+- `:root` and `.dark` define the base CSS variables (e.g. `--background`, `--primary`).
+- `@theme inline` maps tokens to Tailwind v4 utilities (e.g. `--color-background: var(--background)`), so `bg-background`, `text-foreground`, `border-border` work.
+- `wxt-temp/ui/sidepanel/styles/index.css` must import Tailwind first, then the theme file:
+  - `@import "tailwindcss";`
+  - `@import "./theme.css";`
+- When adding a new theme token, define it in both `:root` / `.dark` and map it in `@theme inline`, otherwise no Tailwind utility is generated.
+- Overlays are not defined by default; use `bg-black/40` for scrims, or define `--overlay` + `--color-overlay` if you want a theme token.
+- Avoid self-referential mappings (e.g. `--font-sans: var(--font-sans)`); use distinct base tokens if you want font/shadow utilities.
