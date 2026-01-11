@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { EyeOff, Trash2 } from 'lucide-react';
 import Card from '../components/Card';
 import Drawer from '../components/Drawer';
+import SelectMenu from '../components/SelectMenu';
 import { mockHiddenRules } from '../utils/mockData';
 
 export default function HiddenRulesSection() {
@@ -129,20 +130,20 @@ export default function HiddenRulesSection() {
             </label>
             <label className="grid gap-1">
               <span>Scope</span>
-              <select
-                className="input select"
+              <SelectMenu
                 value={editRule.scope}
-                onChange={(event) =>
+                options={[
+                  { value: 'page', label: 'Page' },
+                  { value: 'site', label: 'Site' },
+                  { value: 'global', label: 'Global' },
+                ]}
+                onChange={(value) =>
                   setEditRule({
                     ...editRule,
-                    scope: event.target.value as 'page' | 'site' | 'global',
+                    scope: value as 'page' | 'site' | 'global',
                   })
                 }
-              >
-                <option value="page">Page</option>
-                <option value="site">Site</option>
-                <option value="global">Global</option>
-              </select>
+              />
             </label>
             <label className="inline-flex items-center gap-2 text-xs">
               <input

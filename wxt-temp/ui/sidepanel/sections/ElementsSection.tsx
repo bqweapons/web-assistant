@@ -1,18 +1,26 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Crosshair, ExternalLink, Link as LinkIcon, Search, Trash2 } from 'lucide-react';
+import { Check, Crosshair, ExternalLink, Link as LinkIcon, Search, Trash2, X } from 'lucide-react';
 import Card from '../components/Card';
 import Drawer from '../components/Drawer';
-import { mockElements } from '../utils/mockData';
+import SelectMenu from '../components/SelectMenu';
+import { mockElements, mockFlows } from '../utils/mockData';
 
 export default function ElementsSection() {
   const currentSite = 'all-sites';
   const [elements, setElements] = useState(mockElements);
+  const [flows, setFlows] = useState(mockFlows);
   const actionClass = 'btn-icon h-8 w-8';
   const [activeElementId, setActiveElementId] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [typeFilter, setTypeFilter] = useState('all');
   const activeElement = elements.find((element) => element.id === activeElementId) ?? null;
   const [editElement, setEditElement] = useState(activeElement);
+  const [flowDrawerOpen, setFlowDrawerOpen] = useState(false);
+  const [draftFlow, setDraftFlow] = useState({
+    name: '',
+    description: '',
+    steps: 0,
+  });
   const typeOptions = useMemo(() => {
     const types = new Set(elements.map((element) => element.type));
     return ['all', ...Array.from(types).sort()];
@@ -26,12 +34,12 @@ export default function ElementsSection() {
       if (!normalizedQuery) {
         return true;
       }
-      const haystack = `${element.label} ${element.type} ${element.page}`.toLowerCase();
+      const haystack = `${element.text} ${element.type} ${element.pageUrl} ${element.selector} ${element.href || ''}`.toLowerCase();
       return haystack.includes(normalizedQuery);
     });
   }, [elements, normalizedQuery, typeFilter]);
   const elementsByPage = filteredElements.reduce<Record<string, typeof filteredElements>>((acc, element) => {
-    const pageKey = element.page || 'unknown';
+    const pageKey = element.pageUrl || element.siteUrl || 'unknown';
     if (!acc[pageKey]) {
       acc[pageKey] = [];
     }
@@ -43,91 +51,275 @@ export default function ElementsSection() {
   const totalCount = elements.length;
   const filteredCount = filteredElements.length;
   const showClear = Boolean(searchQuery) || typeFilter !== 'all';
+  const stylePresets = [
+    { value: '', label: 'Custom', styles: null },
+    {
+      value: 'button-default',
+      label: 'Primary',
+      styles: {
+        color: '#ffffff',
+        backgroundColor: '#1b84ff',
+        fontSize: '12px',
+        fontWeight: '600',
+        padding: '8px 16px',
+        borderRadius: '8px',
+      },
+    },
+    {
+      value: 'button-outline',
+      label: 'Outline',
+      styles: {
+        backgroundColor: 'transparent',
+        color: '#2563eb',
+        border: '2px solid #2563eb',
+        padding: '8px 16px',
+        borderRadius: '10px',
+      },
+    },
+    {
+      value: 'floating-card',
+      label: 'Floating',
+      styles: {
+        backgroundColor: '#ffffff',
+        color: '#0f172a',
+        border: '1px solid rgba(15, 23, 42, 0.12)',
+        borderRadius: '12px',
+        padding: '16px',
+        boxShadow: '0 12px 32px rgba(15, 23, 42, 0.18)',
+        position: 'relative',
+      },
+    },
+    {
+      value: 'link-default',
+      label: 'Link',
+      styles: {
+        color: '#2563eb',
+        textDecoration: 'underline',
+      },
+    },
+    {
+      value: 'area-default',
+      label: 'Area',
+      styles: {
+        backgroundColor: 'transparent',
+        color: '#0f172a',
+        padding: '16px',
+        borderRadius: '14px',
+        width: '320px',
+        minHeight: '180px',
+      },
+    },
+  ];
+  const areaChildCounts = useMemo(() => {
+    return elements.reduce<Record<string, number>>((acc, element) => {
+      if (element.containerId) {
+        acc[element.containerId] = (acc[element.containerId] ?? 0) + 1;
+      }
+      return acc;
+    }, {});
+  }, [elements]);
+  const actionFlowOptions = useMemo(
+    () => [
+      { value: '', label: 'Unassigned' },
+      ...flows.map((flow) => ({
+        value: flow.id,
+        label: flow.name,
+        rightLabel: `${flow.steps} steps`,
+      })),
+      { value: '__create__', label: 'Create new flow…' },
+    ],
+    [flows],
+  );
+  const styleFields = [
+    { key: 'backgroundColor', label: 'Background color', placeholder: '#ffffff' },
+    { key: 'color', label: 'Text color', placeholder: '#0f172a' },
+    { key: 'border', label: 'Border', placeholder: '1px solid #000000' },
+    { key: 'borderRadius', label: 'Border radius', placeholder: '8px' },
+    { key: 'boxShadow', label: 'Box shadow', placeholder: '0 12px 32px rgba(15, 23, 42, 0.18)' },
+    { key: 'fontSize', label: 'Font size', placeholder: '12px' },
+    { key: 'fontWeight', label: 'Font weight', placeholder: '600' },
+    { key: 'padding', label: 'Padding', placeholder: '8px 16px' },
+    { key: 'position', label: 'CSS position', placeholder: 'absolute' },
+    { key: 'width', label: 'Width', placeholder: '120px' },
+    { key: 'height', label: 'Height', placeholder: '40px' },
+    { key: 'left', label: 'Left', placeholder: '12px' },
+    { key: 'top', label: 'Top', placeholder: '12px' },
+    { key: 'zIndex', label: 'Z-index', placeholder: '999' },
+  ];
 
-  const getPageHref = (page: string, site: string) => {
-    if (page.startsWith('http://') || page.startsWith('https://') || page.startsWith('file://')) {
-      return page;
+  const formatTimestamp = (value?: number) => {
+    if (!value) {
+      return 'Unknown';
     }
-    const siteHasScheme = site.startsWith('http://') || site.startsWith('https://') || site.startsWith('file://');
-    const siteRoot = site.replace(/\/$/, '');
-    if (page.startsWith('/')) {
-      return siteHasScheme ? `${siteRoot}${page}` : `https://${siteRoot}${page}`;
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) {
+      return 'Unknown';
     }
-    if (page.includes('/')) {
-      return `https://${page}`;
+    const pad = (segment: number) => String(segment).padStart(2, '0');
+    return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())} ${pad(
+      date.getHours(),
+    )}:${pad(date.getMinutes())}`;
+  };
+
+  const handleCreateFlow = () => {
+    const name = draftFlow.name.trim() || 'New flow';
+    const description = draftFlow.description.trim();
+    const nextFlow = {
+      id: `flow-${Date.now()}`,
+      name,
+      description,
+      site: activeElement?.siteUrl || 'site',
+      steps: Number.isFinite(draftFlow.steps) ? Math.max(0, draftFlow.steps) : 0,
+      updatedAt: formatTimestamp(Date.now()),
+    };
+    setFlows((prev) => [...prev, nextFlow]);
+    setEditElement((prev) => (prev ? { ...prev, actionFlowId: nextFlow.id } : prev));
+    setFlowDrawerOpen(false);
+  };
+
+  const getElementLabel = (element: typeof elements[number]) => {
+    const text = element.text?.trim();
+    if (text) {
+      return text;
+    }
+    const selector = element.selector?.trim();
+    if (selector) {
+      return selector;
+    }
+    return `${element.type} element`;
+  };
+
+  const getPageHref = (pageUrl: string, siteUrl: string) => {
+    if (pageUrl.startsWith('http://') || pageUrl.startsWith('https://') || pageUrl.startsWith('file://')) {
+      return pageUrl;
+    }
+    const siteHasScheme =
+      siteUrl.startsWith('http://') || siteUrl.startsWith('https://') || siteUrl.startsWith('file://');
+    const siteRoot = siteUrl.replace(/\/$/, '');
+    if (pageUrl.startsWith('/')) {
+      return siteHasScheme ? `${siteRoot}${pageUrl}` : `https://${siteRoot}${pageUrl}`;
+    }
+    if (pageUrl.includes('/')) {
+      return `https://${pageUrl}`;
     }
     if (siteHasScheme) {
-      return site;
+      return siteUrl;
     }
     return `https://${siteRoot}`;
   };
-  const getPageLabel = (page: string, site: string) => {
-    if (!page) {
+  const getPageLabel = (pageUrl: string, siteUrl: string) => {
+    if (!pageUrl) {
       return 'Unknown page';
     }
     const formatHostPath = (host: string, pathname: string) => {
       const cleanPath = pathname.replace(/^\/+/, '');
       return cleanPath ? `${host}/${cleanPath}` : host;
     };
-    if (page.startsWith('http://') || page.startsWith('https://') || page.startsWith('file://')) {
+    if (pageUrl.startsWith('http://') || pageUrl.startsWith('https://') || pageUrl.startsWith('file://')) {
       try {
-        const url = new URL(page);
+        const url = new URL(pageUrl);
         if (url.protocol === 'file:') {
           const fileName = url.pathname.split('/').pop();
-          return fileName || url.pathname || page;
+          return fileName || url.pathname || pageUrl;
         }
-        return formatHostPath(url.host, url.pathname);
+        const isRoot = url.pathname === '/' && !url.search && !url.hash;
+        const hasExplicitTrailingSlash = pageUrl.endsWith('/') && !pageUrl.endsWith('://');
+        if (isRoot) {
+          const origin = `${url.protocol}//${url.host}`;
+          return hasExplicitTrailingSlash ? `${origin}/` : origin;
+        }
+        return `${url.protocol}//${formatHostPath(url.host, url.pathname)}`;
       } catch {
-        return page;
+        return pageUrl;
       }
     }
-    if (page.startsWith('/')) {
-      const siteHost = site.replace(/^https?:\/\//, '').replace(/^file:\/\//, '').replace(/\/$/, '');
+    if (pageUrl.startsWith('/')) {
+      const siteHost = siteUrl.replace(/^https?:\/\//, '').replace(/^file:\/\//, '').replace(/\/$/, '');
       if (siteHost) {
-        return formatHostPath(siteHost, page);
+        if (pageUrl === '/') {
+          return `${siteHost}/`;
+        }
+        return formatHostPath(siteHost, pageUrl);
       }
-      return page.replace(/^\/+/, '');
+      return pageUrl.replace(/^\/+/, '');
     }
-    const [hostCandidate, ...rest] = page.split('/');
+    const [hostCandidate, ...rest] = pageUrl.split('/');
     if (rest.length > 0) {
       return formatHostPath(hostCandidate, `/${rest.join('/')}`);
     }
-    return page;
+    return pageUrl;
   };
   const getElementDetail = (element: typeof elements[number]) => {
     const type = element.type.toLowerCase();
     if (type === 'button') {
-      return `Flow: ${element.flowName || 'Unassigned'}`;
+      if (element.actionFlowId) {
+        return `Action flow: ${element.actionFlowId}`;
+      }
+      return element.actionFlow ? 'Action flow: Configured' : 'Action flow: Unassigned';
     }
     if (type === 'link') {
-      return `Link: ${element.url || 'Unassigned'}`;
+      return `Link: ${element.href || 'Unassigned'}`;
     }
     if (type === 'area') {
-      const count = typeof element.areaCount === 'number' ? element.areaCount : 0;
-      return `Contains ${count} items`;
+      const count = areaChildCounts[element.id] ?? 0;
+      return `Contains ${count} ${count === 1 ? 'element' : 'elements'}`;
     }
-    return 'Detail: Not set';
+    return element.selector ? `Selector: ${element.selector}` : 'Detail: Not set';
   };
   const getElementDetailRows = (element: typeof elements[number]) => {
     const rows = [
       { label: 'Type', value: element.type },
-      { label: 'Scope', value: element.scope },
-      { label: 'Site', value: element.site || 'Unknown' },
-      { label: 'Page', value: getPageLabel(element.page, element.site || currentSite) },
+      { label: 'Scope', value: element.scope || 'page' },
+      { label: 'Site', value: element.siteUrl || 'Unknown' },
+      { label: 'Page', value: getPageLabel(element.pageUrl, element.siteUrl || currentSite) },
+      { label: 'Selector', value: element.selector || 'Not set' },
     ];
     const type = element.type.toLowerCase();
     if (type === 'button') {
-      rows.push({ label: 'Flow', value: element.flowName || 'Not set' });
+      rows.push({
+        label: 'Action flow',
+        value: element.actionFlowId || (element.actionFlow ? 'Configured' : 'Not set'),
+      });
     }
     if (type === 'link') {
-      rows.push({ label: 'Link', value: element.url || 'Not set' });
+      rows.push({ label: 'Link', value: element.href || 'Not set' });
     }
     if (type === 'area') {
-      const count = typeof element.areaCount === 'number' ? element.areaCount : 0;
-      rows.push({ label: 'Contains', value: `${count} items` });
+      rows.push({ label: 'Layout', value: element.layout || 'row' });
     }
-    rows.push({ label: 'Last updated', value: element.updatedAt });
+    rows.push({ label: 'Last updated', value: formatTimestamp(element.updatedAt) });
     return rows;
+  };
+
+  const detectStylePreset = (style: Record<string, string> = {}) => {
+    const normalized = Object.keys(style).reduce<Record<string, string>>((acc, key) => {
+      acc[key] = typeof style[key] === 'string' ? style[key].trim() : '';
+      return acc;
+    }, {});
+    const match = stylePresets.find((preset) => {
+      if (!preset.styles) {
+        return false;
+      }
+      const entries = Object.entries(preset.styles);
+      if (entries.length === 0) {
+        return false;
+      }
+      return entries.every(([key, value]) => (normalized[key] || '').trim() === (value || '').trim());
+    });
+    return match?.value || '';
+  };
+
+  const applyStylePreset = (presetValue: string) => {
+    if (!editElement) {
+      return;
+    }
+    const preset = stylePresets.find((option) => option.value === presetValue);
+    const nextStyle = preset?.styles ? { ...preset.styles } : {};
+    setEditElement({
+      ...editElement,
+      stylePreset: presetValue,
+      style: nextStyle,
+    });
   };
 
   useEffect(() => {
@@ -135,17 +327,30 @@ export default function ElementsSection() {
       setEditElement(null);
       return;
     }
+    const resolvedStyle = activeElement.style || {};
     setEditElement({
       ...activeElement,
-      flowName: activeElement.flowName || '',
-      url: activeElement.url || '',
+      text: activeElement.text || '',
+      href: activeElement.href || '',
+      selector: activeElement.selector || '',
+      position: activeElement.position || 'append',
+      actionFlowId: activeElement.actionFlowId || '',
+      actionFlowLocked: Boolean(activeElement.actionFlowLocked),
+      scope: activeElement.scope || 'page',
+      floating: activeElement.floating !== false,
       linkTarget: activeElement.linkTarget || 'new-tab',
-      tooltipPosition: activeElement.tooltipPosition || 'top',
-      tooltipPersistent: Boolean(activeElement.tooltipPersistent),
       layout: activeElement.layout || 'row',
-      areaCount: typeof activeElement.areaCount === 'number' ? activeElement.areaCount : 0,
+      style: resolvedStyle,
+      stylePreset: activeElement.stylePreset || detectStylePreset(resolvedStyle),
     });
   }, [activeElement]);
+
+  useEffect(() => {
+    if (!flowDrawerOpen) {
+      return;
+    }
+    setDraftFlow({ name: '', description: '', steps: 0 });
+  }, [flowDrawerOpen]);
 
   const handleElementSave = () => {
     if (!editElement) {
@@ -185,7 +390,7 @@ export default function ElementsSection() {
           >
             {typeOptions.map((type) => (
               <option key={type} value={type}>
-                {type === 'all' ? 'All types' : type}
+                {type === 'all' ? 'All types' : `${type.slice(0, 1).toUpperCase()}${type.slice(1)}`}
               </option>
             ))}
           </select>
@@ -214,21 +419,23 @@ export default function ElementsSection() {
         </Card>
       ) : (
         <div className="grid gap-3">
-          {pageEntries.map(([page, pageElements]) => (
-            <div key={page} className="grid gap-2">
+          {pageEntries.map(([page, pageElements]) => {
+            const pageSite = pageElements[0]?.siteUrl || currentSite;
+            return (
+              <div key={page} className="grid gap-2">
               <div className="flex items-center justify-between gap-2">
                 <div className="flex min-w-0 items-center gap-2">
                   <span className="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-full border border-border bg-muted text-muted-foreground">
                     <LinkIcon className="h-3.5 w-3.5" />
                   </span>
                   <p className="truncate text-sm font-semibold text-card-foreground">
-                    {getPageLabel(page, currentSite)}
+                    {getPageLabel(page, pageSite)}
                   </p>
                 </div>
                 <div className="flex items-center gap-2">
                   <a
                     className="inline-flex items-center gap-1 text-xs font-semibold text-primary underline-offset-2 hover:underline"
-                    href={getPageHref(page, currentSite)}
+                    href={getPageHref(page, pageSite)}
                     target="_blank"
                     rel="noreferrer"
                   >
@@ -248,7 +455,7 @@ export default function ElementsSection() {
                       <div className="flex min-w-0 flex-1 items-center gap-2">
                         <span className="badge-pill shrink-0">{element.type}</span>
                         <h3 className="min-w-0 flex-1 truncate text-sm font-semibold text-card-foreground">
-                          {element.label || `${element.type} element`}
+                          {getElementLabel(element)}
                         </h3>
                       </div>
                       <div className="flex shrink-0 items-center gap-1">
@@ -274,20 +481,53 @@ export default function ElementsSection() {
                       <p className="min-w-0 flex-1 truncate text-xs text-muted-foreground">
                         {getElementDetail(element)}
                       </p>
-                      <p className="shrink-0 text-xs text-muted-foreground">{element.updatedAt}</p>
+                      <p className="shrink-0 text-xs text-muted-foreground">{formatTimestamp(element.updatedAt)}</p>
                     </div>
                   </Card>
                 ))}
               </div>
-            </div>
-          ))}
+              </div>
+            );
+          })}
         </div>
       )}
 
       <Drawer
         open={Boolean(activeElement)}
-        title={activeElement?.label || `${activeElement?.type ?? 'Element'} details`}
+        title={
+          activeElement ? (
+            <>
+              <span className="badge-pill shrink-0">{activeElement.type}</span>
+              <span>{getElementLabel(activeElement)}</span>
+            </>
+          ) : (
+            'Element details'
+          )
+        }
         description="Update the element settings below."
+        actions={
+          <>
+            <button
+              type="button"
+              className="btn-icon h-8 w-8"
+              onClick={() => setActiveElementId(null)}
+              aria-label="Cancel"
+              title="Cancel"
+            >
+              <X className="h-4 w-4" />
+            </button>
+            <button
+              type="button"
+              className="btn-icon h-8 w-8 border-transparent bg-primary text-primary-foreground hover:brightness-95"
+              onClick={handleElementSave}
+              aria-label="Save"
+              title="Save"
+            >
+              <Check className="h-4 w-4" />
+            </button>
+          </>
+        }
+        showClose={false}
         onClose={() => setActiveElementId(null)}
       >
         {editElement ? (
@@ -296,38 +536,37 @@ export default function ElementsSection() {
               <span>Name</span>
               <input
                 className="input"
-                value={editElement.label}
-                onChange={(event) => setEditElement({ ...editElement, label: event.target.value })}
-                placeholder="Element name"
+                value={editElement.text}
+                onChange={(event) => setEditElement({ ...editElement, text: event.target.value })}
+                placeholder="Element text"
               />
             </label>
-            <div className="grid gap-1">
-              <span>Type</span>
-              <p className="text-sm font-semibold text-foreground">{editElement.type}</p>
-            </div>
-            <label className="grid gap-1">
-              <span>Scope</span>
-              <select
-                className="input select"
-                value={editElement.scope}
-                onChange={(event) =>
-                  setEditElement({ ...editElement, scope: event.target.value === 'site' ? 'site' : 'page' })
-                }
-              >
-                <option value="page">Page</option>
-                <option value="site">Site</option>
-              </select>
-            </label>
+            {/* <label className="inline-flex items-center gap-2 text-xs">
+              <input
+                type="checkbox"
+                className="h-4 w-4"
+                checked={editElement.floating}
+                onChange={(event) => setEditElement({ ...editElement, floating: event.target.checked })}
+              />
+              <span>Floating element</span>
+            </label> */}
             {editElement.type.toLowerCase() === 'button' ? (
-              <label className="grid gap-1">
-                <span>Flow name</span>
-                <input
-                  className="input"
-                  value={editElement.flowName}
-                  onChange={(event) => setEditElement({ ...editElement, flowName: event.target.value })}
-                  placeholder="Select or name a flow"
-                />
-              </label>
+              <>
+                <label className="grid gap-1">
+                  <span>Action flow</span>
+                  <SelectMenu
+                    value={editElement.actionFlowId || ''}
+                    options={actionFlowOptions}
+                    onChange={(value) => {
+                      if (value === '__create__') {
+                        setFlowDrawerOpen(true);
+                        return;
+                      }
+                      setEditElement({ ...editElement, actionFlowId: value });
+                    }}
+                  />
+                </label>
+              </>
             ) : null}
             {editElement.type.toLowerCase() === 'link' ? (
               <>
@@ -335,59 +574,26 @@ export default function ElementsSection() {
                   <span>Link URL</span>
                   <input
                     className="input"
-                    value={editElement.url}
-                    onChange={(event) => setEditElement({ ...editElement, url: event.target.value })}
+                    value={editElement.href}
+                    onChange={(event) => setEditElement({ ...editElement, href: event.target.value })}
                     placeholder="https://example.com"
                   />
                 </label>
                 <label className="grid gap-1">
                   <span>Link target</span>
-                  <select
-                    className="input select"
-                    value={editElement.linkTarget}
-                    onChange={(event) =>
+                  <SelectMenu
+                    value={editElement.linkTarget || 'new-tab'}
+                    options={[
+                      { value: 'new-tab', label: 'Open in new tab' },
+                      { value: 'same-tab', label: 'Open in same tab' },
+                    ]}
+                    onChange={(value) =>
                       setEditElement({
                         ...editElement,
-                        linkTarget: event.target.value === 'same-tab' ? 'same-tab' : 'new-tab',
+                        linkTarget: value === 'same-tab' ? 'same-tab' : 'new-tab',
                       })
-                    }
-                  >
-                    <option value="new-tab">Open in new tab</option>
-                    <option value="same-tab">Open in same tab</option>
-                  </select>
-                </label>
-              </>
-            ) : null}
-            {editElement.type.toLowerCase() === 'tooltip' ? (
-              <>
-                <label className="grid gap-1">
-                  <span>Tooltip position</span>
-                  <select
-                    className="input select"
-                    value={editElement.tooltipPosition}
-                    onChange={(event) =>
-                      setEditElement({
-                        ...editElement,
-                        tooltipPosition: event.target.value as 'top' | 'right' | 'bottom' | 'left',
-                      })
-                    }
-                  >
-                    <option value="top">Top</option>
-                    <option value="right">Right</option>
-                    <option value="bottom">Bottom</option>
-                    <option value="left">Left</option>
-                  </select>
-                </label>
-                <label className="inline-flex items-center gap-2 text-xs">
-                  <input
-                    type="checkbox"
-                    className="h-4 w-4"
-                    checked={editElement.tooltipPersistent}
-                    onChange={(event) =>
-                      setEditElement({ ...editElement, tooltipPersistent: event.target.checked })
                     }
                   />
-                  <span>Keep tooltip visible</span>
                 </label>
               </>
             ) : null}
@@ -395,51 +601,140 @@ export default function ElementsSection() {
               <>
                 <label className="grid gap-1">
                   <span>Layout</span>
-                  <select
-                    className="input select"
-                    value={editElement.layout}
-                    onChange={(event) =>
+                  <SelectMenu
+                    value={editElement.layout || 'row'}
+                    options={[
+                      { value: 'row', label: 'Row' },
+                      { value: 'column', label: 'Column' },
+                    ]}
+                    onChange={(value) =>
                       setEditElement({
                         ...editElement,
-                        layout: event.target.value === 'column' ? 'column' : 'row',
-                      })
-                    }
-                  >
-                    <option value="row">Row</option>
-                    <option value="column">Column</option>
-                  </select>
-                </label>
-                <label className="grid gap-1">
-                  <span>Contained items</span>
-                  <input
-                    className="input"
-                    type="number"
-                    min="0"
-                    value={editElement.areaCount}
-                    onChange={(event) =>
-                      setEditElement({
-                        ...editElement,
-                        areaCount: Number(event.target.value) || 0,
+                        layout: value === 'column' ? 'column' : 'row',
                       })
                     }
                   />
                 </label>
               </>
             ) : null}
-            <div className="grid gap-1">
-              <span>Last updated</span>
-              <p className="text-sm text-foreground">{editElement.updatedAt}</p>
-            </div>
-            <div className="flex items-center justify-end gap-2 pt-2">
-              <button type="button" className="btn-ghost" onClick={() => setActiveElementId(null)}>
-                Cancel
-              </button>
-              <button type="button" className="btn-primary" onClick={handleElementSave}>
-                Save changes
-              </button>
+            
+            <label className="grid gap-1">
+              <span>Scope</span>
+              <SelectMenu
+                value={editElement.scope || 'page'}
+                options={[
+                  { value: 'page', label: 'Page' },
+                  { value: 'site', label: 'Site' },
+                ]}
+                onChange={(value) =>
+                  setEditElement({ ...editElement, scope: value === 'site' ? 'site' : 'page' })
+                }
+              />
+            </label>
+            <div className="grid gap-2">
+              <span className="text-xs font-semibold text-foreground">Styles</span>
+              <label className="grid gap-1">
+                <span>Style preset</span>
+                <SelectMenu
+                  value={editElement.stylePreset || ''}
+                  options={stylePresets.map((preset) => ({
+                    value: preset.value,
+                    label: preset.label,
+                  }))}
+                  onChange={(value) => applyStylePreset(value)}
+                />
+              </label>
+              {styleFields.map((field) => (
+                <label key={field.key} className="grid gap-1">
+                  <span>{field.label}</span>
+                  <input
+                    className="input"
+                    value={editElement.style?.[field.key] || ''}
+                    onChange={(event) => {
+                      const nextValue = event.target.value;
+                      const nextStyle = { ...(editElement.style || {}) };
+                      if (nextValue) {
+                        nextStyle[field.key] = nextValue;
+                      } else {
+                        delete nextStyle[field.key];
+                      }
+                      setEditElement({
+                        ...editElement,
+                        style: nextStyle,
+                        stylePreset: detectStylePreset(nextStyle),
+                      });
+                    }}
+                    placeholder={field.placeholder}
+                  />
+                </label>
+              ))}
             </div>
           </div>
         ) : null}
+      </Drawer>
+
+      <Drawer
+        open={flowDrawerOpen}
+        title="New flow"
+        description="Create a new action flow."
+        actions={
+          <>
+            <button
+              type="button"
+              className="btn-icon h-8 w-8"
+              onClick={() => setFlowDrawerOpen(false)}
+              aria-label="Cancel"
+              title="Cancel"
+            >
+              <X className="h-4 w-4" />
+            </button>
+            <button
+              type="button"
+              className="btn-icon h-8 w-8 border-transparent bg-primary text-primary-foreground hover:brightness-95"
+              onClick={handleCreateFlow}
+              aria-label="Save"
+              title="Save"
+            >
+              <Check className="h-4 w-4" />
+            </button>
+          </>
+        }
+        showClose={false}
+        onClose={() => setFlowDrawerOpen(false)}
+      >
+        <div className="grid gap-3 text-xs text-muted-foreground">
+          <label className="grid gap-1">
+            <span>Name</span>
+            <input
+              className="input"
+              value={draftFlow.name}
+              onChange={(event) => setDraftFlow({ ...draftFlow, name: event.target.value })}
+              placeholder="Flow name"
+            />
+          </label>
+          <label className="grid gap-1">
+            <span>Description</span>
+            <textarea
+              className="input"
+              rows={2}
+              value={draftFlow.description}
+              onChange={(event) => setDraftFlow({ ...draftFlow, description: event.target.value })}
+              placeholder="What does this flow do?"
+            />
+          </label>
+          <label className="grid gap-1">
+            <span>Steps</span>
+            <input
+              className="input"
+              type="number"
+              min="0"
+              value={draftFlow.steps}
+              onChange={(event) =>
+                setDraftFlow({ ...draftFlow, steps: Number(event.target.value) || 0 })
+              }
+            />
+          </label>
+        </div>
       </Drawer>
     </div>
   );

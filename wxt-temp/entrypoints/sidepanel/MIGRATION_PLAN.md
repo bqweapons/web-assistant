@@ -123,3 +123,11 @@ This plan focuses on WXT migration with a modern, easy-to-use UI.
 ## Risks / 风险
 - Some shared modules may need path aliasing or relocation.  
 - 某些共享模块可能需要 alias 或迁移到 `shared/`。
+
+## Current Implementation Notes (wxt-temp)
+- Tailwind v4 pipeline: `@import "tailwindcss";` in `ui/sidepanel/styles/index.css`, theme tokens in `ui/sidepanel/styles/theme.css` via `@theme inline`.
+- Settings popover + drawers use an overlay and lock body scroll while open (no background scroll).
+- Tabs show tooltips (via `title`), and Flows/Hidden top actions are direct buttons (no dropdown).
+- Overview: summary cards + site list; each site entry links to the site URL; grouping is by site totals.
+- Elements: grouped by page, page row has link, search + type filter; cards show type badge + detail line + timestamp.
+- Flows/Hidden/Elements drawers now expose editable fields (simple form inputs) with Save/Cancel for mock data.

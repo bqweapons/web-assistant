@@ -78,10 +78,7 @@ export default function FlowsSection() {
               </div>
               <p className="mt-2 text-xs text-muted-foreground">{flow.description || 'No description'}</p>
               <p className="mt-1 text-xs text-muted-foreground">{flow.steps} steps</p>
-              <div className="mt-1 flex items-center justify-between gap-2">
-                <p className="text-xs text-muted-foreground">{flow.updatedAt}</p>
-                <span className="badge-pill">{flow.scope}</span>
-              </div>
+              <p className="mt-1 text-xs text-muted-foreground">{flow.updatedAt}</p>
             </Card>
           ))}
         </div>
@@ -113,23 +110,6 @@ export default function FlowsSection() {
                 onChange={(event) => setEditFlow({ ...editFlow, description: event.target.value })}
                 placeholder="Describe what the flow does"
               />
-            </label>
-            <label className="grid gap-1">
-              <span>Scope</span>
-              <select
-                className="input select"
-                value={editFlow.scope}
-                onChange={(event) =>
-                  setEditFlow({
-                    ...editFlow,
-                    scope: event.target.value as 'page' | 'site' | 'global',
-                  })
-                }
-              >
-                <option value="page">Page</option>
-                <option value="site">Site</option>
-                <option value="global">Global</option>
-              </select>
             </label>
             <label className="grid gap-1">
               <span>Steps</span>

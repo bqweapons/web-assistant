@@ -1,18 +1,28 @@
 type MockElement = {
   id: string;
-  label: string;
-  type: string;
-  site: string;
-  page: string;
-  scope: string;
-  updatedAt: string;
-  flowName?: string;
-  url?: string;
-  areaCount?: number;
-  linkTarget?: 'new-tab' | 'same-tab';
-  tooltipPosition?: 'top' | 'right' | 'bottom' | 'left';
-  tooltipPersistent?: boolean;
+  type: 'button' | 'link' | 'area';
+  text: string;
+  selector: string;
+  position: string;
+  style: Record<string, string>;
+  pageUrl: string;
+  siteUrl: string;
+  frameUrl: string;
+  frameSelectors: string[];
+  floating: boolean;
+  createdAt: number;
+  updatedAt: number;
+  beforeSelector?: string;
+  afterSelector?: string;
+  actionFlowId?: string;
+  actionFlowLocked?: boolean;
+  actionFlow?: string;
+  containerId?: string;
+  scope?: 'page' | 'site' | 'global';
+  stylePreset?: string;
   layout?: 'row' | 'column';
+  href?: string;
+  linkTarget?: 'new-tab' | 'same-tab';
 };
 
 type MockFlow = {
@@ -20,7 +30,6 @@ type MockFlow = {
   name: string;
   description?: string;
   site: string;
-  scope: string;
   steps: number;
   updatedAt: string;
 };
@@ -38,213 +47,74 @@ type MockHiddenRule = {
 
 export const mockElements: MockElement[] = [
   {
-    id: 'd071b99d',
-    label: 'Floating area',
-    type: 'Area',
-    areaCount: 3,
-    site: 'file://',
-    page: 'test-page.html',
-    scope: 'page',
-    updatedAt: '2026-01-03 10:12:04',
+    id: '56bb644c-ac15-42cf-a3f6-9b7b7b76f7a4',
+    type: 'link',
+    text: 'Dashboard',
+    href: '/sitesettings/stats',
+    linkTarget: 'same-tab',
+    selector: 'div#__layout > div > div > header > div',
+    position: 'append',
+    style: {
+      color: '#2563eb',
+      fontSize: '11px',
+    },
+    pageUrl: 'https://note.com',
+    siteUrl: 'https://note.com',
+    frameUrl: 'https://note.com/',
+    frameSelectors: [],
+    floating: false,
+    createdAt: 1763452627914,
+    updatedAt: 1763858504570,
   },
   {
-    id: '9277912d',
-    label: 'middle',
-    type: 'Button',
-    flowName: 'Form submit',
-    site: 'file://',
-    page: 'test-page.html',
-    scope: 'page',
-    updatedAt: '2026-01-03 11:05:22',
+    id: '358dabbd-23f0-437e-be55-9e6d57262199',
+    type: 'area',
+    text: 'Highlight area',
+    selector: 'body',
+    position: 'append',
+    layout: 'row',
+    style: {
+      backgroundColor: '#f59e0b30',
+      borderRadius: '14px',
+      color: '#0f172a',
+      height: '80px',
+      left: '398px',
+      position: 'absolute',
+      top: '7px',
+      width: '329px',
+      zIndex: '2147482000',
+    },
+    pageUrl: 'https://note.com/sitesettings/stats',
+    siteUrl: 'https://note.com',
+    frameUrl: 'https://note.com/sitesettings/stats',
+    frameSelectors: [],
+    floating: true,
+    createdAt: 1765326879172,
+    updatedAt: 1765326919396,
   },
   {
-    id: 'a000d2a8',
-    label: 'Button23',
-    type: 'Button',
-    flowName: 'Primary action',
-    site: 'file://',
-    page: 'test-page.html',
-    scope: 'page',
-    updatedAt: '2026-01-03 16:17:52',
-  },
-  {
-    id: '1fbc2aec',
-    label: 'A',
-    type: 'Button',
-    flowName: 'Onboarding',
-    site: 'file://',
-    page: 'test-page.html',
-    scope: 'site',
-    updatedAt: '2026-01-03 19:03:11',
-  },
-  {
-    id: '8b333467',
-    label: 'test',
-    type: 'Link',
-    url: 'https://google.com',
-    site: 'mail.google.com',
-    page: 'mail.google.com',
-    scope: 'site',
-    updatedAt: '2026-01-02 09:44:30',
-  },
-  {
-    id: '9148934e',
-    label: 'Quick action',
-    type: 'Button',
-    flowName: 'Archive flow',
-    site: 'mail.google.com',
-    page: 'mail.google.com',
-    scope: 'page',
-    updatedAt: '2026-01-02 09:50:12',
-  },
-  {
-    id: '56bb644c',
-    label: 'Settings link',
-    type: 'Link',
-    url: '/sitesettings/stats',
-    site: 'note.com',
-    page: 'note.com',
-    scope: 'site',
-    updatedAt: '2026-01-02 11:20:03',
-  },
-  {
-    id: 'e9f65cf7',
-    label: 'Stats button',
-    type: 'Button',
-    flowName: 'Open stats',
-    site: 'note.com',
-    page: 'note.com/sitesettings/stats',
-    scope: 'page',
-    updatedAt: '2026-01-02 11:25:49',
-  },
-  {
-    id: '358dabbd',
-    label: 'Highlight area',
-    type: 'Area',
-    areaCount: 2,
-    site: 'note.com',
-    page: 'note.com/sitesettings/stats',
-    scope: 'page',
-    updatedAt: '2026-01-02 11:26:31',
-  },
-  {
-    id: '9a3dd7c1',
-    label: 'Primary CTA',
-    type: 'Button',
-    flowName: 'Primary CTA',
-    site: 'note.com',
-    page: 'note.com/sitesettings/stats',
-    scope: 'page',
-    updatedAt: '2026-01-02 11:27:10',
-  },
-  {
-    id: 'befa536c',
-    label: 'Login',
-    type: 'Button',
-    flowName: 'Login flow',
-    site: 'avanade.service-now.com',
-    page: 'avanade.service-now.com',
-    scope: 'site',
-    updatedAt: '2026-01-01 08:14:03',
-  },
-  {
-    id: 'ed2ea86e',
-    label: 'Add info',
-    type: 'Button',
-    flowName: 'Billing form',
-    site: 'pay.openai.com',
-    page: 'pay.openai.com',
-    scope: 'page',
-    updatedAt: '2026-01-01 14:44:50',
-  },
-  {
-    id: '79524958',
-    label: 'Login',
-    type: 'Button',
-    flowName: 'Login flow',
-    site: 'type.jp',
-    page: 'type.jp/login',
-    scope: 'page',
-    updatedAt: '2026-01-01 09:10:40',
-  },
-  {
-    id: 'file0001',
-    label: 'CTA banner',
-    type: 'Area',
-    areaCount: 4,
-    site: 'file://',
-    page: 'test-page2.html',
-    scope: 'page',
-    updatedAt: '2026-01-03 21:10:18',
-  },
-  {
-    id: 'file0002',
-    label: 'Submit button',
-    type: 'Button',
-    flowName: 'Submit form',
-    site: 'file://',
-    page: 'test-page2.html',
-    scope: 'page',
-    updatedAt: '2026-01-03 21:12:05',
-  },
-  {
-    id: 'file0003',
-    label: 'Helper tip',
-    type: 'Tooltip',
-    site: 'file://',
-    page: 'test-page3.html',
-    scope: 'page',
-    updatedAt: '2026-01-03 21:18:44',
-  },
-  {
-    id: 'file0004',
-    label: 'Footer link',
-    type: 'Link',
-    url: 'https://example.com/docs',
-    site: 'file://',
-    page: 'test-page3.html',
-    scope: 'page',
-    updatedAt: '2026-01-03 21:22:51',
-  },
-  {
-    id: 'note0001',
-    label: 'Editor button',
-    type: 'Button',
-    flowName: 'Publish flow',
-    site: 'note.com',
-    page: 'note.com/editor',
-    scope: 'page',
-    updatedAt: '2026-01-02 12:40:03',
-  },
-  {
-    id: 'note0002',
-    label: 'Draft link',
-    type: 'Link',
-    url: '/drafts',
-    site: 'note.com',
-    page: 'note.com/drafts',
-    scope: 'page',
-    updatedAt: '2026-01-02 12:44:57',
-  },
-  {
-    id: 'gmail001',
-    label: 'Archive pill',
-    type: 'Button',
-    flowName: 'Archive flow',
-    site: 'mail.google.com',
-    page: 'mail.google.com/inbox',
-    scope: 'page',
-    updatedAt: '2026-01-02 10:20:39',
-  },
-  {
-    id: 'gmail002',
-    label: 'Label chip',
-    type: 'Button',
-    flowName: 'Label flow',
-    site: 'mail.google.com',
-    page: 'mail.google.com/inbox',
-    scope: 'page',
-    updatedAt: '2026-01-02 10:22:18',
+    id: '9a3dd7c1-d5a4-4003-a259-ffa12e1b6de6',
+    type: 'button',
+    text: 'Publish',
+    selector: 'body',
+    actionFlowId: 'flow-publish',
+    actionFlowLocked: false,
+    containerId: '358dabbd-23f0-437e-be55-9e6d57262199',
+    position: 'append',
+    style: {
+      backgroundColor: '#1b84ff',
+      borderRadius: '8px',
+      color: '#ffffff',
+      fontSize: '12px',
+      fontWeight: '600',
+    },
+    pageUrl: 'https://note.com/',
+    siteUrl: 'https://note.com',
+    frameUrl: 'https://note.com/sitesettings/stats',
+    frameSelectors: [],
+    floating: false,
+    createdAt: 1765326888518,
+    updatedAt: 1765326905920,
   },
 ];
 
@@ -254,7 +124,6 @@ export const mockFlows: MockFlow[] = [
     name: 'test1',
     description: 'Login flow for the test page.',
     site: 'file://',
-    scope: 'site',
     steps: 10,
     updatedAt: '2026-01-03 14:05:08',
   },
@@ -263,7 +132,6 @@ export const mockFlows: MockFlow[] = [
     name: 'test2',
     description: 'Form submit with validation.',
     site: 'file://',
-    scope: 'page',
     steps: 6,
     updatedAt: '2026-01-03 18:22:41',
   },
@@ -272,7 +140,6 @@ export const mockFlows: MockFlow[] = [
     name: 'C23',
     description: 'Core flow for primary actions.',
     site: 'file://',
-    scope: 'global',
     steps: 5,
     updatedAt: '2026-01-03 20:09:36',
   },
@@ -281,7 +148,6 @@ export const mockFlows: MockFlow[] = [
     name: 'template-short',
     description: 'Quick template run.',
     site: 'file://',
-    scope: 'global',
     steps: 3,
     updatedAt: '2026-01-03 20:20:16',
   },
@@ -290,7 +156,6 @@ export const mockFlows: MockFlow[] = [
     name: 'gmail-cleanup',
     description: 'Archive and label a thread.',
     site: 'mail.google.com',
-    scope: 'page',
     steps: 4,
     updatedAt: '2026-01-02 10:02:44',
   },
@@ -299,7 +164,6 @@ export const mockFlows: MockFlow[] = [
     name: 'note-stats',
     description: 'Open stats and export data.',
     site: 'note.com',
-    scope: 'site',
     steps: 6,
     updatedAt: '2026-01-02 12:10:31',
   },
@@ -308,7 +172,6 @@ export const mockFlows: MockFlow[] = [
     name: 'payment-checkout',
     description: 'Fill billing form fields.',
     site: 'pay.openai.com',
-    scope: 'page',
     steps: 5,
     updatedAt: '2026-01-01 15:01:28',
   },

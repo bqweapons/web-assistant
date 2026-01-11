@@ -7,7 +7,8 @@ import HiddenRulesSection from './sections/HiddenRulesSection';
 import OverviewSection from './sections/OverviewSection';
 import SettingsSection from './sections/SettingsSection';
 import SettingsPopover from './components/SettingsPopover';
-import { ChevronDown, EyeOff, Layers, LayoutDashboard, Moon, Settings, Sun, Workflow } from 'lucide-react';
+import SelectMenu from './components/SelectMenu';
+import { EyeOff, Layers, LayoutDashboard, Moon, Settings, Sun, Workflow } from 'lucide-react';
 
 const TAB_IDS = {
   elements: 'elements',
@@ -49,10 +50,12 @@ export default function App() {
   const [activeTab, setActiveTab] = useState(TAB_IDS.elements);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [isDark, setIsDark] = useState(false);
+  const [addElementType, setAddElementType] = useState('');
 
   useEffect(() => {
     document.documentElement.classList.toggle('dark', isDark);
   }, [isDark]);
+
 
   const headerActions = useMemo(
     () => [
@@ -83,39 +86,17 @@ export default function App() {
 
         {activeTab === TAB_IDS.elements && (
           <div className="mt-2">
-            <details className="group relative">
-              <summary className="btn-primary w-full cursor-pointer list-none">
-                <span className="inline-flex items-center justify-center gap-2">
-                  Add element to page
-                  <ChevronDown className="h-4 w-4 transition group-open:rotate-180" />
-                </span>
-              </summary>
-              <div className="absolute left-0 right-0 z-10 mt-2 rounded border border-border bg-card p-2 shadow-md">
-                <div className="flex flex-col gap-1">
-                  <button
-                    type="button"
-                    className="flex items-center justify-between gap-2 rounded px-3 py-2 text-left text-sm text-card-foreground transition hover:bg-muted"
-                  >
-                    <span>Area</span>
-                    <span className="text-xs text-muted-foreground">Select a region</span>
-                  </button>
-                  <button
-                    type="button"
-                    className="flex items-center justify-between gap-2 rounded px-3 py-2 text-left text-sm text-card-foreground transition hover:bg-muted"
-                  >
-                    <span>Button</span>
-                    <span className="text-xs text-muted-foreground">Insert a clickable button</span>
-                  </button>
-                  <button
-                    type="button"
-                    className="flex items-center justify-between gap-2 rounded px-3 py-2 text-left text-sm text-card-foreground transition hover:bg-muted"
-                  >
-                    <span>Tooltip</span>
-                    <span className="text-xs text-muted-foreground">Show helper text on hover</span>
-                  </button>
-                </div>
-              </div>
-            </details>
+            <SelectMenu
+              value={addElementType}
+              placeholder="Add element to page"
+              iconPosition="right"
+              options={[
+                { value: 'area', label: 'Area', rightLabel: 'Select a region' },
+                { value: 'button', label: 'Button', rightLabel: 'Insert a clickable button' },
+                { value: 'tooltip', label: 'Tooltip', rightLabel: 'Show helper text on hover' },
+              ]}
+              onChange={(value) => setAddElementType(value)}
+            />
           </div>
         )}
 
@@ -148,4 +129,3 @@ export default function App() {
     </div>
   );
 }
-
