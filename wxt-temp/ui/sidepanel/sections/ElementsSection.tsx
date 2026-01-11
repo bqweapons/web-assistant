@@ -1,5 +1,22 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Check, ChevronDown, Crosshair, ExternalLink, Link as LinkIcon, Search, Trash2, X } from 'lucide-react';
+import {
+  AlignCenter,
+  AlignLeft,
+  AlignRight,
+  AArrowDown,
+  AArrowUp,
+  Bold,
+  Check,
+  ChevronDown,
+  Crosshair,
+  ExternalLink,
+  Italic,
+  Link as LinkIcon,
+  Search,
+  Trash2,
+  Underline,
+  X,
+} from 'lucide-react';
 import Card from '../components/Card';
 import Drawer from '../components/Drawer';
 import SelectMenu from '../components/SelectMenu';
@@ -130,34 +147,48 @@ export default function ElementsSection() {
     ],
     [flows],
   );
-  const commonStyleFields = [
-    { key: 'backgroundColor', label: 'Background color', placeholder: '#ffffff', type: 'color' },
-    { key: 'color', label: 'Text color', placeholder: '#0f172a', type: 'color' },
-    { key: 'fontSize', label: 'Font size', placeholder: '12px', type: 'number', unit: 'px', defaultValue: 12 },
+  const positionOptions = [
+    { value: '', label: 'Auto' },
+    { value: 'static', label: 'Static' },
+    { value: 'relative', label: 'Relative' },
+    { value: 'absolute', label: 'Absolute' },
+    { value: 'fixed', label: 'Fixed' },
+    { value: 'sticky', label: 'Sticky' },
+  ];
+  const shadowOptions = [
+    { value: '', label: 'None' },
+    { value: '0 12px 32px rgba(15, 23, 42, 0.18)', label: 'Soft' },
+    { value: '0 8px 24px rgba(15, 23, 42, 0.24)', label: 'Medium' },
+    { value: '0 4px 12px rgba(15, 23, 42, 0.3)', label: 'Strong' },
+  ];
+  const customCssOrder = [
+    'backgroundColor',
+    'color',
+    'fontSize',
+    'fontWeight',
+    'fontStyle',
+    'textDecoration',
+    'textAlign',
+    'border',
+    'borderRadius',
+    'boxShadow',
+    'padding',
+    'position',
+    'width',
+    'height',
+    'left',
+    'top',
+    'zIndex',
   ];
   const defaultColorSwatches = [
+    { label: 'Transparent', value: 'transparent' },
+    { label: 'Black', value: '#000000' },
+    { label: 'White', value: '#ffffff' },
     { label: 'Blue', value: '#2563eb' },
     { label: 'Red', value: '#ef4444' },
     { label: 'Green', value: '#10b981' },
     { label: 'Orange', value: '#f59e0b' },
     { label: 'Purple', value: '#8b5cf6' },
-    { label: 'Slate', value: '#64748b' },
-    { label: 'Black', value: '#000000' },
-    { label: 'White', value: '#ffffff' },
-    { label: 'Transparent', value: 'transparent' },
-  ];
-  const advancedStyleFields = [
-    { key: 'border', label: 'Border', placeholder: '1px solid #000000' },
-    { key: 'borderRadius', label: 'Border radius', placeholder: '8px', type: 'number', unit: 'px', defaultValue: 8 },
-    { key: 'boxShadow', label: 'Box shadow', placeholder: '0 12px 32px rgba(15, 23, 42, 0.18)' },
-    { key: 'fontWeight', label: 'Font weight', placeholder: '600', type: 'number', unit: '', defaultValue: 600 },
-    { key: 'padding', label: 'Padding', placeholder: '8px 16px' },
-    { key: 'position', label: 'CSS position', placeholder: 'absolute' },
-    { key: 'width', label: 'Width', placeholder: '120px', type: 'number', unit: 'px', defaultValue: 120 },
-    { key: 'height', label: 'Height', placeholder: '40px', type: 'number', unit: 'px', defaultValue: 40 },
-    { key: 'left', label: 'Left', placeholder: '12px', type: 'number', unit: 'px', defaultValue: 12 },
-    { key: 'top', label: 'Top', placeholder: '12px', type: 'number', unit: 'px', defaultValue: 12 },
-    { key: 'zIndex', label: 'Z-index', placeholder: '999', type: 'number', unit: '', defaultValue: 999 },
   ];
 
   const formatTimestamp = (value?: number) => {
@@ -322,16 +353,44 @@ export default function ElementsSection() {
     return match?.value || '';
   };
 
+  const toKebabCase = (value: string) => value.replace(/[A-Z]/g, (match) => `-${match.toLowerCase()}`);
+
+  const formatCustomCss = (rules: Record<string, string>) => {
+    const entries: string[] = [];
+    const used = new Set<string>();
+    const pushEntry = (key: string) => {
+      const rawValue = rules[key];
+      if (!rawValue) {
+        return;
+      }
+      const value = rawValue.trim();
+      if (!value) {
+        return;
+      }
+      entries.push(`${toKebabCase(key)}: ${value};`);
+      used.add(key);
+    };
+    customCssOrder.forEach(pushEntry);
+    Object.keys(rules).forEach((key) => {
+      if (!used.has(key)) {
+        pushEntry(key);
+      }
+    });
+    return entries.join('\n');
+  };
+
   const applyStylePreset = (presetValue: string) => {
     if (!editElement) {
       return;
     }
     const preset = stylePresets.find((option) => option.value === presetValue);
     const nextStyle = preset?.styles ? { ...preset.styles } : {};
+    const nextCustomCss = preset?.styles ? formatCustomCss(preset.styles) : '';
     setEditElement({
       ...editElement,
       stylePreset: presetValue,
       style: nextStyle,
+      customCss: nextCustomCss,
     });
   };
 
@@ -367,11 +426,62 @@ export default function ElementsSection() {
     [editElement?.customCss],
   );
 
+  const applyCustomCssUpdates = (updates: Record<string, string | undefined>) => {
+    if (!editElement) {
+      return;
+    }
+    const currentCustom = parseCustomCss(editElement.customCss || '');
+    const nextCustom = { ...currentCustom };
+    Object.entries(updates).forEach(([key, value]) => {
+      const nextValue = value?.trim();
+      if (nextValue) {
+        nextCustom[key] = nextValue;
+      } else {
+        delete nextCustom[key];
+      }
+    });
+    const nextCustomCss = formatCustomCss(nextCustom);
+    const nextStyle = { ...(editElement.style || {}) };
+    Object.entries(updates).forEach(([key, value]) => {
+      const nextValue = value?.trim();
+      if (nextValue) {
+        nextStyle[key] = nextValue;
+      } else {
+        delete nextStyle[key];
+      }
+    });
+    setEditElement({
+      ...editElement,
+      customCss: nextCustomCss,
+      style: nextStyle,
+      stylePreset: detectStylePreset(nextStyle),
+    });
+  };
+
   const getStyleValue = (key: string) => {
     if (customStyleOverrides[key] !== undefined) {
       return customStyleOverrides[key];
     }
     return editElement?.style?.[key] || '';
+  };
+
+  const getNumericValue = (value: string) => {
+    const match = value.match(/-?\d+(\.\d+)?/);
+    return match ? match[0] : '';
+  };
+
+  const getNumericStyleValue = (key: string) => getNumericValue(getStyleValue(key));
+
+  const updateNumericStyle = (key: string, rawValue: string, unit: string) => {
+    const trimmed = rawValue.trim();
+    applyCustomCssUpdates({ [key]: trimmed ? `${trimmed}${unit}` : '' });
+  };
+
+  const adjustNumericStyle = (key: string, delta: number, unit: string, fallback: number) => {
+    const currentRaw = getNumericStyleValue(key);
+    const current = currentRaw ? Number(currentRaw) : fallback;
+    const next = Number.isFinite(current) ? current + delta : fallback + delta;
+    applyCustomCssUpdates({ [key]: `${next}${unit}` });
   };
 
   const normalizeHex = (raw: string) => {
@@ -447,164 +557,51 @@ export default function ElementsSection() {
     return '#ffffff';
   };
 
-  const adjustNumericValue = (value: string, delta: number, unit: string, fallback: number) => {
-    const match = value.trim().match(/-?\d+(\.\d+)?/);
-    const current = match ? Number(match[0]) : fallback;
-    const next = Number.isFinite(current) ? current + delta : fallback + delta;
-    return `${next}${unit}`;
-  };
+  const fontWeightValue = getStyleValue('fontWeight');
+  const isBold = fontWeightValue === 'bold' || Number(fontWeightValue) >= 600;
+  const isItalic = getStyleValue('fontStyle') === 'italic';
+  const decorationValue = getStyleValue('textDecoration');
+  const isUnderline = decorationValue.includes('underline');
+  const textAlignValue = getStyleValue('textAlign') || 'left';
+  const fontSizeValue = getNumericStyleValue('fontSize');
+  const textColorValue = getStyleValue('color');
+  const backgroundColorValue = getStyleValue('backgroundColor');
+  const borderValue = getStyleValue('border');
+  const borderRadiusValue = getNumericStyleValue('borderRadius');
+  const boxShadowValue = getStyleValue('boxShadow');
+  const paddingValue = getStyleValue('padding');
+  const positionValue = getStyleValue('position');
+  const widthValue = getNumericStyleValue('width');
+  const heightValue = getNumericStyleValue('height');
+  const leftValue = getNumericStyleValue('left');
+  const topValue = getNumericStyleValue('top');
+  const zIndexValue = getNumericStyleValue('zIndex');
 
-  const renderStyleField = (field: {
-    key: string;
-    label: string;
-    placeholder: string;
-    type?: 'color' | 'number';
-    unit?: string;
-    defaultValue?: number;
-  }) => {
-    const value = getStyleValue(field.key);
-    const isColor = field.type === 'color';
-    const isNumber = field.type === 'number';
-    const unit = field.unit ?? '';
-    const fallback = field.defaultValue ?? 0;
-
-    return (
-      <label key={field.key} className="grid gap-1">
-        <span>{field.label}</span>
-        <div className="flex items-center gap-2">
-          <input
-            className="input"
-            value={value}
-            onChange={(event) => {
-              if (!editElement) {
-                return;
-              }
-              const nextValue = event.target.value;
-              const nextStyle = { ...(editElement.style || {}) };
-              if (nextValue) {
-                nextStyle[field.key] = nextValue;
-              } else {
-                delete nextStyle[field.key];
-              }
-              setEditElement({
-                ...editElement,
-                style: nextStyle,
-                stylePreset: detectStylePreset(nextStyle),
-              });
-            }}
-            placeholder={field.placeholder}
-          />
-          {isColor ? (
-            <input
-              type="color"
-              className="h-9 w-10 cursor-pointer rounded border border-border p-0"
-              value={resolveColorValue(value, field.placeholder)}
-              onChange={(event) => {
-                if (!editElement) {
-                  return;
+  const renderColorSwatches = (fieldKey: string) =>
+    defaultColorSwatches.map((swatch) => {
+      const isTransparent = swatch.value === 'transparent';
+      return (
+        <button
+          key={`${fieldKey}-${swatch.value}`}
+          type="button"
+          className="h-5.5 w-5.5 shrink-0 cursor-pointer rounded-md border border-border"
+          title={swatch.label}
+          aria-label={swatch.label}
+          onClick={() => applyCustomCssUpdates({ [fieldKey]: swatch.value })}
+          style={
+            isTransparent
+              ? {
+                  backgroundImage:
+                    'linear-gradient(45deg, #e2e8f0 25%, transparent 25%), linear-gradient(-45deg, #e2e8f0 25%, transparent 25%), linear-gradient(45deg, transparent 75%, #e2e8f0 75%), linear-gradient(-45deg, transparent 75%, #e2e8f0 75%)',
+                  backgroundPosition: '0 0, 0 3px, 3px -3px, -3px 0',
+                  backgroundSize: '6px 6px',
+                  backgroundColor: '#ffffff',
                 }
-                const nextValue = event.target.value;
-                const nextStyle = { ...(editElement.style || {}) };
-                if (nextValue) {
-                  nextStyle[field.key] = nextValue;
-                } else {
-                  delete nextStyle[field.key];
-                }
-                setEditElement({
-                  ...editElement,
-                  style: nextStyle,
-                  stylePreset: detectStylePreset(nextStyle),
-                });
-              }}
-            />
-          ) : null}
-          {isNumber ? (
-            <div className="flex items-center gap-1">
-              <button
-                type="button"
-                className="btn-ghost h-8 w-8 p-0"
-                aria-label={`Decrease ${field.label}`}
-                onClick={() => {
-                  if (!editElement) {
-                    return;
-                  }
-                  const nextValue = adjustNumericValue(value, -1, unit, fallback);
-                  const nextStyle = { ...(editElement.style || {}) };
-                  nextStyle[field.key] = nextValue;
-                  setEditElement({
-                    ...editElement,
-                    style: nextStyle,
-                    stylePreset: detectStylePreset(nextStyle),
-                  });
-                }}
-              >
-                -
-              </button>
-              <button
-                type="button"
-                className="btn-ghost h-8 w-8 p-0"
-                aria-label={`Increase ${field.label}`}
-                onClick={() => {
-                  if (!editElement) {
-                    return;
-                  }
-                  const nextValue = adjustNumericValue(value, 1, unit, fallback);
-                  const nextStyle = { ...(editElement.style || {}) };
-                  nextStyle[field.key] = nextValue;
-                  setEditElement({
-                    ...editElement,
-                    style: nextStyle,
-                    stylePreset: detectStylePreset(nextStyle),
-                  });
-                }}
-              >
-                +
-              </button>
-            </div>
-          ) : null}
-        </div>
-        {isColor ? (
-          <div className="flex flex-wrap gap-2 pt-1">
-            {defaultColorSwatches.map((swatch) => {
-              const isTransparent = swatch.value === 'transparent';
-              return (
-                <button
-                  key={swatch.value}
-                  type="button"
-                  className="h-6 w-6 cursor-pointer rounded-full border border-border"
-                  title={swatch.label}
-                  aria-label={swatch.label}
-                  onClick={() => {
-                    if (!editElement) {
-                      return;
-                    }
-                    const nextStyle = { ...(editElement.style || {}) };
-                    nextStyle[field.key] = swatch.value;
-                    setEditElement({
-                      ...editElement,
-                      style: nextStyle,
-                      stylePreset: detectStylePreset(nextStyle),
-                    });
-                  }}
-                  style={
-                    isTransparent
-                      ? {
-                          backgroundImage:
-                            'linear-gradient(45deg, #e2e8f0 25%, transparent 25%), linear-gradient(-45deg, #e2e8f0 25%, transparent 25%), linear-gradient(45deg, transparent 75%, #e2e8f0 75%), linear-gradient(-45deg, transparent 75%, #e2e8f0 75%)',
-                          backgroundPosition: '0 0, 0 3px, 3px -3px, -3px 0',
-                          backgroundSize: '6px 6px',
-                          backgroundColor: '#ffffff',
-                        }
-                      : { backgroundColor: swatch.value }
-                  }
-                />
-              );
-            })}
-          </div>
-        ) : null}
-      </label>
-    );
-  };
+              : { backgroundColor: swatch.value }
+          }
+        />
+      );
+    });
 
   useEffect(() => {
     if (!activeElement) {
@@ -852,6 +849,8 @@ export default function ElementsSection() {
                     <SelectMenu
                       value={editElement.actionFlowId || ''}
                       options={actionFlowOptions}
+                      useInputStyle={false}
+                      buttonClassName="btn-ghost h-8 w-full justify-between px-2 text-xs"
                       onChange={(value) => {
                         if (value === '__create__') {
                           setFlowDrawerOpen(true);
@@ -913,57 +912,292 @@ export default function ElementsSection() {
             </div>
             <div className="rounded border border-border bg-card p-3">
               <div className="text-xs font-semibold text-foreground">Styles</div>
-              <div className="mt-2 grid gap-2 sm:grid-cols-2">
-                <div className="grid gap-1 sm:col-span-2">
-                  <span>Style preset</span>
+              <div className="mt-2 grid gap-3">
+                <div className="grid gap-1">
+                  <span className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+                    Preset
+                  </span>
                   <SelectMenu
                     value={editElement.stylePreset || ''}
                     options={stylePresets.map((preset) => ({
                       value: preset.value,
                       label: preset.label,
                     }))}
+                    useInputStyle={false}
+                    buttonClassName="btn-ghost h-8 w-full justify-between px-2 text-xs"
                     onChange={(value) => applyStylePreset(value)}
                   />
                 </div>
-                <div className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground sm:col-span-2">
-                  <span>Common</span>
-                  <span className="h-px flex-1 bg-border" />
+
+                <div className="flex flex-wrap items-center gap-2 rounded border border-border bg-muted p-2 sm:flex-nowrap">
+                  <div className="flex items-center gap-1">
+                    <button
+                      type="button"
+                      className="btn-ghost h-6 w-6 p-0"
+                      aria-label="Decrease font size"
+                      onClick={() => adjustNumericStyle('fontSize', -1, 'px', 12)}
+                    >
+                      <AArrowDown className="h-3.5 w-3.5" />
+                    </button>
+                    <button
+                      type="button"
+                      className="btn-ghost h-6 w-6 p-0"
+                      aria-label="Increase font size"
+                      onClick={() => adjustNumericStyle('fontSize', 1, 'px', 12)}
+                    >
+                      <AArrowUp className="h-3.5 w-3.5" />
+                    </button>
+                  </div>
+                  <span className="h-6 w-px bg-border" />
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      className={`btn-ghost h-6 w-6 p-0 ${isBold ? 'bg-accent text-accent-foreground' : ''}`}
+                      aria-pressed={isBold}
+                      onClick={() => applyCustomCssUpdates({ fontWeight: isBold ? '' : '700' })}
+                    >
+                      <Bold className="h-3.5 w-3.5" />
+                    </button>
+                    <button
+                      type="button"
+                      className={`btn-ghost h-6 w-6 p-0 ${isItalic ? 'bg-accent text-accent-foreground' : ''}`}
+                      aria-pressed={isItalic}
+                      onClick={() => applyCustomCssUpdates({ fontStyle: isItalic ? '' : 'italic' })}
+                    >
+                      <Italic className="h-3.5 w-3.5" />
+                    </button>
+                    <button
+                      type="button"
+                      className={`btn-ghost h-6 w-6 p-0 ${isUnderline ? 'bg-accent text-accent-foreground' : ''}`}
+                      aria-pressed={isUnderline}
+                      onClick={() =>
+                        applyCustomCssUpdates({
+                          textDecoration: isUnderline ? '' : 'underline',
+                        })
+                      }
+                    >
+                      <Underline className="h-3.5 w-3.5" />
+                    </button>
+                  </div>
+                  <span className="h-6 w-px bg-border" />
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      className={`btn-ghost h-6 w-6 p-0 ${textAlignValue === 'left' ? 'bg-accent text-accent-foreground' : ''}`}
+                      aria-pressed={textAlignValue === 'left'}
+                      onClick={() => applyCustomCssUpdates({ textAlign: 'left' })}
+                    >
+                      <AlignLeft className="h-3.5 w-3.5" />
+                    </button>
+                    <button
+                      type="button"
+                      className={`btn-ghost h-6 w-6 p-0 ${textAlignValue === 'center' ? 'bg-accent text-accent-foreground' : ''}`}
+                      aria-pressed={textAlignValue === 'center'}
+                      onClick={() => applyCustomCssUpdates({ textAlign: 'center' })}
+                    >
+                      <AlignCenter className="h-3.5 w-3.5" />
+                    </button>
+                    <button
+                      type="button"
+                      className={`btn-ghost h-6 w-6 p-0 ${textAlignValue === 'right' ? 'bg-accent text-accent-foreground' : ''}`}
+                      aria-pressed={textAlignValue === 'right'}
+                      onClick={() => applyCustomCssUpdates({ textAlign: 'right' })}
+                    >
+                      <AlignRight className="h-3.5 w-3.5" />
+                    </button>
+                  </div>
                 </div>
-                {commonStyleFields.map((field) => renderStyleField(field))}
-                <details className="group sm:col-span-2">
-                  <summary className="cursor-pointer list-none">
-                    <div className="flex flex-col gap-1">
-                      <div className="flex items-center justify-between gap-3">
-                        <div className="flex w-full items-center gap-2 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
-                          <span>Advanced</span>
-                          <span className="h-px flex-1 bg-border" />
-                        </div>
-                        <ChevronDown className="h-4 w-4 text-muted-foreground transition group-open:rotate-180" />
-                      </div>
-                      <div className="text-[11px] text-muted-foreground">
-                        Position and size overrides for precise placement.
+
+                <div className="grid gap-3 rounded border border-border bg-muted p-2">
+                  <div className="grid gap-2 sm:grid-cols-2">
+                    <div className="grid gap-1">
+                      <span className="text-[10px] font-semibold uppercase text-muted-foreground">
+                        Text
+                      </span>
+                      <div className="flex items-center gap-2">
+                        <input
+                          type="color"
+                          className="h-7 w-6.5 cursor-pointer rounded-md border border-border p-0"
+                          value={resolveColorValue(textColorValue, '#0f172a')}
+                          onChange={(event) => applyCustomCssUpdates({ color: event.target.value })}
+                        />
+                        <span className="h-6 w-px bg-border" />
+                        {renderColorSwatches('color')}
                       </div>
                     </div>
+                    <div className="grid gap-1">
+                      <span className="text-[10px] font-semibold uppercase text-muted-foreground">
+                        Background
+                      </span>
+                      <div className="flex items-center gap-2">
+                        <input
+                          type="color"
+                          className="h-7 w-6.5 cursor-pointer rounded-md border border-border p-0"
+                          value={resolveColorValue(backgroundColorValue, '#ffffff')}
+                          onChange={(event) =>
+                            applyCustomCssUpdates({ backgroundColor: event.target.value })
+                          }
+                        />
+                        <span className="h-6 w-px bg-border" />
+                        {renderColorSwatches('backgroundColor')}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <details className="group">
+                  <summary className="cursor-pointer list-none">
+                    <div className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+                      <span>Layout</span>
+                      <span className="h-px flex-1 bg-border" />
+                      <ChevronDown className="h-4 w-4 text-muted-foreground transition group-open:rotate-180" />
+                    </div>
                   </summary>
-                  <div className="mt-2 grid gap-2 sm:grid-cols-2">
-                    {advancedStyleFields.map((field) => renderStyleField(field))}
-                    <label className="grid gap-1 sm:col-span-2">
-                      <span>Custom CSS</span>
-                      <textarea
-                        className="input min-h-[88px]"
-                        rows={3}
-                        value={editElement.customCss || ''}
-                        onChange={(event) =>
-                          setEditElement({
-                            ...editElement,
-                            customCss: event.target.value,
-                          })
-                        }
-                        placeholder="color: #0f172a; padding: 8px;"
+                  <div className="mt-2 flex flex-wrap items-center gap-2 rounded border border-border bg-muted p-2">
+                    <div className="flex items-center gap-2">
+                      <span className="text-[10px] font-semibold uppercase text-muted-foreground">
+                        Border
+                      </span>
+                      <input
+                        className="input h-8 w-40 px-2 text-xs"
+                        value={borderValue}
+                        onChange={(event) => applyCustomCssUpdates({ border: event.target.value })}
+                        placeholder="1px solid #000"
                       />
-                    </label>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <span className="text-[10px] font-semibold uppercase text-muted-foreground">
+                        Radius
+                      </span>
+                      <input
+                        className="input h-8 w-16 px-2 text-xs"
+                        type="number"
+                        value={borderRadiusValue}
+                        onChange={(event) =>
+                          updateNumericStyle('borderRadius', event.target.value, 'px')
+                        }
+                        placeholder="8"
+                      />
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <span className="text-[10px] font-semibold uppercase text-muted-foreground">
+                        Shadow
+                      </span>
+                      <SelectMenu
+                        value={shadowOptions.some((option) => option.value === boxShadowValue) ? boxShadowValue : ''}
+                        options={shadowOptions}
+                        placeholder="Custom"
+                        useInputStyle={false}
+                        buttonClassName="btn-ghost h-8 px-2 text-xs"
+                        onChange={(value) => applyCustomCssUpdates({ boxShadow: value })}
+                      />
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <span className="text-[10px] font-semibold uppercase text-muted-foreground">
+                        Padding
+                      </span>
+                      <input
+                        className="input h-8 w-28 px-2 text-xs"
+                        value={paddingValue}
+                        onChange={(event) => applyCustomCssUpdates({ padding: event.target.value })}
+                        placeholder="8px 16px"
+                      />
+                    </div>
                   </div>
                 </details>
+
+                <details className="group">
+                  <summary className="cursor-pointer list-none">
+                    <div className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+                      <span>Position</span>
+                      <span className="h-px flex-1 bg-border" />
+                      <ChevronDown className="h-4 w-4 text-muted-foreground transition group-open:rotate-180" />
+                    </div>
+                  </summary>
+                  <div className="mt-2 flex flex-wrap items-center gap-2 rounded border border-border bg-muted p-2">
+                    <div className="flex items-center gap-2">
+                      <span className="text-[10px] font-semibold uppercase text-muted-foreground">
+                        Mode
+                      </span>
+                      <SelectMenu
+                        value={positionValue}
+                        options={positionOptions}
+                        placeholder="Auto"
+                        useInputStyle={false}
+                        buttonClassName="btn-ghost h-8 px-2 text-xs"
+                        onChange={(value) => applyCustomCssUpdates({ position: value })}
+                      />
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <span className="text-[10px] font-semibold uppercase text-muted-foreground">W</span>
+                      <input
+                        className="input h-8 w-16 px-2 text-xs"
+                        type="number"
+                        value={widthValue}
+                        onChange={(event) => updateNumericStyle('width', event.target.value, 'px')}
+                        placeholder="120"
+                      />
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <span className="text-[10px] font-semibold uppercase text-muted-foreground">H</span>
+                      <input
+                        className="input h-8 w-16 px-2 text-xs"
+                        type="number"
+                        value={heightValue}
+                        onChange={(event) => updateNumericStyle('height', event.target.value, 'px')}
+                        placeholder="40"
+                      />
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <span className="text-[10px] font-semibold uppercase text-muted-foreground">X</span>
+                      <input
+                        className="input h-8 w-16 px-2 text-xs"
+                        type="number"
+                        value={leftValue}
+                        onChange={(event) => updateNumericStyle('left', event.target.value, 'px')}
+                        placeholder="12"
+                      />
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <span className="text-[10px] font-semibold uppercase text-muted-foreground">Y</span>
+                      <input
+                        className="input h-8 w-16 px-2 text-xs"
+                        type="number"
+                        value={topValue}
+                        onChange={(event) => updateNumericStyle('top', event.target.value, 'px')}
+                        placeholder="12"
+                      />
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <span className="text-[10px] font-semibold uppercase text-muted-foreground">Z</span>
+                      <input
+                        className="input h-8 w-16 px-2 text-xs"
+                        type="number"
+                        value={zIndexValue}
+                        onChange={(event) => updateNumericStyle('zIndex', event.target.value, '')}
+                        placeholder="999"
+                      />
+                    </div>
+                  </div>
+                </details>
+
+                <label className="grid gap-1">
+                  <span className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+                    Custom Styles
+                  </span>
+                  <textarea
+                    className="input min-h-[88px] font-mono text-[11px]"
+                    rows={3}
+                    value={editElement.customCss || ''}
+                    onChange={(event) =>
+                      setEditElement({
+                        ...editElement,
+                        customCss: event.target.value,
+                      })
+                    }
+                    placeholder="color: #0f172a; padding: 8px;"
+                  />
+                </label>
               </div>
             </div>
           </div>

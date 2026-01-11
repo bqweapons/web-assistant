@@ -75,7 +75,7 @@ export default function SelectMenu({
     buttonClassName,
   );
   const menuClasses = cx(
-    'absolute left-0 right-0 z-10 mt-2 rounded border border-border bg-card p-2 shadow-md',
+    'absolute left-0 right-auto z-10 mt-2 min-w-full w-max rounded border border-border bg-card p-2 shadow-md',
     menuClassName,
   );
 
