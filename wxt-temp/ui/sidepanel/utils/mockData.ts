@@ -20,6 +20,7 @@ type MockElement = {
   containerId?: string;
   scope?: 'page' | 'site' | 'global';
   stylePreset?: string;
+  customCss?: string;
   layout?: 'row' | 'column';
   href?: string;
   linkTarget?: 'new-tab' | 'same-tab';

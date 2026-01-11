@@ -128,7 +128,7 @@ export default function HiddenRulesSection() {
                 placeholder="Why this rule exists"
               />
             </label>
-            <label className="grid gap-1">
+            <div className="grid gap-1">
               <span>Scope</span>
               <SelectMenu
                 value={editRule.scope}
@@ -144,7 +144,7 @@ export default function HiddenRulesSection() {
                   })
                 }
               />
-            </label>
+            </div>
             <label className="inline-flex items-center gap-2 text-xs">
               <input
                 type="checkbox"

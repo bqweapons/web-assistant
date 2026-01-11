@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Check, Crosshair, ExternalLink, Link as LinkIcon, Search, Trash2, X } from 'lucide-react';
+import { Check, ChevronDown, Crosshair, ExternalLink, Link as LinkIcon, Search, Trash2, X } from 'lucide-react';
 import Card from '../components/Card';
 import Drawer from '../components/Drawer';
 import SelectMenu from '../components/SelectMenu';
@@ -130,21 +130,34 @@ export default function ElementsSection() {
     ],
     [flows],
   );
-  const styleFields = [
-    { key: 'backgroundColor', label: 'Background color', placeholder: '#ffffff' },
-    { key: 'color', label: 'Text color', placeholder: '#0f172a' },
+  const commonStyleFields = [
+    { key: 'backgroundColor', label: 'Background color', placeholder: '#ffffff', type: 'color' },
+    { key: 'color', label: 'Text color', placeholder: '#0f172a', type: 'color' },
+    { key: 'fontSize', label: 'Font size', placeholder: '12px', type: 'number', unit: 'px', defaultValue: 12 },
+  ];
+  const defaultColorSwatches = [
+    { label: 'Blue', value: '#2563eb' },
+    { label: 'Red', value: '#ef4444' },
+    { label: 'Green', value: '#10b981' },
+    { label: 'Orange', value: '#f59e0b' },
+    { label: 'Purple', value: '#8b5cf6' },
+    { label: 'Slate', value: '#64748b' },
+    { label: 'Black', value: '#000000' },
+    { label: 'White', value: '#ffffff' },
+    { label: 'Transparent', value: 'transparent' },
+  ];
+  const advancedStyleFields = [
     { key: 'border', label: 'Border', placeholder: '1px solid #000000' },
-    { key: 'borderRadius', label: 'Border radius', placeholder: '8px' },
+    { key: 'borderRadius', label: 'Border radius', placeholder: '8px', type: 'number', unit: 'px', defaultValue: 8 },
     { key: 'boxShadow', label: 'Box shadow', placeholder: '0 12px 32px rgba(15, 23, 42, 0.18)' },
-    { key: 'fontSize', label: 'Font size', placeholder: '12px' },
-    { key: 'fontWeight', label: 'Font weight', placeholder: '600' },
+    { key: 'fontWeight', label: 'Font weight', placeholder: '600', type: 'number', unit: '', defaultValue: 600 },
     { key: 'padding', label: 'Padding', placeholder: '8px 16px' },
     { key: 'position', label: 'CSS position', placeholder: 'absolute' },
-    { key: 'width', label: 'Width', placeholder: '120px' },
-    { key: 'height', label: 'Height', placeholder: '40px' },
-    { key: 'left', label: 'Left', placeholder: '12px' },
-    { key: 'top', label: 'Top', placeholder: '12px' },
-    { key: 'zIndex', label: 'Z-index', placeholder: '999' },
+    { key: 'width', label: 'Width', placeholder: '120px', type: 'number', unit: 'px', defaultValue: 120 },
+    { key: 'height', label: 'Height', placeholder: '40px', type: 'number', unit: 'px', defaultValue: 40 },
+    { key: 'left', label: 'Left', placeholder: '12px', type: 'number', unit: 'px', defaultValue: 12 },
+    { key: 'top', label: 'Top', placeholder: '12px', type: 'number', unit: 'px', defaultValue: 12 },
+    { key: 'zIndex', label: 'Z-index', placeholder: '999', type: 'number', unit: '', defaultValue: 999 },
   ];
 
   const formatTimestamp = (value?: number) => {
@@ -322,6 +335,277 @@ export default function ElementsSection() {
     });
   };
 
+  const parseCustomCss = (raw: string) => {
+    const rules: Record<string, string> = {};
+    raw
+      .split(';')
+      .map((segment) => segment.trim())
+      .filter(Boolean)
+      .forEach((segment) => {
+        const [property, ...rest] = segment.split(':');
+        if (!property || rest.length === 0) {
+          return;
+        }
+        const value = rest.join(':').trim();
+        if (!value) {
+          return;
+        }
+        const key = property
+          .trim()
+          .toLowerCase()
+          .replace(/-([a-z])/g, (_, char: string) => char.toUpperCase());
+        if (!key) {
+          return;
+        }
+        rules[key] = value;
+      });
+    return rules;
+  };
+
+  const customStyleOverrides = useMemo(
+    () => (editElement?.customCss ? parseCustomCss(editElement.customCss) : {}),
+    [editElement?.customCss],
+  );
+
+  const getStyleValue = (key: string) => {
+    if (customStyleOverrides[key] !== undefined) {
+      return customStyleOverrides[key];
+    }
+    return editElement?.style?.[key] || '';
+  };
+
+  const normalizeHex = (raw: string) => {
+    const value = raw.trim();
+    if (!value.startsWith('#')) {
+      return '';
+    }
+    const hex = value.slice(1);
+    if (hex.length === 3) {
+      return `#${hex
+        .split('')
+        .map((ch) => `${ch}${ch}`)
+        .join('')}`;
+    }
+    if (hex.length === 4) {
+      return `#${hex
+        .slice(0, 3)
+        .split('')
+        .map((ch) => `${ch}${ch}`)
+        .join('')}`;
+    }
+    if (hex.length === 6) {
+      return `#${hex}`;
+    }
+    if (hex.length === 8) {
+      return `#${hex.slice(0, 6)}`;
+    }
+    return '';
+  };
+
+  const colorToHex = (value: string) => {
+    const normalized = value.trim();
+    const hex = normalizeHex(normalized);
+    if (hex) {
+      return hex;
+    }
+    if (!normalized) {
+      return '';
+    }
+    if (typeof document === 'undefined') {
+      return '';
+    }
+    const test = document.createElement('div');
+    test.style.color = '';
+    test.style.color = normalized;
+    if (!test.style.color) {
+      return '';
+    }
+    document.body.appendChild(test);
+    const rgb = getComputedStyle(test).color;
+    test.remove();
+    const match = rgb.match(/rgba?\((\d+),\s*(\d+),\s*(\d+)(?:,\s*([.\d]+))?\)/);
+    if (!match) {
+      return '';
+    }
+    const [, r, g, b, a] = match;
+    if (a !== undefined && Number(a) === 0) {
+      return '';
+    }
+    const toHex = (num: string) => Number(num).toString(16).padStart(2, '0');
+    return `#${toHex(r)}${toHex(g)}${toHex(b)}`;
+  };
+
+  const resolveColorValue = (value: string, fallback: string) => {
+    const hex = colorToHex(value);
+    if (hex) {
+      return hex;
+    }
+    const fallbackHex = colorToHex(fallback);
+    if (fallbackHex) {
+      return fallbackHex;
+    }
+    return '#ffffff';
+  };
+
+  const adjustNumericValue = (value: string, delta: number, unit: string, fallback: number) => {
+    const match = value.trim().match(/-?\d+(\.\d+)?/);
+    const current = match ? Number(match[0]) : fallback;
+    const next = Number.isFinite(current) ? current + delta : fallback + delta;
+    return `${next}${unit}`;
+  };
+
+  const renderStyleField = (field: {
+    key: string;
+    label: string;
+    placeholder: string;
+    type?: 'color' | 'number';
+    unit?: string;
+    defaultValue?: number;
+  }) => {
+    const value = getStyleValue(field.key);
+    const isColor = field.type === 'color';
+    const isNumber = field.type === 'number';
+    const unit = field.unit ?? '';
+    const fallback = field.defaultValue ?? 0;
+
+    return (
+      <label key={field.key} className="grid gap-1">
+        <span>{field.label}</span>
+        <div className="flex items-center gap-2">
+          <input
+            className="input"
+            value={value}
+            onChange={(event) => {
+              if (!editElement) {
+                return;
+              }
+              const nextValue = event.target.value;
+              const nextStyle = { ...(editElement.style || {}) };
+              if (nextValue) {
+                nextStyle[field.key] = nextValue;
+              } else {
+                delete nextStyle[field.key];
+              }
+              setEditElement({
+                ...editElement,
+                style: nextStyle,
+                stylePreset: detectStylePreset(nextStyle),
+              });
+            }}
+            placeholder={field.placeholder}
+          />
+          {isColor ? (
+            <input
+              type="color"
+              className="h-9 w-10 cursor-pointer rounded border border-border p-0"
+              value={resolveColorValue(value, field.placeholder)}
+              onChange={(event) => {
+                if (!editElement) {
+                  return;
+                }
+                const nextValue = event.target.value;
+                const nextStyle = { ...(editElement.style || {}) };
+                if (nextValue) {
+                  nextStyle[field.key] = nextValue;
+                } else {
+                  delete nextStyle[field.key];
+                }
+                setEditElement({
+                  ...editElement,
+                  style: nextStyle,
+                  stylePreset: detectStylePreset(nextStyle),
+                });
+              }}
+            />
+          ) : null}
+          {isNumber ? (
+            <div className="flex items-center gap-1">
+              <button
+                type="button"
+                className="btn-ghost h-8 w-8 p-0"
+                aria-label={`Decrease ${field.label}`}
+                onClick={() => {
+                  if (!editElement) {
+                    return;
+                  }
+                  const nextValue = adjustNumericValue(value, -1, unit, fallback);
+                  const nextStyle = { ...(editElement.style || {}) };
+                  nextStyle[field.key] = nextValue;
+                  setEditElement({
+                    ...editElement,
+                    style: nextStyle,
+                    stylePreset: detectStylePreset(nextStyle),
+                  });
+                }}
+              >
+                -
+              </button>
+              <button
+                type="button"
+                className="btn-ghost h-8 w-8 p-0"
+                aria-label={`Increase ${field.label}`}
+                onClick={() => {
+                  if (!editElement) {
+                    return;
+                  }
+                  const nextValue = adjustNumericValue(value, 1, unit, fallback);
+                  const nextStyle = { ...(editElement.style || {}) };
+                  nextStyle[field.key] = nextValue;
+                  setEditElement({
+                    ...editElement,
+                    style: nextStyle,
+                    stylePreset: detectStylePreset(nextStyle),
+                  });
+                }}
+              >
+                +
+              </button>
+            </div>
+          ) : null}
+        </div>
+        {isColor ? (
+          <div className="flex flex-wrap gap-2 pt-1">
+            {defaultColorSwatches.map((swatch) => {
+              const isTransparent = swatch.value === 'transparent';
+              return (
+                <button
+                  key={swatch.value}
+                  type="button"
+                  className="h-6 w-6 cursor-pointer rounded-full border border-border"
+                  title={swatch.label}
+                  aria-label={swatch.label}
+                  onClick={() => {
+                    if (!editElement) {
+                      return;
+                    }
+                    const nextStyle = { ...(editElement.style || {}) };
+                    nextStyle[field.key] = swatch.value;
+                    setEditElement({
+                      ...editElement,
+                      style: nextStyle,
+                      stylePreset: detectStylePreset(nextStyle),
+                    });
+                  }}
+                  style={
+                    isTransparent
+                      ? {
+                          backgroundImage:
+                            'linear-gradient(45deg, #e2e8f0 25%, transparent 25%), linear-gradient(-45deg, #e2e8f0 25%, transparent 25%), linear-gradient(45deg, transparent 75%, #e2e8f0 75%), linear-gradient(-45deg, transparent 75%, #e2e8f0 75%)',
+                          backgroundPosition: '0 0, 0 3px, 3px -3px, -3px 0',
+                          backgroundSize: '6px 6px',
+                          backgroundColor: '#ffffff',
+                        }
+                      : { backgroundColor: swatch.value }
+                  }
+                />
+              );
+            })}
+          </div>
+        ) : null}
+      </label>
+    );
+  };
+
   useEffect(() => {
     if (!activeElement) {
       setEditElement(null);
@@ -340,6 +624,7 @@ export default function ElementsSection() {
       floating: activeElement.floating !== false,
       linkTarget: activeElement.linkTarget || 'new-tab',
       layout: activeElement.layout || 'row',
+      customCss: activeElement.customCss || '',
       style: resolvedStyle,
       stylePreset: activeElement.stylePreset || detectStylePreset(resolvedStyle),
     });
@@ -369,6 +654,7 @@ export default function ElementsSection() {
           <h2 className="text-base font-semibold text-card-foreground">Elements</h2>
           <p className="text-xs text-muted-foreground">Find saved elements across pages.</p>
         </div>
+        <span className="text-xs text-muted-foreground">{filteredCount}</span>
       </div>
 
       <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
@@ -410,11 +696,11 @@ export default function ElementsSection() {
       </div>
 
       {elements.length === 0 ? (
-        <Card className="border-dashed bg-muted text-center text-sm text-muted-foreground">
+        <Card className="bg-muted text-center text-sm text-muted-foreground">
           No elements yet. Create your first element to get started.
         </Card>
       ) : filteredElements.length === 0 ? (
-        <Card className="border-dashed bg-muted text-center text-sm text-muted-foreground">
+        <Card className="bg-muted text-center text-sm text-muted-foreground">
           No matches. Try a different search or filter.
         </Card>
       ) : (
@@ -532,142 +818,153 @@ export default function ElementsSection() {
       >
         {editElement ? (
           <div className="grid gap-3 text-xs text-muted-foreground">
-            <label className="grid gap-1">
-              <span>Name</span>
-              <input
-                className="input"
-                value={editElement.text}
-                onChange={(event) => setEditElement({ ...editElement, text: event.target.value })}
-                placeholder="Element text"
-              />
-            </label>
-            {/* <label className="inline-flex items-center gap-2 text-xs">
-              <input
-                type="checkbox"
-                className="h-4 w-4"
-                checked={editElement.floating}
-                onChange={(event) => setEditElement({ ...editElement, floating: event.target.checked })}
-              />
-              <span>Floating element</span>
-            </label> */}
-            {editElement.type.toLowerCase() === 'button' ? (
-              <>
-                <label className="grid gap-1">
-                  <span>Action flow</span>
-                  <SelectMenu
-                    value={editElement.actionFlowId || ''}
-                    options={actionFlowOptions}
-                    onChange={(value) => {
-                      if (value === '__create__') {
-                        setFlowDrawerOpen(true);
-                        return;
-                      }
-                      setEditElement({ ...editElement, actionFlowId: value });
-                    }}
-                  />
-                </label>
-              </>
-            ) : null}
-            {editElement.type.toLowerCase() === 'link' ? (
-              <>
-                <label className="grid gap-1">
-                  <span>Link URL</span>
+            <div className="rounded border border-border bg-card p-3">
+              <div className="text-xs font-semibold text-foreground">Basics</div>
+              <div className="mt-2 grid gap-2 sm:grid-cols-2">
+                <label className="grid gap-1 sm:col-span-2">
+                  <span>Name</span>
                   <input
                     className="input"
-                    value={editElement.href}
-                    onChange={(event) => setEditElement({ ...editElement, href: event.target.value })}
-                    placeholder="https://example.com"
+                    value={editElement.text}
+                    onChange={(event) => setEditElement({ ...editElement, text: event.target.value })}
+                    placeholder="Element text"
                   />
                 </label>
-                <label className="grid gap-1">
-                  <span>Link target</span>
-                  <SelectMenu
-                    value={editElement.linkTarget || 'new-tab'}
-                    options={[
-                      { value: 'new-tab', label: 'Open in new tab' },
-                      { value: 'same-tab', label: 'Open in same tab' },
-                    ]}
-                    onChange={(value) =>
-                      setEditElement({
-                        ...editElement,
-                        linkTarget: value === 'same-tab' ? 'same-tab' : 'new-tab',
-                      })
-                    }
-                  />
-                </label>
-              </>
-            ) : null}
-            {editElement.type.toLowerCase() === 'area' ? (
-              <>
-                <label className="grid gap-1">
-                  <span>Layout</span>
-                  <SelectMenu
-                    value={editElement.layout || 'row'}
-                    options={[
-                      { value: 'row', label: 'Row' },
-                      { value: 'column', label: 'Column' },
-                    ]}
-                    onChange={(value) =>
-                      setEditElement({
-                        ...editElement,
-                        layout: value === 'column' ? 'column' : 'row',
-                      })
-                    }
-                  />
-                </label>
-              </>
-            ) : null}
-            
-            <label className="grid gap-1">
-              <span>Scope</span>
-              <SelectMenu
-                value={editElement.scope || 'page'}
-                options={[
-                  { value: 'page', label: 'Page' },
-                  { value: 'site', label: 'Site' },
-                ]}
-                onChange={(value) =>
-                  setEditElement({ ...editElement, scope: value === 'site' ? 'site' : 'page' })
-                }
-              />
-            </label>
-            <div className="grid gap-2">
-              <span className="text-xs font-semibold text-foreground">Styles</span>
-              <label className="grid gap-1">
-                <span>Style preset</span>
-                <SelectMenu
-                  value={editElement.stylePreset || ''}
-                  options={stylePresets.map((preset) => ({
-                    value: preset.value,
-                    label: preset.label,
-                  }))}
-                  onChange={(value) => applyStylePreset(value)}
-                />
-              </label>
-              {styleFields.map((field) => (
-                <label key={field.key} className="grid gap-1">
-                  <span>{field.label}</span>
+                <label className="inline-flex items-center gap-2 text-xs sm:col-span-2">
                   <input
-                    className="input"
-                    value={editElement.style?.[field.key] || ''}
-                    onChange={(event) => {
-                      const nextValue = event.target.value;
-                      const nextStyle = { ...(editElement.style || {}) };
-                      if (nextValue) {
-                        nextStyle[field.key] = nextValue;
-                      } else {
-                        delete nextStyle[field.key];
-                      }
-                      setEditElement({
-                        ...editElement,
-                        style: nextStyle,
-                        stylePreset: detectStylePreset(nextStyle),
-                      });
-                    }}
-                    placeholder={field.placeholder}
+                    type="checkbox"
+                    className="h-4 w-4"
+                    checked={editElement.scope === 'site'}
+                    onChange={(event) =>
+                      setEditElement({ ...editElement, scope: event.target.checked ? 'site' : 'page' })
+                    }
                   />
+                  <span>Apply to entire site</span>
                 </label>
-              ))}
+              </div>
+            </div>
+            <div className="rounded border border-border bg-card p-3">
+              <div className="text-xs font-semibold text-foreground">Action</div>
+              <div className="mt-2 grid gap-2 sm:grid-cols-2">
+                {editElement.type.toLowerCase() === 'button' ? (
+                  <div className="grid gap-1 sm:col-span-2">
+                    <span>Action flow</span>
+                    <SelectMenu
+                      value={editElement.actionFlowId || ''}
+                      options={actionFlowOptions}
+                      onChange={(value) => {
+                        if (value === '__create__') {
+                          setFlowDrawerOpen(true);
+                          return;
+                        }
+                        setEditElement({ ...editElement, actionFlowId: value });
+                      }}
+                    />
+                  </div>
+                ) : null}
+                {editElement.type.toLowerCase() === 'link' ? (
+                  <>
+                    <label className="grid gap-1 sm:col-span-2">
+                      <span>Link URL</span>
+                      <input
+                        className="input"
+                        value={editElement.href}
+                        onChange={(event) => setEditElement({ ...editElement, href: event.target.value })}
+                        placeholder="https://example.com"
+                      />
+                    </label>
+                    <div className="grid gap-1 sm:col-span-2">
+                      <span>Link target</span>
+                      <SelectMenu
+                        value={editElement.linkTarget || 'new-tab'}
+                        options={[
+                          { value: 'new-tab', label: 'Open in new tab' },
+                          { value: 'same-tab', label: 'Open in same tab' },
+                        ]}
+                        onChange={(value) =>
+                          setEditElement({
+                            ...editElement,
+                            linkTarget: value === 'same-tab' ? 'same-tab' : 'new-tab',
+                          })
+                        }
+                      />
+                    </div>
+                  </>
+                ) : null}
+                {editElement.type.toLowerCase() === 'area' ? (
+                  <div className="grid gap-1 sm:col-span-2">
+                    <span>Layout</span>
+                    <SelectMenu
+                      value={editElement.layout || 'row'}
+                      options={[
+                        { value: 'row', label: 'Row' },
+                        { value: 'column', label: 'Column' },
+                      ]}
+                      onChange={(value) =>
+                        setEditElement({
+                          ...editElement,
+                          layout: value === 'column' ? 'column' : 'row',
+                        })
+                      }
+                    />
+                  </div>
+                ) : null}
+              </div>
+            </div>
+            <div className="rounded border border-border bg-card p-3">
+              <div className="text-xs font-semibold text-foreground">Styles</div>
+              <div className="mt-2 grid gap-2 sm:grid-cols-2">
+                <div className="grid gap-1 sm:col-span-2">
+                  <span>Style preset</span>
+                  <SelectMenu
+                    value={editElement.stylePreset || ''}
+                    options={stylePresets.map((preset) => ({
+                      value: preset.value,
+                      label: preset.label,
+                    }))}
+                    onChange={(value) => applyStylePreset(value)}
+                  />
+                </div>
+                <div className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground sm:col-span-2">
+                  <span>Common</span>
+                  <span className="h-px flex-1 bg-border" />
+                </div>
+                {commonStyleFields.map((field) => renderStyleField(field))}
+                <details className="group sm:col-span-2">
+                  <summary className="cursor-pointer list-none">
+                    <div className="flex flex-col gap-1">
+                      <div className="flex items-center justify-between gap-3">
+                        <div className="flex w-full items-center gap-2 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+                          <span>Advanced</span>
+                          <span className="h-px flex-1 bg-border" />
+                        </div>
+                        <ChevronDown className="h-4 w-4 text-muted-foreground transition group-open:rotate-180" />
+                      </div>
+                      <div className="text-[11px] text-muted-foreground">
+                        Position and size overrides for precise placement.
+                      </div>
+                    </div>
+                  </summary>
+                  <div className="mt-2 grid gap-2 sm:grid-cols-2">
+                    {advancedStyleFields.map((field) => renderStyleField(field))}
+                    <label className="grid gap-1 sm:col-span-2">
+                      <span>Custom CSS</span>
+                      <textarea
+                        className="input min-h-[88px]"
+                        rows={3}
+                        value={editElement.customCss || ''}
+                        onChange={(event) =>
+                          setEditElement({
+                            ...editElement,
+                            customCss: event.target.value,
+                          })
+                        }
+                        placeholder="color: #0f172a; padding: 8px;"
+                      />
+                    </label>
+                  </div>
+                </details>
+              </div>
             </div>
           </div>
         ) : null}

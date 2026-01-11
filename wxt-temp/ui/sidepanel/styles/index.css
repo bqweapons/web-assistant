@@ -31,6 +31,11 @@
     display: none;
   }
 
+  input[type="checkbox"] {
+    accent-color: var(--primary);
+    cursor: pointer;
+  }
+
 }
 
 @layer components {
@@ -98,9 +103,9 @@
   }
 
   .input {
-    @apply w-full border px-3 py-2 text-sm shadow-sm;
+    @apply w-full border px-3 py-2 text-sm;
     border-radius: var(--radius);
-    background-color: var(--input);
+      background-color: color-mix(in oklab, var(--input) 25%, transparent);
     border-color: var(--border);
     color: var(--foreground);
   }

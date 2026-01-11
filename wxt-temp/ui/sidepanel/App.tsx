@@ -90,6 +90,9 @@ export default function App() {
               value={addElementType}
               placeholder="Add element to page"
               iconPosition="right"
+              useInputStyle={false}
+              buttonClassName="btn-primary w-full"
+              centerLabel
               options={[
                 { value: 'area', label: 'Area', rightLabel: 'Select a region' },
                 { value: 'button', label: 'Button', rightLabel: 'Insert a clickable button' },
