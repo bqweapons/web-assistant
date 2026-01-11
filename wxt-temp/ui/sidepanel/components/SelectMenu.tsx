@@ -6,6 +6,7 @@ export type SelectOption = {
   label: string;
   rightLabel?: string;
   disabled?: boolean;
+  sticky?: boolean;
 };
 
 type SelectMenuProps = {
@@ -75,7 +76,7 @@ export default function SelectMenu({
     buttonClassName,
   );
   const menuClasses = cx(
-    'absolute left-0 right-auto z-10 mt-2 min-w-full w-max rounded border border-border bg-card p-2 shadow-md',
+    'absolute left-0 right-auto z-10 mt-2 max-h-[30vh] min-w-full w-max overflow-y-auto rounded border border-border bg-card p-2 shadow-md',
     menuClassName,
   );
 
@@ -105,6 +106,7 @@ export default function SelectMenu({
                   aria-selected={isSelected}
                   className={cx(
                     'flex items-center justify-between gap-2 rounded px-3 py-2 text-left text-sm transition',
+                    option.sticky && 'sticky top-[-10px] z-10 -mx-2 rounded-none border-b border-border bg-card px-5',
                     option.disabled
                       ? 'cursor-not-allowed opacity-60'
                       : 'cursor-pointer text-card-foreground hover:bg-muted focus-visible:bg-muted',

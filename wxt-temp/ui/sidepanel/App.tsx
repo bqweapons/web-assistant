@@ -1,6 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
 import AppHeader from './components/AppHeader';
-import TabBar from './components/TabBar';
 import ElementsSection from './sections/ElementsSection';
 import FlowsSection from './sections/FlowsSection';
 import HiddenRulesSection from './sections/HiddenRulesSection';
@@ -74,16 +73,17 @@ export default function App() {
   );
 
   return (
-    <div className="min-h-screen bg-background text-foreground">
+    <div className="flex h-screen flex-col bg-background text-foreground">
       <AppHeader
         title="Ladybird"
         context="No active page"
         actions={headerActions}
+        tabs={tabs}
+        activeTabId={activeTab}
+        onTabChange={setActiveTab}
       />
 
-      <main className="px-2 pb-6">
-        <TabBar tabs={tabs} activeId={activeTab} onChange={setActiveTab} />
-
+      <main className="flex-1 overflow-y-auto px-4 pb-6">
         {activeTab === TAB_IDS.elements && (
           <div className="mt-2">
             <SelectMenu

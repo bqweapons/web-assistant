@@ -1,8 +1,10 @@
 import type { AppHeaderProps } from '../types';
+import TabBar from './TabBar';
 
-export default function AppHeader({ title, context, actions }: AppHeaderProps) {
+export default function AppHeader({ title, context, actions, tabs, activeTabId, onTabChange }: AppHeaderProps) {
+  const showTabs = tabs && activeTabId && onTabChange;
   return (
-    <header className="sticky top-0 z-10 border-b border-border bg-background px-4 py-4 backdrop-blur">
+    <header className="sticky top-0 z-10 bg-background px-4 pt-4 backdrop-blur">
       <div className="flex flex-col gap-3">
         <div className="flex items-start justify-between gap-4">
           <div className="flex items-center gap-3">
@@ -40,6 +42,11 @@ export default function AppHeader({ title, context, actions }: AppHeaderProps) {
             ))}
           </div>
         </div>
+        {showTabs ? (
+          <div className="-mx-4 border-y border-border bg-card shadow-sm">
+            <TabBar tabs={tabs} activeId={activeTabId} onChange={onTabChange} />
+          </div>
+        ) : null}
       </div>
     </header>
   );

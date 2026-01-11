@@ -27,6 +27,7 @@ export default function ElementsSection() {
   const [elements, setElements] = useState(mockElements);
   const [flows, setFlows] = useState(mockFlows);
   const actionClass = 'btn-icon h-8 w-8';
+  const selectButtonClass = 'btn-ghost h-9 w-full justify-between px-2 text-xs';
   const [activeElementId, setActiveElementId] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [typeFilter, setTypeFilter] = useState('all');
@@ -68,7 +69,7 @@ export default function ElementsSection() {
   const totalCount = elements.length;
   const filteredCount = filteredElements.length;
   const showClear = Boolean(searchQuery) || typeFilter !== 'all';
-  const stylePresets = [
+  const stylePresets: Array<{ value: string; label: string; styles: Record<string, string> | null }> = [
     { value: '', label: 'Custom', styles: null },
     {
       value: 'button-default',
@@ -137,13 +138,13 @@ export default function ElementsSection() {
   }, [elements]);
   const actionFlowOptions = useMemo(
     () => [
+      { value: '__create__', label: 'Create new flow…', sticky: true },
       { value: '', label: 'Unassigned' },
       ...flows.map((flow) => ({
         value: flow.id,
         label: flow.name,
         rightLabel: `${flow.steps} steps`,
       })),
-      { value: '__create__', label: 'Create new flow…' },
     ],
     [flows],
   );
@@ -850,7 +851,7 @@ export default function ElementsSection() {
                       value={editElement.actionFlowId || ''}
                       options={actionFlowOptions}
                       useInputStyle={false}
-                      buttonClassName="btn-ghost h-8 w-full justify-between px-2 text-xs"
+                      buttonClassName={selectButtonClass}
                       onChange={(value) => {
                         if (value === '__create__') {
                           setFlowDrawerOpen(true);
@@ -880,6 +881,8 @@ export default function ElementsSection() {
                           { value: 'new-tab', label: 'Open in new tab' },
                           { value: 'same-tab', label: 'Open in same tab' },
                         ]}
+                        useInputStyle={false}
+                        buttonClassName={selectButtonClass}
                         onChange={(value) =>
                           setEditElement({
                             ...editElement,
@@ -899,6 +902,8 @@ export default function ElementsSection() {
                         { value: 'row', label: 'Row' },
                         { value: 'column', label: 'Column' },
                       ]}
+                      useInputStyle={false}
+                      buttonClassName={selectButtonClass}
                       onChange={(value) =>
                         setEditElement({
                           ...editElement,
@@ -924,7 +929,7 @@ export default function ElementsSection() {
                       label: preset.label,
                     }))}
                     useInputStyle={false}
-                    buttonClassName="btn-ghost h-8 w-full justify-between px-2 text-xs"
+                    buttonClassName={selectButtonClass}
                     onChange={(value) => applyStylePreset(value)}
                   />
                 </div>
@@ -1009,7 +1014,7 @@ export default function ElementsSection() {
                 </div>
 
                 <div className="grid gap-3 rounded border border-border bg-muted p-2">
-                  <div className="grid gap-2 sm:grid-cols-2">
+                  <div className="grid gap-2">
                     <div className="grid gap-1">
                       <span className="text-[10px] font-semibold uppercase text-muted-foreground">
                         Text

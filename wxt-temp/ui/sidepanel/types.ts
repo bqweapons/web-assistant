@@ -11,6 +11,9 @@ export type AppHeaderProps = {
   title: string;
   context: string;
   actions: HeaderAction[];
+  tabs?: TabDefinition[];
+  activeTabId?: string;
+  onTabChange?: (id: string) => void;
 };
 
 export type TabDefinition = {

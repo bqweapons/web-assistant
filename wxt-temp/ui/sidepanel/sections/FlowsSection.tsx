@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Play, Trash2 } from 'lucide-react';
+import { Check, Play, Trash2, X } from 'lucide-react';
 import Card from '../components/Card';
 import Drawer from '../components/Drawer';
 import { mockFlows } from '../utils/mockData';
@@ -88,6 +88,29 @@ export default function FlowsSection() {
         open={Boolean(activeFlow)}
         title={activeFlow?.name ?? 'Flow details'}
         description="Edit the flow settings below."
+        actions={
+          <>
+            <button
+              type="button"
+              className="btn-icon h-8 w-8"
+              onClick={() => setActiveFlowId(null)}
+              aria-label="Cancel"
+              title="Cancel"
+            >
+              <X className="h-4 w-4" />
+            </button>
+            <button
+              type="button"
+              className="btn-icon h-8 w-8 border-transparent bg-primary text-primary-foreground hover:brightness-95"
+              onClick={handleFlowSave}
+              aria-label="Save"
+              title="Save"
+            >
+              <Check className="h-4 w-4" />
+            </button>
+          </>
+        }
+        showClose={false}
         onClose={() => setActiveFlowId(null)}
       >
         {editFlow ? (
@@ -105,7 +128,7 @@ export default function FlowsSection() {
               <span>Description</span>
               <textarea
                 className="input"
-                rows={3}
+                rows={2}
                 value={editFlow.description}
                 onChange={(event) => setEditFlow({ ...editFlow, description: event.target.value })}
                 placeholder="Describe what the flow does"
@@ -124,20 +147,8 @@ export default function FlowsSection() {
                     steps: Number(event.target.value) || 0,
                   })
                 }
-              />
+                />
             </label>
-            <div className="grid gap-1">
-              <span>Last updated</span>
-              <p className="text-sm text-foreground">{editFlow.updatedAt}</p>
-            </div>
-            <div className="flex items-center justify-end gap-2 pt-2">
-              <button type="button" className="btn-ghost" onClick={() => setActiveFlowId(null)}>
-                Cancel
-              </button>
-              <button type="button" className="btn-primary" onClick={handleFlowSave}>
-                Save changes
-              </button>
-            </div>
           </div>
         ) : null}
       </Drawer>

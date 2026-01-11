@@ -17,10 +17,12 @@
     color: var(--foreground);
     font-family: var(--font-sans);
     letter-spacing: var(--tracking-normal);
+    height: 100vh;
+    overflow: hidden;
   }
 
   #root {
-    min-height: 100vh;
+    height: 100vh;
   }
 
   details > summary {

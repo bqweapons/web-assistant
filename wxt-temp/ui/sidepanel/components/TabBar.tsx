@@ -2,7 +2,7 @@ import type { TabBarProps } from '../types';
 
 export default function TabBar({ tabs, activeId, onChange }: TabBarProps) {
   return (
-    <nav className="-mx-2 flex border-b border-border bg-card shadow-sm">
+    <nav className="flex">
       {tabs.map((tab) => {
         const isActive = tab.id === activeId;
         return (
