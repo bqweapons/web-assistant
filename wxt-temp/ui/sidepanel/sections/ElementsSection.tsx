@@ -19,6 +19,8 @@ import {
 } from 'lucide-react';
 import Card from '../components/Card';
 import Drawer from '../components/Drawer';
+import FlowDrawer from '../components/FlowDrawer';
+import FlowStepsBuilderPreview from '../components/FlowStepsBuilderPreview';
 import SelectMenu from '../components/SelectMenu';
 import { mockElements, mockFlows } from '../utils/mockData';
 
@@ -136,17 +138,29 @@ export default function ElementsSection() {
       return acc;
     }, {});
   }, [elements]);
+  const normalizeSiteKey = (value: string) =>
+    value.replace(/^https?:\/\//, '').replace(/^file:\/\//, '').replace(/\/$/, '');
+  const flowSiteKey = useMemo(
+    () => normalizeSiteKey(editElement?.siteUrl || activeElement?.siteUrl || ''),
+    [editElement?.siteUrl, activeElement?.siteUrl],
+  );
+  const filteredFlows = useMemo(() => {
+    if (!flowSiteKey) {
+      return flows;
+    }
+    return flows.filter((flow) => normalizeSiteKey(flow.site) === flowSiteKey);
+  }, [flows, flowSiteKey]);
   const actionFlowOptions = useMemo(
     () => [
       { value: '__create__', label: 'Create new flow…', sticky: true },
       { value: '', label: 'Unassigned' },
-      ...flows.map((flow) => ({
+      ...filteredFlows.map((flow) => ({
         value: flow.id,
         label: flow.name,
         rightLabel: `${flow.steps} steps`,
       })),
     ],
-    [flows],
+    [filteredFlows],
   );
   const positionOptions = [
     { value: '', label: 'Auto' },
@@ -221,6 +235,32 @@ export default function ElementsSection() {
     setEditElement((prev) => (prev ? { ...prev, actionFlowId: nextFlow.id } : prev));
     setFlowDrawerOpen(false);
   };
+
+  const getFlowStepCount = (value: number | unknown[]) => {
+    if (Array.isArray(value)) {
+      return value.length;
+    }
+    const parsed = Number(value);
+    return Number.isFinite(parsed) ? parsed : 0;
+  };
+
+  const renderFlowSummary = (steps: number, onSave: () => void) => (
+    <>
+      <p className="text-xs font-semibold text-muted-foreground">Summary</p>
+      <p className="text-sm text-foreground">{steps} steps</p>
+      <div className="flex flex-wrap items-center gap-2">
+        <button type="button" className="btn-primary text-xs" onClick={onSave}>
+          Save
+        </button>
+        <button type="button" className="btn-primary text-xs" disabled>
+          Save &amp; Run
+        </button>
+        <button type="button" className="btn-primary text-xs" disabled>
+          Run
+        </button>
+      </div>
+    </>
+  );
 
   const getElementLabel = (element: typeof elements[number]) => {
     const text = element.text?.trim();
@@ -1209,59 +1249,39 @@ export default function ElementsSection() {
         ) : null}
       </Drawer>
 
-      <Drawer
+      <FlowDrawer
         open={flowDrawerOpen}
         title="New flow"
-        description="Create a new action flow."
-        actions={
-          <>
-            <button
-              type="button"
-              className="btn-icon h-8 w-8"
-              onClick={() => setFlowDrawerOpen(false)}
-              aria-label="Cancel"
-              title="Cancel"
-            >
-              <X className="h-4 w-4" />
-            </button>
-            <button
-              type="button"
-              className="btn-icon h-8 w-8 border-transparent bg-primary text-primary-foreground hover:brightness-95"
-              onClick={handleCreateFlow}
-              aria-label="Save"
-              title="Save"
-            >
-              <Check className="h-4 w-4" />
-            </button>
-          </>
-        }
-        showClose={false}
+        subtitle="Create a new action flow."
         onClose={() => setFlowDrawerOpen(false)}
+        summary={renderFlowSummary(getFlowStepCount(draftFlow.steps), handleCreateFlow)}
+        overlayClassName="z-[70]"
+        panelClassName="z-[80]"
       >
-        <div className="grid gap-3 text-xs text-muted-foreground">
-          <label className="grid gap-1">
-            <span>Name</span>
+        <div className="space-y-4 text-xs text-muted-foreground">
+          <label className="block text-xs font-semibold text-muted-foreground">
+            Name
             <input
-              className="input"
+              className="input mt-1"
               value={draftFlow.name}
               onChange={(event) => setDraftFlow({ ...draftFlow, name: event.target.value })}
               placeholder="Flow name"
             />
           </label>
-          <label className="grid gap-1">
-            <span>Description</span>
+          <label className="block text-xs font-semibold text-muted-foreground">
+            Description
             <textarea
-              className="input"
+              className="input mt-1"
               rows={2}
               value={draftFlow.description}
               onChange={(event) => setDraftFlow({ ...draftFlow, description: event.target.value })}
               placeholder="What does this flow do?"
             />
           </label>
-          <label className="grid gap-1">
-            <span>Steps</span>
+          <label className="block text-xs font-semibold text-muted-foreground">
+            Steps
             <input
-              className="input"
+              className="input mt-1"
               type="number"
               min="0"
               value={draftFlow.steps}
@@ -1270,8 +1290,9 @@ export default function ElementsSection() {
               }
             />
           </label>
+          <FlowStepsBuilderPreview />
         </div>
-      </Drawer>
+      </FlowDrawer>
     </div>
   );
 }

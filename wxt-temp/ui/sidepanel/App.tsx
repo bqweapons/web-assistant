@@ -50,6 +50,7 @@ export default function App() {
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [isDark, setIsDark] = useState(false);
   const [addElementType, setAddElementType] = useState('');
+  const [createFlowOpen, setCreateFlowOpen] = useState(false);
 
   useEffect(() => {
     document.documentElement.classList.toggle('dark', isDark);
@@ -113,7 +114,11 @@ export default function App() {
 
         {activeTab === TAB_IDS.flows && (
           <div className="mt-2">
-            <button type="button" className="btn-primary w-full">
+            <button
+              type="button"
+              className="btn-primary w-full"
+              onClick={() => setCreateFlowOpen(true)}
+            >
               Create flow
             </button>
           </div>
@@ -121,7 +126,12 @@ export default function App() {
 
         <div className="mt-2">
           {activeTab === TAB_IDS.elements && <ElementsSection />}
-          {activeTab === TAB_IDS.flows && <FlowsSection />}
+          {activeTab === TAB_IDS.flows && (
+            <FlowsSection
+              createFlowOpen={createFlowOpen}
+              onCreateFlowClose={() => setCreateFlowOpen(false)}
+            />
+          )}
           {activeTab === TAB_IDS.hiddenRules && <HiddenRulesSection />}
           {activeTab === TAB_IDS.overview && <OverviewSection />}
         </div>

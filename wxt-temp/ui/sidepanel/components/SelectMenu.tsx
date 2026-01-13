@@ -36,7 +36,9 @@ export default function SelectMenu({
   centerLabel = false,
 }: SelectMenuProps) {
   const [open, setOpen] = useState(false);
+  const [openUpward, setOpenUpward] = useState(false);
   const containerRef = useRef<HTMLDivElement | null>(null);
+  const menuRef = useRef<HTMLDivElement | null>(null);
 
   const selected = options.find((option) => option.value === value);
   const label = selected?.label || placeholder;
@@ -46,6 +48,7 @@ export default function SelectMenu({
 
   useEffect(() => {
     if (!open) {
+      setOpenUpward(false);
       return;
     }
     const handlePointer = (event: MouseEvent | TouchEvent) => {
@@ -68,6 +71,59 @@ export default function SelectMenu({
     };
   }, [open]);
 
+  useEffect(() => {
+    if (!open) {
+      return;
+    }
+    const findScrollParent = (node: HTMLElement | null) => {
+      let current = node?.parentElement || null;
+      while (current && current !== document.body) {
+        const style = window.getComputedStyle(current);
+        if (
+          /(auto|scroll)/.test(style.overflowY) ||
+          /(auto|scroll)/.test(style.overflow)
+        ) {
+          return current;
+        }
+        current = current.parentElement;
+      }
+      return null;
+    };
+    const container = containerRef.current;
+    const scrollParent = findScrollParent(container);
+    let frameId = 0;
+    const updateMenuPosition = () => {
+      if (!container) {
+        return;
+      }
+      const rect = container.getBoundingClientRect();
+      const boundaryRect = scrollParent?.getBoundingClientRect() ?? {
+        top: 0,
+        bottom: window.innerHeight,
+      };
+      const spaceBelow = boundaryRect.bottom - rect.bottom;
+      const spaceAbove = rect.top - boundaryRect.top;
+      const menuHeight =
+        menuRef.current?.getBoundingClientRect().height ??
+        Math.min((boundaryRect.bottom - boundaryRect.top) * 0.6, 320);
+      const shouldOpenUpward = spaceBelow < menuHeight && spaceAbove > spaceBelow;
+      setOpenUpward(shouldOpenUpward);
+    };
+    const scheduleUpdate = () => {
+      window.cancelAnimationFrame(frameId);
+      frameId = window.requestAnimationFrame(updateMenuPosition);
+    };
+    scheduleUpdate();
+    const scrollTarget: Window | HTMLElement = scrollParent ?? window;
+    scrollTarget.addEventListener('scroll', scheduleUpdate, { passive: true });
+    window.addEventListener('resize', scheduleUpdate);
+    return () => {
+      window.cancelAnimationFrame(frameId);
+      scrollTarget.removeEventListener('scroll', scheduleUpdate);
+      window.removeEventListener('resize', scheduleUpdate);
+    };
+  }, [open]);
+
   const iconClassName = cx('h-4 w-4 transition', open && 'rotate-180');
   const triggerClassName = cx(
     useInputStyle && 'input',
@@ -76,7 +132,8 @@ export default function SelectMenu({
     buttonClassName,
   );
   const menuClasses = cx(
-    'absolute left-0 right-auto z-10 mt-2 max-h-[30vh] min-w-full w-max overflow-y-auto rounded border border-border bg-card p-2 shadow-md',
+    'absolute left-0 right-auto z-10 max-h-[30vh] min-w-full w-max overflow-y-auto rounded border border-border bg-card p-2 shadow-md',
+    openUpward ? 'bottom-full mb-2' : 'mt-2',
     menuClassName,
   );
 
@@ -94,7 +151,7 @@ export default function SelectMenu({
         {iconPosition === 'right' ? <ChevronDown className={iconClassName} /> : null}
       </button>
       {open ? (
-        <div className={menuClasses} role="listbox">
+        <div ref={menuRef} className={menuClasses} role="listbox">
           <div className="flex flex-col gap-1">
             {options.map((option) => {
               const isSelected = option.value === value;
