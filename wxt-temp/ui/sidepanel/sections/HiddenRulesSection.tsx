@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { EyeOff, Trash2 } from 'lucide-react';
 import Card from '../components/Card';
 import Drawer from '../components/Drawer';
+import SelectorInput from '../components/SelectorInput';
 import SelectMenu from '../components/SelectMenu';
 import { mockHiddenRules } from '../utils/mockData';
 
@@ -111,10 +112,9 @@ export default function HiddenRulesSection() {
             </label>
             <label className="grid gap-1">
               <span>Selector</span>
-              <input
-                className="input"
+              <SelectorInput
                 value={editRule.selector}
-                onChange={(event) => setEditRule({ ...editRule, selector: event.target.value })}
+                onChange={(value) => setEditRule({ ...editRule, selector: value })}
                 placeholder="CSS selector"
               />
             </label>

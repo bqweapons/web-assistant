@@ -169,7 +169,9 @@ export default function SelectMenu({
                       : 'cursor-pointer text-card-foreground hover:bg-muted focus-visible:bg-muted',
                     isSelected && !option.disabled && 'bg-muted',
                   )}
-                  onClick={() => {
+                  onClick={(event) => {
+                    event.preventDefault();
+                    event.stopPropagation();
                     if (option.disabled) {
                       return;
                     }

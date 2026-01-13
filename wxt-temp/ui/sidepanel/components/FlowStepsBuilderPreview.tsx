@@ -1,6 +1,8 @@
-import { useState } from 'react';
-import { GripVertical, Plus, Trash2 } from 'lucide-react';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
+import { ChevronRight, GripVertical, Trash2 } from 'lucide-react';
 import SelectMenu from './SelectMenu';
+import SelectorInput from './SelectorInput';
+import StepPicker from './StepPicker';
 
 type StepFieldOption = {
   value: string;
@@ -11,18 +13,20 @@ type StepField = {
   id: string;
   label: string;
   placeholder?: string;
-  type?: 'text' | 'number' | 'textarea' | 'select';
+  type?: 'text' | 'number' | 'textarea' | 'select' | 'checkbox';
   value: string;
   withPicker?: boolean;
   options?: StepFieldOption[];
-  showWhen?: { fieldId: string; value: string };
+  showWhen?: { fieldId: string; value?: string; values?: string[] };
 };
 
 type DataSourceMeta = {
   fileName?: string;
+  fileType?: 'csv' | 'tsv';
   columns?: string[];
   rowCount?: number;
   error?: string;
+  rawText?: string;
 };
 
 type StepData = {
@@ -36,6 +40,65 @@ type StepData = {
   dataSource?: DataSourceMeta;
 };
 
+type AddStepPlaceholderProps = {
+  label: string;
+  ariaLabel: string;
+  onPick: (type: string) => void;
+  onDropReorder?: () => void;
+  canDrop?: boolean;
+};
+
+function AddStepPlaceholder({ label, ariaLabel, onPick, onDropReorder, canDrop }: AddStepPlaceholderProps) {
+  const triggerRef = useRef<HTMLButtonElement | null>(null);
+
+  const handleActivate = () => {
+    triggerRef.current?.click();
+  };
+
+  return (
+    <div
+      role="button"
+      tabIndex={0}
+      className="cursor-pointer rounded-lg border border-dashed border-border/60 bg-secondary px-3 py-2 shadow-sm transition hover:border-border/80 hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
+      aria-label={ariaLabel}
+      onClick={(event) => {
+        const target = event.target as HTMLElement;
+        if (target.closest?.('[data-step-picker]') || target.closest?.('[data-step-picker-menu]')) {
+          return;
+        }
+        handleActivate();
+      }}
+      onDragOver={(event) => {
+        if (!onDropReorder) {
+          return;
+        }
+        if (canDrop) {
+          event.preventDefault();
+          event.dataTransfer.dropEffect = 'move';
+        }
+      }}
+      onDrop={(event) => {
+        if (!onDropReorder || !canDrop) {
+          return;
+        }
+        event.preventDefault();
+        onDropReorder();
+      }}
+      onKeyDown={(event) => {
+        if (event.key === 'Enter' || event.key === ' ') {
+          event.preventDefault();
+          handleActivate();
+        }
+      }}
+    >
+      <div className="flex items-center justify-center gap-2 text-[11px] font-semibold text-muted-foreground">
+        <StepPicker ariaLabel={ariaLabel} onPick={onPick} buttonRef={triggerRef} />
+        <span>{label}</span>
+      </div>
+    </div>
+  );
+}
+
 const WAIT_MODES: StepFieldOption[] = [
   { value: 'time', label: 'Time delay' },
   { value: 'condition', label: 'Element condition' },
@@ -48,17 +111,6 @@ const CONDITION_OPERATORS: StepFieldOption[] = [
   { value: 'less', label: 'Less than' },
 ];
 
-const DATA_SOURCE_TYPES: StepFieldOption[] = [
-  { value: 'csv', label: 'CSV' },
-  { value: 'tsv', label: 'TSV' },
-  { value: 'json', label: 'JSON' },
-];
-
-const HEADER_ROW_OPTIONS: StepFieldOption[] = [
-  { value: 'header', label: 'Header row' },
-  { value: 'none', label: 'No header' },
-];
-
 const DEFAULT_STEPS: StepData[] = [
   {
     id: 'step-ds-1',
@@ -66,21 +118,19 @@ const DEFAULT_STEPS: StepData[] = [
     title: 'Load data source',
     summary: 'Awaiting file selection',
     fields: [
-      { id: 'sourceType', label: 'Source type', type: 'select', value: 'csv', options: DATA_SOURCE_TYPES },
-      { id: 'headerRow', label: 'Header row (CSV/TSV)', type: 'select', value: 'header', options: HEADER_ROW_OPTIONS },
       {
-        id: 'jsonPath',
-        label: 'JSON path',
-        placeholder: 'data.items',
-        type: 'text',
-        value: '',
-        showWhen: { fieldId: 'sourceType', value: 'json' },
+        id: 'headerRow',
+        label: 'Header row',
+        type: 'checkbox',
+        value: 'true',
       },
     ],
     dataSource: {
       fileName: '',
+      fileType: 'csv',
       columns: [],
       rowCount: 0,
+      rawText: '',
     },
     children: [
       {
@@ -215,6 +265,14 @@ const DEFAULT_STEPS: StepData[] = [
             summary: 'Wait until .status contains "Ready"',
             fields: [
               { id: 'mode', label: 'Wait for', type: 'select', value: 'condition', options: WAIT_MODES },
+              {
+                id: 'duration',
+                label: 'Duration (ms)',
+                placeholder: '1200',
+                type: 'number',
+                value: '1200',
+                showWhen: { fieldId: 'mode', value: 'time' },
+              },
               {
                 id: 'selector',
                 label: 'Selector',
@@ -438,21 +496,32 @@ const DEFAULT_STEPS: StepData[] = [
   },
 ];
 
-const STEP_TYPES = [
-  { value: 'click', label: 'Click' },
-  { value: 'input', label: 'Input' },
-  { value: 'loop', label: 'Loop' },
-  { value: 'data-source', label: 'Data Source' },
-  { value: 'if-else', label: 'If / Else' },
-  { value: 'wait', label: 'Wait' },
-  { value: 'navigate', label: 'Navigate' },
-  { value: 'assert', label: 'Assert' },
-];
+const STEP_TYPE_LABELS: Record<string, string> = {
+  click: 'Click',
+  input: 'Input',
+  loop: 'Loop',
+  'data-source': 'Data Source',
+  'if-else': 'If / Else',
+  wait: 'Wait',
+  navigate: 'Navigate',
+  assert: 'Assert',
+};
 
 export default function FlowStepsBuilderPreview({ steps = DEFAULT_STEPS }: { steps?: StepData[] }) {
   const [draftSteps, setDraftSteps] = useState<StepData[]>(steps);
-  const [activeStepId, setActiveStepId] = useState(steps[0]?.id || '');
+  const [activeStepId, setActiveStepId] = useState('');
   const [activeFieldTarget, setActiveFieldTarget] = useState<{ stepId: string; fieldId: string } | null>(null);
+  const [collapsedDataSource, setCollapsedDataSource] = useState<Record<string, boolean>>({});
+  const [dragState, setDragState] = useState<
+    | null
+    | {
+        stepId: string;
+        context:
+          | { scope: 'root' }
+          | { scope: 'children'; parentId: string }
+          | { scope: 'branch'; parentId: string; branchId: string };
+      }
+  >(null);
 
   const findStepById = (items: StepData[], stepId: string): StepData | undefined => {
     for (const step of items) {
@@ -477,12 +546,98 @@ export default function FlowStepsBuilderPreview({ steps = DEFAULT_STEPS }: { ste
     return undefined;
   };
 
+  useEffect(() => {
+    setDraftSteps(steps);
+    setActiveStepId((prev) => {
+      if (prev && findStepById(steps, prev)) {
+        return prev;
+      }
+      return '';
+    });
+  }, [steps]);
+
+  const isSameContext = (
+    left:
+      | { scope: 'root' }
+      | { scope: 'children'; parentId: string }
+      | { scope: 'branch'; parentId: string; branchId: string },
+    right:
+      | { scope: 'root' }
+      | { scope: 'children'; parentId: string }
+      | { scope: 'branch'; parentId: string; branchId: string },
+  ) => {
+    if (left.scope !== right.scope) {
+      return false;
+    }
+    if (left.scope === 'root' && right.scope === 'root') {
+      return true;
+    }
+    if (left.scope === 'children' && right.scope === 'children') {
+      return left.parentId === right.parentId;
+    }
+    if (left.scope === 'branch' && right.scope === 'branch') {
+      return left.parentId === right.parentId && left.branchId === right.branchId;
+    }
+    return false;
+  };
+
+  const reorderList = (items: StepData[], fromId: string, toId?: string) => {
+    const fromIndex = items.findIndex((item) => item.id === fromId);
+    if (fromIndex === -1) {
+      return items;
+    }
+    const next = [...items];
+    const [moved] = next.splice(fromIndex, 1);
+    if (!toId) {
+      next.push(moved);
+      return next;
+    }
+    const targetIndex = next.findIndex((item) => item.id === toId);
+    if (targetIndex === -1) {
+      next.push(moved);
+      return next;
+    }
+    next.splice(targetIndex, 0, moved);
+    return next;
+  };
+
+  const reorderWithinContext = (
+    items: StepData[],
+    context:
+      | { scope: 'root' }
+      | { scope: 'children'; parentId: string }
+      | { scope: 'branch'; parentId: string; branchId: string },
+    fromId: string,
+    toId?: string,
+  ) => {
+    if (context.scope === 'root') {
+      return reorderList(items, fromId, toId);
+    }
+    return updateSteps(items, context.parentId, (step) => {
+      if (context.scope === 'children') {
+        const nextChildren = reorderList(step.children ?? [], fromId, toId);
+        return { ...step, children: nextChildren };
+      }
+      if (context.scope === 'branch') {
+        const nextBranches =
+          step.branches?.map((branch) => {
+            if (branch.id !== context.branchId) {
+              return branch;
+            }
+            return { ...branch, steps: reorderList(branch.steps, fromId, toId) };
+          }) ?? [];
+        return { ...step, branches: nextBranches };
+      }
+      return step;
+    });
+  };
+
   const updateSteps = (items: StepData[], stepId: string, updater: (step: StepData) => StepData) =>
     items.map((step) => {
-      let nextStep = step;
       if (step.id === stepId) {
-        nextStep = updater(step);
+        return updater(step);
       }
+      let nextStep = step;
       if (step.children?.length) {
         const nextChildren = updateSteps(step.children, stepId, updater);
         if (nextChildren !== step.children) {
@@ -513,24 +668,378 @@ export default function FlowStepsBuilderPreview({ steps = DEFAULT_STEPS }: { ste
     if (!field.showWhen) {
       return true;
     }
-    return getFieldValue(step, field.showWhen.fieldId) === field.showWhen.value;
+    const currentValue = getFieldValue(step, field.showWhen.fieldId);
+    if (field.showWhen.values) {
+      return field.showWhen.values.includes(currentValue);
+    }
+    if (field.showWhen.value !== undefined) {
+      return currentValue === field.showWhen.value;
+    }
+    return true;
+  };
+
+  const getOperatorLabel = (value: string) =>
+    CONDITION_OPERATORS.find((option) => option.value === value)?.label || value;
+
+  const buildStepSummary = (step: StepData) => {
+    const selector = getFieldValue(step, 'selector');
+    const value = getFieldValue(step, 'value');
+    const operator = getFieldValue(step, 'operator');
+    const expected = getFieldValue(step, 'expected');
+    const mode = getFieldValue(step, 'mode');
+    const duration = getFieldValue(step, 'duration');
+    const url = getFieldValue(step, 'url');
+    const iterations = getFieldValue(step, 'iterations');
+    const operatorLabel = operator ? getOperatorLabel(operator) : '';
+
+    switch (step.type) {
+      case 'click':
+        return `Selector: ${selector || 'Not set'}`;
+      case 'input':
+        if (value) {
+          return `Value: ${value}`;
+        }
+        return selector ? `Selector: ${selector}` : 'Input';
+      case 'loop':
+        return iterations ? `Repeat ${iterations} times` : 'Repeat steps';
+      case 'data-source': {
+        if (step.dataSource?.error) {
+          return 'Failed to parse file';
+        }
+        if (step.dataSource?.columns?.length) {
+          return `${step.dataSource.columns.length} columns | ${step.dataSource.rowCount ?? 0} rows`;
+        }
+        return step.dataSource?.fileName ? 'No columns detected' : 'Awaiting file selection';
+      }
+      case 'if-else':
+        if (selector || expected || operatorLabel) {
+          return `If ${selector || 'selector'} ${operatorLabel || 'is'} "${expected || ''}"`.trim();
+        }
+        return 'Conditional check';
+      case 'wait':
+        if (mode === 'condition') {
+          return `Wait until ${selector || 'selector'} ${operatorLabel || 'is'} "${expected || ''}"`.trim();
+        }
+        return `Duration: ${duration || '0'} ms`;
+      case 'navigate':
+        return `URL: ${url || 'Not set'}`;
+      case 'assert':
+        return `Expect ${selector || 'selector'} ${operatorLabel || 'is'} "${expected || ''}"`.trim();
+      default:
+        return step.summary || step.title;
+    }
   };
 
   const updateField = (stepId: string, fieldId: string, value: string) => {
     setDraftSteps((prev) =>
       updateSteps(prev, stepId, (step) => {
-        const nextFields = step.fields.map((field) =>
+        let nextFields = step.fields.map((field) =>
           field.id === fieldId ? { ...field, value } : field,
         );
-        return { ...step, fields: nextFields };
+        if (step.type === 'wait' && fieldId === 'mode' && value === 'time') {
+          const durationIndex = nextFields.findIndex((field) => field.id === 'duration');
+          if (durationIndex === -1) {
+            nextFields = [
+              ...nextFields,
+              {
+                id: 'duration',
+                label: 'Duration (ms)',
+                placeholder: '1200',
+                type: 'number',
+                value: '1200',
+                showWhen: { fieldId: 'mode', value: 'time' },
+              },
+            ];
+          } else if (!nextFields[durationIndex].value) {
+            nextFields = nextFields.map((field, index) =>
+              index === durationIndex ? { ...field, value: '1200' } : field,
+            );
+          }
+        }
+        const nextStep = { ...step, fields: nextFields };
+        if (step.type === 'data-source' && fieldId === 'headerRow' && step.dataSource?.rawText) {
+          const sourceType = step.dataSource?.fileType || 'csv';
+          const headerRow = nextFields.find((field) => field.id === 'headerRow')?.value;
+          const hasHeader = headerRow ? headerRow === 'true' : true;
+          try {
+            const delimiter = sourceType === 'tsv' ? '\t' : ',';
+            const meta = extractDelimitedMeta(step.dataSource.rawText, delimiter, hasHeader);
+            return {
+              ...nextStep,
+              summary:
+                meta.columns.length > 0
+                  ? `${meta.columns.length} columns | ${meta.rowCount} rows`
+                  : 'No columns detected',
+              dataSource: {
+                ...step.dataSource,
+                columns: meta.columns,
+                rowCount: meta.rowCount,
+                error: '',
+              },
+            };
+          } catch {
+            return {
+              ...nextStep,
+              summary: 'Failed to parse file',
+              dataSource: {
+                ...step.dataSource,
+                columns: [],
+                rowCount: 0,
+                error: 'Failed to parse file.',
+              },
+            };
+          }
+        }
+        return {
+          ...nextStep,
+          summary: buildStepSummary(nextStep),
+        };
       }),
     );
   };
 
-  const updateStepType = (stepId: string, type: string) => {
-    setDraftSteps((prev) =>
-      updateSteps(prev, stepId, (step) => ({ ...step, type })),
+  const createStepId = (prefix: string) =>
+    `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
+
+  const createStepTemplate = (type: string): StepData => {
+    switch (type) {
+      case 'click':
+        return {
+          id: createStepId('click'),
+          type: 'click',
+          title: 'Click element',
+          summary: 'Selector: .btn-primary',
+          fields: [
+            {
+              id: 'selector',
+              label: 'Selector',
+              placeholder: '.btn-primary',
+              type: 'text',
+              value: '',
+              withPicker: true,
+            },
+          ],
+        };
+      case 'input':
+        return {
+          id: createStepId('input'),
+          type: 'input',
+          title: 'Fill input',
+          summary: 'Value: Example text',
+          fields: [
+            {
+              id: 'selector',
+              label: 'Selector',
+              placeholder: 'input[name="title"]',
+              type: 'text',
+              value: '',
+              withPicker: true,
+            },
+            { id: 'value', label: 'Value', placeholder: 'Example text', type: 'text', value: '' },
+          ],
+        };
+      case 'loop':
+        return {
+          id: createStepId('loop'),
+          type: 'loop',
+          title: 'Repeat steps',
+          summary: 'Repeat 3 times',
+          fields: [{ id: 'iterations', label: 'Iterations', placeholder: '3', type: 'number', value: '3' }],
+          children: [],
+        };
+      case 'data-source':
+        return {
+          id: createStepId('data-source'),
+          type: 'data-source',
+          title: 'Load data source',
+          summary: 'Awaiting file selection',
+          fields: [
+            {
+              id: 'headerRow',
+              label: 'Header row',
+              type: 'checkbox',
+              value: 'true',
+            },
+          ],
+          dataSource: {
+            fileName: '',
+            fileType: 'csv',
+            columns: [],
+            rowCount: 0,
+            rawText: '',
+          },
+          children: [],
+        };
+      case 'if-else':
+        return {
+          id: createStepId('if-else'),
+          type: 'if-else',
+          title: 'Conditional check',
+          summary: 'If .status contains "Ready"',
+          fields: [
+            { id: 'selector', label: 'Selector', placeholder: '.status', type: 'text', value: '.status' },
+            { id: 'operator', label: 'Operator', type: 'select', value: 'contains', options: CONDITION_OPERATORS },
+            { id: 'expected', label: 'Value', placeholder: 'Ready', type: 'text', value: 'Ready' },
+          ],
+          branches: [
+            { id: 'branch-then', label: 'Then', steps: [] },
+            { id: 'branch-else', label: 'Else', steps: [] },
+          ],
+        };
+      case 'wait':
+        return {
+          id: createStepId('wait'),
+          type: 'wait',
+          title: 'Wait',
+          summary: 'Duration: 1200 ms',
+          fields: [
+            { id: 'mode', label: 'Wait for', type: 'select', value: 'time', options: WAIT_MODES },
+            {
+              id: 'duration',
+              label: 'Duration (ms)',
+              placeholder: '1200',
+              type: 'number',
+              value: '1200',
+              showWhen: { fieldId: 'mode', value: 'time' },
+            },
+            {
+              id: 'selector',
+              label: 'Selector',
+              placeholder: '.status',
+              type: 'text',
+              value: '.status',
+              withPicker: true,
+              showWhen: { fieldId: 'mode', value: 'condition' },
+            },
+            {
+              id: 'operator',
+              label: 'Operator',
+              type: 'select',
+              value: 'contains',
+              options: CONDITION_OPERATORS,
+              showWhen: { fieldId: 'mode', value: 'condition' },
+            },
+            {
+              id: 'expected',
+              label: 'Value',
+              placeholder: 'Ready',
+              type: 'text',
+              value: 'Ready',
+              showWhen: { fieldId: 'mode', value: 'condition' },
+            },
+          ],
+        };
+      case 'navigate':
+        return {
+          id: createStepId('navigate'),
+          type: 'navigate',
+          title: 'Navigate',
+          summary: 'URL: https://example.com',
+          fields: [
+            { id: 'url', label: 'URL', placeholder: 'https://example.com', type: 'text', value: '' },
+          ],
+        };
+      case 'assert':
+        return {
+          id: createStepId('assert'),
+          type: 'assert',
+          title: 'Assert text',
+          summary: 'Expect .status equals "Ready"',
+          fields: [
+            { id: 'selector', label: 'Selector', placeholder: '.status', type: 'text', value: '.status' },
+            { id: 'operator', label: 'Operator', type: 'select', value: 'equals', options: CONDITION_OPERATORS },
+            { id: 'expected', label: 'Value', placeholder: 'Ready', type: 'text', value: 'Ready' },
+          ],
+        };
+      default:
+        return {
+          id: createStepId('step'),
+          type,
+          title: 'New step',
+          summary: 'Configure step details',
+          fields: [],
+        };
+    }
+  };
+
+  const createInputStepWithValue = (value: string) => {
+    const step = createStepTemplate('input');
+    const nextFields = step.fields.map((field) =>
+      field.id === 'value' ? { ...field, value } : field,
     );
+    const nextStep = { ...step, fields: nextFields };
+    return { ...nextStep, summary: buildStepSummary(nextStep) };
+  };
+
+  const addStep = (
+    type: string,
+    target:
+      | { scope: 'root' }
+      | { scope: 'children'; stepId: string }
+      | { scope: 'branch'; stepId: string; branchId: string },
+  ) => {
+    const newStep = createStepTemplate(type);
+    if (target.scope === 'root') {
+      setDraftSteps((prev) => [...prev, newStep]);
+      setActiveStepId(newStep.id);
+      return;
+    }
+    setDraftSteps((prev) =>
+      updateSteps(prev, target.stepId, (step) => {
+        if (target.scope === 'children') {
+          const nextChildren = [...(step.children ?? []), newStep];
+          return { ...step, children: nextChildren };
+        }
+        if (target.scope === 'branch') {
+          const nextBranches =
+            step.branches?.map((branch) => {
+              if (branch.id !== target.branchId) {
+                return branch;
+              }
+              return { ...branch, steps: [...branch.steps, newStep] };
+            }) ?? [];
+          return { ...step, branches: nextBranches };
+        }
+        return step;
+      }),
+    );
+    setActiveStepId(newStep.id);
+  };
+
+  const removeStepById = (items: StepData[], stepId: string) => {
+    const next: StepData[] = [];
+    for (const step of items) {
+      if (step.id === stepId) {
+        continue;
+      }
+      let nextStep = step;
+      if (step.children?.length) {
+        const nextChildren = removeStepById(step.children, stepId);
+        nextStep = { ...nextStep, children: nextChildren };
+      }
+      if (step.branches?.length) {
+        const nextBranches = step.branches.map((branch) => ({
+          ...branch,
+          steps: removeStepById(branch.steps, stepId),
+        }));
+        nextStep = { ...nextStep, branches: nextBranches };
+      }
+      next.push(nextStep);
+    }
+    return next;
+  };
+
+  const handleDeleteStep = (stepId: string) => {
+    setDraftSteps((prev) => {
+      const next = removeStepById(prev, stepId);
+      setActiveStepId((current) => {
+        if (current && findStepById(next, current)) {
+          return current;
+        }
+        return '';
+      });
+      return next;
+    });
   };
 
   const normalizeColumnToken = (column: string) => {
@@ -546,109 +1055,110 @@ export default function FlowStepsBuilderPreview({ steps = DEFAULT_STEPS }: { ste
     return `{{row["${escaped}"]}}`;
   };
 
-  const insertColumnToken = (column: string) => {
-    if (!activeFieldTarget) {
-      return;
-    }
+  const insertColumnToken = (column: string, fallbackStepId?: string) => {
     const token = normalizeColumnToken(column);
     if (!token) {
       return;
     }
-    setDraftSteps((prev) =>
-      updateSteps(prev, activeFieldTarget.stepId, (step) => {
+    if (fallbackStepId) {
+      const newStep = createInputStepWithValue(token);
+      setDraftSteps((prev) => {
+        if (!findStepById(prev, fallbackStepId)) {
+          return prev;
+        }
+        return updateSteps(prev, fallbackStepId, (step) => {
+          const nextChildren = [...(step.children ?? []), newStep];
+          return { ...step, children: nextChildren };
+        });
+      });
+      setActiveStepId(newStep.id);
+      setActiveFieldTarget({ stepId: newStep.id, fieldId: 'value' });
+      return;
+    }
+    setDraftSteps((prev) => {
+      const target = activeFieldTarget;
+      if (!target) {
+        return prev;
+      }
+      setActiveFieldTarget(target);
+      setActiveStepId(target.stepId);
+      return updateSteps(prev, target.stepId, (step) => {
         const nextFields = step.fields.map((field) => {
-          if (field.id !== activeFieldTarget.fieldId) {
+          if (field.id !== target.fieldId) {
             return field;
           }
           const nextValue = field.value ? `${field.value} ${token}` : token;
           return { ...field, value: nextValue };
         });
-        return { ...step, fields: nextFields };
-      }),
-    );
+        const nextStep = { ...step, fields: nextFields };
+        return { ...nextStep, summary: buildStepSummary(nextStep) };
+      });
+    });
   };
 
-  const splitDelimitedLine = (line: string, delimiter: string) => {
-    const result: string[] = [];
+  const parseDelimitedRows = (text: string, delimiter: string) => {
+    const rows: string[][] = [];
+    let row: string[] = [];
     let current = '';
     let inQuotes = false;
-    for (let i = 0; i < line.length; i += 1) {
-      const char = line[i];
+
+    for (let i = 0; i < text.length; i += 1) {
+      const char = text[i];
       if (char === '"') {
-        if (inQuotes && line[i + 1] === '"') {
+        if (inQuotes && text[i + 1] === '"') {
           current += '"';
           i += 1;
         } else {
           inQuotes = !inQuotes;
         }
-      } else if (char === delimiter && !inQuotes) {
-        result.push(current);
-        current = '';
-      } else {
-        current += char;
+        continue;
       }
+      if (char === '\r' || char === '\n') {
+        if (inQuotes) {
+          current += char;
+          continue;
+        }
+        if (char === '\r' && text[i + 1] === '\n') {
+          i += 1;
+        }
+        row.push(current);
+        current = '';
+        rows.push(row);
+        row = [];
+        continue;
+      }
+      if (char === delimiter && !inQuotes) {
+        row.push(current);
+        current = '';
+        continue;
+      }
+      current += char;
     }
-    result.push(current);
-    return result;
+
+    row.push(current);
+    rows.push(row);
+    return rows.filter((nextRow) => nextRow.some((cell) => cell.trim() !== ''));
   };
 
   const extractDelimitedMeta = (text: string, delimiter: string, hasHeader: boolean) => {
-    const lines = text.split(/\r?\n/).filter((line) => line.trim() !== '');
-    if (lines.length === 0) {
+    const rows = parseDelimitedRows(text, delimiter);
+    if (rows.length === 0) {
       return { columns: [] as string[], rowCount: 0 };
     }
-    const headerLine = lines[0];
-    const headerParts = splitDelimitedLine(headerLine, delimiter);
+    const headerParts = rows[0];
     const columns = hasHeader
       ? headerParts.map((value) => value.trim()).filter(Boolean)
-      : headerParts.map((_, index) => `Column ${index + 1}`);
-    const rowCount = Math.max(0, lines.length - (hasHeader ? 1 : 0));
+      : headerParts.map((_, index) => `column${index + 1}`);
+    const rowCount = Math.max(0, rows.length - (hasHeader ? 1 : 0));
     return { columns, rowCount };
-  };
-
-  const getJsonAtPath = (data: unknown, path: string) => {
-    if (!path.trim()) {
-      return data;
-    }
-    return path
-      .split('.')
-      .filter(Boolean)
-      .reduce<unknown>((current, segment) => {
-        if (current === null || current === undefined) {
-          return undefined;
-        }
-        if (Array.isArray(current)) {
-          const index = Number(segment);
-          if (!Number.isNaN(index)) {
-            return current[index];
-          }
-          return current;
-        }
-        if (typeof current === 'object') {
-          return (current as Record<string, unknown>)[segment];
-        }
-        return undefined;
-      }, data);
-  };
-
-  const extractJsonMeta = (text: string, jsonPath: string) => {
-    const parsed = JSON.parse(text);
-    const scoped = getJsonAtPath(parsed, jsonPath);
-    if (Array.isArray(scoped)) {
-      const firstObject = scoped.find((item) => item && typeof item === 'object');
-      const columns = firstObject && typeof firstObject === 'object' ? Object.keys(firstObject as object) : [];
-      return { columns, rowCount: scoped.length };
-    }
-    if (scoped && typeof scoped === 'object') {
-      return { columns: Object.keys(scoped as object), rowCount: 1 };
-    }
-    return { columns: [], rowCount: 0 };
   };
 
   const handleDataSourceFileChange = (stepId: string, file: File | null) => {
     if (!file) {
       return;
     }
+    const name = file.name.toLowerCase();
+    const inferredType = name.endsWith('.tsv') ? 'tsv' : name.endsWith('.csv') ? 'csv' : '';
     const reader = new FileReader();
     reader.onload = () => {
       const text = typeof reader.result === 'string' ? reader.result : '';
@@ -657,23 +1167,17 @@ export default function FlowStepsBuilderPreview({ steps = DEFAULT_STEPS }: { ste
         if (!step) {
           return prev;
         }
-        const sourceType = getFieldValue(step, 'sourceType') || 'csv';
-        const headerRow = getFieldValue(step, 'headerRow') || 'header';
-        const jsonPath = getFieldValue(step, 'jsonPath');
+        const sourceType = inferredType || step.dataSource?.fileType || 'csv';
+        const headerRow = getFieldValue(step, 'headerRow');
+        const hasHeader = headerRow ? headerRow === 'true' : true;
         let columns: string[] = [];
         let rowCount = 0;
         let error = '';
         try {
-          if (sourceType === 'json') {
-            const meta = extractJsonMeta(text, jsonPath);
-            columns = meta.columns;
-            rowCount = meta.rowCount;
-          } else {
-            const delimiter = sourceType === 'tsv' ? '\t' : ',';
-            const meta = extractDelimitedMeta(text, delimiter, headerRow !== 'none');
-            columns = meta.columns;
-            rowCount = meta.rowCount;
-          }
+          const delimiter = sourceType === 'tsv' ? '\t' : ',';
+          const meta = extractDelimitedMeta(text, delimiter, hasHeader);
+          columns = meta.columns;
+          rowCount = meta.rowCount;
         } catch {
           error = 'Failed to parse file.';
         }
@@ -682,13 +1186,15 @@ export default function FlowStepsBuilderPreview({ steps = DEFAULT_STEPS }: { ste
           summary: error
             ? 'Failed to parse file'
             : columns.length > 0
-              ? `${columns.length} columns • ${rowCount} rows`
+              ? `${columns.length} columns | ${rowCount} rows`
               : 'No columns detected',
           dataSource: {
             fileName: file.name,
+            fileType: sourceType as 'csv' | 'tsv',
             columns,
             rowCount,
             error,
+            rawText: text,
           },
         }));
       });
@@ -696,66 +1202,193 @@ export default function FlowStepsBuilderPreview({ steps = DEFAULT_STEPS }: { ste
     reader.readAsText(file);
   };
 
-  const renderStepList = (items: StepData[], depth = 0) => (
+  const renderStepList = (
+    items: StepData[],
+    depth = 0,
+    options?: {
+      context?:
+        | { scope: 'root' }
+        | { scope: 'children'; parentId: string }
+        | { scope: 'branch'; parentId: string; branchId: string };
+      addPlaceholder?: { label: string; ariaLabel: string; onPick: (type: string) => void };
+    },
+  ) => (
     <div className={depth > 0 ? 'grid gap-2 border-l border-border/70 pl-3' : 'grid gap-2'}>
       {items.map((step, index) => {
+        const listContext = options?.context;
         const isActive = step.id === activeStepId;
         const isLoop = step.type === 'loop';
         const isIfElse = step.type === 'if-else';
         const isDataSource = step.type === 'data-source';
+        const dataSourceCollapsed = isDataSource ? collapsedDataSource[step.id] ?? true : false;
+        const dataSourceCount = isDataSource ? step.children?.length ?? 0 : 0;
         const dataSourceMeta = step.dataSource;
+        const typeLabel = STEP_TYPE_LABELS[step.type] ?? step.type;
+        const isDragging = dragState?.stepId === step.id;
+        const canDropHere =
+          Boolean(dragState) && Boolean(listContext) && isSameContext(dragState.context, listContext);
+        const handleDrop = () => {
+          if (!dragState || !listContext || !canDropHere || dragState.stepId === step.id) {
+            return;
+          }
+          setDraftSteps((prev) => reorderWithinContext(prev, listContext, dragState.stepId, step.id));
+          setDragState(null);
+        };
         return (
-          <div key={step.id} className="rounded-lg border border-border bg-card">
+          <div
+            key={step.id}
+            className={`rounded-lg border border-border bg-card shadow-sm transition ${
+              isDragging ? 'opacity-60' : ''
+            }`}
+            onDragOver={(event) => {
+              if (!canDropHere || dragState?.stepId === step.id) {
+                return;
+              }
+              event.preventDefault();
+              event.dataTransfer.dropEffect = 'move';
+            }}
+            onDrop={(event) => {
+              if (!canDropHere || dragState?.stepId === step.id) {
+                return;
+              }
+              event.preventDefault();
+              handleDrop();
+            }}
+          >
             <button
               type="button"
               className={`group flex w-full cursor-pointer items-center gap-2 rounded-lg px-3 py-2 text-left text-xs transition ${
                 isActive ? 'bg-primary/10 text-foreground' : 'text-muted-foreground'
               }`}
               onClick={() => setActiveStepId(isActive ? '' : step.id)}
+              draggable={Boolean(listContext)}
+              onDragStart={(event) => {
+                if (!listContext) {
+                  return;
+                }
+                event.dataTransfer.effectAllowed = 'move';
+                event.dataTransfer.setData('text/plain', step.id);
+                setDragState({ stepId: step.id, context: listContext });
+              }}
+              onDragEnd={() => setDragState(null)}
             >
               <GripVertical className="h-3.5 w-3.5 text-muted-foreground" />
               <div className="min-w-0 flex-1">
-                <div className="flex items-center gap-2">
+                      <div className="flex items-center gap-2">
                   <span className="inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-full border border-border bg-muted text-[10px] font-semibold text-foreground">
                     {index + 1}
                   </span>
                   <p className="text-xs font-semibold text-foreground">{step.title}</p>
-                  {isLoop ? (
-                    <span className="badge-pill text-[9px] uppercase tracking-wide">Loop</span>
-                  ) : null}
-                  {isIfElse ? (
-                    <span className="badge-pill text-[9px] uppercase tracking-wide">If / Else</span>
-                  ) : null}
-                  {isDataSource ? (
-                    <span className="badge-pill text-[9px] uppercase tracking-wide">Data Source</span>
-                  ) : null}
+                  <span className="badge-pill text-[9px] uppercase tracking-wide">{typeLabel}</span>
                 </div>
                 <p className="mt-1 truncate text-[11px] text-muted-foreground">{step.summary}</p>
               </div>
-              <span className="btn-icon btn-icon-danger ml-auto h-8 w-8 opacity-0 transition-opacity group-hover:opacity-100">
+              <button
+                type="button"
+                className="btn-icon btn-icon-danger ml-auto h-8 w-8 opacity-0 transition-opacity group-hover:opacity-100"
+                aria-label="Delete step"
+                onClick={(event) => {
+                  event.stopPropagation();
+                  handleDeleteStep(step.id);
+                }}
+              >
                 <Trash2 className="h-3.5 w-3.5" />
-              </span>
+              </button>
             </button>
             {isActive ? (
               <div className="px-3 pb-3">
-                <div className="mt-3 grid gap-3 text-xs text-muted-foreground">
-                  <label className="grid gap-1">
-                    <span className="text-xs font-semibold text-muted-foreground">Type</span>
-                    <SelectMenu
-                      value={step.type}
-                      options={STEP_TYPES}
-                      useInputStyle={false}
-                      buttonClassName="btn-ghost h-9 w-full justify-between px-2 text-xs"
-                      onChange={(value) => updateStepType(step.id, value)}
-                    />
-                  </label>
-                  {step.fields
-                    .filter((field) => shouldShowField(step, field))
-                    .map((field) => (
-                      <label key={field.id} className="grid gap-1">
-                        <span className="text-xs font-semibold text-muted-foreground">{field.label}</span>
-                        <div className="flex items-center gap-2">
-                          {field.type === 'select' ? (
+                <div className="mt-3 grid gap-2 text-xs text-muted-foreground">
+                  {(() => {
+                    const visibleFields = step.fields
+                      .filter((field) => shouldShowField(step, field))
+                      .filter((field) => !(isDataSource && field.id === 'headerRow'));
+                    if (step.type !== 'wait') {
+                      return visibleFields.map((field) => (
+                        <label key={field.id} className="grid gap-1">
+                          <span className="text-xs font-semibold text-muted-foreground">{field.label}</span>
+                          <div className="flex items-center gap-2">
+                            {(() => {
+                              const showPicker = field.withPicker || field.id === 'selector';
+                              if (field.type === 'select') {
+                                return (
+                                  <SelectMenu
+                                    value={field.value}
+                                    options={field.options ?? []}
+                                    useInputStyle={false}
+                                    buttonClassName="btn-ghost h-9 w-full justify-between px-2 text-xs"
+                                    onChange={(value) => updateField(step.id, field.id, value)}
+                                  />
+                                );
+                              }
+                              if (field.type === 'checkbox') {
+                                return (
+                                  <label className="flex items-center gap-2 text-xs text-foreground">
+                                    <input
+                                      type="checkbox"
+                                      className="h-4 w-4"
+                                      checked={field.value === 'true'}
+                                      onChange={(event) =>
+                                        updateField(step.id, field.id, event.target.checked ? 'true' : 'false')
+                                      }
+                                    />
+                                  </label>
+                                );
+                              }
+                              if (field.type === 'textarea') {
+                                return (
+                                  <textarea
+                                    className="input h-20"
+                                    value={field.value}
+                                    onChange={(event) => updateField(step.id, field.id, event.target.value)}
+                                    placeholder={field.placeholder}
+                                    onFocus={() => setActiveFieldTarget({ stepId: step.id, fieldId: field.id })}
+                                  />
+                                );
+                              }
+                            if (showPicker) {
+                              return (
+                                <SelectorInput
+                                  value={field.value}
+                                  placeholder={field.placeholder}
+                                  type={field.type === 'number' ? 'number' : 'text'}
+                                  onChange={(value) => updateField(step.id, field.id, value)}
+                                  onFocus={() => setActiveFieldTarget({ stepId: step.id, fieldId: field.id })}
+                                  onPick={() => setActiveFieldTarget({ stepId: step.id, fieldId: field.id })}
+                                />
+                              );
+                            }
+                              return (
+                                <input
+                                  className="input"
+                                  type={field.type === 'number' ? 'number' : 'text'}
+                                  value={field.value}
+                                  onChange={(event) => updateField(step.id, field.id, event.target.value)}
+                                  placeholder={field.placeholder}
+                                  onFocus={() => setActiveFieldTarget({ stepId: step.id, fieldId: field.id })}
+                                />
+                              );
+                            })()}
+                          </div>
+                        </label>
+                      ));
+                    }
+                    const rendered: ReactNode[] = [];
+                    const expectedField = visibleFields.find((field) => field.id === 'expected');
+                    const durationField = visibleFields.find((field) => field.id === 'duration');
+                    visibleFields.forEach((field) => {
+                      if (field.id === 'expected') {
+                        return;
+                      }
+                      if (field.id === 'duration') {
+                        return;
+                      }
+                      if (field.id === 'mode' && durationField) {
+                        rendered.push(
+                          <div
+                            key="mode-duration"
+                            className="grid grid-cols-[auto,minmax(0,1fr),auto,minmax(0,1fr)] items-center gap-2"
+                          >
+                            <span className="text-xs font-semibold text-muted-foreground">{field.label}</span>
                             <SelectMenu
                               value={field.value}
                               options={field.options ?? []}
@@ -763,34 +1396,119 @@ export default function FlowStepsBuilderPreview({ steps = DEFAULT_STEPS }: { ste
                               buttonClassName="btn-ghost h-9 w-full justify-between px-2 text-xs"
                               onChange={(value) => updateField(step.id, field.id, value)}
                             />
-                          ) : field.type === 'textarea' ? (
-                            <textarea
-                              className="input h-20"
-                              value={field.value}
-                              onChange={(event) => updateField(step.id, field.id, event.target.value)}
-                              placeholder={field.placeholder}
-                              onFocus={() => setActiveFieldTarget({ stepId: step.id, fieldId: field.id })}
-                            />
-                          ) : (
+                            <span className="text-xs font-semibold text-muted-foreground">
+                              {durationField.label}
+                            </span>
                             <input
-                              className="input"
-                              type={field.type === 'number' ? 'number' : 'text'}
-                              value={field.value}
-                              onChange={(event) => updateField(step.id, field.id, event.target.value)}
-                              placeholder={field.placeholder}
-                              onFocus={() => setActiveFieldTarget({ stepId: step.id, fieldId: field.id })}
+                              className="input w-full"
+                              type="number"
+                              value={durationField.value}
+                              onChange={(event) => updateField(step.id, durationField.id, event.target.value)}
+                              placeholder={durationField.placeholder}
+                              onFocus={() => setActiveFieldTarget({ stepId: step.id, fieldId: durationField.id })}
                             />
-                          )}
-                          {field.withPicker ? (
-                            <button type="button" className="btn-ghost h-9 px-3 text-xs">
-                              Pick
-                            </button>
-                          ) : null}
-                        </div>
-                      </label>
-                    ))}
+                          </div>,
+                        );
+                        return;
+                      }
+                      if (field.id === 'operator' && expectedField) {
+                        rendered.push(
+                          <div key="operator-expected" className="grid gap-1">
+                            <span className="text-xs font-semibold text-muted-foreground">Condition</span>
+                            <div className="grid grid-cols-2 gap-2">
+                              <SelectMenu
+                                value={field.value}
+                                options={field.options ?? []}
+                                useInputStyle={false}
+                                buttonClassName="btn-ghost h-9 w-full justify-between px-2 text-xs"
+                                onChange={(value) => updateField(step.id, field.id, value)}
+                              />
+                              <input
+                                className="input"
+                                type="text"
+                                value={expectedField.value}
+                                onChange={(event) => updateField(step.id, expectedField.id, event.target.value)}
+                                placeholder={expectedField.placeholder}
+                                onFocus={() => setActiveFieldTarget({ stepId: step.id, fieldId: expectedField.id })}
+                              />
+                            </div>
+                          </div>,
+                        );
+                        return;
+                      }
+                      rendered.push(
+                        <label key={field.id} className="grid gap-1">
+                          <span className="text-xs font-semibold text-muted-foreground">{field.label}</span>
+                          <div className="flex items-center gap-2">
+                            {(() => {
+                              const showPicker = field.withPicker || field.id === 'selector';
+                              if (field.type === 'select') {
+                                return (
+                                  <SelectMenu
+                                    value={field.value}
+                                    options={field.options ?? []}
+                                    useInputStyle={false}
+                                    buttonClassName="btn-ghost h-9 w-full justify-between px-2 text-xs"
+                                    onChange={(value) => updateField(step.id, field.id, value)}
+                                  />
+                                );
+                              }
+                              if (field.type === 'checkbox') {
+                                return (
+                                  <label className="flex items-center gap-2 text-xs text-foreground">
+                                    <input
+                                      type="checkbox"
+                                      className="h-4 w-4"
+                                      checked={field.value === 'true'}
+                                      onChange={(event) =>
+                                        updateField(step.id, field.id, event.target.checked ? 'true' : 'false')
+                                      }
+                                    />
+                                  </label>
+                                );
+                              }
+                              if (field.type === 'textarea') {
+                                return (
+                                  <textarea
+                                    className="input h-20"
+                                    value={field.value}
+                                    onChange={(event) => updateField(step.id, field.id, event.target.value)}
+                                    placeholder={field.placeholder}
+                                    onFocus={() => setActiveFieldTarget({ stepId: step.id, fieldId: field.id })}
+                                  />
+                                );
+                              }
+                              if (showPicker) {
+                                return (
+                                  <SelectorInput
+                                    value={field.value}
+                                    placeholder={field.placeholder}
+                                    type={field.type === 'number' ? 'number' : 'text'}
+                                    onChange={(value) => updateField(step.id, field.id, value)}
+                                    onFocus={() => setActiveFieldTarget({ stepId: step.id, fieldId: field.id })}
+                                    onPick={() => setActiveFieldTarget({ stepId: step.id, fieldId: field.id })}
+                                  />
+                                );
+                              }
+                              return (
+                                <input
+                                  className="input"
+                                  type={field.type === 'number' ? 'number' : 'text'}
+                                  value={field.value}
+                                  onChange={(event) => updateField(step.id, field.id, event.target.value)}
+                                  placeholder={field.placeholder}
+                                  onFocus={() => setActiveFieldTarget({ stepId: step.id, fieldId: field.id })}
+                                />
+                              );
+                            })()}
+                          </div>
+                        </label>,
+                      );
+                    });
+                    return rendered;
+                  })()}
                   {isDataSource ? (
-                    <div className="grid gap-3">
+                    <div className="grid gap-2">
                       <label className="grid gap-1">
                         <span className="text-xs font-semibold text-muted-foreground">File</span>
                         <div className="flex flex-wrap items-center gap-2">
@@ -798,7 +1516,7 @@ export default function FlowStepsBuilderPreview({ steps = DEFAULT_STEPS }: { ste
                             Choose file
                             <input
                               type="file"
-                              accept=".csv,.tsv,.json,text/csv,text/tab-separated-values,application/json"
+                              accept=".csv,.tsv,text/csv,text/tab-separated-values"
                               className="hidden"
                               onChange={(event) =>
                                 handleDataSourceFileChange(step.id, event.target.files?.[0] ?? null)
@@ -813,10 +1531,27 @@ export default function FlowStepsBuilderPreview({ steps = DEFAULT_STEPS }: { ste
                           <span className="text-[11px] text-destructive">{dataSourceMeta.error}</span>
                         ) : null}
                       </label>
+                      {dataSourceMeta?.fileName ? (
+                        <label className="flex items-center gap-2 text-xs text-foreground">
+                          <input
+                            type="checkbox"
+                            className="h-4 w-4"
+                            checked={getFieldValue(step, 'headerRow') === 'true'}
+                            onChange={(event) =>
+                              updateField(step.id, 'headerRow', event.target.checked ? 'true' : 'false')
+                            }
+                          />
+                          <span className="text-xs font-semibold text-muted-foreground">Header row</span>
+                        </label>
+                      ) : null}
                       <div className="grid gap-2">
                         <div className="flex items-center justify-between text-[11px] font-semibold text-muted-foreground">
                           <span>Columns</span>
-                          <span>{dataSourceMeta?.rowCount ? `${dataSourceMeta.rowCount} rows` : '—'}</span>
+                          <span>
+                            {dataSourceMeta?.columns?.length
+                              ? `${dataSourceMeta.columns.length} cols`
+                              : 'N/A'}
+                          </span>
                         </div>
                         {dataSourceMeta?.columns && dataSourceMeta.columns.length > 0 ? (
                           <div className="flex flex-wrap gap-2">
@@ -825,7 +1560,7 @@ export default function FlowStepsBuilderPreview({ steps = DEFAULT_STEPS }: { ste
                                 key={column}
                                 type="button"
                                 className="btn-ghost h-7 px-2 text-[10px]"
-                                onClick={() => insertColumnToken(column)}
+                                onClick={() => insertColumnToken(column, step.id)}
                                 title={`Insert ${column}`}
                               >
                                 {column}
@@ -836,7 +1571,7 @@ export default function FlowStepsBuilderPreview({ steps = DEFAULT_STEPS }: { ste
                           <p className="text-[11px] text-muted-foreground">Select a file to load columns.</p>
                         )}
                         <p className="text-[11px] text-muted-foreground">
-                          Click a column to insert <code>{'{{row.column}}'}</code> into the last focused field.
+                          Click a column to create an Input step with <code>{'{{row.column}}'}</code>.
                         </p>
                       </div>
                     </div>
@@ -844,19 +1579,46 @@ export default function FlowStepsBuilderPreview({ steps = DEFAULT_STEPS }: { ste
                 </div>
               </div>
             ) : null}
-            {(isLoop || isDataSource) && step.children?.length ? (
+            {isLoop || isDataSource ? (
               <div className="px-3 pb-3">
                 <div className="flex items-center justify-between text-[11px] font-semibold text-muted-foreground">
-                  <span>{isDataSource ? 'Steps per row' : 'Steps in loop'}</span>
-                  <button
-                    type="button"
-                    className="btn-ghost h-7 w-7 p-0"
-                    aria-label={isDataSource ? 'Add step to data source' : 'Add step to loop'}
-                  >
-                    <Plus className="h-4 w-4" />
-                  </button>
+                  {isDataSource ? (
+                    <button
+                      type="button"
+                      className="flex items-center gap-1 text-[11px] font-semibold text-muted-foreground"
+                      onClick={() =>
+                        setCollapsedDataSource((prev) => ({
+                          ...prev,
+                          [step.id]: !(prev[step.id] ?? true),
+                        }))
+                      }
+                    >
+                      <ChevronRight
+                        className={`h-3 w-3 transition ${dataSourceCollapsed ? '' : 'rotate-90'}`}
+                      />
+                      <span>Steps per row</span>
+                    </button>
+                  ) : (
+                    <span>Steps in loop</span>
+                  )}
+                  {isDataSource ? (
+                    <span className="text-[10px] font-semibold text-muted-foreground">
+                      {dataSourceCount} steps
+                    </span>
+                  ) : null}
                 </div>
-                <div className="mt-2">{renderStepList(step.children, depth + 1)}</div>
+                {!isDataSource || !dataSourceCollapsed ? (
+                  <div className="mt-2">
+                    {renderStepList(step.children ?? [], depth + 1, {
+                      context: { scope: 'children', parentId: step.id },
+                      addPlaceholder: {
+                        label: isDataSource ? 'Add step per row' : 'Add step in loop',
+                        ariaLabel: isDataSource ? 'Add step to data source' : 'Add step to loop',
+                        onPick: (type) => addStep(type, { scope: 'children', stepId: step.id }),
+                      },
+                    })}
+                  </div>
+                ) : null}
               </div>
             ) : null}
             {isIfElse && step.branches?.length ? (
@@ -865,11 +1627,18 @@ export default function FlowStepsBuilderPreview({ steps = DEFAULT_STEPS }: { ste
                   <div key={branch.id} className="mt-2">
                     <div className="flex items-center justify-between text-[11px] font-semibold text-muted-foreground">
                       <span>{branch.label}</span>
-                      <button type="button" className="btn-ghost h-7 w-7 p-0" aria-label={`Add step to ${branch.label}`}>
-                        <Plus className="h-4 w-4" />
-                      </button>
                     </div>
-                    <div className="mt-2">{renderStepList(branch.steps, depth + 1)}</div>
+                    <div className="mt-2">
+                      {renderStepList(branch.steps ?? [], depth + 1, {
+                        context: { scope: 'branch', parentId: step.id, branchId: branch.id },
+                        addPlaceholder: {
+                          label: `Add step to ${branch.label}`,
+                          ariaLabel: `Add step to ${branch.label}`,
+                          onPick: (type) =>
+                            addStep(type, { scope: 'branch', stepId: step.id, branchId: branch.id }),
+                        },
+                      })}
+                    </div>
                   </div>
                 ))}
               </div>
@@ -877,6 +1646,25 @@ export default function FlowStepsBuilderPreview({ steps = DEFAULT_STEPS }: { ste
           </div>
         );
       })}
+      {options?.addPlaceholder ? (
+        <AddStepPlaceholder
+          label={options.addPlaceholder.label}
+          ariaLabel={options.addPlaceholder.ariaLabel}
+          onPick={options.addPlaceholder.onPick}
+          canDrop={
+            Boolean(dragState) &&
+            Boolean(options.context) &&
+            isSameContext(dragState.context, options.context)
+          }
+          onDropReorder={() => {
+            if (!dragState || !options.context) {
+              return;
+            }
+            setDraftSteps((prev) => reorderWithinContext(prev, options.context, dragState.stepId));
+            setDragState(null);
+          }}
+        />
+      ) : null}
     </div>
   );
 
@@ -884,11 +1672,17 @@ export default function FlowStepsBuilderPreview({ steps = DEFAULT_STEPS }: { ste
     <div className="space-y-2">
       <div className="flex items-center justify-between">
         <span className="text-xs font-semibold text-muted-foreground">Steps</span>
-        <button type="button" className="btn-ghost h-7 w-7 p-0" aria-label="Add step">
-          <Plus className="h-4 w-4" />
-        </button>
       </div>
-      <div className="max-h-[35.5vh] overflow-y-auto pr-1">{renderStepList(draftSteps)}</div>
+      <div className="max-h-[35.5vh] overflow-y-auto pr-1" data-step-scroll>
+        {renderStepList(draftSteps, 0, {
+          context: { scope: 'root' },
+          addPlaceholder: {
+            label: 'Add step',
+            ariaLabel: 'Add step',
+            onPick: (type) => addStep(type, { scope: 'root' }),
+          },
+        })}
+      </div>
     </div>
   );
 }
