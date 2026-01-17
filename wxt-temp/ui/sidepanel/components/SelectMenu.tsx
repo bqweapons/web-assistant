@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { ChevronDown } from 'lucide-react';
+import { t } from '../utils/i18n';
 
 export type SelectOption = {
   value: string;
@@ -28,7 +29,7 @@ export default function SelectMenu({
   value,
   options,
   onChange,
-  placeholder = 'Select',
+  placeholder = t('sidepanel_select_placeholder', 'Select'),
   iconPosition = 'right',
   useInputStyle = true,
   buttonClassName = '',

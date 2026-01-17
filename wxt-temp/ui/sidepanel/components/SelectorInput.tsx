@@ -1,4 +1,5 @@
 import { Crosshair } from 'lucide-react';
+import { t } from '../utils/i18n';
 
 type SelectorInputProps = {
   value: string;
@@ -27,7 +28,12 @@ export default function SelectorInput({
         placeholder={placeholder}
         onFocus={onFocus}
       />
-      <button type="button" className="btn-ghost h-8 w-8 p-0" onClick={onPick} aria-label="Pick element">
+      <button
+        type="button"
+        className="btn-ghost h-8 w-8 p-0"
+        onClick={onPick}
+        aria-label={t('sidepanel_selector_pick', 'Pick element')}
+      >
         <Crosshair className="h-4 w-4" />
       </button>
     </div>

@@ -1,46 +1,803 @@
 {
-  "extensionName": {
-    "message": "Ladybird: no-code buttons, links and tooltips",
-    "description": "Extension name for listings and toolbar surfaces"
+  "actionDefaultTitle": {
+    "message": "Open Ladybird"
   },
   "extensionDescription": {
-    "message": "Create no-code buttons, links and tooltips on any page, personalize calls-to-action, and manage everything from a unified side panel",
-    "description": "Description for the Chrome Web Store and manifest"
+    "message": "Create no-code buttons, links and tooltips on any page, personalize calls-to-action, and manage everything from a unified side panel"
   },
-  "actionDefaultTitle": {
-    "message": "Open Ladybird",
-    "description": "Default title for the browser action"
+  "extensionName": {
+    "message": "Ladybird: no-code buttons, links and tooltips"
   },
-  "hud_running_step": {
-    "message": "Running flow step",
-    "description": "HUD status when running a step"
+  "sidepanel_action_cancel": {
+    "message": "Cancel"
   },
-  "hud_waiting_navigation": {
-    "message": "Waiting for navigation…",
-    "description": "HUD status when waiting for navigation"
+  "sidepanel_action_clear": {
+    "message": "Clear"
   },
-  "hud_flow_paused": {
-    "message": "Flow paused",
-    "description": "HUD status when flow is paused"
+  "sidepanel_action_dark_mode": {
+    "message": "Dark mode"
   },
-  "hud_flow_resumed": {
-    "message": "Flow resumed",
-    "description": "HUD status when flow is resumed"
+  "sidepanel_action_light_mode": {
+    "message": "Light mode"
   },
-  "hud_flow_stopped": {
-    "message": "Flow stopped",
-    "description": "HUD status when flow is stopped"
+  "sidepanel_action_open": {
+    "message": "Open"
   },
-  "hud_flow_finished": {
-    "message": "Flow finished",
-    "description": "HUD status when flow is finished"
+  "sidepanel_action_run": {
+    "message": "Run"
   },
-  "hud_step_completed": {
-    "message": "Step completed",
-    "description": "HUD status when a step completes"
+  "sidepanel_action_save": {
+    "message": "Save"
   },
-  "hud_rejoin_waiting": {
-    "message": "Restored flow; waiting for navigation…",
-    "description": "HUD status when rejoining a waiting flow"
+  "sidepanel_action_save_changes": {
+    "message": "Save changes"
+  },
+  "sidepanel_action_save_run": {
+    "message": "Save & Run"
+  },
+  "sidepanel_action_settings": {
+    "message": "Settings"
+  },
+  "sidepanel_app_context_none": {
+    "message": "No active page"
+  },
+  "sidepanel_app_logo_alt": {
+    "message": "{title} logo"
+  },
+  "sidepanel_app_title": {
+    "message": "Ladybird"
+  },
+  "sidepanel_color_black": {
+    "message": "Black"
+  },
+  "sidepanel_color_blue": {
+    "message": "Blue"
+  },
+  "sidepanel_color_green": {
+    "message": "Green"
+  },
+  "sidepanel_color_orange": {
+    "message": "Orange"
+  },
+  "sidepanel_color_purple": {
+    "message": "Purple"
+  },
+  "sidepanel_color_red": {
+    "message": "Red"
+  },
+  "sidepanel_color_transparent": {
+    "message": "Transparent"
+  },
+  "sidepanel_color_white": {
+    "message": "White"
+  },
+  "sidepanel_drawer_close": {
+    "message": "Close drawer"
+  },
+  "sidepanel_element_type_area": {
+    "message": "Area"
+  },
+  "sidepanel_element_type_button": {
+    "message": "Button"
+  },
+  "sidepanel_element_type_link": {
+    "message": "Link"
+  },
+  "sidepanel_elements_action_flow_configured": {
+    "message": "Action flow: Configured"
+  },
+  "sidepanel_elements_action_flow_unassigned": {
+    "message": "Action flow: Unassigned"
+  },
+  "sidepanel_elements_action_flow_value": {
+    "message": "Action flow: {value}"
+  },
+  "sidepanel_elements_action_title": {
+    "message": "Action"
+  },
+  "sidepanel_elements_add_area": {
+    "message": "Area"
+  },
+  "sidepanel_elements_add_area_hint": {
+    "message": "Select a region"
+  },
+  "sidepanel_elements_add_button": {
+    "message": "Button"
+  },
+  "sidepanel_elements_add_button_hint": {
+    "message": "Insert a clickable button"
+  },
+  "sidepanel_elements_add_placeholder": {
+    "message": "Add element to page"
+  },
+  "sidepanel_elements_add_tooltip": {
+    "message": "Tooltip"
+  },
+  "sidepanel_elements_add_tooltip_hint": {
+    "message": "Show helper text on hover"
+  },
+  "sidepanel_elements_apply_site": {
+    "message": "Apply to entire site"
+  },
+  "sidepanel_elements_basics": {
+    "message": "Basics"
+  },
+  "sidepanel_elements_border_placeholder": {
+    "message": "1px solid #000"
+  },
+  "sidepanel_elements_contains_count": {
+    "message": "Contains {count} elements"
+  },
+  "sidepanel_elements_custom_styles": {
+    "message": "Custom Styles"
+  },
+  "sidepanel_elements_custom_styles_placeholder": {
+    "message": "color: #0f172a; padding: 8px;"
+  },
+  "sidepanel_elements_default_label": {
+    "message": "{type} element"
+  },
+  "sidepanel_elements_delete": {
+    "message": "Delete element"
+  },
+  "sidepanel_elements_detail_not_set": {
+    "message": "Detail: Not set"
+  },
+  "sidepanel_elements_detail_subtitle": {
+    "message": "Update the element settings below."
+  },
+  "sidepanel_elements_detail_title": {
+    "message": "Element details"
+  },
+  "sidepanel_elements_empty": {
+    "message": "No elements yet. Create your first element to get started."
+  },
+  "sidepanel_elements_empty_filtered": {
+    "message": "No matches. Try a different search or filter."
+  },
+  "sidepanel_elements_font_decrease": {
+    "message": "Decrease font size"
+  },
+  "sidepanel_elements_font_increase": {
+    "message": "Increase font size"
+  },
+  "sidepanel_elements_link_new_tab": {
+    "message": "Open in new tab"
+  },
+  "sidepanel_elements_link_placeholder": {
+    "message": "https://example.com"
+  },
+  "sidepanel_elements_link_same_tab": {
+    "message": "Open in same tab"
+  },
+  "sidepanel_elements_link_target": {
+    "message": "Link target"
+  },
+  "sidepanel_elements_link_url": {
+    "message": "Link URL"
+  },
+  "sidepanel_elements_link_value": {
+    "message": "Link: {value}"
+  },
+  "sidepanel_elements_locate": {
+    "message": "Locate element"
+  },
+  "sidepanel_elements_name_placeholder": {
+    "message": "Element text"
+  },
+  "sidepanel_elements_padding_placeholder": {
+    "message": "8px 16px"
+  },
+  "sidepanel_elements_position_absolute": {
+    "message": "Absolute"
+  },
+  "sidepanel_elements_position_auto": {
+    "message": "Auto"
+  },
+  "sidepanel_elements_position_fixed": {
+    "message": "Fixed"
+  },
+  "sidepanel_elements_position_height": {
+    "message": "H"
+  },
+  "sidepanel_elements_position_height_placeholder": {
+    "message": "40"
+  },
+  "sidepanel_elements_position_mode": {
+    "message": "Mode"
+  },
+  "sidepanel_elements_position_relative": {
+    "message": "Relative"
+  },
+  "sidepanel_elements_position_static": {
+    "message": "Static"
+  },
+  "sidepanel_elements_position_sticky": {
+    "message": "Sticky"
+  },
+  "sidepanel_elements_position_width": {
+    "message": "W"
+  },
+  "sidepanel_elements_position_width_placeholder": {
+    "message": "120"
+  },
+  "sidepanel_elements_position_x": {
+    "message": "X"
+  },
+  "sidepanel_elements_position_x_placeholder": {
+    "message": "12"
+  },
+  "sidepanel_elements_position_y": {
+    "message": "Y"
+  },
+  "sidepanel_elements_position_y_placeholder": {
+    "message": "12"
+  },
+  "sidepanel_elements_position_z": {
+    "message": "Z"
+  },
+  "sidepanel_elements_position_z_placeholder": {
+    "message": "999"
+  },
+  "sidepanel_elements_radius_placeholder": {
+    "message": "8"
+  },
+  "sidepanel_elements_search_placeholder": {
+    "message": "Search by name, type, or page"
+  },
+  "sidepanel_elements_selector_value": {
+    "message": "Selector: {value}"
+  },
+  "sidepanel_elements_shadow_custom": {
+    "message": "Custom"
+  },
+  "sidepanel_elements_shadow_medium": {
+    "message": "Medium"
+  },
+  "sidepanel_elements_shadow_none": {
+    "message": "None"
+  },
+  "sidepanel_elements_shadow_soft": {
+    "message": "Soft"
+  },
+  "sidepanel_elements_shadow_strong": {
+    "message": "Strong"
+  },
+  "sidepanel_elements_style_area": {
+    "message": "Area"
+  },
+  "sidepanel_elements_style_background": {
+    "message": "Background"
+  },
+  "sidepanel_elements_style_border": {
+    "message": "Border"
+  },
+  "sidepanel_elements_style_custom": {
+    "message": "Custom"
+  },
+  "sidepanel_elements_style_floating": {
+    "message": "Floating"
+  },
+  "sidepanel_elements_style_link": {
+    "message": "Link"
+  },
+  "sidepanel_elements_style_outline": {
+    "message": "Outline"
+  },
+  "sidepanel_elements_style_padding": {
+    "message": "Padding"
+  },
+  "sidepanel_elements_style_position": {
+    "message": "Position"
+  },
+  "sidepanel_elements_style_preset": {
+    "message": "Preset"
+  },
+  "sidepanel_elements_style_primary": {
+    "message": "Primary"
+  },
+  "sidepanel_elements_style_radius": {
+    "message": "Radius"
+  },
+  "sidepanel_elements_style_shadow": {
+    "message": "Shadow"
+  },
+  "sidepanel_elements_style_text": {
+    "message": "Text"
+  },
+  "sidepanel_elements_styles_title": {
+    "message": "Styles"
+  },
+  "sidepanel_elements_subtitle": {
+    "message": "Find saved elements across pages."
+  },
+  "sidepanel_elements_title": {
+    "message": "Elements"
+  },
+  "sidepanel_elements_type_all": {
+    "message": "All types"
+  },
+  "sidepanel_field_action_flow": {
+    "message": "Action flow"
+  },
+  "sidepanel_field_configured": {
+    "message": "Configured"
+  },
+  "sidepanel_field_description": {
+    "message": "Description"
+  },
+  "sidepanel_field_duration_ms": {
+    "message": "Duration (ms)"
+  },
+  "sidepanel_field_iterations": {
+    "message": "Iterations"
+  },
+  "sidepanel_field_last_updated": {
+    "message": "Last updated"
+  },
+  "sidepanel_field_layout": {
+    "message": "Layout"
+  },
+  "sidepanel_field_link": {
+    "message": "Link"
+  },
+  "sidepanel_field_name": {
+    "message": "Name"
+  },
+  "sidepanel_field_not_set": {
+    "message": "Not set"
+  },
+  "sidepanel_field_note": {
+    "message": "Note"
+  },
+  "sidepanel_field_operator": {
+    "message": "Operator"
+  },
+  "sidepanel_field_page": {
+    "message": "Page"
+  },
+  "sidepanel_field_scope": {
+    "message": "Scope"
+  },
+  "sidepanel_field_selector": {
+    "message": "Selector"
+  },
+  "sidepanel_field_site": {
+    "message": "Site"
+  },
+  "sidepanel_field_type": {
+    "message": "Type"
+  },
+  "sidepanel_field_unassigned": {
+    "message": "Unassigned"
+  },
+  "sidepanel_field_url": {
+    "message": "URL"
+  },
+  "sidepanel_field_value": {
+    "message": "Value"
+  },
+  "sidepanel_field_wait_for": {
+    "message": "Wait for"
+  },
+  "sidepanel_flow_drawer_close": {
+    "message": "Close flow drawer"
+  },
+  "sidepanel_flows_create": {
+    "message": "Create flow"
+  },
+  "sidepanel_flows_create_new": {
+    "message": "Create new flow…"
+  },
+  "sidepanel_flows_delete": {
+    "message": "Delete flow"
+  },
+  "sidepanel_flows_description_placeholder": {
+    "message": "Describe what the flow does"
+  },
+  "sidepanel_flows_description_prompt": {
+    "message": "What does this flow do?"
+  },
+  "sidepanel_flows_detail_subtitle": {
+    "message": "Edit the flow settings below."
+  },
+  "sidepanel_flows_detail_title": {
+    "message": "Flow details"
+  },
+  "sidepanel_flows_empty": {
+    "message": "No flows yet. Create one to define automated actions."
+  },
+  "sidepanel_flows_empty_filtered": {
+    "message": "No matches. Try a different search or filter."
+  },
+  "sidepanel_flows_name_placeholder": {
+    "message": "Flow name"
+  },
+  "sidepanel_flows_new_default": {
+    "message": "New flow"
+  },
+  "sidepanel_flows_new_subtitle": {
+    "message": "Create a new action flow."
+  },
+  "sidepanel_flows_new_title": {
+    "message": "New flow"
+  },
+  "sidepanel_flows_no_description": {
+    "message": "No description"
+  },
+  "sidepanel_flows_run": {
+    "message": "Run flow"
+  },
+  "sidepanel_flows_search_placeholder": {
+    "message": "Search flows"
+  },
+  "sidepanel_flows_sort_name": {
+    "message": "Name"
+  },
+  "sidepanel_flows_sort_recent": {
+    "message": "Recently updated"
+  },
+  "sidepanel_flows_sort_steps": {
+    "message": "Steps"
+  },
+  "sidepanel_flows_subtitle": {
+    "message": "Build reusable action sequences."
+  },
+  "sidepanel_flows_summary_title": {
+    "message": "Summary"
+  },
+  "sidepanel_flows_title": {
+    "message": "Action flows"
+  },
+  "sidepanel_hidden_add": {
+    "message": "Add hidden rule"
+  },
+  "sidepanel_hidden_delete": {
+    "message": "Delete rule"
+  },
+  "sidepanel_hidden_detail_subtitle": {
+    "message": "Edit the hidden rule details below."
+  },
+  "sidepanel_hidden_detail_title": {
+    "message": "Hidden rule details"
+  },
+  "sidepanel_hidden_disable": {
+    "message": "Disable rule"
+  },
+  "sidepanel_hidden_empty": {
+    "message": "No hidden rules yet."
+  },
+  "sidepanel_hidden_enabled": {
+    "message": "Rule enabled"
+  },
+  "sidepanel_hidden_name_placeholder": {
+    "message": "Hidden rule name"
+  },
+  "sidepanel_hidden_note_placeholder": {
+    "message": "Why this rule exists"
+  },
+  "sidepanel_hidden_selector_placeholder": {
+    "message": "CSS selector"
+  },
+  "sidepanel_hidden_subtitle": {
+    "message": "Hide or suppress elements automatically."
+  },
+  "sidepanel_hidden_title": {
+    "message": "Hidden rules"
+  },
+  "sidepanel_label_unknown": {
+    "message": "Unknown"
+  },
+  "sidepanel_label_unknown_page": {
+    "message": "Unknown page"
+  },
+  "sidepanel_language_en_us": {
+    "message": "English (US)"
+  },
+  "sidepanel_language_ja": {
+    "message": "Japanese"
+  },
+  "sidepanel_language_zh_cn": {
+    "message": "Simplified Chinese"
+  },
+  "sidepanel_layout_column": {
+    "message": "Column"
+  },
+  "sidepanel_layout_row": {
+    "message": "Row"
+  },
+  "sidepanel_overview_elements_count": {
+    "message": "{count} elements"
+  },
+  "sidepanel_overview_flows_count": {
+    "message": "{count} flows"
+  },
+  "sidepanel_overview_hidden_count": {
+    "message": "{count} hidden"
+  },
+  "sidepanel_overview_sites_count": {
+    "message": "{count} sites"
+  },
+  "sidepanel_overview_sites_subtitle": {
+    "message": "Totals grouped by site."
+  },
+  "sidepanel_overview_sites_title": {
+    "message": "Sites"
+  },
+  "sidepanel_overview_subtitle": {
+    "message": "Summary by site from the latest export snapshot."
+  },
+  "sidepanel_overview_title": {
+    "message": "Overview"
+  },
+  "sidepanel_overview_total_items": {
+    "message": "{count} total items"
+  },
+  "sidepanel_scope_global": {
+    "message": "Global"
+  },
+  "sidepanel_scope_page": {
+    "message": "Page"
+  },
+  "sidepanel_scope_site": {
+    "message": "Site"
+  },
+  "sidepanel_select_placeholder": {
+    "message": "Select"
+  },
+  "sidepanel_selector_pick": {
+    "message": "Pick element"
+  },
+  "sidepanel_settings_close": {
+    "message": "Close settings"
+  },
+  "sidepanel_settings_data_export": {
+    "message": "Export"
+  },
+  "sidepanel_settings_data_import": {
+    "message": "Import"
+  },
+  "sidepanel_settings_data_subtitle": {
+    "message": "Import or export saved elements and flows."
+  },
+  "sidepanel_settings_data_title": {
+    "message": "Data management"
+  },
+  "sidepanel_settings_language_subtitle": {
+    "message": "Pick the language for the side panel."
+  },
+  "sidepanel_settings_language_title": {
+    "message": "Language"
+  },
+  "sidepanel_settings_locale": {
+    "message": "Locale: {locale}"
+  },
+  "sidepanel_settings_share_copy": {
+    "message": "Copy link"
+  },
+  "sidepanel_settings_share_open": {
+    "message": "Open store"
+  },
+  "sidepanel_settings_share_subtitle": {
+    "message": "Send the Chrome Web Store link to teammates."
+  },
+  "sidepanel_settings_share_title": {
+    "message": "Share"
+  },
+  "sidepanel_settings_subtitle": {
+    "message": "Fine-tune data, language, and sharing."
+  },
+  "sidepanel_settings_title": {
+    "message": "Settings"
+  },
+  "sidepanel_step_assert_description": {
+    "message": "Check a value or state."
+  },
+  "sidepanel_step_assert_label": {
+    "message": "Assert"
+  },
+  "sidepanel_step_click_description": {
+    "message": "Click an element by selector."
+  },
+  "sidepanel_step_click_label": {
+    "message": "Click"
+  },
+  "sidepanel_step_condition_contains": {
+    "message": "Contains"
+  },
+  "sidepanel_step_condition_equals": {
+    "message": "Equals"
+  },
+  "sidepanel_step_condition_greater": {
+    "message": "Greater than"
+  },
+  "sidepanel_step_condition_is": {
+    "message": "is"
+  },
+  "sidepanel_step_condition_label": {
+    "message": "Condition"
+  },
+  "sidepanel_step_condition_less": {
+    "message": "Less than"
+  },
+  "sidepanel_step_data_source_description": {
+    "message": "Load CSV/TSV and loop rows."
+  },
+  "sidepanel_step_data_source_label": {
+    "message": "Data Source"
+  },
+  "sidepanel_step_if_else_description": {
+    "message": "Branch steps based on a condition."
+  },
+  "sidepanel_step_if_else_label": {
+    "message": "If / Else"
+  },
+  "sidepanel_step_input_description": {
+    "message": "Type text into a field."
+  },
+  "sidepanel_step_input_label": {
+    "message": "Input"
+  },
+  "sidepanel_step_loop_description": {
+    "message": "Repeat nested steps for a count."
+  },
+  "sidepanel_step_loop_label": {
+    "message": "Loop"
+  },
+  "sidepanel_step_navigate_description": {
+    "message": "Go to a URL."
+  },
+  "sidepanel_step_navigate_label": {
+    "message": "Navigate"
+  },
+  "sidepanel_step_summary_conditional": {
+    "message": "Conditional check"
+  },
+  "sidepanel_step_summary_duration": {
+    "message": "Duration: {value} ms"
+  },
+  "sidepanel_step_summary_expect": {
+    "message": "Expect {selector} {operator} \\\"{value}\\\""
+  },
+  "sidepanel_step_summary_if": {
+    "message": "If {selector} {operator} \\\"{value}\\\""
+  },
+  "sidepanel_step_summary_input": {
+    "message": "Input"
+  },
+  "sidepanel_step_summary_repeat_steps": {
+    "message": "Repeat steps"
+  },
+  "sidepanel_step_summary_repeat_times": {
+    "message": "Repeat {count} times"
+  },
+  "sidepanel_step_summary_selector": {
+    "message": "Selector: {value}"
+  },
+  "sidepanel_step_summary_url": {
+    "message": "URL: {value}"
+  },
+  "sidepanel_step_summary_value": {
+    "message": "Value: {value}"
+  },
+  "sidepanel_step_summary_wait_until": {
+    "message": "Wait until {selector} {operator} \\\"{value}\\\""
+  },
+  "sidepanel_step_wait_description": {
+    "message": "Pause or wait for element condition."
+  },
+  "sidepanel_step_wait_label": {
+    "message": "Wait"
+  },
+  "sidepanel_step_wait_mode_condition": {
+    "message": "Element condition"
+  },
+  "sidepanel_step_wait_mode_time": {
+    "message": "Time delay"
+  },
+  "sidepanel_steps_add": {
+    "message": "Add step"
+  },
+  "sidepanel_steps_add_in_loop": {
+    "message": "Add step in loop"
+  },
+  "sidepanel_steps_add_per_row": {
+    "message": "Add step per row"
+  },
+  "sidepanel_steps_add_to_branch": {
+    "message": "Add step to {label}"
+  },
+  "sidepanel_steps_add_to_data_source": {
+    "message": "Add step to data source"
+  },
+  "sidepanel_steps_add_to_loop": {
+    "message": "Add step to loop"
+  },
+  "sidepanel_steps_choose_file": {
+    "message": "Choose file"
+  },
+  "sidepanel_steps_columns": {
+    "message": "Columns"
+  },
+  "sidepanel_steps_columns_count": {
+    "message": "{count} cols"
+  },
+  "sidepanel_steps_columns_empty": {
+    "message": "Select a file to load columns."
+  },
+  "sidepanel_steps_columns_hint": {
+    "message": "Click a column to create an Input step with"
+  },
+  "sidepanel_steps_columns_missing": {
+    "message": "No columns detected"
+  },
+  "sidepanel_steps_columns_na": {
+    "message": "N/A"
+  },
+  "sidepanel_steps_columns_rows": {
+    "message": "{columns} columns | {rows} rows"
+  },
+  "sidepanel_steps_count": {
+    "message": "{count} steps"
+  },
+  "sidepanel_steps_delete": {
+    "message": "Delete step"
+  },
+  "sidepanel_steps_file_label": {
+    "message": "File"
+  },
+  "sidepanel_steps_file_parse_error": {
+    "message": "Failed to parse file"
+  },
+  "sidepanel_steps_file_waiting": {
+    "message": "Awaiting file selection"
+  },
+  "sidepanel_steps_header_row": {
+    "message": "Header row"
+  },
+  "sidepanel_steps_in_loop": {
+    "message": "Steps in loop"
+  },
+  "sidepanel_steps_insert_column": {
+    "message": "Insert {column}"
+  },
+  "sidepanel_steps_no_file_selected": {
+    "message": "No file selected"
+  },
+  "sidepanel_steps_per_row": {
+    "message": "Steps per row"
+  },
+  "sidepanel_steps_search_empty": {
+    "message": "No steps found."
+  },
+  "sidepanel_steps_search_placeholder": {
+    "message": "Search steps"
+  },
+  "sidepanel_steps_title": {
+    "message": "Steps"
+  },
+  "sidepanel_tab_elements": {
+    "message": "Elements"
+  },
+  "sidepanel_tab_elements_tooltip": {
+    "message": "Saved elements and quick actions."
+  },
+  "sidepanel_tab_flows": {
+    "message": "Flows"
+  },
+  "sidepanel_tab_flows_tooltip": {
+    "message": "Reusable action flows."
+  },
+  "sidepanel_tab_hidden": {
+    "message": "Hidden"
+  },
+  "sidepanel_tab_hidden_tooltip": {
+    "message": "Hidden rules for blocking elements."
+  },
+  "sidepanel_tab_overview": {
+    "message": "Overview"
+  },
+  "sidepanel_tab_overview_tooltip": {
+    "message": "Summary across sites."
   }
 }

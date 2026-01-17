@@ -5,6 +5,7 @@ import Drawer from '../components/Drawer';
 import SelectorInput from '../components/SelectorInput';
 import SelectMenu from '../components/SelectMenu';
 import { mockHiddenRules } from '../utils/mockData';
+import { t } from '../utils/i18n';
 
 export default function HiddenRulesSection() {
   const preferredSite = 'www.yahoo.co.jp';
@@ -18,6 +19,16 @@ export default function HiddenRulesSection() {
   const [activeRuleId, setActiveRuleId] = useState<string | null>(null);
   const activeRule = siteRules.find((rule) => rule.id === activeRuleId) ?? null;
   const [editRule, setEditRule] = useState(activeRule);
+
+  const getScopeLabel = (value: string) => {
+    if (value === 'site') {
+      return t('sidepanel_scope_site', 'Site');
+    }
+    if (value === 'global') {
+      return t('sidepanel_scope_global', 'Global');
+    }
+    return t('sidepanel_scope_page', 'Page');
+  };
 
   useEffect(() => {
     if (!activeRule) {
@@ -43,15 +54,19 @@ export default function HiddenRulesSection() {
     <section className="flex flex-col gap-2">
       <div className="flex items-center justify-between gap-2">
         <div className="space-y-1">
-          <h3 className="text-sm font-semibold text-card-foreground">Hidden rules</h3>
-          <p className="text-xs text-muted-foreground">Hide or suppress elements automatically.</p>
+          <h3 className="text-sm font-semibold text-card-foreground">
+            {t('sidepanel_hidden_title', 'Hidden rules')}
+          </h3>
+          <p className="text-xs text-muted-foreground">
+            {t('sidepanel_hidden_subtitle', 'Hide or suppress elements automatically.')}
+          </p>
         </div>
         <span className="text-xs text-muted-foreground">{siteRules.length}</span>
       </div>
 
       {siteRules.length === 0 ? (
         <Card className="border-dashed bg-muted text-center text-xs text-muted-foreground">
-          No hidden rules yet.
+          {t('sidepanel_hidden_empty', 'No hidden rules yet.')}
         </Card>
       ) : (
         <div className="grid gap-2">
@@ -68,7 +83,7 @@ export default function HiddenRulesSection() {
                   <button
                     type="button"
                     className={actionClass}
-                    aria-label="Disable rule"
+                    aria-label={t('sidepanel_hidden_disable', 'Disable rule')}
                     onClick={(event) => event.stopPropagation()}
                   >
                     <EyeOff className="h-4 w-4" />
@@ -76,7 +91,7 @@ export default function HiddenRulesSection() {
                   <button
                     type="button"
                     className={`${actionClass} btn-icon-danger`}
-                    aria-label="Delete rule"
+                    aria-label={t('sidepanel_hidden_delete', 'Delete rule')}
                     onClick={(event) => event.stopPropagation()}
                   >
                     <Trash2 className="h-4 w-4" />
@@ -86,7 +101,7 @@ export default function HiddenRulesSection() {
               <p className="mt-2 text-xs text-muted-foreground">{rule.note || rule.name}</p>
               <div className="mt-1 flex items-center justify-between gap-2">
                 <p className="text-xs text-muted-foreground">{rule.updatedAt}</p>
-                <span className="badge-pill">{rule.scope}</span>
+                <span className="badge-pill">{getScopeLabel(rule.scope)}</span>
               </div>
             </Card>
           ))}
@@ -95,47 +110,47 @@ export default function HiddenRulesSection() {
 
       <Drawer
         open={Boolean(activeRule)}
-        title={activeRule?.name ?? 'Hidden rule details'}
-        description="Edit the hidden rule details below."
+        title={activeRule?.name ?? t('sidepanel_hidden_detail_title', 'Hidden rule details')}
+        description={t('sidepanel_hidden_detail_subtitle', 'Edit the hidden rule details below.')}
         onClose={() => setActiveRuleId(null)}
       >
         {editRule ? (
           <div className="grid gap-3 text-xs text-muted-foreground">
             <label className="grid gap-1">
-              <span>Name</span>
+              <span>{t('sidepanel_field_name', 'Name')}</span>
               <input
                 className="input"
                 value={editRule.name}
                 onChange={(event) => setEditRule({ ...editRule, name: event.target.value })}
-                placeholder="Hidden rule name"
+                placeholder={t('sidepanel_hidden_name_placeholder', 'Hidden rule name')}
               />
             </label>
             <label className="grid gap-1">
-              <span>Selector</span>
+              <span>{t('sidepanel_field_selector', 'Selector')}</span>
               <SelectorInput
                 value={editRule.selector}
                 onChange={(value) => setEditRule({ ...editRule, selector: value })}
-                placeholder="CSS selector"
+                placeholder={t('sidepanel_hidden_selector_placeholder', 'CSS selector')}
               />
             </label>
             <label className="grid gap-1">
-              <span>Note</span>
+              <span>{t('sidepanel_field_note', 'Note')}</span>
               <textarea
                 className="input"
                 rows={2}
                 value={editRule.note}
                 onChange={(event) => setEditRule({ ...editRule, note: event.target.value })}
-                placeholder="Why this rule exists"
+                placeholder={t('sidepanel_hidden_note_placeholder', 'Why this rule exists')}
               />
             </label>
             <div className="grid gap-1">
-              <span>Scope</span>
+              <span>{t('sidepanel_field_scope', 'Scope')}</span>
               <SelectMenu
                 value={editRule.scope}
                 options={[
-                  { value: 'page', label: 'Page' },
-                  { value: 'site', label: 'Site' },
-                  { value: 'global', label: 'Global' },
+                  { value: 'page', label: t('sidepanel_scope_page', 'Page') },
+                  { value: 'site', label: t('sidepanel_scope_site', 'Site') },
+                  { value: 'global', label: t('sidepanel_scope_global', 'Global') },
                 ]}
                 onChange={(value) =>
                   setEditRule({
@@ -152,18 +167,18 @@ export default function HiddenRulesSection() {
                 checked={editRule.enabled}
                 onChange={(event) => setEditRule({ ...editRule, enabled: event.target.checked })}
               />
-              <span>Rule enabled</span>
+              <span>{t('sidepanel_hidden_enabled', 'Rule enabled')}</span>
             </label>
             <div className="grid gap-1">
-              <span>Last updated</span>
+              <span>{t('sidepanel_field_last_updated', 'Last updated')}</span>
               <p className="text-sm text-foreground">{editRule.updatedAt}</p>
             </div>
             <div className="flex items-center justify-end gap-2 pt-2">
               <button type="button" className="btn-ghost" onClick={() => setActiveRuleId(null)}>
-                Cancel
+                {t('sidepanel_action_cancel', 'Cancel')}
               </button>
               <button type="button" className="btn-primary" onClick={handleRuleSave}>
-                Save changes
+                {t('sidepanel_action_save_changes', 'Save changes')}
               </button>
             </div>
           </div>

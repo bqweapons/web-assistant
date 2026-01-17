@@ -1,46 +1,803 @@
 {
-  "extensionName": {
-    "message": "懒鸟：无需编码即可为网页添加按钮、链接和提示",
-    "description": "Chrome 网上应用店展示用扩展名称"
+  "actionDefaultTitle": {
+    "message": "打开懒鸟"
   },
   "extensionDescription": {
-    "message": "为任意网页添加自定义按钮、链接和提示，并在侧边栏集中管理所有增强内容。",
-    "description": "Chrome 网上应用店和 manifest 使用的描述"
+    "message": "在任意页面创建零代码按钮、链接和工具提示，个性化行动号召，并通过统一的侧边面板管理一切"
   },
-  "actionDefaultTitle": {
-    "message": "打开懒鸟",
-    "description": "浏览器操作的默认标题"
+  "extensionName": {
+    "message": "懒鸟：无需编码即可为网页添加按钮、链接和提示"
   },
-  "hud_running_step": {
-    "message": "正在执行流程步骤",
-    "description": "HUD 状态：运行中"
+  "sidepanel_action_cancel": {
+    "message": "取消"
   },
-  "hud_waiting_navigation": {
-    "message": "等待页面导航…",
-    "description": "HUD 状态：等待导航"
+  "sidepanel_action_clear": {
+    "message": "清除"
   },
-  "hud_flow_paused": {
-    "message": "流程已暂停",
-    "description": "HUD 状态：暂停"
+  "sidepanel_action_dark_mode": {
+    "message": "深色模式"
   },
-  "hud_flow_resumed": {
-    "message": "流程已继续",
-    "description": "HUD 状态：继续"
+  "sidepanel_action_light_mode": {
+    "message": "浅色模式"
   },
-  "hud_flow_stopped": {
-    "message": "流程已停止",
-    "description": "HUD 状态：停止"
+  "sidepanel_action_open": {
+    "message": "打开"
   },
-  "hud_flow_finished": {
-    "message": "流程已完成",
-    "description": "HUD 状态：完成"
+  "sidepanel_action_run": {
+    "message": "运行"
   },
-  "hud_step_completed": {
-    "message": "步骤已完成",
-    "description": "HUD 状态：步骤完成"
+  "sidepanel_action_save": {
+    "message": "保存"
   },
-  "hud_rejoin_waiting": {
-    "message": "流程恢复，正在等待导航…",
-    "description": "HUD 状态：恢复后等待"
+  "sidepanel_action_save_changes": {
+    "message": "保存更改"
+  },
+  "sidepanel_action_save_run": {
+    "message": "保存并运行"
+  },
+  "sidepanel_action_settings": {
+    "message": "设置"
+  },
+  "sidepanel_app_context_none": {
+    "message": "无活动页面"
+  },
+  "sidepanel_app_logo_alt": {
+    "message": "{title} 标志"
+  },
+  "sidepanel_app_title": {
+    "message": "Ladybird"
+  },
+  "sidepanel_color_black": {
+    "message": "黑色"
+  },
+  "sidepanel_color_blue": {
+    "message": "蓝色"
+  },
+  "sidepanel_color_green": {
+    "message": "绿色"
+  },
+  "sidepanel_color_orange": {
+    "message": "橙色"
+  },
+  "sidepanel_color_purple": {
+    "message": "紫色"
+  },
+  "sidepanel_color_red": {
+    "message": "红色"
+  },
+  "sidepanel_color_transparent": {
+    "message": "透明"
+  },
+  "sidepanel_color_white": {
+    "message": "白色"
+  },
+  "sidepanel_drawer_close": {
+    "message": "关闭抽屉"
+  },
+  "sidepanel_element_type_area": {
+    "message": "区域"
+  },
+  "sidepanel_element_type_button": {
+    "message": "按钮"
+  },
+  "sidepanel_element_type_link": {
+    "message": "链接"
+  },
+  "sidepanel_elements_action_flow_configured": {
+    "message": "操作流程：已配置"
+  },
+  "sidepanel_elements_action_flow_unassigned": {
+    "message": "操作流程：未分配"
+  },
+  "sidepanel_elements_action_flow_value": {
+    "message": "操作流程：{value}"
+  },
+  "sidepanel_elements_action_title": {
+    "message": "操作"
+  },
+  "sidepanel_elements_add_area": {
+    "message": "区域"
+  },
+  "sidepanel_elements_add_area_hint": {
+    "message": "选择区域"
+  },
+  "sidepanel_elements_add_button": {
+    "message": "按钮"
+  },
+  "sidepanel_elements_add_button_hint": {
+    "message": "插入可点击按钮"
+  },
+  "sidepanel_elements_add_placeholder": {
+    "message": "向页面添加元素"
+  },
+  "sidepanel_elements_add_tooltip": {
+    "message": "工具提示"
+  },
+  "sidepanel_elements_add_tooltip_hint": {
+    "message": "悬停时显示帮助文本"
+  },
+  "sidepanel_elements_apply_site": {
+    "message": "应用到整个站点"
+  },
+  "sidepanel_elements_basics": {
+    "message": "基础"
+  },
+  "sidepanel_elements_border_placeholder": {
+    "message": "1px solid #000"
+  },
+  "sidepanel_elements_contains_count": {
+    "message": "包含 {count} 个元素"
+  },
+  "sidepanel_elements_custom_styles": {
+    "message": "自定义样式"
+  },
+  "sidepanel_elements_custom_styles_placeholder": {
+    "message": "color: #0f172a; padding: 8px;"
+  },
+  "sidepanel_elements_default_label": {
+    "message": "{type} 元素"
+  },
+  "sidepanel_elements_delete": {
+    "message": "删除元素"
+  },
+  "sidepanel_elements_detail_not_set": {
+    "message": "详情：未设置"
+  },
+  "sidepanel_elements_detail_subtitle": {
+    "message": "在下方更新元素设置。"
+  },
+  "sidepanel_elements_detail_title": {
+    "message": "元素详情"
+  },
+  "sidepanel_elements_empty": {
+    "message": "暂无元素。创建第一个元素开始使用。"
+  },
+  "sidepanel_elements_empty_filtered": {
+    "message": "没有匹配结果。尝试更换搜索或筛选。"
+  },
+  "sidepanel_elements_font_decrease": {
+    "message": "减小字号"
+  },
+  "sidepanel_elements_font_increase": {
+    "message": "增大字号"
+  },
+  "sidepanel_elements_link_new_tab": {
+    "message": "在新标签页打开"
+  },
+  "sidepanel_elements_link_placeholder": {
+    "message": "https://example.com"
+  },
+  "sidepanel_elements_link_same_tab": {
+    "message": "在当前标签页打开"
+  },
+  "sidepanel_elements_link_target": {
+    "message": "链接目标"
+  },
+  "sidepanel_elements_link_url": {
+    "message": "链接 URL"
+  },
+  "sidepanel_elements_link_value": {
+    "message": "链接：{value}"
+  },
+  "sidepanel_elements_locate": {
+    "message": "定位元素"
+  },
+  "sidepanel_elements_name_placeholder": {
+    "message": "元素文本"
+  },
+  "sidepanel_elements_padding_placeholder": {
+    "message": "8px 16px"
+  },
+  "sidepanel_elements_position_absolute": {
+    "message": "绝对"
+  },
+  "sidepanel_elements_position_auto": {
+    "message": "自动"
+  },
+  "sidepanel_elements_position_fixed": {
+    "message": "固定"
+  },
+  "sidepanel_elements_position_height": {
+    "message": "H"
+  },
+  "sidepanel_elements_position_height_placeholder": {
+    "message": "40"
+  },
+  "sidepanel_elements_position_mode": {
+    "message": "模式"
+  },
+  "sidepanel_elements_position_relative": {
+    "message": "相对"
+  },
+  "sidepanel_elements_position_static": {
+    "message": "静态"
+  },
+  "sidepanel_elements_position_sticky": {
+    "message": "粘性"
+  },
+  "sidepanel_elements_position_width": {
+    "message": "W"
+  },
+  "sidepanel_elements_position_width_placeholder": {
+    "message": "120"
+  },
+  "sidepanel_elements_position_x": {
+    "message": "X"
+  },
+  "sidepanel_elements_position_x_placeholder": {
+    "message": "12"
+  },
+  "sidepanel_elements_position_y": {
+    "message": "Y"
+  },
+  "sidepanel_elements_position_y_placeholder": {
+    "message": "12"
+  },
+  "sidepanel_elements_position_z": {
+    "message": "Z"
+  },
+  "sidepanel_elements_position_z_placeholder": {
+    "message": "999"
+  },
+  "sidepanel_elements_radius_placeholder": {
+    "message": "8"
+  },
+  "sidepanel_elements_search_placeholder": {
+    "message": "按名称、类型或页面搜索"
+  },
+  "sidepanel_elements_selector_value": {
+    "message": "选择器：{value}"
+  },
+  "sidepanel_elements_shadow_custom": {
+    "message": "自定义"
+  },
+  "sidepanel_elements_shadow_medium": {
+    "message": "中等"
+  },
+  "sidepanel_elements_shadow_none": {
+    "message": "无"
+  },
+  "sidepanel_elements_shadow_soft": {
+    "message": "柔和"
+  },
+  "sidepanel_elements_shadow_strong": {
+    "message": "强"
+  },
+  "sidepanel_elements_style_area": {
+    "message": "区域"
+  },
+  "sidepanel_elements_style_background": {
+    "message": "背景"
+  },
+  "sidepanel_elements_style_border": {
+    "message": "边框"
+  },
+  "sidepanel_elements_style_custom": {
+    "message": "自定义"
+  },
+  "sidepanel_elements_style_floating": {
+    "message": "悬浮"
+  },
+  "sidepanel_elements_style_link": {
+    "message": "链接"
+  },
+  "sidepanel_elements_style_outline": {
+    "message": "描边"
+  },
+  "sidepanel_elements_style_padding": {
+    "message": "内边距"
+  },
+  "sidepanel_elements_style_position": {
+    "message": "位置"
+  },
+  "sidepanel_elements_style_preset": {
+    "message": "预设"
+  },
+  "sidepanel_elements_style_primary": {
+    "message": "主色"
+  },
+  "sidepanel_elements_style_radius": {
+    "message": "圆角"
+  },
+  "sidepanel_elements_style_shadow": {
+    "message": "阴影"
+  },
+  "sidepanel_elements_style_text": {
+    "message": "文本"
+  },
+  "sidepanel_elements_styles_title": {
+    "message": "样式"
+  },
+  "sidepanel_elements_subtitle": {
+    "message": "查找跨页面保存的元素。"
+  },
+  "sidepanel_elements_title": {
+    "message": "元素"
+  },
+  "sidepanel_elements_type_all": {
+    "message": "所有类型"
+  },
+  "sidepanel_field_action_flow": {
+    "message": "操作流程"
+  },
+  "sidepanel_field_configured": {
+    "message": "已配置"
+  },
+  "sidepanel_field_description": {
+    "message": "描述"
+  },
+  "sidepanel_field_duration_ms": {
+    "message": "时长 (ms)"
+  },
+  "sidepanel_field_iterations": {
+    "message": "循环次数"
+  },
+  "sidepanel_field_last_updated": {
+    "message": "更新时间"
+  },
+  "sidepanel_field_layout": {
+    "message": "布局"
+  },
+  "sidepanel_field_link": {
+    "message": "链接"
+  },
+  "sidepanel_field_name": {
+    "message": "名称"
+  },
+  "sidepanel_field_not_set": {
+    "message": "未设置"
+  },
+  "sidepanel_field_note": {
+    "message": "备注"
+  },
+  "sidepanel_field_operator": {
+    "message": "运算符"
+  },
+  "sidepanel_field_page": {
+    "message": "页面"
+  },
+  "sidepanel_field_scope": {
+    "message": "范围"
+  },
+  "sidepanel_field_selector": {
+    "message": "选择器"
+  },
+  "sidepanel_field_site": {
+    "message": "站点"
+  },
+  "sidepanel_field_type": {
+    "message": "类型"
+  },
+  "sidepanel_field_unassigned": {
+    "message": "未分配"
+  },
+  "sidepanel_field_url": {
+    "message": "URL"
+  },
+  "sidepanel_field_value": {
+    "message": "值"
+  },
+  "sidepanel_field_wait_for": {
+    "message": "等待条件"
+  },
+  "sidepanel_flow_drawer_close": {
+    "message": "关闭流程抽屉"
+  },
+  "sidepanel_flows_create": {
+    "message": "创建流程"
+  },
+  "sidepanel_flows_create_new": {
+    "message": "创建新流程…"
+  },
+  "sidepanel_flows_delete": {
+    "message": "删除流程"
+  },
+  "sidepanel_flows_description_placeholder": {
+    "message": "描述此流程的作用"
+  },
+  "sidepanel_flows_description_prompt": {
+    "message": "这个流程做什么？"
+  },
+  "sidepanel_flows_detail_subtitle": {
+    "message": "在下方编辑流程设置。"
+  },
+  "sidepanel_flows_detail_title": {
+    "message": "流程详情"
+  },
+  "sidepanel_flows_empty": {
+    "message": "暂无流程。创建一个以定义自动化操作。"
+  },
+  "sidepanel_flows_empty_filtered": {
+    "message": "没有匹配结果。尝试更换搜索或筛选。"
+  },
+  "sidepanel_flows_name_placeholder": {
+    "message": "流程名称"
+  },
+  "sidepanel_flows_new_default": {
+    "message": "新流程"
+  },
+  "sidepanel_flows_new_subtitle": {
+    "message": "创建新的操作流程。"
+  },
+  "sidepanel_flows_new_title": {
+    "message": "新流程"
+  },
+  "sidepanel_flows_no_description": {
+    "message": "暂无描述"
+  },
+  "sidepanel_flows_run": {
+    "message": "运行流程"
+  },
+  "sidepanel_flows_search_placeholder": {
+    "message": "搜索流程"
+  },
+  "sidepanel_flows_sort_name": {
+    "message": "名称"
+  },
+  "sidepanel_flows_sort_recent": {
+    "message": "最近更新"
+  },
+  "sidepanel_flows_sort_steps": {
+    "message": "步骤"
+  },
+  "sidepanel_flows_subtitle": {
+    "message": "构建可复用的操作序列。"
+  },
+  "sidepanel_flows_summary_title": {
+    "message": "摘要"
+  },
+  "sidepanel_flows_title": {
+    "message": "操作流程"
+  },
+  "sidepanel_hidden_add": {
+    "message": "添加隐藏规则"
+  },
+  "sidepanel_hidden_delete": {
+    "message": "删除规则"
+  },
+  "sidepanel_hidden_detail_subtitle": {
+    "message": "在下方编辑隐藏规则详情。"
+  },
+  "sidepanel_hidden_detail_title": {
+    "message": "隐藏规则详情"
+  },
+  "sidepanel_hidden_disable": {
+    "message": "禁用规则"
+  },
+  "sidepanel_hidden_empty": {
+    "message": "暂无隐藏规则。"
+  },
+  "sidepanel_hidden_enabled": {
+    "message": "规则已启用"
+  },
+  "sidepanel_hidden_name_placeholder": {
+    "message": "隐藏规则名称"
+  },
+  "sidepanel_hidden_note_placeholder": {
+    "message": "为什么需要此规则"
+  },
+  "sidepanel_hidden_selector_placeholder": {
+    "message": "CSS 选择器"
+  },
+  "sidepanel_hidden_subtitle": {
+    "message": "自动隐藏或屏蔽元素。"
+  },
+  "sidepanel_hidden_title": {
+    "message": "隐藏规则"
+  },
+  "sidepanel_label_unknown": {
+    "message": "未知"
+  },
+  "sidepanel_label_unknown_page": {
+    "message": "未知页面"
+  },
+  "sidepanel_language_en_us": {
+    "message": "英语（美国）"
+  },
+  "sidepanel_language_ja": {
+    "message": "日语"
+  },
+  "sidepanel_language_zh_cn": {
+    "message": "简体中文"
+  },
+  "sidepanel_layout_column": {
+    "message": "列"
+  },
+  "sidepanel_layout_row": {
+    "message": "行"
+  },
+  "sidepanel_overview_elements_count": {
+    "message": "{count} 个元素"
+  },
+  "sidepanel_overview_flows_count": {
+    "message": "{count} 个流程"
+  },
+  "sidepanel_overview_hidden_count": {
+    "message": "{count} 条隐藏规则"
+  },
+  "sidepanel_overview_sites_count": {
+    "message": "{count} 个站点"
+  },
+  "sidepanel_overview_sites_subtitle": {
+    "message": "按站点汇总。"
+  },
+  "sidepanel_overview_sites_title": {
+    "message": "站点"
+  },
+  "sidepanel_overview_subtitle": {
+    "message": "根据最新导出快照按站点汇总。"
+  },
+  "sidepanel_overview_title": {
+    "message": "概览"
+  },
+  "sidepanel_overview_total_items": {
+    "message": "共 {count} 项"
+  },
+  "sidepanel_scope_global": {
+    "message": "全局"
+  },
+  "sidepanel_scope_page": {
+    "message": "页面"
+  },
+  "sidepanel_scope_site": {
+    "message": "站点"
+  },
+  "sidepanel_select_placeholder": {
+    "message": "选择"
+  },
+  "sidepanel_selector_pick": {
+    "message": "选择元素"
+  },
+  "sidepanel_settings_close": {
+    "message": "关闭设置"
+  },
+  "sidepanel_settings_data_export": {
+    "message": "导出"
+  },
+  "sidepanel_settings_data_import": {
+    "message": "导入"
+  },
+  "sidepanel_settings_data_subtitle": {
+    "message": "导入或导出已保存的元素和流程。"
+  },
+  "sidepanel_settings_data_title": {
+    "message": "数据管理"
+  },
+  "sidepanel_settings_language_subtitle": {
+    "message": "选择侧边面板语言。"
+  },
+  "sidepanel_settings_language_title": {
+    "message": "语言"
+  },
+  "sidepanel_settings_locale": {
+    "message": "区域设置：{locale}"
+  },
+  "sidepanel_settings_share_copy": {
+    "message": "复制链接"
+  },
+  "sidepanel_settings_share_open": {
+    "message": "打开商店"
+  },
+  "sidepanel_settings_share_subtitle": {
+    "message": "将 Chrome Web Store 链接发送给团队成员。"
+  },
+  "sidepanel_settings_share_title": {
+    "message": "分享"
+  },
+  "sidepanel_settings_subtitle": {
+    "message": "精细设置数据、语言和分享。"
+  },
+  "sidepanel_settings_title": {
+    "message": "设置"
+  },
+  "sidepanel_step_assert_description": {
+    "message": "检查值或状态。"
+  },
+  "sidepanel_step_assert_label": {
+    "message": "断言"
+  },
+  "sidepanel_step_click_description": {
+    "message": "根据选择器点击元素。"
+  },
+  "sidepanel_step_click_label": {
+    "message": "点击"
+  },
+  "sidepanel_step_condition_contains": {
+    "message": "包含"
+  },
+  "sidepanel_step_condition_equals": {
+    "message": "等于"
+  },
+  "sidepanel_step_condition_greater": {
+    "message": "大于"
+  },
+  "sidepanel_step_condition_is": {
+    "message": "是"
+  },
+  "sidepanel_step_condition_label": {
+    "message": "条件"
+  },
+  "sidepanel_step_condition_less": {
+    "message": "小于"
+  },
+  "sidepanel_step_data_source_description": {
+    "message": "加载 CSV/TSV 并遍历行。"
+  },
+  "sidepanel_step_data_source_label": {
+    "message": "数据源"
+  },
+  "sidepanel_step_if_else_description": {
+    "message": "根据条件分支步骤。"
+  },
+  "sidepanel_step_if_else_label": {
+    "message": "如果 / 否则"
+  },
+  "sidepanel_step_input_description": {
+    "message": "在字段中输入文本。"
+  },
+  "sidepanel_step_input_label": {
+    "message": "输入"
+  },
+  "sidepanel_step_loop_description": {
+    "message": "按次数重复嵌套步骤。"
+  },
+  "sidepanel_step_loop_label": {
+    "message": "循环"
+  },
+  "sidepanel_step_navigate_description": {
+    "message": "访问 URL。"
+  },
+  "sidepanel_step_navigate_label": {
+    "message": "跳转"
+  },
+  "sidepanel_step_summary_conditional": {
+    "message": "条件检查"
+  },
+  "sidepanel_step_summary_duration": {
+    "message": "时长：{value} ms"
+  },
+  "sidepanel_step_summary_expect": {
+    "message": "期望 {selector} {operator} \"{value}\""
+  },
+  "sidepanel_step_summary_if": {
+    "message": "如果 {selector} {operator} \"{value}\""
+  },
+  "sidepanel_step_summary_input": {
+    "message": "输入"
+  },
+  "sidepanel_step_summary_repeat_steps": {
+    "message": "重复步骤"
+  },
+  "sidepanel_step_summary_repeat_times": {
+    "message": "重复 {count} 次"
+  },
+  "sidepanel_step_summary_selector": {
+    "message": "选择器：{value}"
+  },
+  "sidepanel_step_summary_url": {
+    "message": "URL：{value}"
+  },
+  "sidepanel_step_summary_value": {
+    "message": "值：{value}"
+  },
+  "sidepanel_step_summary_wait_until": {
+    "message": "等待直到 {selector} {operator} \"{value}\""
+  },
+  "sidepanel_step_wait_description": {
+    "message": "暂停或等待元素条件。"
+  },
+  "sidepanel_step_wait_label": {
+    "message": "等待"
+  },
+  "sidepanel_step_wait_mode_condition": {
+    "message": "元素条件"
+  },
+  "sidepanel_step_wait_mode_time": {
+    "message": "时间延迟"
+  },
+  "sidepanel_steps_add": {
+    "message": "添加步骤"
+  },
+  "sidepanel_steps_add_in_loop": {
+    "message": "在循环中添加步骤"
+  },
+  "sidepanel_steps_add_per_row": {
+    "message": "每行添加步骤"
+  },
+  "sidepanel_steps_add_to_branch": {
+    "message": "在 {label} 中添加步骤"
+  },
+  "sidepanel_steps_add_to_data_source": {
+    "message": "在数据源中添加步骤"
+  },
+  "sidepanel_steps_add_to_loop": {
+    "message": "添加步骤到循环"
+  },
+  "sidepanel_steps_choose_file": {
+    "message": "选择文件"
+  },
+  "sidepanel_steps_columns": {
+    "message": "列"
+  },
+  "sidepanel_steps_columns_count": {
+    "message": "{count} 列"
+  },
+  "sidepanel_steps_columns_empty": {
+    "message": "选择文件以加载列。"
+  },
+  "sidepanel_steps_columns_hint": {
+    "message": "点击列以创建输入步骤："
+  },
+  "sidepanel_steps_columns_missing": {
+    "message": "未检测到列"
+  },
+  "sidepanel_steps_columns_na": {
+    "message": "N/A"
+  },
+  "sidepanel_steps_columns_rows": {
+    "message": "{columns} 列 | {rows} 行"
+  },
+  "sidepanel_steps_count": {
+    "message": "{count} 步"
+  },
+  "sidepanel_steps_delete": {
+    "message": "删除步骤"
+  },
+  "sidepanel_steps_file_label": {
+    "message": "文件"
+  },
+  "sidepanel_steps_file_parse_error": {
+    "message": "文件解析失败"
+  },
+  "sidepanel_steps_file_waiting": {
+    "message": "等待选择文件"
+  },
+  "sidepanel_steps_header_row": {
+    "message": "表头行"
+  },
+  "sidepanel_steps_in_loop": {
+    "message": "循环内步骤"
+  },
+  "sidepanel_steps_insert_column": {
+    "message": "插入 {column}"
+  },
+  "sidepanel_steps_no_file_selected": {
+    "message": "未选择文件"
+  },
+  "sidepanel_steps_per_row": {
+    "message": "每行步骤"
+  },
+  "sidepanel_steps_search_empty": {
+    "message": "未找到步骤。"
+  },
+  "sidepanel_steps_search_placeholder": {
+    "message": "搜索步骤"
+  },
+  "sidepanel_steps_title": {
+    "message": "步骤"
+  },
+  "sidepanel_tab_elements": {
+    "message": "元素"
+  },
+  "sidepanel_tab_elements_tooltip": {
+    "message": "已保存的元素与快捷操作。"
+  },
+  "sidepanel_tab_flows": {
+    "message": "流程"
+  },
+  "sidepanel_tab_flows_tooltip": {
+    "message": "可复用的操作流程。"
+  },
+  "sidepanel_tab_hidden": {
+    "message": "隐藏"
+  },
+  "sidepanel_tab_hidden_tooltip": {
+    "message": "用于屏蔽元素的隐藏规则。"
+  },
+  "sidepanel_tab_overview": {
+    "message": "概览"
+  },
+  "sidepanel_tab_overview_tooltip": {
+    "message": "跨站点汇总。"
   }
 }

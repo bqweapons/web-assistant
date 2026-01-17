@@ -1,7 +1,8 @@
 import { useEffect, useRef, useState, type Ref } from 'react';
 import { createPortal } from 'react-dom';
-import { Plus } from 'lucide-react';
+import { Plus, Search } from 'lucide-react';
 import { STEP_LIBRARY } from './stepLibrary';
+import { t } from '../utils/i18n';
 
 type StepPickerProps = {
   onPick: (type: string) => void;
@@ -12,11 +13,13 @@ type StepPickerProps = {
 export default function StepPicker({ onPick, ariaLabel, buttonRef }: StepPickerProps) {
   const [open, setOpen] = useState(false);
   const [menuPosition, setMenuPosition] = useState<{ top: number; left: number } | null>(null);
+  const [query, setQuery] = useState('');
   const pickerRef = useRef<HTMLDivElement | null>(null);
   const menuRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
     if (!open) {
+      setQuery('');
       return;
     }
     const handlePointer = (event: MouseEvent | TouchEvent) => {
@@ -40,6 +43,14 @@ export default function StepPicker({ onPick, ariaLabel, buttonRef }: StepPickerP
       document.removeEventListener('keydown', handleKey);
     };
   }, [open]);
+
+  const normalizedQuery = query.trim().toLowerCase();
+  const filteredLibrary = normalizedQuery
+    ? STEP_LIBRARY.filter((item) => {
+        const haystack = `${item.label} ${item.description}`.toLowerCase();
+        return haystack.includes(normalizedQuery);
+      })
+    : STEP_LIBRARY;
 
   useEffect(() => {
     if (!open) {
@@ -94,21 +105,42 @@ export default function StepPicker({ onPick, ariaLabel, buttonRef }: StepPickerP
       }`}
       style={{ top: menuPosition?.top ?? 0, left: menuPosition?.left ?? 0 }}
     >
+      <div className="mb-2">
+        <div className="relative">
+          <Search className="pointer-events-none absolute left-2 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
+          <input
+            className="input h-8 pl-7 text-xs"
+            placeholder={t('sidepanel_steps_search_placeholder', 'Search steps')}
+            value={query}
+            onChange={(event) => setQuery(event.target.value)}
+          />
+        </div>
+      </div>
       <div className="flex flex-col gap-1">
-        {STEP_LIBRARY.map((item) => (
-          <button
-            key={item.type}
-            type="button"
-            className="rounded px-2 py-2 text-left transition hover:bg-muted focus-visible:bg-muted"
-            onClick={() => {
-              onPick(item.type);
-              setOpen(false);
-            }}
-          >
-            <div className="text-xs font-semibold text-foreground">{item.label}</div>
-            <div className="text-[11px] text-muted-foreground">{item.description}</div>
-          </button>
-        ))}
+        {filteredLibrary.length === 0 ? (
+          <div className="rounded px-2 py-2 text-[11px] text-muted-foreground">
+            {t('sidepanel_steps_search_empty', 'No steps found.')}
+          </div>
+        ) : (
+          filteredLibrary.map((item) => (
+            <button
+              key={item.type}
+              type="button"
+              className="rounded px-2 py-2 text-left transition hover:bg-muted focus-visible:bg-muted"
+              onClick={() => {
+                onPick(item.type);
+                setOpen(false);
+              }}
+            >
+              <div className="text-xs font-semibold text-foreground">
+                {t(item.labelKey, item.label)}
+              </div>
+              <div className="text-[11px] text-muted-foreground">
+                {t(item.descriptionKey, item.description)}
+              </div>
+            </button>
+          ))
+        )}
       </div>
     </div>
   ) : null;

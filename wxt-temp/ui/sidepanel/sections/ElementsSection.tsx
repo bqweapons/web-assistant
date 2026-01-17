@@ -23,8 +23,10 @@ import FlowDrawer from '../components/FlowDrawer';
 import FlowStepsBuilderPreview from '../components/FlowStepsBuilderPreview';
 import SelectMenu from '../components/SelectMenu';
 import { mockElements, mockFlows } from '../utils/mockData';
+import { t, useLocale } from '../utils/i18n';
 
 export default function ElementsSection() {
+  const locale = useLocale();
   const currentSite = 'all-sites';
   const [elements, setElements] = useState(mockElements);
   const [flows, setFlows] = useState(mockFlows);
@@ -72,10 +74,10 @@ export default function ElementsSection() {
   const filteredCount = filteredElements.length;
   const showClear = Boolean(searchQuery) || typeFilter !== 'all';
   const stylePresets: Array<{ value: string; label: string; styles: Record<string, string> | null }> = [
-    { value: '', label: 'Custom', styles: null },
+      { value: '', label: t('sidepanel_elements_style_custom', 'Custom'), styles: null },
     {
       value: 'button-default',
-      label: 'Primary',
+      label: t('sidepanel_elements_style_primary', 'Primary'),
       styles: {
         color: '#ffffff',
         backgroundColor: '#1b84ff',
@@ -87,7 +89,7 @@ export default function ElementsSection() {
     },
     {
       value: 'button-outline',
-      label: 'Outline',
+      label: t('sidepanel_elements_style_outline', 'Outline'),
       styles: {
         backgroundColor: 'transparent',
         color: '#2563eb',
@@ -98,7 +100,7 @@ export default function ElementsSection() {
     },
     {
       value: 'floating-card',
-      label: 'Floating',
+      label: t('sidepanel_elements_style_floating', 'Floating'),
       styles: {
         backgroundColor: '#ffffff',
         color: '#0f172a',
@@ -111,7 +113,7 @@ export default function ElementsSection() {
     },
     {
       value: 'link-default',
-      label: 'Link',
+      label: t('sidepanel_elements_style_link', 'Link'),
       styles: {
         color: '#2563eb',
         textDecoration: 'underline',
@@ -119,7 +121,7 @@ export default function ElementsSection() {
     },
     {
       value: 'area-default',
-      label: 'Area',
+      label: t('sidepanel_elements_style_area', 'Area'),
       styles: {
         backgroundColor: 'transparent',
         color: '#0f172a',
@@ -152,29 +154,29 @@ export default function ElementsSection() {
   }, [flows, flowSiteKey]);
   const actionFlowOptions = useMemo(
     () => [
-      { value: '__create__', label: 'Create new flow…', sticky: true },
-      { value: '', label: 'Unassigned' },
+      { value: '__create__', label: t('sidepanel_flows_create_new', 'Create new flow…'), sticky: true },
+      { value: '', label: t('sidepanel_field_unassigned', 'Unassigned') },
       ...filteredFlows.map((flow) => ({
         value: flow.id,
         label: flow.name,
-        rightLabel: `${flow.steps} steps`,
+        rightLabel: t('sidepanel_steps_count', '{count} steps').replace('{count}', String(flow.steps)),
       })),
     ],
-    [filteredFlows],
+    [filteredFlows, locale],
   );
   const positionOptions = [
-    { value: '', label: 'Auto' },
-    { value: 'static', label: 'Static' },
-    { value: 'relative', label: 'Relative' },
-    { value: 'absolute', label: 'Absolute' },
-    { value: 'fixed', label: 'Fixed' },
-    { value: 'sticky', label: 'Sticky' },
+    { value: '', label: t('sidepanel_elements_position_auto', 'Auto') },
+    { value: 'static', label: t('sidepanel_elements_position_static', 'Static') },
+    { value: 'relative', label: t('sidepanel_elements_position_relative', 'Relative') },
+    { value: 'absolute', label: t('sidepanel_elements_position_absolute', 'Absolute') },
+    { value: 'fixed', label: t('sidepanel_elements_position_fixed', 'Fixed') },
+    { value: 'sticky', label: t('sidepanel_elements_position_sticky', 'Sticky') },
   ];
   const shadowOptions = [
-    { value: '', label: 'None' },
-    { value: '0 12px 32px rgba(15, 23, 42, 0.18)', label: 'Soft' },
-    { value: '0 8px 24px rgba(15, 23, 42, 0.24)', label: 'Medium' },
-    { value: '0 4px 12px rgba(15, 23, 42, 0.3)', label: 'Strong' },
+    { value: '', label: t('sidepanel_elements_shadow_none', 'None') },
+    { value: '0 12px 32px rgba(15, 23, 42, 0.18)', label: t('sidepanel_elements_shadow_soft', 'Soft') },
+    { value: '0 8px 24px rgba(15, 23, 42, 0.24)', label: t('sidepanel_elements_shadow_medium', 'Medium') },
+    { value: '0 4px 12px rgba(15, 23, 42, 0.3)', label: t('sidepanel_elements_shadow_strong', 'Strong') },
   ];
   const customCssOrder = [
     'backgroundColor',
@@ -196,23 +198,23 @@ export default function ElementsSection() {
     'zIndex',
   ];
   const defaultColorSwatches = [
-    { label: 'Transparent', value: 'transparent' },
-    { label: 'Black', value: '#000000' },
-    { label: 'White', value: '#ffffff' },
-    { label: 'Blue', value: '#2563eb' },
-    { label: 'Red', value: '#ef4444' },
-    { label: 'Green', value: '#10b981' },
-    { label: 'Orange', value: '#f59e0b' },
-    { label: 'Purple', value: '#8b5cf6' },
+    { label: t('sidepanel_color_transparent', 'Transparent'), value: 'transparent' },
+    { label: t('sidepanel_color_black', 'Black'), value: '#000000' },
+    { label: t('sidepanel_color_white', 'White'), value: '#ffffff' },
+    { label: t('sidepanel_color_blue', 'Blue'), value: '#2563eb' },
+    { label: t('sidepanel_color_red', 'Red'), value: '#ef4444' },
+    { label: t('sidepanel_color_green', 'Green'), value: '#10b981' },
+    { label: t('sidepanel_color_orange', 'Orange'), value: '#f59e0b' },
+    { label: t('sidepanel_color_purple', 'Purple'), value: '#8b5cf6' },
   ];
 
   const formatTimestamp = (value?: number) => {
     if (!value) {
-      return 'Unknown';
+      return t('sidepanel_label_unknown', 'Unknown');
     }
     const date = new Date(value);
     if (Number.isNaN(date.getTime())) {
-      return 'Unknown';
+      return t('sidepanel_label_unknown', 'Unknown');
     }
     const pad = (segment: number) => String(segment).padStart(2, '0');
     return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())} ${pad(
@@ -221,7 +223,7 @@ export default function ElementsSection() {
   };
 
   const handleCreateFlow = () => {
-    const name = draftFlow.name.trim() || 'New flow';
+    const name = draftFlow.name.trim() || t('sidepanel_flows_new_default', 'New flow');
     const description = draftFlow.description.trim();
     const nextFlow = {
       id: `flow-${Date.now()}`,
@@ -246,17 +248,21 @@ export default function ElementsSection() {
 
   const renderFlowSummary = (steps: number, onSave: () => void) => (
     <>
-      <p className="text-xs font-semibold text-muted-foreground">Summary</p>
-      <p className="text-sm text-foreground">{steps} steps</p>
+      <p className="text-xs font-semibold text-muted-foreground">
+        {t('sidepanel_flows_summary_title', 'Summary')}
+      </p>
+      <p className="text-sm text-foreground">
+        {t('sidepanel_steps_count', '{count} steps').replace('{count}', String(steps))}
+      </p>
       <div className="flex flex-wrap items-center gap-2">
         <button type="button" className="btn-primary text-xs" onClick={onSave}>
-          Save
+          {t('sidepanel_action_save', 'Save')}
         </button>
         <button type="button" className="btn-primary text-xs" disabled>
-          Save &amp; Run
+          {t('sidepanel_action_save_run', 'Save & Run')}
         </button>
         <button type="button" className="btn-primary text-xs" disabled>
-          Run
+          {t('sidepanel_action_run', 'Run')}
         </button>
       </div>
     </>
@@ -271,7 +277,24 @@ export default function ElementsSection() {
     if (selector) {
       return selector;
     }
-    return `${element.type} element`;
+    return t('sidepanel_elements_default_label', '{type} element').replace(
+      '{type}',
+      getElementTypeLabel(element.type),
+    );
+  };
+
+  const getElementTypeLabel = (value: string) => {
+    const normalized = value.toLowerCase();
+    if (normalized === 'button') {
+      return t('sidepanel_element_type_button', 'Button');
+    }
+    if (normalized === 'link') {
+      return t('sidepanel_element_type_link', 'Link');
+    }
+    if (normalized === 'area') {
+      return t('sidepanel_element_type_area', 'Area');
+    }
+    return value;
   };
 
   const getPageHref = (pageUrl: string, siteUrl: string) => {
@@ -294,7 +317,7 @@ export default function ElementsSection() {
   };
   const getPageLabel = (pageUrl: string, siteUrl: string) => {
     if (!pageUrl) {
-      return 'Unknown page';
+      return t('sidepanel_label_unknown_page', 'Unknown page');
     }
     const formatHostPath = (host: string, pathname: string) => {
       const cleanPath = pathname.replace(/^\/+/, '');
@@ -338,41 +361,78 @@ export default function ElementsSection() {
     const type = element.type.toLowerCase();
     if (type === 'button') {
       if (element.actionFlowId) {
-        return `Action flow: ${element.actionFlowId}`;
+        return t('sidepanel_elements_action_flow_value', 'Action flow: {value}').replace(
+          '{value}',
+          element.actionFlowId,
+        );
       }
-      return element.actionFlow ? 'Action flow: Configured' : 'Action flow: Unassigned';
+      return element.actionFlow
+        ? t('sidepanel_elements_action_flow_configured', 'Action flow: Configured')
+        : t('sidepanel_elements_action_flow_unassigned', 'Action flow: Unassigned');
     }
     if (type === 'link') {
-      return `Link: ${element.href || 'Unassigned'}`;
+      return t('sidepanel_elements_link_value', 'Link: {value}').replace(
+        '{value}',
+        element.href || t('sidepanel_field_unassigned', 'Unassigned'),
+      );
     }
     if (type === 'area') {
       const count = areaChildCounts[element.id] ?? 0;
-      return `Contains ${count} ${count === 1 ? 'element' : 'elements'}`;
+      return t('sidepanel_elements_contains_count', 'Contains {count} elements').replace(
+        '{count}',
+        String(count),
+      );
     }
-    return element.selector ? `Selector: ${element.selector}` : 'Detail: Not set';
+    return element.selector
+      ? t('sidepanel_elements_selector_value', 'Selector: {value}').replace('{value}', element.selector)
+      : t('sidepanel_elements_detail_not_set', 'Detail: Not set');
   };
   const getElementDetailRows = (element: typeof elements[number]) => {
     const rows = [
-      { label: 'Type', value: element.type },
-      { label: 'Scope', value: element.scope || 'page' },
-      { label: 'Site', value: element.siteUrl || 'Unknown' },
-      { label: 'Page', value: getPageLabel(element.pageUrl, element.siteUrl || currentSite) },
-      { label: 'Selector', value: element.selector || 'Not set' },
+      { label: t('sidepanel_field_type', 'Type'), value: getElementTypeLabel(element.type) },
+      {
+        label: t('sidepanel_field_scope', 'Scope'),
+        value:
+          element.scope === 'site'
+            ? t('sidepanel_scope_site', 'Site')
+            : element.scope === 'global'
+              ? t('sidepanel_scope_global', 'Global')
+              : t('sidepanel_scope_page', 'Page'),
+      },
+      { label: t('sidepanel_field_site', 'Site'), value: element.siteUrl || t('sidepanel_label_unknown', 'Unknown') },
+      { label: t('sidepanel_field_page', 'Page'), value: getPageLabel(element.pageUrl, element.siteUrl || currentSite) },
+      { label: t('sidepanel_field_selector', 'Selector'), value: element.selector || t('sidepanel_field_not_set', 'Not set') },
     ];
     const type = element.type.toLowerCase();
     if (type === 'button') {
       rows.push({
-        label: 'Action flow',
-        value: element.actionFlowId || (element.actionFlow ? 'Configured' : 'Not set'),
+        label: t('sidepanel_field_action_flow', 'Action flow'),
+        value:
+          element.actionFlowId ||
+          (element.actionFlow
+            ? t('sidepanel_field_configured', 'Configured')
+            : t('sidepanel_field_not_set', 'Not set')),
       });
     }
     if (type === 'link') {
-      rows.push({ label: 'Link', value: element.href || 'Not set' });
+      rows.push({
+        label: t('sidepanel_field_link', 'Link'),
+        value: element.href || t('sidepanel_field_not_set', 'Not set'),
+      });
     }
     if (type === 'area') {
-      rows.push({ label: 'Layout', value: element.layout || 'row' });
+      rows.push({
+        label: t('sidepanel_field_layout', 'Layout'),
+        value:
+          element.layout === 'column'
+            ? t('sidepanel_layout_column', 'Column')
+            : t('sidepanel_layout_row', 'Row'),
+      });
     }
-    rows.push({ label: 'Last updated', value: formatTimestamp(element.updatedAt) });
+    rows.push({
+      label: t('sidepanel_field_last_updated', 'Last updated'),
+      value: formatTimestamp(element.updatedAt),
+    });
     return rows;
   };
 
@@ -689,8 +749,12 @@ export default function ElementsSection() {
     <div className="flex flex-col gap-2">
       <div className="flex items-center justify-between gap-2">
         <div>
-          <h2 className="text-base font-semibold text-card-foreground">Elements</h2>
-          <p className="text-xs text-muted-foreground">Find saved elements across pages.</p>
+          <h2 className="text-base font-semibold text-card-foreground">
+            {t('sidepanel_elements_title', 'Elements')}
+          </h2>
+          <p className="text-xs text-muted-foreground">
+            {t('sidepanel_elements_subtitle', 'Find saved elements across pages.')}
+          </p>
         </div>
         <span className="text-xs text-muted-foreground">{filteredCount}</span>
       </div>
@@ -701,7 +765,7 @@ export default function ElementsSection() {
           <input
             className="input pl-9"
             type="search"
-            placeholder="Search by name, type, or page"
+            placeholder={t('sidepanel_elements_search_placeholder', 'Search by name, type, or page')}
             value={searchQuery}
             onChange={(event) => setSearchQuery(event.target.value)}
           />
@@ -714,7 +778,9 @@ export default function ElementsSection() {
           >
             {typeOptions.map((type) => (
               <option key={type} value={type}>
-                {type === 'all' ? 'All types' : `${type.slice(0, 1).toUpperCase()}${type.slice(1)}`}
+                {type === 'all'
+                  ? t('sidepanel_elements_type_all', 'All types')
+                  : getElementTypeLabel(type)}
               </option>
             ))}
           </select>
@@ -727,7 +793,7 @@ export default function ElementsSection() {
                 setTypeFilter('all');
               }}
             >
-              Clear
+              {t('sidepanel_action_clear', 'Clear')}
             </button>
           ) : null}
         </div>
@@ -735,11 +801,11 @@ export default function ElementsSection() {
 
       {elements.length === 0 ? (
         <Card className="bg-muted text-center text-sm text-muted-foreground">
-          No elements yet. Create your first element to get started.
+          {t('sidepanel_elements_empty', 'No elements yet. Create your first element to get started.')}
         </Card>
       ) : filteredElements.length === 0 ? (
         <Card className="bg-muted text-center text-sm text-muted-foreground">
-          No matches. Try a different search or filter.
+          {t('sidepanel_elements_empty_filtered', 'No matches. Try a different search or filter.')}
         </Card>
       ) : (
         <div className="grid gap-3">
@@ -757,15 +823,15 @@ export default function ElementsSection() {
                   </p>
                 </div>
                 <div className="flex items-center gap-2">
-                  <a
-                    className="inline-flex items-center gap-1 text-xs font-semibold text-primary underline-offset-2 hover:underline"
-                    href={getPageHref(page, pageSite)}
-                    target="_blank"
-                    rel="noreferrer"
-                  >
-                    <ExternalLink className="h-3.5 w-3.5" />
-                    Open
-                  </a>
+                    <a
+                      className="inline-flex items-center gap-1 text-xs font-semibold text-primary underline-offset-2 hover:underline"
+                      href={getPageHref(page, pageSite)}
+                      target="_blank"
+                      rel="noreferrer"
+                    >
+                      <ExternalLink className="h-3.5 w-3.5" />
+                      {t('sidepanel_action_open', 'Open')}
+                    </a>
                 </div>
               </div>
               <div className="grid gap-2">
@@ -777,7 +843,7 @@ export default function ElementsSection() {
                   >
                     <div className="flex items-start justify-between gap-2">
                       <div className="flex min-w-0 flex-1 items-center gap-2">
-                        <span className="badge-pill shrink-0">{element.type}</span>
+                        <span className="badge-pill shrink-0">{getElementTypeLabel(element.type)}</span>
                         <h3 className="min-w-0 flex-1 truncate text-sm font-semibold text-card-foreground">
                           {getElementLabel(element)}
                         </h3>
@@ -786,7 +852,7 @@ export default function ElementsSection() {
                         <button
                           type="button"
                           className={actionClass}
-                          aria-label="Locate element"
+                          aria-label={t('sidepanel_elements_locate', 'Locate element')}
                           onClick={(event) => event.stopPropagation()}
                         >
                           <Crosshair className="h-4 w-4" />
@@ -794,7 +860,7 @@ export default function ElementsSection() {
                         <button
                           type="button"
                           className={`${actionClass} btn-icon-danger`}
-                          aria-label="Delete element"
+                          aria-label={t('sidepanel_elements_delete', 'Delete element')}
                           onClick={(event) => event.stopPropagation()}
                         >
                           <Trash2 className="h-4 w-4" />
@@ -821,22 +887,24 @@ export default function ElementsSection() {
         title={
           activeElement ? (
             <>
-              <span className="badge-pill shrink-0">{activeElement.type}</span>
+              <span className="badge-pill shrink-0">
+                {getElementTypeLabel(activeElement.type)}
+              </span>
               <span>{getElementLabel(activeElement)}</span>
             </>
           ) : (
-            'Element details'
+            t('sidepanel_elements_detail_title', 'Element details')
           )
         }
-        description="Update the element settings below."
+        description={t('sidepanel_elements_detail_subtitle', 'Update the element settings below.')}
         actions={
           <>
             <button
               type="button"
               className="btn-icon h-8 w-8"
               onClick={() => setActiveElementId(null)}
-              aria-label="Cancel"
-              title="Cancel"
+              aria-label={t('sidepanel_action_cancel', 'Cancel')}
+              title={t('sidepanel_action_cancel', 'Cancel')}
             >
               <X className="h-4 w-4" />
             </button>
@@ -844,8 +912,8 @@ export default function ElementsSection() {
               type="button"
               className="btn-icon h-8 w-8 border-transparent bg-primary text-primary-foreground hover:brightness-95"
               onClick={handleElementSave}
-              aria-label="Save"
-              title="Save"
+              aria-label={t('sidepanel_action_save', 'Save')}
+              title={t('sidepanel_action_save', 'Save')}
             >
               <Check className="h-4 w-4" />
             </button>
@@ -857,15 +925,17 @@ export default function ElementsSection() {
         {editElement ? (
           <div className="grid gap-3 text-xs text-muted-foreground">
             <div className="rounded border border-border bg-card p-3">
-              <div className="text-xs font-semibold text-foreground">Basics</div>
+              <div className="text-xs font-semibold text-foreground">
+                {t('sidepanel_elements_basics', 'Basics')}
+              </div>
               <div className="mt-2 grid gap-2 sm:grid-cols-2">
                 <label className="grid gap-1 sm:col-span-2">
-                  <span>Name</span>
+                  <span>{t('sidepanel_field_name', 'Name')}</span>
                   <input
                     className="input"
                     value={editElement.text}
                     onChange={(event) => setEditElement({ ...editElement, text: event.target.value })}
-                    placeholder="Element text"
+                    placeholder={t('sidepanel_elements_name_placeholder', 'Element text')}
                   />
                 </label>
                 <label className="inline-flex items-center gap-2 text-xs sm:col-span-2">
@@ -877,16 +947,18 @@ export default function ElementsSection() {
                       setEditElement({ ...editElement, scope: event.target.checked ? 'site' : 'page' })
                     }
                   />
-                  <span>Apply to entire site</span>
+                  <span>{t('sidepanel_elements_apply_site', 'Apply to entire site')}</span>
                 </label>
               </div>
             </div>
             <div className="rounded border border-border bg-card p-3">
-              <div className="text-xs font-semibold text-foreground">Action</div>
+              <div className="text-xs font-semibold text-foreground">
+                {t('sidepanel_elements_action_title', 'Action')}
+              </div>
               <div className="mt-2 grid gap-2 sm:grid-cols-2">
                 {editElement.type.toLowerCase() === 'button' ? (
                   <div className="grid gap-1 sm:col-span-2">
-                    <span>Action flow</span>
+                    <span>{t('sidepanel_field_action_flow', 'Action flow')}</span>
                     <SelectMenu
                       value={editElement.actionFlowId || ''}
                       options={actionFlowOptions}
@@ -905,21 +977,21 @@ export default function ElementsSection() {
                 {editElement.type.toLowerCase() === 'link' ? (
                   <>
                     <label className="grid gap-1 sm:col-span-2">
-                      <span>Link URL</span>
+                      <span>{t('sidepanel_elements_link_url', 'Link URL')}</span>
                       <input
                         className="input"
                         value={editElement.href}
                         onChange={(event) => setEditElement({ ...editElement, href: event.target.value })}
-                        placeholder="https://example.com"
+                        placeholder={t('sidepanel_elements_link_placeholder', 'https://example.com')}
                       />
                     </label>
                     <div className="grid gap-1 sm:col-span-2">
-                      <span>Link target</span>
+                      <span>{t('sidepanel_elements_link_target', 'Link target')}</span>
                       <SelectMenu
                         value={editElement.linkTarget || 'new-tab'}
                         options={[
-                          { value: 'new-tab', label: 'Open in new tab' },
-                          { value: 'same-tab', label: 'Open in same tab' },
+                          { value: 'new-tab', label: t('sidepanel_elements_link_new_tab', 'Open in new tab') },
+                          { value: 'same-tab', label: t('sidepanel_elements_link_same_tab', 'Open in same tab') },
                         ]}
                         useInputStyle={false}
                         buttonClassName={selectButtonClass}
@@ -935,12 +1007,12 @@ export default function ElementsSection() {
                 ) : null}
                 {editElement.type.toLowerCase() === 'area' ? (
                   <div className="grid gap-1 sm:col-span-2">
-                    <span>Layout</span>
+                    <span>{t('sidepanel_field_layout', 'Layout')}</span>
                     <SelectMenu
                       value={editElement.layout || 'row'}
                       options={[
-                        { value: 'row', label: 'Row' },
-                        { value: 'column', label: 'Column' },
+                        { value: 'row', label: t('sidepanel_layout_row', 'Row') },
+                        { value: 'column', label: t('sidepanel_layout_column', 'Column') },
                       ]}
                       useInputStyle={false}
                       buttonClassName={selectButtonClass}
@@ -956,11 +1028,13 @@ export default function ElementsSection() {
               </div>
             </div>
             <div className="rounded border border-border bg-card p-3">
-              <div className="text-xs font-semibold text-foreground">Styles</div>
+              <div className="text-xs font-semibold text-foreground">
+                {t('sidepanel_elements_styles_title', 'Styles')}
+              </div>
               <div className="mt-2 grid gap-3">
                 <div className="grid gap-1">
                   <span className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
-                    Preset
+                    {t('sidepanel_elements_style_preset', 'Preset')}
                   </span>
                   <SelectMenu
                     value={editElement.stylePreset || ''}
@@ -979,7 +1053,7 @@ export default function ElementsSection() {
                     <button
                       type="button"
                       className="btn-ghost h-6 w-6 p-0"
-                      aria-label="Decrease font size"
+                      aria-label={t('sidepanel_elements_font_decrease', 'Decrease font size')}
                       onClick={() => adjustNumericStyle('fontSize', -1, 'px', 12)}
                     >
                       <AArrowDown className="h-3.5 w-3.5" />
@@ -987,7 +1061,7 @@ export default function ElementsSection() {
                     <button
                       type="button"
                       className="btn-ghost h-6 w-6 p-0"
-                      aria-label="Increase font size"
+                      aria-label={t('sidepanel_elements_font_increase', 'Increase font size')}
                       onClick={() => adjustNumericStyle('fontSize', 1, 'px', 12)}
                     >
                       <AArrowUp className="h-3.5 w-3.5" />
@@ -1057,7 +1131,7 @@ export default function ElementsSection() {
                   <div className="grid gap-2">
                     <div className="grid gap-1">
                       <span className="text-[10px] font-semibold uppercase text-muted-foreground">
-                        Text
+                        {t('sidepanel_elements_style_text', 'Text')}
                       </span>
                       <div className="flex items-center gap-2">
                         <input
@@ -1072,7 +1146,7 @@ export default function ElementsSection() {
                     </div>
                     <div className="grid gap-1">
                       <span className="text-[10px] font-semibold uppercase text-muted-foreground">
-                        Background
+                        {t('sidepanel_elements_style_background', 'Background')}
                       </span>
                       <div className="flex items-center gap-2">
                         <input
@@ -1093,7 +1167,7 @@ export default function ElementsSection() {
                 <details className="group">
                   <summary className="cursor-pointer list-none">
                     <div className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
-                      <span>Layout</span>
+                      <span>{t('sidepanel_field_layout', 'Layout')}</span>
                       <span className="h-px flex-1 bg-border" />
                       <ChevronDown className="h-4 w-4 text-muted-foreground transition group-open:rotate-180" />
                     </div>
@@ -1101,18 +1175,18 @@ export default function ElementsSection() {
                   <div className="mt-2 flex flex-wrap items-center gap-2 rounded border border-border bg-muted p-2">
                     <div className="flex items-center gap-2">
                       <span className="text-[10px] font-semibold uppercase text-muted-foreground">
-                        Border
+                        {t('sidepanel_elements_style_border', 'Border')}
                       </span>
                       <input
                         className="input h-8 w-40 px-2 text-xs"
                         value={borderValue}
                         onChange={(event) => applyCustomCssUpdates({ border: event.target.value })}
-                        placeholder="1px solid #000"
+                        placeholder={t('sidepanel_elements_border_placeholder', '1px solid #000')}
                       />
                     </div>
                     <div className="flex items-center gap-2">
                       <span className="text-[10px] font-semibold uppercase text-muted-foreground">
-                        Radius
+                        {t('sidepanel_elements_style_radius', 'Radius')}
                       </span>
                       <input
                         className="input h-8 w-16 px-2 text-xs"
@@ -1121,17 +1195,17 @@ export default function ElementsSection() {
                         onChange={(event) =>
                           updateNumericStyle('borderRadius', event.target.value, 'px')
                         }
-                        placeholder="8"
+                        placeholder={t('sidepanel_elements_radius_placeholder', '8')}
                       />
                     </div>
                     <div className="flex items-center gap-2">
                       <span className="text-[10px] font-semibold uppercase text-muted-foreground">
-                        Shadow
+                        {t('sidepanel_elements_style_shadow', 'Shadow')}
                       </span>
                       <SelectMenu
                         value={shadowOptions.some((option) => option.value === boxShadowValue) ? boxShadowValue : ''}
                         options={shadowOptions}
-                        placeholder="Custom"
+                        placeholder={t('sidepanel_elements_shadow_custom', 'Custom')}
                         useInputStyle={false}
                         buttonClassName="btn-ghost h-8 px-2 text-xs"
                         onChange={(value) => applyCustomCssUpdates({ boxShadow: value })}
@@ -1139,13 +1213,13 @@ export default function ElementsSection() {
                     </div>
                     <div className="flex items-center gap-2">
                       <span className="text-[10px] font-semibold uppercase text-muted-foreground">
-                        Padding
+                        {t('sidepanel_elements_style_padding', 'Padding')}
                       </span>
                       <input
                         className="input h-8 w-28 px-2 text-xs"
                         value={paddingValue}
                         onChange={(event) => applyCustomCssUpdates({ padding: event.target.value })}
-                        placeholder="8px 16px"
+                        placeholder={t('sidepanel_elements_padding_placeholder', '8px 16px')}
                       />
                     </div>
                   </div>
@@ -1154,7 +1228,7 @@ export default function ElementsSection() {
                 <details className="group">
                   <summary className="cursor-pointer list-none">
                     <div className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
-                      <span>Position</span>
+                      <span>{t('sidepanel_elements_style_position', 'Position')}</span>
                       <span className="h-px flex-1 bg-border" />
                       <ChevronDown className="h-4 w-4 text-muted-foreground transition group-open:rotate-180" />
                     </div>
@@ -1162,65 +1236,75 @@ export default function ElementsSection() {
                   <div className="mt-2 flex flex-wrap items-center gap-2 rounded border border-border bg-muted p-2">
                     <div className="flex items-center gap-2">
                       <span className="text-[10px] font-semibold uppercase text-muted-foreground">
-                        Mode
+                        {t('sidepanel_elements_position_mode', 'Mode')}
                       </span>
                       <SelectMenu
                         value={positionValue}
                         options={positionOptions}
-                        placeholder="Auto"
+                        placeholder={t('sidepanel_elements_position_auto', 'Auto')}
                         useInputStyle={false}
                         buttonClassName="btn-ghost h-8 px-2 text-xs"
                         onChange={(value) => applyCustomCssUpdates({ position: value })}
                       />
                     </div>
                     <div className="flex items-center gap-2">
-                      <span className="text-[10px] font-semibold uppercase text-muted-foreground">W</span>
+                      <span className="text-[10px] font-semibold uppercase text-muted-foreground">
+                        {t('sidepanel_elements_position_width', 'W')}
+                      </span>
                       <input
                         className="input h-8 w-16 px-2 text-xs"
                         type="number"
                         value={widthValue}
                         onChange={(event) => updateNumericStyle('width', event.target.value, 'px')}
-                        placeholder="120"
+                        placeholder={t('sidepanel_elements_position_width_placeholder', '120')}
                       />
                     </div>
                     <div className="flex items-center gap-2">
-                      <span className="text-[10px] font-semibold uppercase text-muted-foreground">H</span>
+                      <span className="text-[10px] font-semibold uppercase text-muted-foreground">
+                        {t('sidepanel_elements_position_height', 'H')}
+                      </span>
                       <input
                         className="input h-8 w-16 px-2 text-xs"
                         type="number"
                         value={heightValue}
                         onChange={(event) => updateNumericStyle('height', event.target.value, 'px')}
-                        placeholder="40"
+                        placeholder={t('sidepanel_elements_position_height_placeholder', '40')}
                       />
                     </div>
                     <div className="flex items-center gap-2">
-                      <span className="text-[10px] font-semibold uppercase text-muted-foreground">X</span>
+                      <span className="text-[10px] font-semibold uppercase text-muted-foreground">
+                        {t('sidepanel_elements_position_x', 'X')}
+                      </span>
                       <input
                         className="input h-8 w-16 px-2 text-xs"
                         type="number"
                         value={leftValue}
                         onChange={(event) => updateNumericStyle('left', event.target.value, 'px')}
-                        placeholder="12"
+                        placeholder={t('sidepanel_elements_position_x_placeholder', '12')}
                       />
                     </div>
                     <div className="flex items-center gap-2">
-                      <span className="text-[10px] font-semibold uppercase text-muted-foreground">Y</span>
+                      <span className="text-[10px] font-semibold uppercase text-muted-foreground">
+                        {t('sidepanel_elements_position_y', 'Y')}
+                      </span>
                       <input
                         className="input h-8 w-16 px-2 text-xs"
                         type="number"
                         value={topValue}
                         onChange={(event) => updateNumericStyle('top', event.target.value, 'px')}
-                        placeholder="12"
+                        placeholder={t('sidepanel_elements_position_y_placeholder', '12')}
                       />
                     </div>
                     <div className="flex items-center gap-2">
-                      <span className="text-[10px] font-semibold uppercase text-muted-foreground">Z</span>
+                      <span className="text-[10px] font-semibold uppercase text-muted-foreground">
+                        {t('sidepanel_elements_position_z', 'Z')}
+                      </span>
                       <input
                         className="input h-8 w-16 px-2 text-xs"
                         type="number"
                         value={zIndexValue}
                         onChange={(event) => updateNumericStyle('zIndex', event.target.value, '')}
-                        placeholder="999"
+                        placeholder={t('sidepanel_elements_position_z_placeholder', '999')}
                       />
                     </div>
                   </div>
@@ -1228,7 +1312,7 @@ export default function ElementsSection() {
 
                 <label className="grid gap-1">
                   <span className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
-                    Custom Styles
+                    {t('sidepanel_elements_custom_styles', 'Custom Styles')}
                   </span>
                   <textarea
                     className="input min-h-[88px] font-mono text-[11px]"
@@ -1240,7 +1324,7 @@ export default function ElementsSection() {
                         customCss: event.target.value,
                       })
                     }
-                    placeholder="color: #0f172a; padding: 8px;"
+                    placeholder={t('sidepanel_elements_custom_styles_placeholder', 'color: #0f172a; padding: 8px;')}
                   />
                 </label>
               </div>
@@ -1251,8 +1335,8 @@ export default function ElementsSection() {
 
       <FlowDrawer
         open={flowDrawerOpen}
-        title="New flow"
-        subtitle="Create a new action flow."
+        title={t('sidepanel_flows_new_title', 'New flow')}
+        subtitle={t('sidepanel_flows_new_subtitle', 'Create a new action flow.')}
         onClose={() => setFlowDrawerOpen(false)}
         summary={renderFlowSummary(getFlowStepCount(draftFlow.steps), handleCreateFlow)}
         overlayClassName="z-[70]"
@@ -1260,26 +1344,26 @@ export default function ElementsSection() {
       >
         <div className="space-y-4 text-xs text-muted-foreground">
           <label className="block text-xs font-semibold text-muted-foreground">
-            Name
+            {t('sidepanel_field_name', 'Name')}
             <input
               className="input mt-1"
               value={draftFlow.name}
               onChange={(event) => setDraftFlow({ ...draftFlow, name: event.target.value })}
-              placeholder="Flow name"
+              placeholder={t('sidepanel_flows_name_placeholder', 'Flow name')}
             />
           </label>
           <label className="block text-xs font-semibold text-muted-foreground">
-            Description
+            {t('sidepanel_field_description', 'Description')}
             <textarea
               className="input mt-1"
               rows={2}
               value={draftFlow.description}
               onChange={(event) => setDraftFlow({ ...draftFlow, description: event.target.value })}
-              placeholder="What does this flow do?"
+              placeholder={t('sidepanel_flows_description_prompt', 'What does this flow do?')}
             />
           </label>
           <label className="block text-xs font-semibold text-muted-foreground">
-            Steps
+            {t('sidepanel_steps_title', 'Steps')}
             <input
               className="input mt-1"
               type="number"

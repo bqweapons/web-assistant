@@ -1,5 +1,6 @@
 import type { AppHeaderProps } from '../types';
 import TabBar from './TabBar';
+import { t } from '../utils/i18n';
 
 export default function AppHeader({ title, context, actions, tabs, activeTabId, onTabChange }: AppHeaderProps) {
   const showTabs = tabs && activeTabId && onTabChange;
@@ -10,7 +11,7 @@ export default function AppHeader({ title, context, actions, tabs, activeTabId, 
           <div className="flex items-center gap-3">
             <img
               src="/icon/128.png"
-              alt={`${title} logo`}
+              alt={t('sidepanel_app_logo_alt', '{title} logo').replace('{title}', title)}
               className="h-9 w-9 rounded object-cover"
             />
             <div>

@@ -1,22 +1,28 @@
-import { useEffect, useState } from 'react';
-import { Play, Trash2 } from 'lucide-react';
+import { useEffect, useMemo, useState } from 'react';
+import { Check, CheckCircle2, Play, Search, Trash2 } from 'lucide-react';
 import Card from '../components/Card';
 import FlowDrawer from '../components/FlowDrawer';
 import FlowStepsBuilderPreview from '../components/FlowStepsBuilderPreview';
 import { mockFlows } from '../utils/mockData';
+import { t } from '../utils/i18n';
 
 type FlowsSectionProps = {
   createFlowOpen?: boolean;
   onCreateFlowClose?: () => void;
 };
 
-export default function FlowsSection({ createFlowOpen = false, onCreateFlowClose }: FlowsSectionProps) {
+export default function FlowsSection({
+  createFlowOpen = false,
+  onCreateFlowClose,
+}: FlowsSectionProps) {
   const currentSite = mockFlows[0]?.site ?? 'file://';
   const [flows, setFlows] = useState(mockFlows);
-  const siteFlows = flows.filter((flow) => flow.site === currentSite);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [sortMode, setSortMode] = useState('recent');
   const actionClass = 'btn-icon h-8 w-8';
   const [activeFlowId, setActiveFlowId] = useState<string | null>(null);
-  const activeFlow = siteFlows.find((flow) => flow.id === activeFlowId) ?? null;
+  const [draftFlowSite] = useState(currentSite);
+  const activeFlow = flows.find((flow) => flow.id === activeFlowId) ?? null;
   const [editFlow, setEditFlow] = useState(activeFlow);
   const [draftFlow, setDraftFlow] = useState({
     name: '',
@@ -31,6 +37,37 @@ export default function FlowsSection({ createFlowOpen = false, onCreateFlowClose
     const parsed = Number(value);
     return Number.isFinite(parsed) ? parsed : 0;
   };
+
+  const normalizedQuery = searchQuery.trim().toLowerCase();
+
+  const filteredFlows = useMemo(() => {
+    return flows.filter((flow) => {
+      if (flow.site !== currentSite) {
+        return false;
+      }
+      if (!normalizedQuery) {
+        return true;
+      }
+      const haystack = `${flow.name} ${flow.description ?? ''} ${flow.site}`.toLowerCase();
+      return haystack.includes(normalizedQuery);
+    });
+  }, [currentSite, flows, normalizedQuery]);
+
+  const visibleFlows = useMemo(() => {
+    const items = [...filteredFlows];
+    if (sortMode === 'name') {
+      items.sort((a, b) => a.name.localeCompare(b.name));
+      return items;
+    }
+    if (sortMode === 'steps') {
+      items.sort((a, b) => getStepCount(b.steps) - getStepCount(a.steps));
+      return items;
+    }
+    items.sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
+    return items;
+  }, [filteredFlows, sortMode]);
+
+  const showClear = Boolean(normalizedQuery) || sortMode !== 'recent';
 
   useEffect(() => {
     if (!activeFlow) {
@@ -58,25 +95,33 @@ export default function FlowsSection({ createFlowOpen = false, onCreateFlowClose
     const pad = (segment: number) => String(segment).padStart(2, '0');
     return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())} ${pad(
       date.getHours(),
-    )}:${pad(date.getMinutes())}:${pad(date.getSeconds())}`;
+    )}:${pad(date.getMinutes())}`;
   };
+
+  const formatDisplayTimestamp = (value: string) => value.replace(/:\d{2}$/, '');
 
   const handleFlowSave = () => {
     if (!editFlow) {
       return;
     }
-    setFlows((prev) => prev.map((item) => (item.id === editFlow.id ? { ...item, ...editFlow } : item)));
+    setFlows((prev) =>
+      prev.map((item) =>
+        item.id === editFlow.id
+          ? { ...item, ...editFlow, updatedAt: formatTimestamp(Date.now()) }
+          : item,
+      ),
+    );
     setActiveFlowId(null);
   };
 
   const handleCreateFlow = () => {
-    const name = draftFlow.name.trim() || 'New flow';
+    const name = draftFlow.name.trim() || t('sidepanel_flows_new_default', 'New flow');
     const description = draftFlow.description.trim();
     const nextFlow = {
       id: `flow-${Date.now()}`,
       name,
       description,
-      site: currentSite,
+      site: draftFlowSite || currentSite,
       steps: Number.isFinite(draftFlow.steps) ? Math.max(0, draftFlow.steps) : 0,
       updatedAt: formatTimestamp(Date.now()),
     };
@@ -86,17 +131,38 @@ export default function FlowsSection({ createFlowOpen = false, onCreateFlowClose
 
   const renderSummary = (steps: number, onSave: () => void) => (
     <>
-      <p className="text-xs font-semibold text-muted-foreground">Summary</p>
-      <p className="text-sm text-foreground">{steps} steps</p>
+      <p className="text-xs font-semibold text-muted-foreground">
+        {t('sidepanel_flows_summary_title', 'Summary')}
+      </p>
+      <p className="text-sm text-foreground">
+        {t('sidepanel_steps_count', '{count} steps').replace('{count}', String(steps))}
+      </p>
       <div className="flex flex-wrap items-center gap-2">
-        <button type="button" className="btn-primary text-xs" onClick={onSave}>
-          Save
+        <button type="button" className="btn-primary h-8 px-3 text-xs" onClick={onSave}>
+          <span className="inline-flex items-center gap-1">
+            <Check className="h-3.5 w-3.5" />
+            {t('sidepanel_action_save', 'Save')}
+          </span>
         </button>
-        <button type="button" className="btn-primary text-xs" disabled>
-          Save &amp; Run
+        <button
+          type="button"
+          className="btn-ghost h-8 px-3 text-xs disabled:cursor-not-allowed disabled:opacity-60"
+          disabled
+        >
+          <span className="inline-flex items-center gap-1">
+            <CheckCircle2 className="h-3.5 w-3.5" />
+            {t('sidepanel_action_save_run', 'Save & Run')}
+          </span>
         </button>
-        <button type="button" className="btn-primary text-xs" disabled>
-          Run
+        <button
+          type="button"
+          className="btn-ghost h-8 px-3 text-xs disabled:cursor-not-allowed disabled:opacity-60"
+          disabled
+        >
+          <span className="inline-flex items-center gap-1">
+            <Play className="h-3.5 w-3.5" />
+            {t('sidepanel_action_run', 'Run')}
+          </span>
         </button>
       </div>
     </>
@@ -106,32 +172,82 @@ export default function FlowsSection({ createFlowOpen = false, onCreateFlowClose
     <section className="flex flex-col gap-2">
       <div className="flex items-center justify-between gap-2">
         <div>
-          <h2 className="text-base font-semibold text-card-foreground">Action flows</h2>
-          <p className="text-xs text-muted-foreground">Build reusable action sequences.</p>
+          <h2 className="text-base font-semibold text-card-foreground">
+            {t('sidepanel_flows_title', 'Action flows')}
+          </h2>
+          <p className="text-xs text-muted-foreground">
+            {t('sidepanel_flows_subtitle', 'Build reusable action sequences.')}
+          </p>
         </div>
-        <span className="text-xs text-muted-foreground">{siteFlows.length}</span>
+        <span className="text-xs text-muted-foreground">{visibleFlows.length}</span>
       </div>
 
-      {siteFlows.length === 0 ? (
-        <Card className="border-dashed bg-muted text-center text-sm text-muted-foreground">
-          No flows yet. Create one to define automated actions.
+      <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+        <div className="relative flex-1">
+          <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+          <input
+            className="input pl-9"
+            type="search"
+            value={searchQuery}
+            onChange={(event) => setSearchQuery(event.target.value)}
+            placeholder={t('sidepanel_flows_search_placeholder', 'Search flows')}
+          />
+        </div>
+        <div className="flex items-center gap-2">
+          <select
+            className="input select w-full sm:w-40"
+            value={sortMode}
+            onChange={(event) => setSortMode(event.target.value)}
+          >
+            <option value="recent">
+              {t('sidepanel_flows_sort_recent', 'Recently updated')}
+            </option>
+            <option value="name">{t('sidepanel_flows_sort_name', 'Name')}</option>
+            <option value="steps">{t('sidepanel_flows_sort_steps', 'Steps')}</option>
+          </select>
+          {showClear ? (
+            <button
+              type="button"
+              className="btn-ghost px-3"
+              onClick={() => {
+                setSearchQuery('');
+                setSortMode('recent');
+              }}
+            >
+              {t('sidepanel_action_clear', 'Clear')}
+            </button>
+          ) : null}
+        </div>
+      </div>
+
+      {flows.length === 0 ? (
+        <Card className="bg-muted text-center text-sm text-muted-foreground">
+          {t('sidepanel_flows_empty', 'No flows yet. Create one to define automated actions.')}
+        </Card>
+      ) : visibleFlows.length === 0 ? (
+        <Card className="bg-muted text-center text-sm text-muted-foreground">
+          {t('sidepanel_flows_empty_filtered', 'No matches. Try a different search or filter.')}
         </Card>
       ) : (
         <div className="grid gap-2">
-          {siteFlows.map((flow) => (
+          {visibleFlows.map((flow) => (
             <Card
               key={flow.id}
               onClick={() => setActiveFlowId(flow.id)}
             >
               <div className="flex items-start justify-between gap-2">
-                <h3 className="min-w-0 flex-1 truncate text-sm font-semibold text-card-foreground">
-                  {flow.name}
-                </h3>
+                <div className="min-w-0">
+                  <h3 className="truncate text-sm font-semibold text-card-foreground">{flow.name}</h3>
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    {flow.description || t('sidepanel_flows_no_description', 'No description')}
+                  </p>
+                </div>
                 <div className="flex shrink-0 items-center gap-1">
                   <button
                     type="button"
                     className={actionClass}
-                    aria-label="Run flow"
+                    aria-label={t('sidepanel_flows_run', 'Run flow')}
+                    title={t('sidepanel_flows_run', 'Run flow')}
                     onClick={(event) => event.stopPropagation()}
                   >
                     <Play className="h-4 w-4" />
@@ -139,16 +255,23 @@ export default function FlowsSection({ createFlowOpen = false, onCreateFlowClose
                   <button
                     type="button"
                     className={`${actionClass} btn-icon-danger`}
-                    aria-label="Delete flow"
+                    aria-label={t('sidepanel_flows_delete', 'Delete flow')}
+                    title={t('sidepanel_flows_delete', 'Delete flow')}
                     onClick={(event) => event.stopPropagation()}
                   >
                     <Trash2 className="h-4 w-4" />
                   </button>
                 </div>
               </div>
-              <p className="mt-2 text-xs text-muted-foreground">{flow.description || 'No description'}</p>
-              <p className="mt-1 text-xs text-muted-foreground">{flow.steps} steps</p>
-              <p className="mt-1 text-xs text-muted-foreground">{flow.updatedAt}</p>
+              <div className="mt-2 flex items-center justify-between text-xs text-muted-foreground">
+                <span className="badge-pill">
+                  {t('sidepanel_steps_count', '{count} steps').replace(
+                    '{count}',
+                    String(getStepCount(flow.steps)),
+                  )}
+                </span>
+                <span>{formatDisplayTimestamp(flow.updatedAt)}</span>
+              </div>
             </Card>
           ))}
         </div>
@@ -156,32 +279,38 @@ export default function FlowsSection({ createFlowOpen = false, onCreateFlowClose
 
       <FlowDrawer
         open={Boolean(activeFlow)}
-        title={activeFlow?.name ?? 'Flow details'}
-        subtitle="Edit the flow settings below."
+        title={activeFlow?.name ?? t('sidepanel_flows_detail_title', 'Flow details')}
+        subtitle={t('sidepanel_flows_detail_subtitle', 'Edit the flow settings below.')}
         onClose={() => setActiveFlowId(null)}
         summary={renderSummary(getStepCount(editFlow?.steps || 0), handleFlowSave)}
       >
         {editFlow ? (
           <div className="space-y-4 text-xs text-muted-foreground">
             <label className="block text-xs font-semibold text-muted-foreground">
-              Name
+              {t('sidepanel_field_name', 'Name')}
               <input
                 className="input mt-1"
                 value={editFlow.name}
                 onChange={(event) => setEditFlow({ ...editFlow, name: event.target.value })}
-                placeholder="Flow name"
+                placeholder={t('sidepanel_flows_name_placeholder', 'Flow name')}
               />
             </label>
             <label className="block text-xs font-semibold text-muted-foreground">
-              Description
+              {t('sidepanel_field_description', 'Description')}
               <textarea
                 className="input mt-1"
                 rows={2}
                 value={editFlow.description}
                 onChange={(event) => setEditFlow({ ...editFlow, description: event.target.value })}
-                placeholder="Describe what the flow does"
+                placeholder={t('sidepanel_flows_description_placeholder', 'Describe what the flow does')}
               />
             </label>
+            <div className="flex items-center justify-between gap-2 rounded-lg border border-border bg-muted px-3 py-2 text-xs">
+              <span className="font-semibold text-muted-foreground">
+                {t('sidepanel_field_site', 'Site')}
+              </span>
+              <span className="text-foreground">{editFlow.site}</span>
+            </div>
             <FlowStepsBuilderPreview />
           </div>
         ) : null}
@@ -189,44 +318,35 @@ export default function FlowsSection({ createFlowOpen = false, onCreateFlowClose
 
       <FlowDrawer
         open={createFlowOpen}
-        title="New flow"
-        subtitle="Create a new action flow."
+        title={t('sidepanel_flows_new_title', 'New flow')}
+        subtitle={t('sidepanel_flows_new_subtitle', 'Create a new action flow.')}
         onClose={() => onCreateFlowClose?.()}
         summary={renderSummary(getStepCount(draftFlow.steps), handleCreateFlow)}
       >
         <div className="space-y-4 text-xs text-muted-foreground">
+          <div className="flex items-center justify-between gap-2 rounded-lg border border-border bg-muted px-3 py-2 text-xs">
+            <span className="font-semibold text-muted-foreground">
+              {t('sidepanel_field_site', 'Site')}
+            </span>
+            <span className="text-foreground">{draftFlowSite}</span>
+          </div>
           <label className="block text-xs font-semibold text-muted-foreground">
-            Name
+            {t('sidepanel_field_name', 'Name')}
             <input
               className="input mt-1"
               value={draftFlow.name}
               onChange={(event) => setDraftFlow({ ...draftFlow, name: event.target.value })}
-              placeholder="Flow name"
+              placeholder={t('sidepanel_flows_name_placeholder', 'Flow name')}
             />
           </label>
           <label className="block text-xs font-semibold text-muted-foreground">
-            Description
+            {t('sidepanel_field_description', 'Description')}
             <textarea
               className="input mt-1"
               rows={2}
               value={draftFlow.description}
               onChange={(event) => setDraftFlow({ ...draftFlow, description: event.target.value })}
-              placeholder="Describe what the flow does"
-            />
-          </label>
-          <label className="block text-xs font-semibold text-muted-foreground">
-            Steps
-            <input
-              className="input mt-1"
-              type="number"
-              min="0"
-              value={draftFlow.steps}
-              onChange={(event) =>
-                setDraftFlow({
-                  ...draftFlow,
-                  steps: Number(event.target.value) || 0,
-                })
-              }
+              placeholder={t('sidepanel_flows_description_placeholder', 'Describe what the flow does')}
             />
           </label>
           <FlowStepsBuilderPreview />
@@ -235,6 +355,3 @@ export default function FlowsSection({ createFlowOpen = false, onCreateFlowClose
     </section>
   );
 }
-
-
-

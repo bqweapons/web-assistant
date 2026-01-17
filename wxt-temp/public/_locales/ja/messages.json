@@ -1,46 +1,803 @@
 {
-  "extensionName": {
-    "message": "Ladybird: ノーコードでボタン・リンク・ツールチップを追加",
-    "description": "Chrome ウェブストア向けの拡張機能名"
+  "actionDefaultTitle": {
+    "message": "Ladybird を開く"
   },
   "extensionDescription": {
-    "message": "あらゆるページにノーコードでボタン・リンク・ツールチップを追加し、すべてのCTAをサイドパネルからまとめて管理します。",
-    "description": "Chrome ウェブストアとマニフェストの説明文"
+    "message": "任意のページでノーコードのボタン、リンク、ツールチップを作成し、CTA をパーソナライズして、統合サイドパネルで管理します"
   },
-  "actionDefaultTitle": {
-    "message": "Ladybird を開く",
-    "description": "ブラウザアクションのデフォルトタイトル"
+  "extensionName": {
+    "message": "Ladybird：ノーコードのボタン、リンク、ツールチップ"
   },
-  "hud_running_step": {
-    "message": "フローステップを実行中",
-    "description": "HUD ステータス: 実行中"
+  "sidepanel_action_cancel": {
+    "message": "キャンセル"
   },
-  "hud_waiting_navigation": {
-    "message": "ナビゲーション待機中…",
-    "description": "HUD ステータス: ナビゲーション待ち"
+  "sidepanel_action_clear": {
+    "message": "クリア"
   },
-  "hud_flow_paused": {
-    "message": "フローを一時停止しました",
-    "description": "HUD ステータス: 一時停止"
+  "sidepanel_action_dark_mode": {
+    "message": "ダークモード"
   },
-  "hud_flow_resumed": {
-    "message": "フローを再開しました",
-    "description": "HUD ステータス: 再開"
+  "sidepanel_action_light_mode": {
+    "message": "ライトモード"
   },
-  "hud_flow_stopped": {
-    "message": "フローを停止しました",
-    "description": "HUD ステータス: 停止"
+  "sidepanel_action_open": {
+    "message": "開く"
   },
-  "hud_flow_finished": {
-    "message": "フローが完了しました",
-    "description": "HUD ステータス: 完了"
+  "sidepanel_action_run": {
+    "message": "実行"
   },
-  "hud_step_completed": {
-    "message": "ステップを完了しました",
-    "description": "HUD ステータス: ステップ完了"
+  "sidepanel_action_save": {
+    "message": "保存"
   },
-  "hud_rejoin_waiting": {
-    "message": "フローを復元しました。ナビゲーション待ち…",
-    "description": "HUD ステータス: 待機復元"
+  "sidepanel_action_save_changes": {
+    "message": "変更を保存"
+  },
+  "sidepanel_action_save_run": {
+    "message": "保存して実行"
+  },
+  "sidepanel_action_settings": {
+    "message": "設定"
+  },
+  "sidepanel_app_context_none": {
+    "message": "アクティブなページがありません"
+  },
+  "sidepanel_app_logo_alt": {
+    "message": "{title} ロゴ"
+  },
+  "sidepanel_app_title": {
+    "message": "Ladybird"
+  },
+  "sidepanel_color_black": {
+    "message": "黒"
+  },
+  "sidepanel_color_blue": {
+    "message": "青"
+  },
+  "sidepanel_color_green": {
+    "message": "緑"
+  },
+  "sidepanel_color_orange": {
+    "message": "オレンジ"
+  },
+  "sidepanel_color_purple": {
+    "message": "紫"
+  },
+  "sidepanel_color_red": {
+    "message": "赤"
+  },
+  "sidepanel_color_transparent": {
+    "message": "透明"
+  },
+  "sidepanel_color_white": {
+    "message": "白"
+  },
+  "sidepanel_drawer_close": {
+    "message": "ドロワーを閉じる"
+  },
+  "sidepanel_element_type_area": {
+    "message": "エリア"
+  },
+  "sidepanel_element_type_button": {
+    "message": "ボタン"
+  },
+  "sidepanel_element_type_link": {
+    "message": "リンク"
+  },
+  "sidepanel_elements_action_flow_configured": {
+    "message": "アクションフロー: 設定済み"
+  },
+  "sidepanel_elements_action_flow_unassigned": {
+    "message": "アクションフロー: 未割り当て"
+  },
+  "sidepanel_elements_action_flow_value": {
+    "message": "アクションフロー: {value}"
+  },
+  "sidepanel_elements_action_title": {
+    "message": "アクション"
+  },
+  "sidepanel_elements_add_area": {
+    "message": "エリア"
+  },
+  "sidepanel_elements_add_area_hint": {
+    "message": "領域を選択"
+  },
+  "sidepanel_elements_add_button": {
+    "message": "ボタン"
+  },
+  "sidepanel_elements_add_button_hint": {
+    "message": "クリック可能なボタンを挿入"
+  },
+  "sidepanel_elements_add_placeholder": {
+    "message": "ページに要素を追加"
+  },
+  "sidepanel_elements_add_tooltip": {
+    "message": "ツールチップ"
+  },
+  "sidepanel_elements_add_tooltip_hint": {
+    "message": "ホバー時にヘルプテキストを表示"
+  },
+  "sidepanel_elements_apply_site": {
+    "message": "サイト全体に適用"
+  },
+  "sidepanel_elements_basics": {
+    "message": "基本"
+  },
+  "sidepanel_elements_border_placeholder": {
+    "message": "1px solid #000"
+  },
+  "sidepanel_elements_contains_count": {
+    "message": "{count} 個の要素を含む"
+  },
+  "sidepanel_elements_custom_styles": {
+    "message": "カスタムスタイル"
+  },
+  "sidepanel_elements_custom_styles_placeholder": {
+    "message": "color: #0f172a; padding: 8px;"
+  },
+  "sidepanel_elements_default_label": {
+    "message": "{type} 要素"
+  },
+  "sidepanel_elements_delete": {
+    "message": "要素を削除"
+  },
+  "sidepanel_elements_detail_not_set": {
+    "message": "詳細: 未設定"
+  },
+  "sidepanel_elements_detail_subtitle": {
+    "message": "以下で要素設定を更新します。"
+  },
+  "sidepanel_elements_detail_title": {
+    "message": "要素の詳細"
+  },
+  "sidepanel_elements_empty": {
+    "message": "要素がありません。最初の要素を作成しましょう。"
+  },
+  "sidepanel_elements_empty_filtered": {
+    "message": "一致するものがありません。検索またはフィルターを変更してください。"
+  },
+  "sidepanel_elements_font_decrease": {
+    "message": "文字サイズを小さく"
+  },
+  "sidepanel_elements_font_increase": {
+    "message": "文字サイズを大きく"
+  },
+  "sidepanel_elements_link_new_tab": {
+    "message": "新しいタブで開く"
+  },
+  "sidepanel_elements_link_placeholder": {
+    "message": "https://example.com"
+  },
+  "sidepanel_elements_link_same_tab": {
+    "message": "同じタブで開く"
+  },
+  "sidepanel_elements_link_target": {
+    "message": "リンク先"
+  },
+  "sidepanel_elements_link_url": {
+    "message": "リンクURL"
+  },
+  "sidepanel_elements_link_value": {
+    "message": "リンク: {value}"
+  },
+  "sidepanel_elements_locate": {
+    "message": "要素を表示"
+  },
+  "sidepanel_elements_name_placeholder": {
+    "message": "要素テキスト"
+  },
+  "sidepanel_elements_padding_placeholder": {
+    "message": "8px 16px"
+  },
+  "sidepanel_elements_position_absolute": {
+    "message": "絶対"
+  },
+  "sidepanel_elements_position_auto": {
+    "message": "自動"
+  },
+  "sidepanel_elements_position_fixed": {
+    "message": "固定"
+  },
+  "sidepanel_elements_position_height": {
+    "message": "H"
+  },
+  "sidepanel_elements_position_height_placeholder": {
+    "message": "40"
+  },
+  "sidepanel_elements_position_mode": {
+    "message": "モード"
+  },
+  "sidepanel_elements_position_relative": {
+    "message": "相対"
+  },
+  "sidepanel_elements_position_static": {
+    "message": "静的"
+  },
+  "sidepanel_elements_position_sticky": {
+    "message": "スティッキー"
+  },
+  "sidepanel_elements_position_width": {
+    "message": "W"
+  },
+  "sidepanel_elements_position_width_placeholder": {
+    "message": "120"
+  },
+  "sidepanel_elements_position_x": {
+    "message": "X"
+  },
+  "sidepanel_elements_position_x_placeholder": {
+    "message": "12"
+  },
+  "sidepanel_elements_position_y": {
+    "message": "Y"
+  },
+  "sidepanel_elements_position_y_placeholder": {
+    "message": "12"
+  },
+  "sidepanel_elements_position_z": {
+    "message": "Z"
+  },
+  "sidepanel_elements_position_z_placeholder": {
+    "message": "999"
+  },
+  "sidepanel_elements_radius_placeholder": {
+    "message": "8"
+  },
+  "sidepanel_elements_search_placeholder": {
+    "message": "名前、種類、ページで検索"
+  },
+  "sidepanel_elements_selector_value": {
+    "message": "セレクター: {value}"
+  },
+  "sidepanel_elements_shadow_custom": {
+    "message": "カスタム"
+  },
+  "sidepanel_elements_shadow_medium": {
+    "message": "中"
+  },
+  "sidepanel_elements_shadow_none": {
+    "message": "なし"
+  },
+  "sidepanel_elements_shadow_soft": {
+    "message": "ソフト"
+  },
+  "sidepanel_elements_shadow_strong": {
+    "message": "強い"
+  },
+  "sidepanel_elements_style_area": {
+    "message": "エリア"
+  },
+  "sidepanel_elements_style_background": {
+    "message": "背景"
+  },
+  "sidepanel_elements_style_border": {
+    "message": "ボーダー"
+  },
+  "sidepanel_elements_style_custom": {
+    "message": "カスタム"
+  },
+  "sidepanel_elements_style_floating": {
+    "message": "フローティング"
+  },
+  "sidepanel_elements_style_link": {
+    "message": "リンク"
+  },
+  "sidepanel_elements_style_outline": {
+    "message": "アウトライン"
+  },
+  "sidepanel_elements_style_padding": {
+    "message": "パディング"
+  },
+  "sidepanel_elements_style_position": {
+    "message": "位置"
+  },
+  "sidepanel_elements_style_preset": {
+    "message": "プリセット"
+  },
+  "sidepanel_elements_style_primary": {
+    "message": "プライマリ"
+  },
+  "sidepanel_elements_style_radius": {
+    "message": "角丸"
+  },
+  "sidepanel_elements_style_shadow": {
+    "message": "シャドウ"
+  },
+  "sidepanel_elements_style_text": {
+    "message": "テキスト"
+  },
+  "sidepanel_elements_styles_title": {
+    "message": "スタイル"
+  },
+  "sidepanel_elements_subtitle": {
+    "message": "ページ全体の保存済み要素を探す。"
+  },
+  "sidepanel_elements_title": {
+    "message": "要素"
+  },
+  "sidepanel_elements_type_all": {
+    "message": "すべての種類"
+  },
+  "sidepanel_field_action_flow": {
+    "message": "アクションフロー"
+  },
+  "sidepanel_field_configured": {
+    "message": "設定済み"
+  },
+  "sidepanel_field_description": {
+    "message": "説明"
+  },
+  "sidepanel_field_duration_ms": {
+    "message": "時間 (ms)"
+  },
+  "sidepanel_field_iterations": {
+    "message": "繰り返し回数"
+  },
+  "sidepanel_field_last_updated": {
+    "message": "最終更新"
+  },
+  "sidepanel_field_layout": {
+    "message": "レイアウト"
+  },
+  "sidepanel_field_link": {
+    "message": "リンク"
+  },
+  "sidepanel_field_name": {
+    "message": "名前"
+  },
+  "sidepanel_field_not_set": {
+    "message": "未設定"
+  },
+  "sidepanel_field_note": {
+    "message": "メモ"
+  },
+  "sidepanel_field_operator": {
+    "message": "演算子"
+  },
+  "sidepanel_field_page": {
+    "message": "ページ"
+  },
+  "sidepanel_field_scope": {
+    "message": "スコープ"
+  },
+  "sidepanel_field_selector": {
+    "message": "セレクター"
+  },
+  "sidepanel_field_site": {
+    "message": "サイト"
+  },
+  "sidepanel_field_type": {
+    "message": "種類"
+  },
+  "sidepanel_field_unassigned": {
+    "message": "未割り当て"
+  },
+  "sidepanel_field_url": {
+    "message": "URL"
+  },
+  "sidepanel_field_value": {
+    "message": "値"
+  },
+  "sidepanel_field_wait_for": {
+    "message": "待機対象"
+  },
+  "sidepanel_flow_drawer_close": {
+    "message": "フローのドロワーを閉じる"
+  },
+  "sidepanel_flows_create": {
+    "message": "フローを作成"
+  },
+  "sidepanel_flows_create_new": {
+    "message": "新しいフローを作成…"
+  },
+  "sidepanel_flows_delete": {
+    "message": "フローを削除"
+  },
+  "sidepanel_flows_description_placeholder": {
+    "message": "フローの内容を説明"
+  },
+  "sidepanel_flows_description_prompt": {
+    "message": "このフローは何をしますか？"
+  },
+  "sidepanel_flows_detail_subtitle": {
+    "message": "以下でフロー設定を編集します。"
+  },
+  "sidepanel_flows_detail_title": {
+    "message": "フローの詳細"
+  },
+  "sidepanel_flows_empty": {
+    "message": "フローがありません。自動アクションを定義するフローを作成しましょう。"
+  },
+  "sidepanel_flows_empty_filtered": {
+    "message": "一致するものがありません。検索またはフィルターを変更してください。"
+  },
+  "sidepanel_flows_name_placeholder": {
+    "message": "フロー名"
+  },
+  "sidepanel_flows_new_default": {
+    "message": "新規フロー"
+  },
+  "sidepanel_flows_new_subtitle": {
+    "message": "新しいアクションフローを作成します。"
+  },
+  "sidepanel_flows_new_title": {
+    "message": "新規フロー"
+  },
+  "sidepanel_flows_no_description": {
+    "message": "説明なし"
+  },
+  "sidepanel_flows_run": {
+    "message": "フローを実行"
+  },
+  "sidepanel_flows_search_placeholder": {
+    "message": "フローを検索"
+  },
+  "sidepanel_flows_sort_name": {
+    "message": "名前"
+  },
+  "sidepanel_flows_sort_recent": {
+    "message": "最近更新"
+  },
+  "sidepanel_flows_sort_steps": {
+    "message": "ステップ"
+  },
+  "sidepanel_flows_subtitle": {
+    "message": "再利用可能なアクション手順を作成します。"
+  },
+  "sidepanel_flows_summary_title": {
+    "message": "サマリー"
+  },
+  "sidepanel_flows_title": {
+    "message": "アクションフロー"
+  },
+  "sidepanel_hidden_add": {
+    "message": "非表示ルールを追加"
+  },
+  "sidepanel_hidden_delete": {
+    "message": "ルールを削除"
+  },
+  "sidepanel_hidden_detail_subtitle": {
+    "message": "以下で非表示ルールの詳細を編集します。"
+  },
+  "sidepanel_hidden_detail_title": {
+    "message": "非表示ルールの詳細"
+  },
+  "sidepanel_hidden_disable": {
+    "message": "ルールを無効化"
+  },
+  "sidepanel_hidden_empty": {
+    "message": "非表示ルールはまだありません。"
+  },
+  "sidepanel_hidden_enabled": {
+    "message": "ルール有効"
+  },
+  "sidepanel_hidden_name_placeholder": {
+    "message": "非表示ルール名"
+  },
+  "sidepanel_hidden_note_placeholder": {
+    "message": "このルールの理由"
+  },
+  "sidepanel_hidden_selector_placeholder": {
+    "message": "CSS セレクター"
+  },
+  "sidepanel_hidden_subtitle": {
+    "message": "要素を自動的に非表示または抑制します。"
+  },
+  "sidepanel_hidden_title": {
+    "message": "非表示ルール"
+  },
+  "sidepanel_label_unknown": {
+    "message": "不明"
+  },
+  "sidepanel_label_unknown_page": {
+    "message": "不明なページ"
+  },
+  "sidepanel_language_en_us": {
+    "message": "英語 (US)"
+  },
+  "sidepanel_language_ja": {
+    "message": "日本語"
+  },
+  "sidepanel_language_zh_cn": {
+    "message": "中国語 (簡体字)"
+  },
+  "sidepanel_layout_column": {
+    "message": "列"
+  },
+  "sidepanel_layout_row": {
+    "message": "行"
+  },
+  "sidepanel_overview_elements_count": {
+    "message": "{count} 個の要素"
+  },
+  "sidepanel_overview_flows_count": {
+    "message": "{count} 件のフロー"
+  },
+  "sidepanel_overview_hidden_count": {
+    "message": "{count} 件の非表示ルール"
+  },
+  "sidepanel_overview_sites_count": {
+    "message": "{count} サイト"
+  },
+  "sidepanel_overview_sites_subtitle": {
+    "message": "サイト別の合計。"
+  },
+  "sidepanel_overview_sites_title": {
+    "message": "サイト"
+  },
+  "sidepanel_overview_subtitle": {
+    "message": "最新のエクスポートスナップショットをサイト別に集計。"
+  },
+  "sidepanel_overview_title": {
+    "message": "概要"
+  },
+  "sidepanel_overview_total_items": {
+    "message": "合計 {count} 件"
+  },
+  "sidepanel_scope_global": {
+    "message": "グローバル"
+  },
+  "sidepanel_scope_page": {
+    "message": "ページ"
+  },
+  "sidepanel_scope_site": {
+    "message": "サイト"
+  },
+  "sidepanel_select_placeholder": {
+    "message": "選択"
+  },
+  "sidepanel_selector_pick": {
+    "message": "要素を選択"
+  },
+  "sidepanel_settings_close": {
+    "message": "設定を閉じる"
+  },
+  "sidepanel_settings_data_export": {
+    "message": "エクスポート"
+  },
+  "sidepanel_settings_data_import": {
+    "message": "インポート"
+  },
+  "sidepanel_settings_data_subtitle": {
+    "message": "保存済みの要素とフローをインポート/エクスポートします。"
+  },
+  "sidepanel_settings_data_title": {
+    "message": "データ管理"
+  },
+  "sidepanel_settings_language_subtitle": {
+    "message": "サイドパネルの言語を選択します。"
+  },
+  "sidepanel_settings_language_title": {
+    "message": "言語"
+  },
+  "sidepanel_settings_locale": {
+    "message": "ロケール: {locale}"
+  },
+  "sidepanel_settings_share_copy": {
+    "message": "リンクをコピー"
+  },
+  "sidepanel_settings_share_open": {
+    "message": "ストアを開く"
+  },
+  "sidepanel_settings_share_subtitle": {
+    "message": "Chrome ウェブストアのリンクをチームに送信します。"
+  },
+  "sidepanel_settings_share_title": {
+    "message": "共有"
+  },
+  "sidepanel_settings_subtitle": {
+    "message": "データ、言語、共有を調整します。"
+  },
+  "sidepanel_settings_title": {
+    "message": "設定"
+  },
+  "sidepanel_step_assert_description": {
+    "message": "値や状態を確認します。"
+  },
+  "sidepanel_step_assert_label": {
+    "message": "アサート"
+  },
+  "sidepanel_step_click_description": {
+    "message": "セレクターで要素をクリックします。"
+  },
+  "sidepanel_step_click_label": {
+    "message": "クリック"
+  },
+  "sidepanel_step_condition_contains": {
+    "message": "含む"
+  },
+  "sidepanel_step_condition_equals": {
+    "message": "等しい"
+  },
+  "sidepanel_step_condition_greater": {
+    "message": "より大きい"
+  },
+  "sidepanel_step_condition_is": {
+    "message": "は"
+  },
+  "sidepanel_step_condition_label": {
+    "message": "条件"
+  },
+  "sidepanel_step_condition_less": {
+    "message": "より小さい"
+  },
+  "sidepanel_step_data_source_description": {
+    "message": "CSV/TSV を読み込み、行をループします。"
+  },
+  "sidepanel_step_data_source_label": {
+    "message": "データソース"
+  },
+  "sidepanel_step_if_else_description": {
+    "message": "条件に基づいてステップを分岐します。"
+  },
+  "sidepanel_step_if_else_label": {
+    "message": "If / Else"
+  },
+  "sidepanel_step_input_description": {
+    "message": "フィールドにテキストを入力します。"
+  },
+  "sidepanel_step_input_label": {
+    "message": "入力"
+  },
+  "sidepanel_step_loop_description": {
+    "message": "指定回数だけネストしたステップを繰り返します。"
+  },
+  "sidepanel_step_loop_label": {
+    "message": "ループ"
+  },
+  "sidepanel_step_navigate_description": {
+    "message": "URL に移動します。"
+  },
+  "sidepanel_step_navigate_label": {
+    "message": "移動"
+  },
+  "sidepanel_step_summary_conditional": {
+    "message": "条件チェック"
+  },
+  "sidepanel_step_summary_duration": {
+    "message": "時間: {value} ms"
+  },
+  "sidepanel_step_summary_expect": {
+    "message": "{selector} {operator} \"{value}\" を期待"
+  },
+  "sidepanel_step_summary_if": {
+    "message": "{selector} {operator} \"{value}\" の場合"
+  },
+  "sidepanel_step_summary_input": {
+    "message": "入力"
+  },
+  "sidepanel_step_summary_repeat_steps": {
+    "message": "ステップを繰り返す"
+  },
+  "sidepanel_step_summary_repeat_times": {
+    "message": "{count} 回繰り返す"
+  },
+  "sidepanel_step_summary_selector": {
+    "message": "セレクター: {value}"
+  },
+  "sidepanel_step_summary_url": {
+    "message": "URL: {value}"
+  },
+  "sidepanel_step_summary_value": {
+    "message": "値: {value}"
+  },
+  "sidepanel_step_summary_wait_until": {
+    "message": "{selector} {operator} \"{value}\" まで待機"
+  },
+  "sidepanel_step_wait_description": {
+    "message": "一時停止するか、要素の条件を待機します。"
+  },
+  "sidepanel_step_wait_label": {
+    "message": "待機"
+  },
+  "sidepanel_step_wait_mode_condition": {
+    "message": "要素の条件"
+  },
+  "sidepanel_step_wait_mode_time": {
+    "message": "時間待機"
+  },
+  "sidepanel_steps_add": {
+    "message": "ステップを追加"
+  },
+  "sidepanel_steps_add_in_loop": {
+    "message": "ループにステップを追加"
+  },
+  "sidepanel_steps_add_per_row": {
+    "message": "行ごとにステップを追加"
+  },
+  "sidepanel_steps_add_to_branch": {
+    "message": "{label} にステップを追加"
+  },
+  "sidepanel_steps_add_to_data_source": {
+    "message": "データソースにステップを追加"
+  },
+  "sidepanel_steps_add_to_loop": {
+    "message": "ループにステップを追加"
+  },
+  "sidepanel_steps_choose_file": {
+    "message": "ファイルを選択"
+  },
+  "sidepanel_steps_columns": {
+    "message": "列"
+  },
+  "sidepanel_steps_columns_count": {
+    "message": "{count} 列"
+  },
+  "sidepanel_steps_columns_empty": {
+    "message": "列を読み込むにはファイルを選択します。"
+  },
+  "sidepanel_steps_columns_hint": {
+    "message": "列をクリックして入力ステップを作成:"
+  },
+  "sidepanel_steps_columns_missing": {
+    "message": "列が検出されません"
+  },
+  "sidepanel_steps_columns_na": {
+    "message": "該当なし"
+  },
+  "sidepanel_steps_columns_rows": {
+    "message": "{columns} 列 | {rows} 行"
+  },
+  "sidepanel_steps_count": {
+    "message": "{count} ステップ"
+  },
+  "sidepanel_steps_delete": {
+    "message": "ステップを削除"
+  },
+  "sidepanel_steps_file_label": {
+    "message": "ファイル"
+  },
+  "sidepanel_steps_file_parse_error": {
+    "message": "ファイルの解析に失敗しました"
+  },
+  "sidepanel_steps_file_waiting": {
+    "message": "ファイル選択待ち"
+  },
+  "sidepanel_steps_header_row": {
+    "message": "ヘッダー行"
+  },
+  "sidepanel_steps_in_loop": {
+    "message": "ループ内のステップ"
+  },
+  "sidepanel_steps_insert_column": {
+    "message": "{column} を挿入"
+  },
+  "sidepanel_steps_no_file_selected": {
+    "message": "ファイルが選択されていません"
+  },
+  "sidepanel_steps_per_row": {
+    "message": "行ごとのステップ"
+  },
+  "sidepanel_steps_search_empty": {
+    "message": "ステップが見つかりません。"
+  },
+  "sidepanel_steps_search_placeholder": {
+    "message": "ステップを検索"
+  },
+  "sidepanel_steps_title": {
+    "message": "ステップ"
+  },
+  "sidepanel_tab_elements": {
+    "message": "要素"
+  },
+  "sidepanel_tab_elements_tooltip": {
+    "message": "保存済み要素とクイックアクション。"
+  },
+  "sidepanel_tab_flows": {
+    "message": "フロー"
+  },
+  "sidepanel_tab_flows_tooltip": {
+    "message": "再利用可能なアクションフロー。"
+  },
+  "sidepanel_tab_hidden": {
+    "message": "非表示"
+  },
+  "sidepanel_tab_hidden_tooltip": {
+    "message": "要素をブロックする非表示ルール。"
+  },
+  "sidepanel_tab_overview": {
+    "message": "概要"
+  },
+  "sidepanel_tab_overview_tooltip": {
+    "message": "サイト横断の概要。"
   }
 }

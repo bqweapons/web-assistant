@@ -3,6 +3,7 @@ import { ChevronRight, GripVertical, Trash2 } from 'lucide-react';
 import SelectMenu from './SelectMenu';
 import SelectorInput from './SelectorInput';
 import StepPicker from './StepPicker';
+import { t } from '../utils/i18n';
 
 type StepFieldOption = {
   value: string;
@@ -100,16 +101,27 @@ function AddStepPlaceholder({ label, ariaLabel, onPick, onDropReorder, canDrop }
 }
 
 const WAIT_MODES: StepFieldOption[] = [
-  { value: 'time', label: 'Time delay' },
-  { value: 'condition', label: 'Element condition' },
+  { value: 'time', label: t('sidepanel_step_wait_mode_time', 'Time delay') },
+  { value: 'condition', label: t('sidepanel_step_wait_mode_condition', 'Element condition') },
 ];
 
 const CONDITION_OPERATORS: StepFieldOption[] = [
-  { value: 'contains', label: 'Contains' },
-  { value: 'equals', label: 'Equals' },
-  { value: 'greater', label: 'Greater than' },
-  { value: 'less', label: 'Less than' },
+  { value: 'contains', label: t('sidepanel_step_condition_contains', 'Contains') },
+  { value: 'equals', label: t('sidepanel_step_condition_equals', 'Equals') },
+  { value: 'greater', label: t('sidepanel_step_condition_greater', 'Greater than') },
+  { value: 'less', label: t('sidepanel_step_condition_less', 'Less than') },
 ];
+
+const FIELD_LABEL_KEYS: Record<string, string> = {
+  Selector: 'sidepanel_field_selector',
+  Value: 'sidepanel_field_value',
+  Iterations: 'sidepanel_field_iterations',
+  'Wait for': 'sidepanel_field_wait_for',
+  'Duration (ms)': 'sidepanel_field_duration_ms',
+  Operator: 'sidepanel_field_operator',
+  URL: 'sidepanel_field_url',
+  'Header row': 'sidepanel_steps_header_row',
+};
 
 const DEFAULT_STEPS: StepData[] = [
   {
@@ -497,21 +509,22 @@ const DEFAULT_STEPS: StepData[] = [
 ];
 
 const STEP_TYPE_LABELS: Record<string, string> = {
-  click: 'Click',
-  input: 'Input',
-  loop: 'Loop',
-  'data-source': 'Data Source',
-  'if-else': 'If / Else',
-  wait: 'Wait',
-  navigate: 'Navigate',
-  assert: 'Assert',
+  click: t('sidepanel_step_click_label', 'Click'),
+  input: t('sidepanel_step_input_label', 'Input'),
+  loop: t('sidepanel_step_loop_label', 'Loop'),
+  'data-source': t('sidepanel_step_data_source_label', 'Data Source'),
+  'if-else': t('sidepanel_step_if_else_label', 'If / Else'),
+  wait: t('sidepanel_step_wait_label', 'Wait'),
+  navigate: t('sidepanel_step_navigate_label', 'Navigate'),
+  assert: t('sidepanel_step_assert_label', 'Assert'),
 };
 
 export default function FlowStepsBuilderPreview({ steps = DEFAULT_STEPS }: { steps?: StepData[] }) {
   const [draftSteps, setDraftSteps] = useState<StepData[]>(steps);
   const [activeStepId, setActiveStepId] = useState('');
   const [activeFieldTarget, setActiveFieldTarget] = useState<{ stepId: string; fieldId: string } | null>(null);
-  const [collapsedDataSource, setCollapsedDataSource] = useState<Record<string, boolean>>({});
+  const [collapsedSteps, setCollapsedSteps] = useState<Record<string, boolean>>({});
+  const [collapsedBranches, setCollapsedBranches] = useState<Record<string, boolean>>({});
   const [dragState, setDragState] = useState<
     | null
     | {
@@ -522,6 +535,11 @@ export default function FlowStepsBuilderPreview({ steps = DEFAULT_STEPS }: { ste
           | { scope: 'branch'; parentId: string; branchId: string };
       }
   >(null);
+
+  const getFieldLabel = (label: string) => {
+    const key = FIELD_LABEL_KEYS[label];
+    return key ? t(key, label) : label;
+  };
 
   const findStepById = (items: StepData[], stepId: string): StepData | undefined => {
     for (const step of items) {
@@ -694,37 +712,63 @@ export default function FlowStepsBuilderPreview({ steps = DEFAULT_STEPS }: { ste
 
     switch (step.type) {
       case 'click':
-        return `Selector: ${selector || 'Not set'}`;
+        return t('sidepanel_step_summary_selector', 'Selector: {value}').replace(
+          '{value}',
+          selector || t('sidepanel_field_not_set', 'Not set'),
+        );
       case 'input':
         if (value) {
-          return `Value: ${value}`;
+          return t('sidepanel_step_summary_value', 'Value: {value}').replace('{value}', value);
         }
-        return selector ? `Selector: ${selector}` : 'Input';
+        return selector
+          ? t('sidepanel_step_summary_selector', 'Selector: {value}').replace('{value}', selector)
+          : t('sidepanel_step_summary_input', 'Input');
       case 'loop':
-        return iterations ? `Repeat ${iterations} times` : 'Repeat steps';
+        return iterations
+          ? t('sidepanel_step_summary_repeat_times', 'Repeat {count} times').replace('{count}', iterations)
+          : t('sidepanel_step_summary_repeat_steps', 'Repeat steps');
       case 'data-source': {
         if (step.dataSource?.error) {
-          return 'Failed to parse file';
+          return t('sidepanel_steps_file_parse_error', 'Failed to parse file');
         }
         if (step.dataSource?.columns?.length) {
-          return `${step.dataSource.columns.length} columns | ${step.dataSource.rowCount ?? 0} rows`;
+          return t('sidepanel_steps_columns_rows', '{columns} columns | {rows} rows')
+            .replace('{columns}', String(step.dataSource.columns.length))
+            .replace('{rows}', String(step.dataSource.rowCount ?? 0));
         }
-        return step.dataSource?.fileName ? 'No columns detected' : 'Awaiting file selection';
+        return step.dataSource?.fileName
+          ? t('sidepanel_steps_columns_missing', 'No columns detected')
+          : t('sidepanel_steps_file_waiting', 'Awaiting file selection');
       }
       case 'if-else':
         if (selector || expected || operatorLabel) {
-          return `If ${selector || 'selector'} ${operatorLabel || 'is'} "${expected || ''}"`.trim();
+          return t('sidepanel_step_summary_if', 'If {selector} {operator} \"{value}\"')
+            .replace('{selector}', selector || t('sidepanel_field_selector', 'Selector'))
+            .replace('{operator}', operatorLabel || t('sidepanel_step_condition_is', 'is'))
+            .replace('{value}', expected || '');
         }
-        return 'Conditional check';
+        return t('sidepanel_step_summary_conditional', 'Conditional check');
       case 'wait':
         if (mode === 'condition') {
-          return `Wait until ${selector || 'selector'} ${operatorLabel || 'is'} "${expected || ''}"`.trim();
+          return t('sidepanel_step_summary_wait_until', 'Wait until {selector} {operator} \"{value}\"')
+            .replace('{selector}', selector || t('sidepanel_field_selector', 'Selector'))
+            .replace('{operator}', operatorLabel || t('sidepanel_step_condition_is', 'is'))
+            .replace('{value}', expected || '');
         }
-        return `Duration: ${duration || '0'} ms`;
+        return t('sidepanel_step_summary_duration', 'Duration: {value} ms').replace(
+          '{value}',
+          duration || '0',
+        );
       case 'navigate':
-        return `URL: ${url || 'Not set'}`;
+        return t('sidepanel_step_summary_url', 'URL: {value}').replace(
+          '{value}',
+          url || t('sidepanel_field_not_set', 'Not set'),
+        );
       case 'assert':
-        return `Expect ${selector || 'selector'} ${operatorLabel || 'is'} "${expected || ''}"`.trim();
+        return t('sidepanel_step_summary_expect', 'Expect {selector} {operator} \"{value}\"')
+          .replace('{selector}', selector || t('sidepanel_field_selector', 'Selector'))
+          .replace('{operator}', operatorLabel || t('sidepanel_step_condition_is', 'is'))
+          .replace('{value}', expected || '');
       default:
         return step.summary || step.title;
     }
@@ -768,8 +812,10 @@ export default function FlowStepsBuilderPreview({ steps = DEFAULT_STEPS }: { ste
               ...nextStep,
               summary:
                 meta.columns.length > 0
-                  ? `${meta.columns.length} columns | ${meta.rowCount} rows`
-                  : 'No columns detected',
+                  ? t('sidepanel_steps_columns_rows', '{columns} columns | {rows} rows')
+                      .replace('{columns}', String(meta.columns.length))
+                      .replace('{rows}', String(meta.rowCount))
+                  : t('sidepanel_steps_columns_missing', 'No columns detected'),
               dataSource: {
                 ...step.dataSource,
                 columns: meta.columns,
@@ -780,12 +826,12 @@ export default function FlowStepsBuilderPreview({ steps = DEFAULT_STEPS }: { ste
           } catch {
             return {
               ...nextStep,
-              summary: 'Failed to parse file',
+              summary: t('sidepanel_steps_file_parse_error', 'Failed to parse file'),
               dataSource: {
                 ...step.dataSource,
                 columns: [],
                 rowCount: 0,
-                error: 'Failed to parse file.',
+                error: t('sidepanel_steps_file_parse_error', 'Failed to parse file'),
               },
             };
           }
@@ -1220,7 +1266,7 @@ export default function FlowStepsBuilderPreview({ steps = DEFAULT_STEPS }: { ste
         const isLoop = step.type === 'loop';
         const isIfElse = step.type === 'if-else';
         const isDataSource = step.type === 'data-source';
-        const dataSourceCollapsed = isDataSource ? collapsedDataSource[step.id] ?? true : false;
+        const isCollapsed = collapsedSteps[step.id] ?? (isDataSource ? true : false);
         const dataSourceCount = isDataSource ? step.children?.length ?? 0 : 0;
         const dataSourceMeta = step.dataSource;
         const typeLabel = STEP_TYPE_LABELS[step.type] ?? step.type;
@@ -1274,7 +1320,7 @@ export default function FlowStepsBuilderPreview({ steps = DEFAULT_STEPS }: { ste
             >
               <GripVertical className="h-3.5 w-3.5 text-muted-foreground" />
               <div className="min-w-0 flex-1">
-                      <div className="flex items-center gap-2">
+                <div className="flex items-center gap-2">
                   <span className="inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-full border border-border bg-muted text-[10px] font-semibold text-foreground">
                     {index + 1}
                   </span>
@@ -1286,7 +1332,7 @@ export default function FlowStepsBuilderPreview({ steps = DEFAULT_STEPS }: { ste
               <button
                 type="button"
                 className="btn-icon btn-icon-danger ml-auto h-8 w-8 opacity-0 transition-opacity group-hover:opacity-100"
-                aria-label="Delete step"
+                aria-label={t('sidepanel_steps_delete', 'Delete step')}
                 onClick={(event) => {
                   event.stopPropagation();
                   handleDeleteStep(step.id);
@@ -1305,7 +1351,9 @@ export default function FlowStepsBuilderPreview({ steps = DEFAULT_STEPS }: { ste
                     if (step.type !== 'wait') {
                       return visibleFields.map((field) => (
                         <label key={field.id} className="grid gap-1">
-                          <span className="text-xs font-semibold text-muted-foreground">{field.label}</span>
+                          <span className="text-xs font-semibold text-muted-foreground">
+                            {getFieldLabel(field.label)}
+                          </span>
                           <div className="flex items-center gap-2">
                             {(() => {
                               const showPicker = field.withPicker || field.id === 'selector';
@@ -1388,7 +1436,9 @@ export default function FlowStepsBuilderPreview({ steps = DEFAULT_STEPS }: { ste
                             key="mode-duration"
                             className="grid grid-cols-[auto,minmax(0,1fr),auto,minmax(0,1fr)] items-center gap-2"
                           >
-                            <span className="text-xs font-semibold text-muted-foreground">{field.label}</span>
+                            <span className="text-xs font-semibold text-muted-foreground">
+                              {getFieldLabel(field.label)}
+                            </span>
                             <SelectMenu
                               value={field.value}
                               options={field.options ?? []}
@@ -1414,7 +1464,9 @@ export default function FlowStepsBuilderPreview({ steps = DEFAULT_STEPS }: { ste
                       if (field.id === 'operator' && expectedField) {
                         rendered.push(
                           <div key="operator-expected" className="grid gap-1">
-                            <span className="text-xs font-semibold text-muted-foreground">Condition</span>
+                          <span className="text-xs font-semibold text-muted-foreground">
+                            {t('sidepanel_step_condition_label', 'Condition')}
+                          </span>
                             <div className="grid grid-cols-2 gap-2">
                               <SelectMenu
                                 value={field.value}
@@ -1438,7 +1490,9 @@ export default function FlowStepsBuilderPreview({ steps = DEFAULT_STEPS }: { ste
                       }
                       rendered.push(
                         <label key={field.id} className="grid gap-1">
-                          <span className="text-xs font-semibold text-muted-foreground">{field.label}</span>
+                          <span className="text-xs font-semibold text-muted-foreground">
+                            {getFieldLabel(field.label)}
+                          </span>
                           <div className="flex items-center gap-2">
                             {(() => {
                               const showPicker = field.withPicker || field.id === 'selector';
@@ -1510,10 +1564,12 @@ export default function FlowStepsBuilderPreview({ steps = DEFAULT_STEPS }: { ste
                   {isDataSource ? (
                     <div className="grid gap-2">
                       <label className="grid gap-1">
-                        <span className="text-xs font-semibold text-muted-foreground">File</span>
+                        <span className="text-xs font-semibold text-muted-foreground">
+                          {t('sidepanel_steps_file_label', 'File')}
+                        </span>
                         <div className="flex flex-wrap items-center gap-2">
                           <label className="btn-ghost h-9 cursor-pointer px-3 text-xs">
-                            Choose file
+                            {t('sidepanel_steps_choose_file', 'Choose file')}
                             <input
                               type="file"
                               accept=".csv,.tsv,text/csv,text/tab-separated-values"
@@ -1524,7 +1580,8 @@ export default function FlowStepsBuilderPreview({ steps = DEFAULT_STEPS }: { ste
                             />
                           </label>
                           <span className="text-[11px] text-muted-foreground">
-                            {dataSourceMeta?.fileName || 'No file selected'}
+                            {dataSourceMeta?.fileName ||
+                              t('sidepanel_steps_no_file_selected', 'No file selected')}
                           </span>
                         </div>
                         {dataSourceMeta?.error ? (
@@ -1541,16 +1598,21 @@ export default function FlowStepsBuilderPreview({ steps = DEFAULT_STEPS }: { ste
                               updateField(step.id, 'headerRow', event.target.checked ? 'true' : 'false')
                             }
                           />
-                          <span className="text-xs font-semibold text-muted-foreground">Header row</span>
+                          <span className="text-xs font-semibold text-muted-foreground">
+                            {t('sidepanel_steps_header_row', 'Header row')}
+                          </span>
                         </label>
                       ) : null}
                       <div className="grid gap-2">
                         <div className="flex items-center justify-between text-[11px] font-semibold text-muted-foreground">
-                          <span>Columns</span>
+                          <span>{t('sidepanel_steps_columns', 'Columns')}</span>
                           <span>
                             {dataSourceMeta?.columns?.length
-                              ? `${dataSourceMeta.columns.length} cols`
-                              : 'N/A'}
+                              ? t('sidepanel_steps_columns_count', '{count} cols').replace(
+                                  '{count}',
+                                  String(dataSourceMeta.columns.length),
+                                )
+                              : t('sidepanel_steps_columns_na', 'N/A')}
                           </span>
                         </div>
                         {dataSourceMeta?.columns && dataSourceMeta.columns.length > 0 ? (
@@ -1561,17 +1623,21 @@ export default function FlowStepsBuilderPreview({ steps = DEFAULT_STEPS }: { ste
                                 type="button"
                                 className="btn-ghost h-7 px-2 text-[10px]"
                                 onClick={() => insertColumnToken(column, step.id)}
-                                title={`Insert ${column}`}
+                                title={t('sidepanel_steps_insert_column', 'Insert {column}').replace('{column}', column)}
                               >
                                 {column}
                               </button>
                             ))}
                           </div>
                         ) : (
-                          <p className="text-[11px] text-muted-foreground">Select a file to load columns.</p>
+                          <p className="text-[11px] text-muted-foreground">
+                            {t('sidepanel_steps_columns_empty', 'Select a file to load columns.')}
+                          </p>
                         )}
                         <p className="text-[11px] text-muted-foreground">
-                          Click a column to create an Input step with <code>{'{{row.column}}'}</code>.
+                          {t('sidepanel_steps_columns_hint', 'Click a column to create an Input step with')}
+                          <span> </span>
+                          <code>{'{{row.column}}'}</code>.
                         </p>
                       </div>
                     </div>
@@ -1582,38 +1648,46 @@ export default function FlowStepsBuilderPreview({ steps = DEFAULT_STEPS }: { ste
             {isLoop || isDataSource ? (
               <div className="px-3 pb-3">
                 <div className="flex items-center justify-between text-[11px] font-semibold text-muted-foreground">
-                  {isDataSource ? (
-                    <button
-                      type="button"
-                      className="flex items-center gap-1 text-[11px] font-semibold text-muted-foreground"
-                      onClick={() =>
-                        setCollapsedDataSource((prev) => ({
-                          ...prev,
-                          [step.id]: !(prev[step.id] ?? true),
-                        }))
-                      }
-                    >
-                      <ChevronRight
-                        className={`h-3 w-3 transition ${dataSourceCollapsed ? '' : 'rotate-90'}`}
-                      />
-                      <span>Steps per row</span>
-                    </button>
-                  ) : (
-                    <span>Steps in loop</span>
-                  )}
+                  <button
+                    type="button"
+                    className="flex items-center gap-1 text-[11px] font-semibold text-muted-foreground"
+                    onClick={() =>
+                      setCollapsedSteps((prev) => ({
+                        ...prev,
+                        [step.id]: !isCollapsed,
+                      }))
+                    }
+                  >
+                    <ChevronRight className={`h-3 w-3 transition ${isCollapsed ? '' : 'rotate-90'}`} />
+                    <span>
+                      {isDataSource
+                        ? t('sidepanel_steps_per_row', 'Steps per row')
+                        : t('sidepanel_steps_in_loop', 'Steps in loop')}
+                    </span>
+                  </button>
                   {isDataSource ? (
                     <span className="text-[10px] font-semibold text-muted-foreground">
-                      {dataSourceCount} steps
+                      {t('sidepanel_steps_count', '{count} steps')
+                        .replace('{count}', String(dataSourceCount))}
                     </span>
-                  ) : null}
+                  ) : (
+                    <span className="text-[10px] font-semibold text-muted-foreground">
+                      {t('sidepanel_steps_count', '{count} steps')
+                        .replace('{count}', String(step.children?.length ?? 0))}
+                    </span>
+                  )}
                 </div>
-                {!isDataSource || !dataSourceCollapsed ? (
+                {!isCollapsed ? (
                   <div className="mt-2">
                     {renderStepList(step.children ?? [], depth + 1, {
                       context: { scope: 'children', parentId: step.id },
                       addPlaceholder: {
-                        label: isDataSource ? 'Add step per row' : 'Add step in loop',
-                        ariaLabel: isDataSource ? 'Add step to data source' : 'Add step to loop',
+                        label: isDataSource
+                          ? t('sidepanel_steps_add_per_row', 'Add step per row')
+                          : t('sidepanel_steps_add_in_loop', 'Add step in loop'),
+                        ariaLabel: isDataSource
+                          ? t('sidepanel_steps_add_to_data_source', 'Add step to data source')
+                          : t('sidepanel_steps_add_to_loop', 'Add step to loop'),
                         onPick: (type) => addStep(type, { scope: 'children', stepId: step.id }),
                       },
                     })}
@@ -1626,19 +1700,48 @@ export default function FlowStepsBuilderPreview({ steps = DEFAULT_STEPS }: { ste
                 {step.branches.map((branch) => (
                   <div key={branch.id} className="mt-2">
                     <div className="flex items-center justify-between text-[11px] font-semibold text-muted-foreground">
-                      <span>{branch.label}</span>
+                      <button
+                        type="button"
+                        className="flex items-center gap-1 text-[11px] font-semibold text-muted-foreground"
+                        onClick={() =>
+                          setCollapsedBranches((prev) => ({
+                            ...prev,
+                            [`${step.id}:${branch.id}`]:
+                              !(prev[`${step.id}:${branch.id}`] ?? false),
+                          }))
+                        }
+                      >
+                        <ChevronRight
+                          className={`h-3 w-3 transition ${
+                            collapsedBranches[`${step.id}:${branch.id}`] ? '' : 'rotate-90'
+                          }`}
+                        />
+                        <span>{branch.label}</span>
+                      </button>
+                      <span className="text-[10px] font-semibold text-muted-foreground">
+                        {t('sidepanel_steps_count', '{count} steps')
+                          .replace('{count}', String(branch.steps.length))}
+                      </span>
                     </div>
-                    <div className="mt-2">
-                      {renderStepList(branch.steps ?? [], depth + 1, {
-                        context: { scope: 'branch', parentId: step.id, branchId: branch.id },
-                        addPlaceholder: {
-                          label: `Add step to ${branch.label}`,
-                          ariaLabel: `Add step to ${branch.label}`,
-                          onPick: (type) =>
-                            addStep(type, { scope: 'branch', stepId: step.id, branchId: branch.id }),
-                        },
-                      })}
-                    </div>
+                    {!collapsedBranches[`${step.id}:${branch.id}`] ? (
+                      <div className="mt-2">
+                        {renderStepList(branch.steps ?? [], depth + 1, {
+                          context: { scope: 'branch', parentId: step.id, branchId: branch.id },
+                          addPlaceholder: {
+                            label: t('sidepanel_steps_add_to_branch', 'Add step to {label}').replace(
+                              '{label}',
+                              branch.label,
+                            ),
+                            ariaLabel: t('sidepanel_steps_add_to_branch', 'Add step to {label}').replace(
+                              '{label}',
+                              branch.label,
+                            ),
+                            onPick: (type) =>
+                              addStep(type, { scope: 'branch', stepId: step.id, branchId: branch.id }),
+                          },
+                        })}
+                      </div>
+                    ) : null}
                   </div>
                 ))}
               </div>
@@ -1671,14 +1774,16 @@ export default function FlowStepsBuilderPreview({ steps = DEFAULT_STEPS }: { ste
   return (
     <div className="space-y-2">
       <div className="flex items-center justify-between">
-        <span className="text-xs font-semibold text-muted-foreground">Steps</span>
+        <span className="text-xs font-semibold text-muted-foreground">
+          {t('sidepanel_steps_title', 'Steps')}
+        </span>
       </div>
       <div className="max-h-[35.5vh] overflow-y-auto pr-1" data-step-scroll>
         {renderStepList(draftSteps, 0, {
           context: { scope: 'root' },
           addPlaceholder: {
-            label: 'Add step',
-            ariaLabel: 'Add step',
+            label: t('sidepanel_steps_add', 'Add step'),
+            ariaLabel: t('sidepanel_steps_add', 'Add step'),
             onPick: (type) => addStep(type, { scope: 'root' }),
           },
         })}

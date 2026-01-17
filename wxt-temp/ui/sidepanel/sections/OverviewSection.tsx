@@ -1,6 +1,7 @@
 import { Globe } from 'lucide-react';
 import Card from '../components/Card';
 import StatCard from '../components/StatCard';
+import { t } from '../utils/i18n';
 
 export default function OverviewSection() {
   const siteStats = [
@@ -33,28 +34,34 @@ export default function OverviewSection() {
     <section className="flex flex-col gap-3">
       <div className="flex items-center justify-between gap-3">
         <div>
-          <h2 className="text-base font-semibold text-card-foreground">Overview</h2>
+          <h2 className="text-base font-semibold text-card-foreground">
+            {t('sidepanel_overview_title', 'Overview')}
+          </h2>
           <p className="mt-1 text-xs text-muted-foreground">
-            Summary by site from the latest export snapshot.
+            {t('sidepanel_overview_subtitle', 'Summary by site from the latest export snapshot.')}
           </p>
         </div>
         <div className="inline-flex items-center gap-2 rounded-full border border-border bg-background px-3 py-1 text-xs text-muted-foreground">
           <Globe className="h-3.5 w-3.5" />
-          {siteStats.length} sites
+          {t('sidepanel_overview_sites_count', '{count} sites').replace('{count}', String(siteStats.length))}
         </div>
       </div>
 
       <div className="grid gap-2 grid-cols-3">
-        <StatCard label="Elements" value={String(totals.elements)} />
-        <StatCard label="Flows" value={String(totals.flows)} />
-        <StatCard label="Hidden" value={String(totals.hidden)} />
+        <StatCard label={t('sidepanel_tab_elements', 'Elements')} value={String(totals.elements)} />
+        <StatCard label={t('sidepanel_tab_flows', 'Flows')} value={String(totals.flows)} />
+        <StatCard label={t('sidepanel_tab_hidden', 'Hidden')} value={String(totals.hidden)} />
       </div>
 
       <Card className="p-0">
         <div className="flex items-center justify-between border-b border-border px-4 py-3">
           <div>
-            <h3 className="text-sm font-semibold text-card-foreground">Sites</h3>
-            <p className="text-xs text-muted-foreground">Totals grouped by site.</p>
+            <h3 className="text-sm font-semibold text-card-foreground">
+              {t('sidepanel_overview_sites_title', 'Sites')}
+            </h3>
+            <p className="text-xs text-muted-foreground">
+              {t('sidepanel_overview_sites_subtitle', 'Totals grouped by site.')}
+            </p>
           </div>
         </div>
         <div className="divide-y divide-border">
@@ -75,18 +82,32 @@ export default function OverviewSection() {
                     >
                       {site.site}
                     </a>
-                    <p className="text-xs text-muted-foreground">{total} total items</p>
+                    <p className="text-xs text-muted-foreground">
+                      {t('sidepanel_overview_total_items', '{count} total items').replace(
+                        '{count}',
+                        String(total),
+                      )}
+                    </p>
                   </div>
                 </div>
                 <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
                   <span className="inline-flex items-center gap-1 rounded-full border border-border bg-background px-2 py-1">
-                    {site.elements} elements
+                    {t('sidepanel_overview_elements_count', '{count} elements').replace(
+                      '{count}',
+                      String(site.elements),
+                    )}
                   </span>
                   <span className="inline-flex items-center gap-1 rounded-full border border-border bg-background px-2 py-1">
-                    {site.flows} flows
+                    {t('sidepanel_overview_flows_count', '{count} flows').replace(
+                      '{count}',
+                      String(site.flows),
+                    )}
                   </span>
                   <span className="inline-flex items-center gap-1 rounded-full border border-border bg-background px-2 py-1">
-                    {site.hidden} hidden
+                    {t('sidepanel_overview_hidden_count', '{count} hidden').replace(
+                      '{count}',
+                      String(site.hidden),
+                    )}
                   </span>
                 </div>
               </div>
