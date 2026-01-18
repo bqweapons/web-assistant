@@ -519,7 +519,7 @@ const STEP_TYPE_LABELS: Record<string, string> = {
   assert: t('sidepanel_step_assert_label', 'Assert'),
 };
 
-export default function FlowStepsBuilderPreview({ steps = DEFAULT_STEPS }: { steps?: StepData[] }) {
+export default function FlowStepsBuilder({ steps = DEFAULT_STEPS }: { steps?: StepData[] }) {
   const [draftSteps, setDraftSteps] = useState<StepData[]>(steps);
   const [activeStepId, setActiveStepId] = useState('');
   const [activeFieldTarget, setActiveFieldTarget] = useState<{ stepId: string; fieldId: string } | null>(null);
@@ -1258,10 +1258,11 @@ export default function FlowStepsBuilderPreview({ steps = DEFAULT_STEPS }: { ste
         | { scope: 'branch'; parentId: string; branchId: string };
       addPlaceholder?: { label: string; ariaLabel: string; onPick: (type: string) => void };
     },
-  ) => (
+  ) => {
+    const listContext = options?.context;
+    return (
     <div className={depth > 0 ? 'grid gap-2 border-l border-border/70 pl-3' : 'grid gap-2'}>
       {items.map((step, index) => {
-        const listContext = options?.context;
         const isActive = step.id === activeStepId;
         const isLoop = step.type === 'loop';
         const isIfElse = step.type === 'if-else';
@@ -1271,8 +1272,7 @@ export default function FlowStepsBuilderPreview({ steps = DEFAULT_STEPS }: { ste
         const dataSourceMeta = step.dataSource;
         const typeLabel = STEP_TYPE_LABELS[step.type] ?? step.type;
         const isDragging = dragState?.stepId === step.id;
-        const canDropHere =
-          Boolean(dragState) && Boolean(listContext) && isSameContext(dragState.context, listContext);
+        const canDropHere = dragState && listContext ? isSameContext(dragState.context, listContext) : false;
         const handleDrop = () => {
           if (!dragState || !listContext || !canDropHere || dragState.stepId === step.id) {
             return;
@@ -1754,22 +1754,20 @@ export default function FlowStepsBuilderPreview({ steps = DEFAULT_STEPS }: { ste
           label={options.addPlaceholder.label}
           ariaLabel={options.addPlaceholder.ariaLabel}
           onPick={options.addPlaceholder.onPick}
-          canDrop={
-            Boolean(dragState) &&
-            Boolean(options.context) &&
-            isSameContext(dragState.context, options.context)
-          }
+          canDrop={dragState && listContext ? isSameContext(dragState.context, listContext) : false}
           onDropReorder={() => {
-            if (!dragState || !options.context) {
+            const dropContext = listContext;
+            if (!dragState || !dropContext) {
               return;
             }
-            setDraftSteps((prev) => reorderWithinContext(prev, options.context, dragState.stepId));
+            setDraftSteps((prev) => reorderWithinContext(prev, dropContext, dragState.stepId));
             setDragState(null);
           }}
         />
       ) : null}
     </div>
-  );
+    );
+  };
 
   return (
     <div className="space-y-2">

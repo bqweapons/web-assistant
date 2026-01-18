@@ -20,7 +20,7 @@ import {
 import Card from '../components/Card';
 import Drawer from '../components/Drawer';
 import FlowDrawer from '../components/FlowDrawer';
-import FlowStepsBuilderPreview from '../components/FlowStepsBuilderPreview';
+import FlowStepsBuilder from '../components/FlowStepsBuilder';
 import SelectMenu from '../components/SelectMenu';
 import { mockElements, mockFlows } from '../utils/mockData';
 import { t, useLocale } from '../utils/i18n';
@@ -1374,7 +1374,7 @@ export default function ElementsSection() {
               }
             />
           </label>
-          <FlowStepsBuilderPreview />
+          <FlowStepsBuilder />
         </div>
       </FlowDrawer>
     </div>

@@ -72,7 +72,7 @@ const subscribe = (listener: () => void) => {
 
 const getLocaleUrl = (locale: SupportedLocale) => {
   if (typeof chrome !== 'undefined' && chrome?.runtime?.getURL) {
-    return chrome.runtime.getURL(`_locales/${locale}/messages.json`);
+    return chrome.runtime.getURL(`/_locales/${locale}/messages.json`);
   }
   return `/_locales/${locale}/messages.json`;
 };
@@ -127,7 +127,7 @@ const getMessage = (key: string) => {
     return cached;
   }
   if (typeof chrome !== 'undefined' && chrome?.i18n?.getMessage) {
-    return chrome.i18n.getMessage(key);
+    return chrome.i18n.getMessage(key as Parameters<typeof chrome.i18n.getMessage>[0]);
   }
   return '';
 };

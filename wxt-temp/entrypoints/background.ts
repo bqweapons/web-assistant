@@ -4,7 +4,7 @@ export default defineBackground(() => {
   if (typeof chrome !== 'undefined' && chrome.sidePanel?.setPanelBehavior) {
     const result = chrome.sidePanel.setPanelBehavior({ openPanelOnActionClick: true });
     if (result && typeof result.catch === 'function') {
-      result.catch((error) => {
+      result.catch((error: unknown) => {
         console.warn('Failed to enable side panel action click', error);
       });
     }

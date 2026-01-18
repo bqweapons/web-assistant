@@ -12,7 +12,7 @@
     "message": "キャンセル"
   },
   "sidepanel_action_clear": {
-    "message": "クリア"
+    "message": "Clear"
   },
   "sidepanel_action_dark_mode": {
     "message": "ダークモード"
@@ -507,13 +507,13 @@
     "message": "行"
   },
   "sidepanel_overview_elements_count": {
-    "message": "{count} 個の要素"
+    "message": "要素：{count}"
   },
   "sidepanel_overview_flows_count": {
-    "message": "{count} 件のフロー"
+    "message": "フロー：{count}"
   },
   "sidepanel_overview_hidden_count": {
-    "message": "{count} 件の非表示ルール"
+    "message": "非表示：{count}"
   },
   "sidepanel_overview_sites_count": {
     "message": "{count} サイト"
@@ -552,10 +552,10 @@
     "message": "設定を閉じる"
   },
   "sidepanel_settings_data_export": {
-    "message": "エクスポート"
+    "message": "Export"
   },
   "sidepanel_settings_data_import": {
-    "message": "インポート"
+    "message": "Import"
   },
   "sidepanel_settings_data_subtitle": {
     "message": "保存済みの要素とフローをインポート/エクスポートします。"
@@ -573,7 +573,7 @@
     "message": "ロケール: {locale}"
   },
   "sidepanel_settings_share_copy": {
-    "message": "リンクをコピー"
+    "message": "Copy link"
   },
   "sidepanel_settings_share_open": {
     "message": "ストアを開く"

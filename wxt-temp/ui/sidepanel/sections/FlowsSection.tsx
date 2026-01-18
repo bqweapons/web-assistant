@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { Check, CheckCircle2, Play, Search, Trash2 } from 'lucide-react';
 import Card from '../components/Card';
 import FlowDrawer from '../components/FlowDrawer';
-import FlowStepsBuilderPreview from '../components/FlowStepsBuilderPreview';
+import FlowStepsBuilder from '../components/FlowStepsBuilder';
 import { mockFlows } from '../utils/mockData';
 import { t } from '../utils/i18n';
 
@@ -311,7 +311,7 @@ export default function FlowsSection({
               </span>
               <span className="text-foreground">{editFlow.site}</span>
             </div>
-            <FlowStepsBuilderPreview />
+            <FlowStepsBuilder />
           </div>
         ) : null}
       </FlowDrawer>
@@ -349,7 +349,7 @@ export default function FlowsSection({
               placeholder={t('sidepanel_flows_description_placeholder', 'Describe what the flow does')}
             />
           </label>
-          <FlowStepsBuilderPreview />
+          <FlowStepsBuilder />
         </div>
       </FlowDrawer>
     </section>
