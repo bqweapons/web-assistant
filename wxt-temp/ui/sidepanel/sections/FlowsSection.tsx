@@ -5,15 +5,18 @@ import FlowDrawer from '../components/FlowDrawer';
 import FlowStepsBuilder from '../components/FlowStepsBuilder';
 import { mockFlows } from '../utils/mockData';
 import { t } from '../utils/i18n';
+import type { SelectorPickerAccept } from '../../../shared/messages';
 
 type FlowsSectionProps = {
   createFlowOpen?: boolean;
   onCreateFlowClose?: () => void;
+  onStartPicker?: (accept: SelectorPickerAccept) => Promise<string | null>;
 };
 
 export default function FlowsSection({
   createFlowOpen = false,
   onCreateFlowClose,
+  onStartPicker,
 }: FlowsSectionProps) {
   const currentSite = mockFlows[0]?.site ?? 'file://';
   const [flows, setFlows] = useState(mockFlows);
@@ -311,7 +314,7 @@ export default function FlowsSection({
               </span>
               <span className="text-foreground">{editFlow.site}</span>
             </div>
-            <FlowStepsBuilder />
+            <FlowStepsBuilder onStartPicker={onStartPicker} />
           </div>
         ) : null}
       </FlowDrawer>
@@ -349,7 +352,7 @@ export default function FlowsSection({
               placeholder={t('sidepanel_flows_description_placeholder', 'Describe what the flow does')}
             />
           </label>
-          <FlowStepsBuilder />
+          <FlowStepsBuilder onStartPicker={onStartPicker} />
         </div>
       </FlowDrawer>
     </section>

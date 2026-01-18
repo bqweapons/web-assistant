@@ -24,15 +24,31 @@ import FlowStepsBuilder from '../components/FlowStepsBuilder';
 import SelectMenu from '../components/SelectMenu';
 import { mockElements, mockFlows } from '../utils/mockData';
 import { t, useLocale } from '../utils/i18n';
+import type { PickerRect, SelectorPickerAccept } from '../../../shared/messages';
 
-export default function ElementsSection() {
+type ElementsSectionProps = {
+  onStartPicker?: (accept: SelectorPickerAccept) => Promise<string | null>;
+  onStartAreaPicker?: () => Promise<PickerRect | null>;
+  onStartElementPicker?: (options?: { disallowInput?: boolean }) => Promise<{
+    selector: string;
+    beforeSelector?: string;
+    afterSelector?: string;
+  } | null>;
+};
+
+export default function ElementsSection({
+  onStartPicker,
+  onStartAreaPicker,
+  onStartElementPicker,
+}: ElementsSectionProps) {
   const locale = useLocale();
-  const currentSite = 'all-sites';
   const [elements, setElements] = useState(mockElements);
+  const currentSite = elements[0]?.siteUrl ?? 'site';
   const [flows, setFlows] = useState(mockFlows);
   const actionClass = 'btn-icon h-8 w-8';
   const selectButtonClass = 'btn-ghost h-9 w-full justify-between px-2 text-xs';
   const [activeElementId, setActiveElementId] = useState<string | null>(null);
+  const [addElementType, setAddElementType] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
   const [typeFilter, setTypeFilter] = useState('all');
   const activeElement = elements.find((element) => element.id === activeElementId) ?? null;
@@ -293,6 +309,9 @@ export default function ElementsSection() {
     }
     if (normalized === 'area') {
       return t('sidepanel_element_type_area', 'Area');
+    }
+    if (normalized === 'tooltip') {
+      return t('sidepanel_element_type_tooltip', 'Tooltip');
     }
     return value;
   };
@@ -735,6 +754,127 @@ export default function ElementsSection() {
     setDraftFlow({ name: '', description: '', steps: 0 });
   }, [flowDrawerOpen]);
 
+  const createElementId = () =>
+    `element-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+  const defaultSiteUrl = elements[0]?.siteUrl || 'https://example.com';
+  const defaultPageUrl = elements[0]?.pageUrl || defaultSiteUrl;
+  const defaultFrameUrl = elements[0]?.frameUrl || defaultPageUrl;
+
+  const handleAddElementType = async (value: string) => {
+    setAddElementType(value);
+    if (!value) {
+      return;
+    }
+    if (value === 'area') {
+      if (!onStartAreaPicker) {
+        setAddElementType('');
+        return;
+      }
+      const rect = await onStartAreaPicker();
+      if (!rect) {
+        setAddElementType('');
+        return;
+      }
+      const now = Date.now();
+      const newArea = {
+        id: createElementId(),
+        type: 'area' as const,
+        text: t('sidepanel_elements_add_area', 'Area'),
+        selector: 'body',
+        position: 'append',
+        layout: 'row' as const,
+        style: {
+          backgroundColor: '#f59e0b30',
+          borderRadius: '14px',
+          color: '#0f172a',
+          height: `${Math.max(1, Math.round(rect.height))}px`,
+          left: `${Math.round(rect.x)}px`,
+          position: 'absolute',
+          top: `${Math.round(rect.y)}px`,
+          width: `${Math.max(1, Math.round(rect.width))}px`,
+          zIndex: '2147482000',
+        },
+        pageUrl: defaultPageUrl,
+        siteUrl: defaultSiteUrl,
+        frameUrl: defaultFrameUrl,
+        frameSelectors: [] as string[],
+        floating: true,
+        createdAt: now,
+        updatedAt: now,
+      };
+      setElements((prev) => [newArea, ...prev]);
+      setActiveElementId(newArea.id);
+      setAddElementType('');
+      return;
+    }
+    if (!onStartElementPicker && !onStartPicker) {
+      setAddElementType('');
+      return;
+    }
+    const normalizedType: 'tooltip' | 'button' | 'link' =
+      value === 'tooltip' ? 'tooltip' : value === 'link' ? 'link' : 'button';
+    const selectorPayload = onStartElementPicker
+      ? await onStartElementPicker({ disallowInput: normalizedType === 'button' || normalizedType === 'link' })
+      : await onStartPicker('selector').then((selector) => (selector ? { selector } : null));
+    if (!selectorPayload?.selector) {
+      setAddElementType('');
+      return;
+    }
+    const { selector, beforeSelector, afterSelector } = selectorPayload;
+    const now = Date.now();
+    const newElement = {
+      id: createElementId(),
+      type: normalizedType,
+      text:
+        normalizedType === 'tooltip'
+          ? t('sidepanel_elements_add_tooltip', 'Tooltip')
+          : normalizedType === 'link'
+            ? t('sidepanel_elements_add_link', 'Link')
+          : t('sidepanel_elements_add_button', 'Button'),
+      selector,
+      beforeSelector,
+      afterSelector,
+      position: 'append',
+      style:
+        normalizedType === 'tooltip'
+          ? {
+              backgroundColor: '#0f172a',
+              borderRadius: '10px',
+              color: '#ffffff',
+              fontSize: '11px',
+              fontWeight: '600',
+              padding: '6px 10px',
+            }
+          : normalizedType === 'link'
+            ? {
+                color: '#2563eb',
+                textDecoration: 'underline',
+              }
+          : {
+              backgroundColor: '#1b84ff',
+              borderRadius: '8px',
+              color: '#ffffff',
+              fontSize: '12px',
+              fontWeight: '600',
+              padding: '8px 16px',
+            },
+      pageUrl: defaultPageUrl,
+      siteUrl: defaultSiteUrl,
+      frameUrl: defaultFrameUrl,
+      frameSelectors: [] as string[],
+      floating: false,
+      createdAt: now,
+      updatedAt: now,
+      tooltipPosition: normalizedType === 'tooltip' ? ('top' as const) : undefined,
+      tooltipPersistent: normalizedType === 'tooltip' ? false : undefined,
+      href: normalizedType === 'link' ? 'https://example.com' : undefined,
+      linkTarget: normalizedType === 'link' ? ('new-tab' as const) : undefined,
+    };
+    setElements((prev) => [newElement, ...prev]);
+    setActiveElementId(newElement.id);
+    setAddElementType('');
+  };
+
   const handleElementSave = () => {
     if (!editElement) {
       return;
@@ -747,6 +887,37 @@ export default function ElementsSection() {
 
   return (
     <div className="flex flex-col gap-2">
+      <SelectMenu
+        value={addElementType}
+        placeholder={t('sidepanel_elements_add_placeholder', 'Add element to page')}
+        iconPosition="right"
+        useInputStyle={false}
+        buttonClassName="btn-primary w-full"
+        centerLabel
+        options={[
+          {
+            value: 'area',
+            label: t('sidepanel_elements_add_area', 'Area'),
+            rightLabel: t('sidepanel_elements_add_area_hint', 'Select a region'),
+          },
+          {
+            value: 'button',
+            label: t('sidepanel_elements_add_button', 'Button'),
+            rightLabel: t('sidepanel_elements_add_button_hint', 'Insert a clickable button'),
+          },
+          {
+            value: 'link',
+            label: t('sidepanel_elements_add_link', 'Link'),
+            rightLabel: t('sidepanel_elements_add_link_hint', 'Insert a clickable link'),
+          },
+          {
+            value: 'tooltip',
+            label: t('sidepanel_elements_add_tooltip', 'Tooltip'),
+            rightLabel: t('sidepanel_elements_add_tooltip_hint', 'Show helper text on hover'),
+          },
+        ]}
+        onChange={handleAddElementType}
+      />
       <div className="flex items-center justify-between gap-2">
         <div>
           <h2 className="text-base font-semibold text-card-foreground">
@@ -1374,7 +1545,7 @@ export default function ElementsSection() {
               }
             />
           </label>
-          <FlowStepsBuilder />
+          <FlowStepsBuilder onStartPicker={onStartPicker} />
         </div>
       </FlowDrawer>
     </div>

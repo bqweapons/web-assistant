@@ -4,6 +4,7 @@ import SelectMenu from './SelectMenu';
 import SelectorInput from './SelectorInput';
 import StepPicker from './StepPicker';
 import { t } from '../utils/i18n';
+import type { SelectorPickerAccept } from '../../../shared/messages';
 
 type StepFieldOption = {
   value: string;
@@ -519,7 +520,12 @@ const STEP_TYPE_LABELS: Record<string, string> = {
   assert: t('sidepanel_step_assert_label', 'Assert'),
 };
 
-export default function FlowStepsBuilder({ steps = DEFAULT_STEPS }: { steps?: StepData[] }) {
+type FlowStepsBuilderProps = {
+  steps?: StepData[];
+  onStartPicker?: (accept: SelectorPickerAccept) => Promise<string | null>;
+};
+
+export default function FlowStepsBuilder({ steps = DEFAULT_STEPS, onStartPicker }: FlowStepsBuilderProps) {
   const [draftSteps, setDraftSteps] = useState<StepData[]>(steps);
   const [activeStepId, setActiveStepId] = useState('');
   const [activeFieldTarget, setActiveFieldTarget] = useState<{ stepId: string; fieldId: string } | null>(null);
@@ -1401,7 +1407,19 @@ export default function FlowStepsBuilder({ steps = DEFAULT_STEPS }: { steps?: St
                                   type={field.type === 'number' ? 'number' : 'text'}
                                   onChange={(value) => updateField(step.id, field.id, value)}
                                   onFocus={() => setActiveFieldTarget({ stepId: step.id, fieldId: field.id })}
-                                  onPick={() => setActiveFieldTarget({ stepId: step.id, fieldId: field.id })}
+                                  onPick={() => {
+                                    setActiveFieldTarget({ stepId: step.id, fieldId: field.id });
+                                    if (!onStartPicker) {
+                                      return;
+                                    }
+                                    const accept: SelectorPickerAccept =
+                                      step.type === 'input' ? 'input' : 'selector';
+                                    void onStartPicker(accept).then((selector) => {
+                                      if (selector) {
+                                        updateField(step.id, field.id, selector);
+                                      }
+                                    });
+                                  }}
                                 />
                               );
                             }
@@ -1533,17 +1551,29 @@ export default function FlowStepsBuilder({ steps = DEFAULT_STEPS }: { steps?: St
                                 );
                               }
                               if (showPicker) {
-                                return (
-                                  <SelectorInput
-                                    value={field.value}
-                                    placeholder={field.placeholder}
-                                    type={field.type === 'number' ? 'number' : 'text'}
-                                    onChange={(value) => updateField(step.id, field.id, value)}
-                                    onFocus={() => setActiveFieldTarget({ stepId: step.id, fieldId: field.id })}
-                                    onPick={() => setActiveFieldTarget({ stepId: step.id, fieldId: field.id })}
-                                  />
-                                );
-                              }
+                              return (
+                                <SelectorInput
+                                  value={field.value}
+                                  placeholder={field.placeholder}
+                                  type={field.type === 'number' ? 'number' : 'text'}
+                                  onChange={(value) => updateField(step.id, field.id, value)}
+                                  onFocus={() => setActiveFieldTarget({ stepId: step.id, fieldId: field.id })}
+                                  onPick={() => {
+                                    setActiveFieldTarget({ stepId: step.id, fieldId: field.id });
+                                    if (!onStartPicker) {
+                                      return;
+                                    }
+                                    const accept: SelectorPickerAccept =
+                                      step.type === 'input' ? 'input' : 'selector';
+                                    void onStartPicker(accept).then((selector) => {
+                                      if (selector) {
+                                        updateField(step.id, field.id, selector);
+                                      }
+                                    });
+                                  }}
+                                />
+                              );
+                            }
                               return (
                                 <input
                                   className="input"

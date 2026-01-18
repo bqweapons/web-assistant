@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import AppHeader from './components/AppHeader';
 import ElementsSection from './sections/ElementsSection';
 import FlowsSection from './sections/FlowsSection';
@@ -6,9 +6,16 @@ import HiddenRulesSection from './sections/HiddenRulesSection';
 import OverviewSection from './sections/OverviewSection';
 import SettingsSection from './sections/SettingsSection';
 import SettingsPopover from './components/SettingsPopover';
-import SelectMenu from './components/SelectMenu';
+import PickerOverlay from './components/PickerOverlay';
 import { EyeOff, Layers, LayoutDashboard, Moon, Settings, Sun, Workflow } from 'lucide-react';
 import { t, useLocale } from './utils/i18n';
+import {
+  MessageType,
+  type PickerAccept,
+  type PickerResultPayload,
+  type RuntimeMessage,
+  type SelectorPickerAccept,
+} from '../../shared/messages';
 
 const TAB_IDS = {
   elements: 'elements',
@@ -51,12 +58,150 @@ export default function App() {
   const [activeTab, setActiveTab] = useState(TAB_IDS.elements);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [isDark, setIsDark] = useState(false);
-  const [addElementType, setAddElementType] = useState('');
   const [createFlowOpen, setCreateFlowOpen] = useState(false);
+  const [pickerActive, setPickerActive] = useState(false);
+  const [pickerError, setPickerError] = useState('');
+  const [pickerAccept, setPickerAccept] = useState<PickerAccept>('selector');
+  const pickerResolveRef = useRef<((value: PickerResultPayload | null) => void) | null>(null);
 
   useEffect(() => {
     document.documentElement.classList.toggle('dark', isDark);
   }, [isDark]);
+
+  const sendRuntimeMessage = useCallback((message: RuntimeMessage) => {
+    return new Promise<unknown>((resolve, reject) => {
+      const runtime = chrome?.runtime;
+      if (!runtime?.sendMessage) {
+        reject(new Error('Messaging API unavailable.'));
+        return;
+      }
+      runtime.sendMessage(message, (response) => {
+        const lastError = runtime.lastError?.message;
+        if (lastError) {
+          reject(new Error(lastError));
+          return;
+        }
+        if (response?.ok === false) {
+          reject(new Error(response.error || 'Messaging failed.'));
+          return;
+        }
+        resolve(response?.data);
+      });
+    });
+  }, []);
+
+  const finalizePicker = useCallback((value: PickerResultPayload | null) => {
+    if (pickerResolveRef.current) {
+      pickerResolveRef.current(value);
+      pickerResolveRef.current = null;
+    }
+    setPickerActive(false);
+    setPickerError('');
+  }, []);
+
+  const startPicker = useCallback(
+    async (accept: PickerAccept, options?: { disallowInput?: boolean }) => {
+      if (pickerResolveRef.current) {
+        pickerResolveRef.current(null);
+        pickerResolveRef.current = null;
+      }
+      setPickerError('');
+      setPickerAccept(accept);
+      setPickerActive(true);
+      return new Promise<PickerResultPayload | null>((resolve) => {
+        pickerResolveRef.current = resolve;
+        sendRuntimeMessage({ type: MessageType.START_PICKER, data: { accept, disallowInput: options?.disallowInput } })
+          .then(() => undefined)
+          .catch(() => {
+            setPickerError(t('sidepanel_picker_start_error', 'Unable to start picker.'));
+            finalizePicker(null);
+          });
+      });
+    },
+    [finalizePicker, sendRuntimeMessage],
+  );
+
+  const startSelectorPicker = useCallback(
+    (accept: SelectorPickerAccept) =>
+      startPicker(accept).then((result) => result?.selector ?? null),
+    [startPicker],
+  );
+
+  const startSelectorPickerWithNeighbors = useCallback(
+    (options?: { disallowInput?: boolean }) =>
+      startPicker('selector', options).then((result) =>
+        result?.selector
+          ? {
+              selector: result.selector,
+              beforeSelector: result.beforeSelector,
+              afterSelector: result.afterSelector,
+            }
+          : null,
+      ),
+    [startPicker],
+  );
+
+  const startAreaPicker = useCallback(
+    () => startPicker('area').then((result) => result?.rect ?? null),
+    [startPicker],
+  );
+
+  const cancelPicker = useCallback(() => {
+    if (!pickerResolveRef.current && !pickerActive) {
+      return;
+    }
+    sendRuntimeMessage({ type: MessageType.CANCEL_PICKER })
+      .then(() => undefined)
+      .catch(() => undefined);
+    finalizePicker(null);
+  }, [finalizePicker, pickerActive, sendRuntimeMessage]);
+
+  useEffect(() => {
+    if (!pickerActive) {
+      return;
+    }
+    const handleKey = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        event.preventDefault();
+        cancelPicker();
+      }
+    };
+    window.addEventListener('keydown', handleKey);
+    return () => {
+      window.removeEventListener('keydown', handleKey);
+    };
+  }, [cancelPicker, pickerActive]);
+
+  useEffect(() => {
+    const handleMessage = (rawMessage: RuntimeMessage) => {
+      if (!rawMessage?.type || !rawMessage.forwarded) {
+        return;
+      }
+      switch (rawMessage.type) {
+        case MessageType.PICKER_RESULT:
+          finalizePicker(rawMessage.data || null);
+          break;
+        case MessageType.PICKER_CANCELLED:
+          finalizePicker(null);
+          break;
+        case MessageType.PICKER_INVALID:
+          if (rawMessage.data?.reason === 'input-required' || pickerAccept === 'input') {
+            setPickerError(t('sidepanel_picker_invalid_input', 'Please select an input field.'));
+          } else if (rawMessage.data?.reason === 'input-not-allowed') {
+            setPickerError(t('sidepanel_picker_invalid_non_input', 'Please select a non-input element.'));
+          }
+          break;
+        default:
+          break;
+      }
+    };
+    const runtime = chrome?.runtime;
+    if (!runtime?.onMessage) {
+      return;
+    }
+    runtime.onMessage.addListener(handleMessage);
+    return () => runtime.onMessage.removeListener(handleMessage);
+  }, [finalizePicker, locale, pickerAccept]);
 
 
   const headerActions = useMemo(
@@ -78,7 +223,7 @@ export default function App() {
   );
 
   return (
-    <div className="flex h-screen flex-col bg-background text-foreground">
+    <div className="relative flex h-screen flex-col bg-background text-foreground">
       <AppHeader
         title={t('sidepanel_app_title', 'Ladybird')}
         context={t('sidepanel_app_context_none', 'No active page')}
@@ -89,37 +234,6 @@ export default function App() {
       />
 
       <main className="flex-1 overflow-y-auto px-4 pb-6">
-        {activeTab === TAB_IDS.elements && (
-          <div className="mt-2">
-            <SelectMenu
-              value={addElementType}
-              placeholder={t('sidepanel_elements_add_placeholder', 'Add element to page')}
-              iconPosition="right"
-              useInputStyle={false}
-              buttonClassName="btn-primary w-full"
-              centerLabel
-              options={[
-                {
-                  value: 'area',
-                  label: t('sidepanel_elements_add_area', 'Area'),
-                  rightLabel: t('sidepanel_elements_add_area_hint', 'Select a region'),
-                },
-                {
-                  value: 'button',
-                  label: t('sidepanel_elements_add_button', 'Button'),
-                  rightLabel: t('sidepanel_elements_add_button_hint', 'Insert a clickable button'),
-                },
-                {
-                  value: 'tooltip',
-                  label: t('sidepanel_elements_add_tooltip', 'Tooltip'),
-                  rightLabel: t('sidepanel_elements_add_tooltip_hint', 'Show helper text on hover'),
-                },
-              ]}
-              onChange={(value) => setAddElementType(value)}
-            />
-          </div>
-        )}
-
         {activeTab === TAB_IDS.flows && (
           <div className="mt-2">
             <button
@@ -133,20 +247,44 @@ export default function App() {
         )}
 
         <div className="mt-2">
-          {activeTab === TAB_IDS.elements && <ElementsSection />}
+          {activeTab === TAB_IDS.elements && (
+            <ElementsSection
+              onStartPicker={startSelectorPicker}
+              onStartAreaPicker={startAreaPicker}
+              onStartElementPicker={startSelectorPickerWithNeighbors}
+            />
+          )}
           {activeTab === TAB_IDS.flows && (
             <FlowsSection
               createFlowOpen={createFlowOpen}
               onCreateFlowClose={() => setCreateFlowOpen(false)}
+              onStartPicker={startSelectorPicker}
             />
           )}
-          {activeTab === TAB_IDS.hiddenRules && <HiddenRulesSection />}
+          {activeTab === TAB_IDS.hiddenRules && <HiddenRulesSection onStartPicker={startSelectorPicker} />}
           {activeTab === TAB_IDS.overview && <OverviewSection />}
         </div>
       </main>
       <SettingsPopover open={settingsOpen} onClose={() => setSettingsOpen(false)}>
         <SettingsSection />
       </SettingsPopover>
+      {pickerActive ? (
+        <PickerOverlay
+          title={
+            pickerAccept === 'area'
+              ? t('sidepanel_picker_area_title', 'Draw a region')
+              : t('sidepanel_picker_title', 'Select an element')
+          }
+          hint={
+            pickerAccept === 'area'
+              ? t('sidepanel_picker_area_hint', 'Drag on the page, press Esc to cancel.')
+              : t('sidepanel_picker_hint', 'Click the target, press Esc to cancel.')
+          }
+          error={pickerError || undefined}
+          cancelLabel={t('sidepanel_picker_cancel', 'Cancel')}
+          onCancel={cancelPicker}
+        />
+      ) : null}
     </div>
   );
 }

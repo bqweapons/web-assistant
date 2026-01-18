@@ -83,6 +83,9 @@
   "sidepanel_element_type_link": {
     "message": "Link"
   },
+  "sidepanel_element_type_tooltip": {
+    "message": "Tooltip"
+  },
   "sidepanel_elements_action_flow_configured": {
     "message": "Action flow: Configured"
   },
@@ -106,6 +109,12 @@
   },
   "sidepanel_elements_add_button_hint": {
     "message": "Insert a clickable button"
+  },
+  "sidepanel_elements_add_link": {
+    "message": "Link"
+  },
+  "sidepanel_elements_add_link_hint": {
+    "message": "Insert a clickable link"
   },
   "sidepanel_elements_add_placeholder": {
     "message": "Add element to page"
@@ -452,6 +461,9 @@
   "sidepanel_hidden_delete": {
     "message": "Delete rule"
   },
+  "sidepanel_hidden_default_name": {
+    "message": "Hidden rule"
+  },
   "sidepanel_hidden_detail_subtitle": {
     "message": "Edit the hidden rule details below."
   },
@@ -514,6 +526,30 @@
   },
   "sidepanel_hidden_title": {
     "message": "Hidden rules"
+  },
+  "sidepanel_picker_cancel": {
+    "message": "Cancel"
+  },
+  "sidepanel_picker_area_hint": {
+    "message": "Drag on the page, press Esc to cancel."
+  },
+  "sidepanel_picker_area_title": {
+    "message": "Draw a region"
+  },
+  "sidepanel_picker_hint": {
+    "message": "Click the target, press Esc to cancel."
+  },
+  "sidepanel_picker_invalid_input": {
+    "message": "Please select an input field."
+  },
+  "sidepanel_picker_invalid_non_input": {
+    "message": "Please select a non-input element."
+  },
+  "sidepanel_picker_start_error": {
+    "message": "Unable to start picker."
+  },
+  "sidepanel_picker_title": {
+    "message": "Select an element"
   },
   "sidepanel_label_unknown": {
     "message": "Unknown"

@@ -5,8 +5,13 @@ import Drawer from '../components/Drawer';
 import SelectorInput from '../components/SelectorInput';
 import { mockHiddenRules } from '../utils/mockData';
 import { t } from '../utils/i18n';
+import type { SelectorPickerAccept } from '../../../shared/messages';
 
-export default function HiddenRulesSection() {
+type HiddenRulesSectionProps = {
+  onStartPicker?: (accept: SelectorPickerAccept) => Promise<string | null>;
+};
+
+export default function HiddenRulesSection({ onStartPicker }: HiddenRulesSectionProps) {
   const [rules, setRules] = useState(mockHiddenRules);
   const preferredSite = 'www.yahoo.co.jp';
   const currentSite =
@@ -44,6 +49,7 @@ export default function HiddenRulesSection() {
 
   const formatDisplayTimestamp = (value: string) => value.replace(/:\d{2}$/, '');
   const isRuleEnabled = (rule: { enabled?: boolean }) => rule.enabled !== false;
+  const createRuleId = () => `hidden-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
 
   useEffect(() => {
     if (!activeRule) {
@@ -80,10 +86,32 @@ export default function HiddenRulesSection() {
     }
   };
 
+  const handleCreateFromPicker = async () => {
+    if (!onStartPicker) {
+      return;
+    }
+    const selector = await onStartPicker('selector');
+    if (!selector) {
+      return;
+    }
+    const newRule = {
+      id: createRuleId(),
+      name: t('sidepanel_hidden_default_name', 'Hidden rule'),
+      note: '',
+      site: currentSite,
+      selector,
+      updatedAt: new Date().toISOString().replace('T', ' ').slice(0, 19),
+      enabled: true,
+      scope: 'site',
+    };
+    setRules((prev) => [newRule, ...prev]);
+    setActiveRuleId(newRule.id);
+  };
+
   return (
     <section className="flex flex-col gap-2">
       <div className="grid grid-cols-2 gap-2">
-        <button type="button" className="btn-primary w-full gap-2">
+        <button type="button" className="btn-primary w-full gap-2" onClick={handleCreateFromPicker}>
           <Crosshair className="h-4 w-4" />
           {t('sidepanel_hidden_action_select', 'Hide page element')}
         </button>
@@ -247,6 +275,16 @@ export default function HiddenRulesSection() {
                 value={editRule.selector}
                 onChange={(value) => setEditRule({ ...editRule, selector: value })}
                 placeholder={t('sidepanel_hidden_selector_placeholder', 'CSS selector')}
+                onPick={async () => {
+                  if (!onStartPicker) {
+                    return;
+                  }
+                  const selector = await onStartPicker('selector');
+                  if (!selector) {
+                    return;
+                  }
+                  setEditRule({ ...editRule, selector });
+                }}
               />
             </label>
             <label className="grid gap-1">

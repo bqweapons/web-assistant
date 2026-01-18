@@ -1,6 +1,6 @@
 type MockElement = {
   id: string;
-  type: 'button' | 'link' | 'area';
+  type: 'button' | 'link' | 'area' | 'tooltip';
   text: string;
   selector: string;
   position: string;
@@ -24,6 +24,8 @@ type MockElement = {
   layout?: 'row' | 'column';
   href?: string;
   linkTarget?: 'new-tab' | 'same-tab';
+  tooltipPosition?: 'top' | 'right' | 'bottom' | 'left';
+  tooltipPersistent?: boolean;
 };
 
 type MockFlow = {

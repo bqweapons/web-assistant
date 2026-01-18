@@ -83,6 +83,9 @@
   "sidepanel_element_type_link": {
     "message": "链接"
   },
+  "sidepanel_element_type_tooltip": {
+    "message": "提示"
+  },
   "sidepanel_elements_action_flow_configured": {
     "message": "操作流程：已配置"
   },
@@ -106,6 +109,12 @@
   },
   "sidepanel_elements_add_button_hint": {
     "message": "插入可点击按钮"
+  },
+  "sidepanel_elements_add_link": {
+    "message": "链接"
+  },
+  "sidepanel_elements_add_link_hint": {
+    "message": "插入可点击链接"
   },
   "sidepanel_elements_add_placeholder": {
     "message": "向页面添加元素"
@@ -452,6 +461,9 @@
   "sidepanel_hidden_delete": {
     "message": "删除规则"
   },
+  "sidepanel_hidden_default_name": {
+    "message": "隐藏规则"
+  },
   "sidepanel_hidden_detail_subtitle": {
     "message": "在下方编辑隐藏规则详情。"
   },
@@ -514,6 +526,30 @@
   },
   "sidepanel_hidden_title": {
     "message": "隐藏规则"
+  },
+  "sidepanel_picker_cancel": {
+    "message": "取消"
+  },
+  "sidepanel_picker_area_hint": {
+    "message": "在页面上拖动选择区域，按 Esc 取消。"
+  },
+  "sidepanel_picker_area_title": {
+    "message": "选择区域"
+  },
+  "sidepanel_picker_hint": {
+    "message": "点击目标元素，按 Esc 取消。"
+  },
+  "sidepanel_picker_invalid_input": {
+    "message": "请选择可输入的字段。"
+  },
+  "sidepanel_picker_invalid_non_input": {
+    "message": "请选择非输入元素。"
+  },
+  "sidepanel_picker_start_error": {
+    "message": "无法启动选择器。"
+  },
+  "sidepanel_picker_title": {
+    "message": "选择页面元素"
   },
   "sidepanel_label_unknown": {
     "message": "未知"

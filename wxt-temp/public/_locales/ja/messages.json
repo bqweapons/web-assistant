@@ -83,6 +83,9 @@
   "sidepanel_element_type_link": {
     "message": "リンク"
   },
+  "sidepanel_element_type_tooltip": {
+    "message": "ツールチップ"
+  },
   "sidepanel_elements_action_flow_configured": {
     "message": "アクションフロー: 設定済み"
   },
@@ -106,6 +109,12 @@
   },
   "sidepanel_elements_add_button_hint": {
     "message": "クリック可能なボタンを挿入"
+  },
+  "sidepanel_elements_add_link": {
+    "message": "リンク"
+  },
+  "sidepanel_elements_add_link_hint": {
+    "message": "クリック可能なリンクを挿入"
   },
   "sidepanel_elements_add_placeholder": {
     "message": "ページに要素を追加"
@@ -452,6 +461,9 @@
   "sidepanel_hidden_delete": {
     "message": "ルールを削除"
   },
+  "sidepanel_hidden_default_name": {
+    "message": "非表示ルール"
+  },
   "sidepanel_hidden_detail_subtitle": {
     "message": "以下で非表示ルールの詳細を編集します。"
   },
@@ -514,6 +526,30 @@
   },
   "sidepanel_hidden_title": {
     "message": "非表示ルール"
+  },
+  "sidepanel_picker_cancel": {
+    "message": "キャンセル"
+  },
+  "sidepanel_picker_area_hint": {
+    "message": "ページ上でドラッグして範囲を選択し、Esc キーでキャンセルできます。"
+  },
+  "sidepanel_picker_area_title": {
+    "message": "範囲を選択"
+  },
+  "sidepanel_picker_hint": {
+    "message": "ページ上のターゲットをクリックして、Esc キーでキャンセルできます。"
+  },
+  "sidepanel_picker_invalid_input": {
+    "message": "入力欄を選択してください。"
+  },
+  "sidepanel_picker_invalid_non_input": {
+    "message": "入力欄以外の要素を選択してください。"
+  },
+  "sidepanel_picker_start_error": {
+    "message": "ピッカーを開始できませんでした。"
+  },
+  "sidepanel_picker_title": {
+    "message": "要素を選択"
   },
   "sidepanel_label_unknown": {
     "message": "不明"
