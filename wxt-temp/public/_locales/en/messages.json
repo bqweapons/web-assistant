@@ -449,9 +449,6 @@
   "sidepanel_flows_title": {
     "message": "Action flows"
   },
-  "sidepanel_hidden_add": {
-    "message": "Add hidden rule"
-  },
   "sidepanel_hidden_delete": {
     "message": "Delete rule"
   },
@@ -464,11 +461,26 @@
   "sidepanel_hidden_disable": {
     "message": "Disable rule"
   },
+  "sidepanel_hidden_edit": {
+    "message": "Edit rule"
+  },
+  "sidepanel_hidden_enable": {
+    "message": "Enable rule"
+  },
   "sidepanel_hidden_empty": {
     "message": "No hidden rules yet."
   },
+  "sidepanel_hidden_empty_filtered": {
+    "message": "No matches. Try a different search or filter."
+  },
   "sidepanel_hidden_enabled": {
     "message": "Rule enabled"
+  },
+  "sidepanel_hidden_status_enabled": {
+    "message": "Enabled"
+  },
+  "sidepanel_hidden_status_paused": {
+    "message": "Paused"
   },
   "sidepanel_hidden_name_placeholder": {
     "message": "Hidden rule name"
@@ -476,11 +488,29 @@
   "sidepanel_hidden_note_placeholder": {
     "message": "Why this rule exists"
   },
+  "sidepanel_hidden_search_placeholder": {
+    "message": "Search hidden rules"
+  },
   "sidepanel_hidden_selector_placeholder": {
     "message": "CSS selector"
   },
+  "sidepanel_hidden_sort_name": {
+    "message": "Name"
+  },
+  "sidepanel_hidden_sort_recent": {
+    "message": "Recently updated"
+  },
+  "sidepanel_hidden_status": {
+    "message": "{count} rules active on {site}"
+  },
   "sidepanel_hidden_subtitle": {
     "message": "Hide or suppress elements automatically."
+  },
+  "sidepanel_hidden_action_auto": {
+    "message": "Auto hide ads"
+  },
+  "sidepanel_hidden_action_select": {
+    "message": "Hide element"
   },
   "sidepanel_hidden_title": {
     "message": "Hidden rules"

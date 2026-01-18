@@ -449,9 +449,6 @@
   "sidepanel_flows_title": {
     "message": "操作流程"
   },
-  "sidepanel_hidden_add": {
-    "message": "添加隐藏规则"
-  },
   "sidepanel_hidden_delete": {
     "message": "删除规则"
   },
@@ -464,11 +461,26 @@
   "sidepanel_hidden_disable": {
     "message": "禁用规则"
   },
+  "sidepanel_hidden_edit": {
+    "message": "编辑规则"
+  },
+  "sidepanel_hidden_enable": {
+    "message": "启用规则"
+  },
   "sidepanel_hidden_empty": {
     "message": "暂无隐藏规则。"
   },
+  "sidepanel_hidden_empty_filtered": {
+    "message": "没有匹配结果。尝试更换搜索或筛选。"
+  },
   "sidepanel_hidden_enabled": {
     "message": "规则已启用"
+  },
+  "sidepanel_hidden_status_enabled": {
+    "message": "已启用"
+  },
+  "sidepanel_hidden_status_paused": {
+    "message": "已暂停"
   },
   "sidepanel_hidden_name_placeholder": {
     "message": "隐藏规则名称"
@@ -476,11 +488,29 @@
   "sidepanel_hidden_note_placeholder": {
     "message": "为什么需要此规则"
   },
+  "sidepanel_hidden_search_placeholder": {
+    "message": "搜索隐藏规则"
+  },
   "sidepanel_hidden_selector_placeholder": {
     "message": "CSS 选择器"
   },
+  "sidepanel_hidden_sort_name": {
+    "message": "名称"
+  },
+  "sidepanel_hidden_sort_recent": {
+    "message": "最近更新"
+  },
+  "sidepanel_hidden_status": {
+    "message": "{site} 上有 {count} 条规则已启用"
+  },
   "sidepanel_hidden_subtitle": {
     "message": "自动隐藏或屏蔽元素。"
+  },
+  "sidepanel_hidden_action_auto": {
+    "message": "自动隐藏广告"
+  },
+  "sidepanel_hidden_action_select": {
+    "message": "隐藏元素"
   },
   "sidepanel_hidden_title": {
     "message": "隐藏规则"

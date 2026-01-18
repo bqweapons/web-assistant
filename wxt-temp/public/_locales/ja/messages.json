@@ -449,9 +449,6 @@
   "sidepanel_flows_title": {
     "message": "アクションフロー"
   },
-  "sidepanel_hidden_add": {
-    "message": "非表示ルールを追加"
-  },
   "sidepanel_hidden_delete": {
     "message": "ルールを削除"
   },
@@ -464,11 +461,26 @@
   "sidepanel_hidden_disable": {
     "message": "ルールを無効化"
   },
+  "sidepanel_hidden_edit": {
+    "message": "ルールを編集"
+  },
+  "sidepanel_hidden_enable": {
+    "message": "ルールを有効化"
+  },
   "sidepanel_hidden_empty": {
     "message": "非表示ルールはまだありません。"
   },
+  "sidepanel_hidden_empty_filtered": {
+    "message": "一致するルールがありません。検索やフィルターを変更してください。"
+  },
   "sidepanel_hidden_enabled": {
     "message": "ルール有効"
+  },
+  "sidepanel_hidden_status_enabled": {
+    "message": "有効"
+  },
+  "sidepanel_hidden_status_paused": {
+    "message": "停止"
   },
   "sidepanel_hidden_name_placeholder": {
     "message": "非表示ルール名"
@@ -476,11 +488,29 @@
   "sidepanel_hidden_note_placeholder": {
     "message": "このルールの理由"
   },
+  "sidepanel_hidden_search_placeholder": {
+    "message": "非表示ルールを検索"
+  },
   "sidepanel_hidden_selector_placeholder": {
     "message": "CSS セレクター"
   },
+  "sidepanel_hidden_sort_name": {
+    "message": "名前"
+  },
+  "sidepanel_hidden_sort_recent": {
+    "message": "更新が新しい順"
+  },
+  "sidepanel_hidden_status": {
+    "message": "{site} で {count} 件のルールが有効"
+  },
   "sidepanel_hidden_subtitle": {
     "message": "要素を自動的に非表示または抑制します。"
+  },
+  "sidepanel_hidden_action_auto": {
+    "message": "広告を隠す"
+  },
+  "sidepanel_hidden_action_select": {
+    "message": "要素を隠す"
   },
   "sidepanel_hidden_title": {
     "message": "非表示ルール"

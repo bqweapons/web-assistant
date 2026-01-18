@@ -120,14 +120,6 @@ export default function App() {
           </div>
         )}
 
-        {activeTab === TAB_IDS.hiddenRules && (
-          <div className="mt-2">
-            <button type="button" className="btn-primary w-full">
-              {t('sidepanel_hidden_add', 'Add hidden rule')}
-            </button>
-          </div>
-        )}
-
         {activeTab === TAB_IDS.flows && (
           <div className="mt-2">
             <button
