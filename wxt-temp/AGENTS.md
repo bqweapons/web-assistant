@@ -1,32 +1,87 @@
-# WXT 迁移临时结构说明
+# WXT Temp Agent Notes
 
-本项目先在 `wxt-temp/` 中搭建 WXT 最小框架，避免影响旧逻辑。这里记录 WXT 的入口含义和各目录用途，方便后续迁移。
+This file defines practical conventions for contributors working inside `wxt-temp/`.
 
-## 关键概念
-- `entrypoints/`：WXT 入口层，直接对应扩展运行时的入口（background/content/sidepanel 等）。入口文件只做挂载与初始化。
-- `ui/`：业务 UI 层（建议结构）。真正的组件、样式和业务逻辑放这里，由 `entrypoints` 引入。
-- `shared/`：跨入口复用的消息协议、类型、工具（建议结构）。
+## Scope
+- Target app: WXT browser extension (MV3) under `wxt-temp/`.
+- Main feature set in this branch: sidepanel-driven element injection (area, button, link), picker flow, edit/drag/resize, i18n.
 
-## wxt-temp 目录作用
-- `wxt-temp/entrypoints/`：扩展入口目录，WXT 自动生成 manifest 对应配置。
-- `wxt-temp/entrypoints/background.ts`：service worker 入口。
-- `wxt-temp/entrypoints/content.ts`：content script 入口（页面注入逻辑从这里开始）。
-- `wxt-temp/entrypoints/sidepanel/`：侧边栏入口页面（HTML/TS/CSS），只负责挂载 UI。
-- `wxt-temp/public/`：静态资源输出到扩展根目录。
-- `wxt-temp/public/_locales/`：i18n 文案（与 `default_locale` 对应）。
-- `wxt-temp/public/icon/`：扩展图标（manifest `icons` 引用）。
-- `wxt-temp/assets/`：构建期资源（例如 svg），不会直接作为扩展根目录文件。
-- `wxt-temp/components/`：示例组件目录（可后续清理/替换）。
-- `wxt-temp/wxt.config.ts`：WXT 配置与 manifest 内容。
-- `wxt-temp/postcss.config.cjs` / `wxt-temp/tailwind.config.cjs`：Tailwind/PostCSS 配置。
+## Project Structure
+- `entrypoints/`
+  - `background.ts`: runtime message bridge, active-tab forwarding, page context broadcast.
+  - `content.ts`: content script entry, picker lifecycle, injection message routing, rehydrate from storage.
+  - `content/injection.ts`: DOM injection registry, placement logic, drag/resize/edit interactions.
+  - `content/picker.ts`: element/area picking overlay and placement hints.
+- `ui/sidepanel/`
+  - `App.tsx`: header/tabs/context and picker orchestration.
+  - `sections/ElementsSection.tsx`: element list, editor drawer, create/delete/save flows.
+  - `components/`: shared UI controls.
+  - `styles/`: Tailwind v4 + theme variables.
+- `shared/`
+  - `messages.ts`: runtime message types/payloads shared by background/content/sidepanel.
+  - `storage.ts`: site-scoped persistence helpers.
+- `public/_locales/{en,ja,zh_CN}/messages.json`: sidepanel i18n resources.
+
+## Element Injection Rules
+- Placement priority in content injection:
+  1. `containerId` (if present) -> append into area container.
+  2. `beforeSelector` / `afterSelector`.
+  3. `selector + position`.
+- For area-contained children:
+  - Keep `containerId`.
+  - Clear `beforeSelector`/`afterSelector`.
+  - Use `position: "append"`.
+- Host node marker: `data-ladybird-element`.
+- Editing marker: `data-ladybird-editing`.
+
+## Picker Rules
+- Picker result may include:
+  - `selector`
+  - `beforeSelector`
+  - `afterSelector`
+  - `containerId` (when click target resolves inside an area host)
+  - `rect` (area draw mode)
+- `Escape` must cancel reliably in picker mode.
+- In selector mode:
+  - Show insertion marker near target edge (small block).
+  - Hide insertion marker when target is inside an area container.
+
+## Editor Behavior Rules
+- Clicking a card opens drawer and highlights/focuses the page element.
+- Draft preview updates are allowed while editing.
+- On drawer cancel for newly created draft elements:
+  - Roll back immediately from list and page (no refresh required).
+- Resize handles (`e`, `s`, `se`) must stay visible in editing mode.
+- Do not destroy resize handles when updating label text; update text nodes without removing child controls.
+
+## Elements Page UI Rules
+- Group list by page, then by area:
+  - Area card as group header.
+  - Children nested under their area.
+  - Non-area, non-grouped items in an "Ungrouped" block.
+- `selector` and `insert position` fields are hidden in drawer basics.
+- Add menu currently hides `tooltip` creation entry (temporary product decision).
+- Delete action in list requires confirm dialog.
+
+## I18n Rules
+- When adding a new UI text key, update all three locale files:
+  - `public/_locales/en/messages.json`
+  - `public/_locales/ja/messages.json`
+  - `public/_locales/zh_CN/messages.json`
+- For dynamic strings, keep placeholders consistent (for example `{name}`).
 
 ## Theme (Tailwind v4)
-- Theme tokens live in `wxt-temp/ui/sidepanel/styles/theme.css`.
-- `:root` and `.dark` define the base CSS variables (e.g. `--background`, `--primary`).
-- `@theme inline` maps tokens to Tailwind v4 utilities (e.g. `--color-background: var(--background)`), so `bg-background`, `text-foreground`, `border-border` work.
-- `wxt-temp/ui/sidepanel/styles/index.css` must import Tailwind first, then the theme file:
-  - `@import "tailwindcss";`
-  - `@import "./theme.css";`
-- When adding a new theme token, define it in both `:root` / `.dark` and map it in `@theme inline`, otherwise no Tailwind utility is generated.
-- Overlays are not defined by default; use `bg-black/40` for scrims, or define `--overlay` + `--color-overlay` if you want a theme token.
-- Avoid self-referential mappings (e.g. `--font-sans: var(--font-sans)`); use distinct base tokens if you want font/shadow utilities.
+- Tokens are defined in `ui/sidepanel/styles/theme.css`.
+- `:root` and `.dark` provide base CSS variables.
+- `@theme inline` maps variables to Tailwind utilities (for example `bg-background`).
+- `ui/sidepanel/styles/index.css` import order must stay:
+  1. `@import "tailwindcss";`
+  2. `@import "./theme.css";`
+
+## Development Checklist
+- Run type check after UI/content/message edits:
+  - `npm run compile` (inside `wxt-temp/`)
+- For message contract changes:
+  - Update `shared/messages.ts`.
+  - Verify background forwarding.
+  - Verify sidepanel/content handlers.
