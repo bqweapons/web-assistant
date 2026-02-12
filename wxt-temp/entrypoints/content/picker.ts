@@ -73,6 +73,20 @@ const resolveSiblingSelector = (element: Element | null) => {
   }
 };
 
+const resolveInsertionSelectors = (target: Element, clientY: number) => {
+  const selector = generateSelector(target);
+  const rect = target.getBoundingClientRect();
+  const placeBefore = clientY <= rect.top + rect.height / 2;
+  return {
+    selector,
+    beforeSelector: placeBefore ? selector : resolveSiblingSelector(target.nextElementSibling),
+    afterSelector: placeBefore ? resolveSiblingSelector(target.previousElementSibling) : selector,
+    indicatorTop: placeBefore ? rect.top : rect.bottom,
+    indicatorLeft: rect.left,
+    indicatorWidth: rect.width,
+  };
+};
+
 const resolveTarget = (target: EventTarget | null) => {
   if (!(target instanceof Element)) {
     return null;
@@ -121,6 +135,19 @@ const createOverlay = () => {
   });
   container.appendChild(highlight);
 
+  const insertionLine = document.createElement('div');
+  Object.assign(insertionLine.style, {
+    position: 'absolute',
+    pointerEvents: 'none',
+    backgroundColor: HIGHLIGHT_BORDER_COLOR,
+    borderRadius: '999px',
+    height: '3px',
+    width: '0',
+    opacity: '0',
+    transition: 'all 0.05s ease-out',
+  });
+  container.appendChild(insertionLine);
+
   return {
     container,
     show(element: Element) {
@@ -135,6 +162,18 @@ const createOverlay = () => {
     },
     hide() {
       highlight.style.opacity = '0';
+      insertionLine.style.opacity = '0';
+    },
+    showInsertion(indicator: { top: number; left: number; width: number }) {
+      Object.assign(insertionLine.style, {
+        opacity: '1',
+        top: `${indicator.top - 1}px`,
+        left: `${indicator.left}px`,
+        width: `${Math.max(24, indicator.width)}px`,
+      });
+    },
+    hideInsertion() {
+      insertionLine.style.opacity = '0';
     },
     dispose() {
       container.remove();
@@ -182,6 +221,20 @@ export const startPicker = (options: {
       return;
     }
     overlay.show(hovered);
+    if (accept === 'selector') {
+      try {
+        const placement = resolveInsertionSelectors(hovered, event.clientY);
+        overlay.showInsertion({
+          top: placement.indicatorTop,
+          left: placement.indicatorLeft,
+          width: placement.indicatorWidth,
+        });
+      } catch {
+        overlay.hideInsertion();
+      }
+      return;
+    }
+    overlay.hideInsertion();
   };
 
   const handleClick = (event: MouseEvent) => {
@@ -203,8 +256,18 @@ export const startPicker = (options: {
     event.preventDefault();
     event.stopPropagation();
     const selector = generateSelector(target);
-    const beforeSelector = resolveSiblingSelector(target.previousElementSibling);
-    const afterSelector = resolveSiblingSelector(target.nextElementSibling);
+    let beforeSelector = resolveSiblingSelector(target.previousElementSibling);
+    let afterSelector = resolveSiblingSelector(target.nextElementSibling);
+    if (accept === 'selector') {
+      const placement = resolveInsertionSelectors(target, event.clientY);
+      beforeSelector = placement.beforeSelector;
+      afterSelector = placement.afterSelector;
+      overlay.showInsertion({
+        top: placement.indicatorTop,
+        left: placement.indicatorLeft,
+        width: placement.indicatorWidth,
+      });
+    }
     overlay.show(target);
     onResult({ selector, beforeSelector, afterSelector });
     dispose();

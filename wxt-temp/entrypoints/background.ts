@@ -170,8 +170,14 @@ export default defineBackground(() => {
       case MessageType.DELETE_ELEMENT:
       case MessageType.PREVIEW_ELEMENT:
       case MessageType.FOCUS_ELEMENT:
+      case MessageType.SET_EDITING_ELEMENT:
       case MessageType.REHYDRATE_ELEMENTS: {
         forwardToActiveTab(message, sendResponse);
+        return true;
+      }
+      case MessageType.ELEMENT_DRAFT_UPDATED: {
+        runtime.sendMessage({ ...message, forwarded: true });
+        sendResponse?.({ ok: true });
         return true;
       }
       case MessageType.GET_ACTIVE_PAGE_CONTEXT: {

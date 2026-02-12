@@ -234,6 +234,7 @@ export default defineContentScript({
         case MessageType.DELETE_ELEMENT:
         case MessageType.PREVIEW_ELEMENT:
         case MessageType.FOCUS_ELEMENT:
+        case MessageType.SET_EDITING_ELEMENT:
         case MessageType.REHYDRATE_ELEMENTS: {
           const result = handleInjectionMessage(message);
           sendResponse?.(result ?? { ok: false, error: 'unsupported-message' });

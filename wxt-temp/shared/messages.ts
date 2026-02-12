@@ -12,6 +12,8 @@ export const MessageType = {
   DELETE_ELEMENT: 'DELETE_ELEMENT',
   PREVIEW_ELEMENT: 'PREVIEW_ELEMENT',
   FOCUS_ELEMENT: 'FOCUS_ELEMENT',
+  SET_EDITING_ELEMENT: 'SET_EDITING_ELEMENT',
+  ELEMENT_DRAFT_UPDATED: 'ELEMENT_DRAFT_UPDATED',
   REHYDRATE_ELEMENTS: 'REHYDRATE_ELEMENTS',
 } as const;
 
@@ -107,4 +109,6 @@ export type RuntimeMessage =
   | { type: typeof MessageType.DELETE_ELEMENT; data: { id: string }; forwarded?: boolean }
   | { type: typeof MessageType.PREVIEW_ELEMENT; data: { element: ElementPayload }; forwarded?: boolean }
   | { type: typeof MessageType.FOCUS_ELEMENT; data: { id: string }; forwarded?: boolean }
+  | { type: typeof MessageType.SET_EDITING_ELEMENT; data: { id?: string }; forwarded?: boolean }
+  | { type: typeof MessageType.ELEMENT_DRAFT_UPDATED; data: { element: ElementPayload }; forwarded?: boolean }
   | { type: typeof MessageType.REHYDRATE_ELEMENTS; data: { elements: ElementPayload[] }; forwarded?: boolean };

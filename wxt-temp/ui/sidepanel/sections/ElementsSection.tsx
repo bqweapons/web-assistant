@@ -25,7 +25,13 @@ import FlowStepsBuilder from '../components/FlowStepsBuilder';
 import SelectMenu from '../components/SelectMenu';
 import { mockFlows } from '../utils/mockData';
 import { t, useLocale } from '../utils/i18n';
-import { MessageType, type ElementPayload, type PickerRect, type SelectorPickerAccept } from '../../../shared/messages';
+import {
+  MessageType,
+  type ElementPayload,
+  type PickerRect,
+  type RuntimeMessage,
+  type SelectorPickerAccept,
+} from '../../../shared/messages';
 import { getSiteData, setSiteData } from '../../../shared/storage';
 
 type ElementInlineStyle = Record<string, string>;
@@ -337,7 +343,7 @@ export default function ElementsSection({
   }, []);
 
   const sendElementMessage = useCallback(
-    async (type: MessageType, payload: { element?: ElementPayload; id?: string; elements?: ElementPayload[] }) => {
+    async (type: MessageType, payload?: Record<string, unknown>) => {
       try {
         const response = (await sendRuntimeMessage({ type, data: payload })) as { ok?: boolean; error?: string };
         if (response?.ok === false && response.error) {
@@ -385,6 +391,50 @@ export default function ElementsSection({
     },
     [normalizedSiteKey],
   );
+
+  useEffect(() => {
+    const runtime = chrome?.runtime;
+    if (!runtime?.onMessage) {
+      return;
+    }
+    const handleRuntimeMessage = (rawMessage: RuntimeMessage) => {
+      if (!rawMessage?.forwarded || rawMessage.type !== MessageType.ELEMENT_DRAFT_UPDATED) {
+        return;
+      }
+      const normalized = normalizeElement((rawMessage.data?.element || null) as BaseElement);
+      if (!normalized) {
+        return;
+      }
+      if (normalizeSiteKey(normalized.siteUrl || '') !== normalizedSiteKey) {
+        return;
+      }
+      setElements((prev) => {
+        const index = prev.findIndex((item) => item.id === normalized.id);
+        if (index === -1) {
+          return prev;
+        }
+        const next = prev.slice();
+        next[index] = normalized;
+        persistSiteData(next, flows).catch(() => undefined);
+        return next;
+      });
+      setEditElement((prev) => (prev?.id === normalized.id ? { ...prev, ...normalized } : prev));
+      setInjectionError('');
+    };
+    runtime.onMessage.addListener(handleRuntimeMessage);
+    return () => runtime.onMessage.removeListener(handleRuntimeMessage);
+  }, [flows, normalizedSiteKey, persistSiteData]);
+
+  useEffect(() => {
+    if (!hasActivePage || !normalizedSiteKey) {
+      sendElementMessage(MessageType.SET_EDITING_ELEMENT, { id: undefined }).catch(() => undefined);
+      return;
+    }
+    sendElementMessage(MessageType.SET_EDITING_ELEMENT, { id: activeElement?.id })
+      .then(() => setInjectionError(''))
+      .catch((error) => setInjectionError(error instanceof Error ? error.message : String(error)));
+  }, [activeElement?.id, hasActivePage, normalizedSiteKey, sendElementMessage]);
+
   const stylePresets: Array<{ value: string; label: string; styles: Record<string, string> | null }> = [
       { value: '', label: t('sidepanel_elements_style_custom', 'Custom'), styles: null },
     {
@@ -1275,9 +1325,16 @@ export default function ElementsSection({
       .catch((error) => {
         const message = error instanceof Error ? error.message : String(error);
         setInjectionError(message);
-      });
+    });
     setActiveElementId(newElement.id);
     setAddElementType('');
+  };
+
+  const handleSelectElement = (id: string) => {
+    setActiveElementId(id);
+    sendElementMessage(MessageType.FOCUS_ELEMENT, { id }).catch((error) =>
+      setInjectionError(error instanceof Error ? error.message : String(error)),
+    );
   };
 
   const handleElementSave = () => {
@@ -1303,6 +1360,9 @@ export default function ElementsSection({
 
   const handleDeleteElement = (event: React.MouseEvent, id: string) => {
     event.stopPropagation();
+    if (activeElementId === id) {
+      setActiveElementId(null);
+    }
     setElements((prev) => {
       const next = prev.filter((item) => item.id !== id);
       persistSiteData(next, flows).catch(() => undefined);
@@ -1514,7 +1574,7 @@ export default function ElementsSection({
                   <Card
                     key={element.id}
                     className="p-4"
-                    onClick={() => setActiveElementId(element.id)}
+                    onClick={() => handleSelectElement(element.id)}
                   >
                     <div className="flex items-start justify-between gap-2">
                       <div className="flex min-w-0 flex-1 items-center gap-2">
