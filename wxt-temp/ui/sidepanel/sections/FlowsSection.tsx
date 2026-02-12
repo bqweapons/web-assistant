@@ -6,14 +6,15 @@ import FlowStepsBuilder, { type StepData as FlowStepData } from '../components/F
 import { t } from '../utils/i18n';
 import type { SelectorPickerAccept } from '../../../shared/messages';
 import { getSiteData, setSiteData, STORAGE_KEY } from '../../../shared/storage';
+import { buildDefaultSiteUrl, deriveSiteKey, type StructuredFlowRecord } from '../../../shared/siteDataSchema';
+import { normalizeFlowSteps } from '../../../shared/flowStepMigration';
 
-type FlowRecord = {
-  id: string;
-  name: string;
-  description: string;
-  site: string;
+type FlowRecord = StructuredFlowRecord & {
+  scope: 'page' | 'site' | 'global';
+  siteKey: string;
+  pageKey: string | null;
   steps: number | FlowStepData[];
-  updatedAt: string;
+  updatedAt: number;
 };
 
 type FlowsSectionProps = {
@@ -23,9 +24,6 @@ type FlowsSectionProps = {
   onCreateFlowClose?: () => void;
   onStartPicker?: (accept: SelectorPickerAccept) => Promise<string | null>;
 };
-
-const normalizeSiteKey = (value: string) =>
-  value.replace(/^https?:\/\//, '').replace(/^file:\/\//, '').replace(/\/$/, '');
 
 const formatTimestamp = (value: number) => {
   const date = new Date(value);
@@ -49,29 +47,32 @@ const getStepCount = (value: number | unknown[]) => {
 const isRecord = (value: unknown): value is Record<string, unknown> =>
   Boolean(value) && typeof value === 'object' && !Array.isArray(value);
 
-const isStepField = (value: unknown): value is FlowStepData['fields'][number] =>
-  isRecord(value) &&
-  typeof value.id === 'string' &&
-  typeof value.label === 'string' &&
-  typeof value.value === 'string';
-
-const isFlowStepData = (value: unknown): value is FlowStepData =>
-  isRecord(value) &&
-  typeof value.id === 'string' &&
-  typeof value.type === 'string' &&
-  typeof value.title === 'string' &&
-  typeof value.summary === 'string' &&
-  Array.isArray(value.fields) &&
-  value.fields.every((field) => isStepField(field));
-
 const toEditableSteps = (value: unknown): FlowStepData[] => {
   if (!Array.isArray(value)) {
     return [];
   }
-  return value.filter((step): step is FlowStepData => isFlowStepData(step));
+  return value as FlowStepData[];
 };
 
-const normalizeFlow = (value: unknown, fallbackSite: string): FlowRecord | null => {
+const toTimestamp = (value: unknown) => {
+  if (typeof value === 'number' && Number.isFinite(value)) {
+    return value;
+  }
+  if (typeof value === 'string') {
+    const numeric = Number(value);
+    if (Number.isFinite(numeric) && numeric > 0) {
+      return numeric;
+    }
+    const normalized = value.includes(' ') ? value.replace(' ', 'T') : value;
+    const parsed = Date.parse(normalized);
+    if (Number.isFinite(parsed)) {
+      return parsed;
+    }
+  }
+  return Date.now();
+};
+
+const normalizeFlow = (value: unknown, fallbackSiteKey: string): FlowRecord | null => {
   if (!isRecord(value)) {
     return null;
   }
@@ -79,28 +80,36 @@ const normalizeFlow = (value: unknown, fallbackSite: string): FlowRecord | null 
   if (!id) {
     return null;
   }
-  const updatedAt =
-    typeof value.updatedAt === 'string'
-      ? value.updatedAt
-      : typeof value.updatedAt === 'number'
-        ? formatTimestamp(value.updatedAt)
-        : formatTimestamp(Date.now());
-  const rawSteps = Array.isArray(value.steps) ? value.steps : null;
-  const editableSteps = toEditableSteps(rawSteps);
-  const normalizedSteps: number | FlowStepData[] =
-    editableSteps.length > 0
-      ? editableSteps
-      : rawSteps
-        ? rawSteps.length
-        : Number(value.steps) || 0;
+  const resolvedSiteKey =
+    deriveSiteKey(typeof value.siteKey === 'string' ? value.siteKey : '') || fallbackSiteKey;
+  if (!resolvedSiteKey) {
+    return null;
+  }
+  const normalizedSteps = normalizeFlowSteps(value.steps, {
+    flowId: id,
+    keepNumber: true,
+    sanitizeExisting: true,
+  });
   return {
     id,
-    name: typeof value.name === 'string' && value.name.trim() ? value.name.trim() : t('sidepanel_flows_new_default', 'New flow'),
+    name:
+      typeof value.name === 'string' && value.name.trim()
+        ? value.name.trim()
+        : t('sidepanel_flows_new_default', 'New flow'),
     description: typeof value.description === 'string' ? value.description : '',
-    site: typeof value.site === 'string' && value.site.trim() ? value.site.trim() : fallbackSite,
-    steps: normalizedSteps,
-    updatedAt,
+    scope: value.scope === 'page' || value.scope === 'global' ? value.scope : 'site',
+    siteKey: resolvedSiteKey,
+    pageKey: typeof value.pageKey === 'string' ? value.pageKey : null,
+    steps: Array.isArray(normalizedSteps) ? (normalizedSteps as FlowStepData[]) : Number(normalizedSteps) || 0,
+    updatedAt: toTimestamp(value.updatedAt),
   };
+};
+
+const getSiteLabel = (siteKey: string) => {
+  if (!siteKey) {
+    return 'site';
+  }
+  return buildDefaultSiteUrl(siteKey);
 };
 
 export default function FlowsSection({
@@ -110,15 +119,7 @@ export default function FlowsSection({
   onCreateFlowClose,
   onStartPicker,
 }: FlowsSectionProps) {
-  const normalizedSiteKey = useMemo(() => normalizeSiteKey(siteKey), [siteKey]);
-  const currentSite = useMemo(() => {
-    if (!normalizedSiteKey) {
-      return 'site';
-    }
-    return siteKey.startsWith('http://') || siteKey.startsWith('https://') || siteKey.startsWith('file://')
-      ? siteKey
-      : `https://${normalizedSiteKey}`;
-  }, [normalizedSiteKey, siteKey]);
+  const normalizedSiteKey = useMemo(() => deriveSiteKey(siteKey), [siteKey]);
 
   const [flows, setFlows] = useState<FlowRecord[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
@@ -137,13 +138,13 @@ export default function FlowsSection({
 
   const filteredFlows = useMemo(() => {
     return flows.filter((flow) => {
-      if (normalizedSiteKey && normalizeSiteKey(flow.site) !== normalizedSiteKey) {
+      if (normalizedSiteKey && flow.siteKey !== normalizedSiteKey) {
         return false;
       }
       if (!normalizedQuery) {
         return true;
       }
-      const haystack = `${flow.name} ${flow.description} ${flow.site}`.toLowerCase();
+      const haystack = `${flow.name} ${flow.description} ${flow.siteKey}`.toLowerCase();
       return haystack.includes(normalizedQuery);
     });
   }, [flows, normalizedQuery, normalizedSiteKey]);
@@ -158,7 +159,7 @@ export default function FlowsSection({
       items.sort((a, b) => getStepCount(b.steps) - getStepCount(a.steps));
       return items;
     }
-    items.sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
+    items.sort((a, b) => b.updatedAt - a.updatedAt);
     return items;
   }, [filteredFlows, sortMode]);
 
@@ -189,14 +190,13 @@ export default function FlowsSection({
     }
     getSiteData(normalizedSiteKey)
       .then((data) => {
-        const next =
-          (Array.isArray(data.flows) ? data.flows : [])
-            .map((item) => normalizeFlow(item, currentSite))
-            .filter((item): item is FlowRecord => Boolean(item));
+        const next = (Array.isArray(data.flows) ? data.flows : [])
+          .map((item) => normalizeFlow(item, normalizedSiteKey))
+          .filter((item): item is FlowRecord => Boolean(item));
         setFlows(next);
       })
       .catch(() => setFlows([]));
-  }, [currentSite, normalizedSiteKey]);
+  }, [normalizedSiteKey]);
 
   useEffect(() => {
     loadFlows();
@@ -227,17 +227,13 @@ export default function FlowsSection({
     [normalizedSiteKey],
   );
 
-  const formatDisplayTimestamp = (value: string) => value.replace(/:\d{2}$/, '');
-
   const handleFlowSave = () => {
     if (!editFlow) {
       return;
     }
-    const updatedAt = formatTimestamp(Date.now());
+    const updatedAt = Date.now();
     setFlows((prev) => {
-      const next = prev.map((item) =>
-        item.id === editFlow.id ? { ...item, ...editFlow, updatedAt } : item,
-      );
+      const next = prev.map((item) => (item.id === editFlow.id ? { ...item, ...editFlow, updatedAt } : item));
       persistFlows(next);
       return next;
     });
@@ -254,9 +250,11 @@ export default function FlowsSection({
       id: `flow-${Date.now()}`,
       name,
       description,
-      site: currentSite,
+      scope: 'site',
+      siteKey: normalizedSiteKey,
+      pageKey: null,
       steps: draftFlow.steps,
-      updatedAt: formatTimestamp(Date.now()),
+      updatedAt: Date.now(),
     };
     setFlows((prev) => {
       const next = [...prev, nextFlow];
@@ -336,9 +334,7 @@ export default function FlowsSection({
             value={sortMode}
             onChange={(event) => setSortMode(event.target.value)}
           >
-            <option value="recent">
-              {t('sidepanel_flows_sort_recent', 'Recently updated')}
-            </option>
+            <option value="recent">{t('sidepanel_flows_sort_recent', 'Recently updated')}</option>
             <option value="name">{t('sidepanel_flows_sort_name', 'Name')}</option>
             <option value="steps">{t('sidepanel_flows_sort_steps', 'Steps')}</option>
           </select>
@@ -359,7 +355,10 @@ export default function FlowsSection({
 
       {!hasActivePage ? (
         <Card className="bg-muted text-center text-sm text-muted-foreground">
-          {t('sidepanel_elements_no_active_page', 'No active page detected. Open a site tab and refresh to manage elements.')}
+          {t(
+            'sidepanel_elements_no_active_page',
+            'No active page detected. Open a site tab and refresh to manage elements.',
+          )}
         </Card>
       ) : flows.length === 0 ? (
         <Card className="bg-muted text-center text-sm text-muted-foreground">
@@ -375,13 +374,9 @@ export default function FlowsSection({
             <Card key={flow.id} onClick={() => setActiveFlowId(flow.id)}>
               <div className="flex items-start justify-between gap-2">
                 <div className="flex min-w-0 items-start gap-2">
-                  <span className="badge-pill shrink-0">
-                    {t('sidepanel_flows_badge', 'Flow')}
-                  </span>
+                  <span className="badge-pill shrink-0">{t('sidepanel_flows_badge', 'Flow')}</span>
                   <div className="min-w-0">
-                    <h3 className="truncate text-sm font-semibold text-card-foreground">
-                      {flow.name}
-                    </h3>
+                    <h3 className="truncate text-sm font-semibold text-card-foreground">{flow.name}</h3>
                     <p className="mt-1 line-clamp-2 text-xs text-muted-foreground">
                       {flow.description || t('sidepanel_flows_no_description', 'No description')}
                     </p>
@@ -417,12 +412,9 @@ export default function FlowsSection({
               </div>
               <div className="mt-2 flex items-center justify-between text-xs text-muted-foreground">
                 <span className="badge-pill">
-                  {t('sidepanel_steps_count', '{count} steps').replace(
-                    '{count}',
-                    String(getStepCount(flow.steps)),
-                  )}
+                  {t('sidepanel_steps_count', '{count} steps').replace('{count}', String(getStepCount(flow.steps)))}
                 </span>
-                <span className="truncate">{formatDisplayTimestamp(flow.updatedAt)}</span>
+                <span className="truncate">{formatTimestamp(flow.updatedAt)}</span>
               </div>
             </Card>
           ))}
@@ -458,13 +450,11 @@ export default function FlowsSection({
               />
             </label>
             <div className="flex items-center justify-between gap-2 rounded-lg border border-border bg-muted px-3 py-2 text-xs">
-              <span className="font-semibold text-muted-foreground">
-                {t('sidepanel_field_site', 'Site')}
-              </span>
-              <span className="text-foreground">{editFlow.site}</span>
+              <span className="font-semibold text-muted-foreground">{t('sidepanel_field_site', 'Site')}</span>
+              <span className="text-foreground">{getSiteLabel(editFlow.siteKey)}</span>
             </div>
             <FlowStepsBuilder
-              steps={Array.isArray(editFlow.steps) ? editFlow.steps : []}
+              steps={toEditableSteps(editFlow.steps)}
               onChange={(steps) => {
                 setEditFlow((prev) => (prev ? { ...prev, steps } : prev));
               }}
@@ -483,10 +473,8 @@ export default function FlowsSection({
       >
         <div className="space-y-4 text-xs text-muted-foreground">
           <div className="flex items-center justify-between gap-2 rounded-lg border border-border bg-muted px-3 py-2 text-xs">
-            <span className="font-semibold text-muted-foreground">
-              {t('sidepanel_field_site', 'Site')}
-            </span>
-            <span className="text-foreground">{currentSite}</span>
+            <span className="font-semibold text-muted-foreground">{t('sidepanel_field_site', 'Site')}</span>
+            <span className="text-foreground">{getSiteLabel(normalizedSiteKey)}</span>
           </div>
           <label className="block text-xs font-semibold text-muted-foreground">
             {t('sidepanel_field_name', 'Name')}

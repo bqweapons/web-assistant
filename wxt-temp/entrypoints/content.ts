@@ -1,5 +1,9 @@
-import { MessageType, type ElementPayload, type RuntimeMessage } from '../shared/messages';
+import { MessageType, type RuntimeMessage } from '../shared/messages';
 import { getSiteData, STORAGE_KEY } from '../shared/storage';
+import {
+  isStructuredElementRecord,
+  type StructuredElementRecord,
+} from '../shared/siteDataSchema';
 import { startPicker, stopPicker } from './content/picker';
 import { handleInjectionMessage, registerPageContextIfNeeded, resetInjectionRegistry } from './content/injection';
 
@@ -43,41 +47,33 @@ const resolvePageKeyFromLocation = (href: string) => {
   }
 };
 
-const resolveElementPageKey = (pageUrl?: string) => {
-  if (!pageUrl || typeof pageUrl !== 'string') {
+const normalizeStoredPageKey = (value?: string | null) => {
+  if (!value || typeof value !== 'string') {
     return '';
   }
-  if (pageUrl.startsWith('/')) {
-    const siteKey = resolveSiteKeyFromLocation(window.location.href);
-    return `${siteKey}${pageUrl}`;
+  const trimmed = value.trim();
+  if (!trimmed) {
+    return '';
   }
-  if (!/^https?:\/\//.test(pageUrl) && !pageUrl.startsWith('file://')) {
-    return normalizeSiteKey(pageUrl);
+  if (trimmed.startsWith('/')) {
+    const site = resolveSiteKeyFromLocation(window.location.href);
+    return `${site}${trimmed}`;
+  }
+  if (!/^https?:\/\//.test(trimmed) && !trimmed.startsWith('file://')) {
+    return trimmed.replace(/^https?:\/\//, '').replace(/^file:\/\//, '').replace(/\/$/, '');
   }
   try {
-    return resolvePageKeyFromLocation(new URL(pageUrl, window.location.href).toString());
+    return resolvePageKeyFromLocation(new URL(trimmed, window.location.href).toString());
   } catch {
     return '';
   }
 };
 
-const toElementPayload = (value: unknown): ElementPayload | null => {
+const toStructuredElementPayload = (value: unknown): StructuredElementRecord | null => {
   if (!value || typeof value !== 'object') {
     return null;
   }
-  const candidate = value as Partial<ElementPayload>;
-  if (!candidate.id || typeof candidate.id !== 'string') {
-    return null;
-  }
-  if (
-    candidate.type !== 'button' &&
-    candidate.type !== 'link' &&
-    candidate.type !== 'tooltip' &&
-    candidate.type !== 'area'
-  ) {
-    return null;
-  }
-  return candidate as ElementPayload;
+  return isStructuredElementRecord(value) ? value : null;
 };
 
 const rehydratePersistedElements = async () => {
@@ -91,18 +87,18 @@ const rehydratePersistedElements = async () => {
   }
   try {
     const data = await getSiteData(siteKey);
-    const elements = Array.isArray(data.elements)
+    const elements: StructuredElementRecord[] = Array.isArray(data.elements)
       ? data.elements
-          .map(toElementPayload)
-          .filter((item): item is ElementPayload => Boolean(item))
+          .map(toStructuredElementPayload)
+          .filter((item): item is StructuredElementRecord => Boolean(item))
           .filter((item) => {
             if (item.scope !== 'page') {
               return true;
             }
-            if (!item.pageUrl) {
+            if (!item.context.pageKey) {
               return true;
             }
-            return resolveElementPageKey(item.pageUrl) === pageKey;
+            return normalizeStoredPageKey(item.context.pageKey) === pageKey;
           })
       : [];
     handleInjectionMessage({

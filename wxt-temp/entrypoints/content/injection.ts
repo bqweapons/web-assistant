@@ -1,12 +1,23 @@
-import { MessageType, type ElementPayload, type RuntimeMessage } from '../../shared/messages';
+import { MessageType, type RuntimeMessage } from '../../shared/messages';
+import {
+  deriveSiteKey,
+  isStructuredElementRecord,
+  type StructuredElementRecord,
+} from '../../shared/siteDataSchema';
+import {
+  structuredElementToRuntimeElement,
+  type RuntimeElementRecord,
+} from '../../shared/elementRuntimeAdapter';
 
 type RegistryEntry = {
-  element: ElementPayload;
+  element: StructuredElementRecord;
   node: HTMLElement;
   root?: ShadowRoot;
   content?: HTMLElement;
   cleanup?: () => void;
 };
+
+type RuntimeElement = RuntimeElementRecord;
 
 type RuntimeMessenger = { sendMessage?: (message: unknown) => void };
 
@@ -51,6 +62,34 @@ const cssEscape =
 const normalizeSiteKey = (value: string) =>
   value.replace(/^https?:\/\//, '').replace(/^file:\/\//, '').replace(/\/$/, '');
 
+const resolveCurrentSiteKey = () => {
+  const href = window.location.href || '';
+  if (!href) {
+    return '';
+  }
+  try {
+    const parsed = new URL(href);
+    if (parsed.protocol === 'file:') {
+      return normalizeSiteKey(href.split(/[?#]/)[0] || href);
+    }
+    return normalizeSiteKey(parsed.host || parsed.hostname || href);
+  } catch {
+    return normalizeSiteKey(href);
+  }
+};
+
+const toStructuredElementPayload = (value: unknown): StructuredElementRecord | null => {
+  return isStructuredElementRecord(value) ? value : null;
+};
+
+const toRuntimeElementPayload = (value: StructuredElementRecord): RuntimeElement => {
+  const fallbackSiteKey = resolveCurrentSiteKey();
+  const siteKey = deriveSiteKey(value.context.siteKey || '') || fallbackSiteKey;
+  return structuredElementToRuntimeElement(value, siteKey) as RuntimeElement;
+};
+
+const getEntryRuntime = (entry: RegistryEntry): RuntimeElement => toRuntimeElementPayload(entry.element);
+
 const parseCustomCss = (raw?: string) => {
   if (!raw) {
     return {} as Record<string, string>;
@@ -90,7 +129,7 @@ const formatCustomCss = (rules: Record<string, string>) =>
     .map(([key, value]) => `${toKebabCase(key)}: ${value};`)
     .join('\n');
 
-const mergeStyleRules = (element: ElementPayload) => ({
+const mergeStyleRules = (element: RuntimeElement) => ({
   ...(element.style?.inline || {}),
   ...parseCustomCss(element.style?.customCss || ''),
 });
@@ -107,7 +146,7 @@ const normalizeStyleRules = (rules: Record<string, string>) => {
   return next;
 };
 
-const setRenderOrderFromElements = (elements: ElementPayload[]) => {
+const setRenderOrderFromElements = (elements: StructuredElementRecord[]) => {
   renderOrderById.clear();
   elements.forEach((element, index) => {
     renderOrderById.set(element.id, index);
@@ -184,7 +223,7 @@ const selectorForSibling = (node: Element | null) => {
 
 const applyInlineStyles = (
   node: HTMLElement,
-  element: ElementPayload,
+  element: RuntimeElement,
   options?: { omitPositioning?: boolean },
 ) => {
   const omitPositioning = options?.omitPositioning === true;
@@ -210,7 +249,7 @@ const applyInlineStyles = (
   }
 };
 
-const applyHostPlacementStyles = (host: HTMLElement, element: ElementPayload) => {
+const applyHostPlacementStyles = (host: HTMLElement, element: RuntimeElement) => {
   const merged = mergeStyleRules(element);
   const nextPosition = merged.position?.trim();
   host.style.position = nextPosition || (element.floating ? 'absolute' : host.style.position || 'relative');
@@ -221,13 +260,13 @@ const applyHostPlacementStyles = (host: HTMLElement, element: ElementPayload) =>
   host.style.zIndex = merged.zIndex?.trim() || '';
 };
 
-const applyHostContainerOrderStyle = (host: HTMLElement, element: ElementPayload) => {
+const applyHostContainerOrderStyle = (host: HTMLElement, element: RuntimeElement) => {
   const rules = mergeStyleRules(element);
   const order = rules.order?.trim() || '';
   host.style.order = element.containerId ? order : '';
 };
 
-const stripPositioningFromStyle = (style?: ElementPayload['style']) => {
+const stripPositioningFromStyle = (style?: RuntimeElement['style']) => {
   const merged = {
     ...(style?.inline || {}),
     ...parseCustomCss(style?.customCss || ''),
@@ -246,7 +285,7 @@ const stripPositioningFromStyle = (style?: ElementPayload['style']) => {
   };
 };
 
-const createHostWithShadow = (element: ElementPayload) => {
+const createHostWithShadow = (element: RuntimeElement) => {
   const host = document.createElement('div');
   host.setAttribute(HOST_ATTR, element.id);
   host.setAttribute(EDITING_ATTR, 'false');
@@ -363,7 +402,7 @@ const createHostWithShadow = (element: ElementPayload) => {
   return { host, root };
 };
 
-const createElementNode = (element: ElementPayload) => {
+const createElementNode = (element: RuntimeElement) => {
   const { host, root } = createHostWithShadow(element);
   let node: HTMLElement;
 
@@ -437,7 +476,7 @@ const removeExistingHosts = (id: string) => {
   });
 };
 
-const insertNode = (host: HTMLElement, element: ElementPayload) => {
+const insertNode = (host: HTMLElement, element: RuntimeElement) => {
   const containerEntry = element.containerId ? registry.get(element.containerId) : null;
   const containerTarget = containerEntry?.content || containerEntry?.node || null;
   if (containerTarget) {
@@ -506,7 +545,7 @@ const insertNode = (host: HTMLElement, element: ElementPayload) => {
   return { ok: true };
 };
 
-const placeTooltip = (element: ElementPayload) => {
+const placeTooltip = (element: RuntimeElement) => {
   const target = resolveTarget(element.selector);
   const entry = registry.get(element.id);
   const tooltip = entry?.content || null;
@@ -584,12 +623,12 @@ const removeDropPreviewHost = () => {
   dropPreviewSourceId = null;
 };
 
-const ensureDropPreviewHost = (element: ElementPayload) => {
+const ensureDropPreviewHost = (element: RuntimeElement) => {
   if (dropPreviewHost && dropPreviewSourceId === element.id && dropPreviewHost.isConnected) {
     return dropPreviewHost;
   }
   removeDropPreviewHost();
-  const previewElement: ElementPayload = {
+  const previewElement: RuntimeElement = {
     ...element,
     floating: false,
     style: stripPositioningFromStyle(element.style),
@@ -608,7 +647,7 @@ const ensureDropPreviewHost = (element: ElementPayload) => {
   return host;
 };
 
-const showAreaDropPreview = (dropTarget: RegistryEntry, element: ElementPayload) => {
+const showAreaDropPreview = (dropTarget: RegistryEntry, element: RuntimeElement) => {
   if (!(dropTarget.content instanceof HTMLElement)) {
     return;
   }
@@ -618,7 +657,7 @@ const showAreaDropPreview = (dropTarget: RegistryEntry, element: ElementPayload)
   }
 };
 
-const showDomDropPreview = (placement: DomDropPlacement, element: ElementPayload) => {
+const showDomDropPreview = (placement: DomDropPlacement, element: RuntimeElement) => {
   const preview = ensureDropPreviewHost(element);
   const reference = placement.reference;
   if (!(reference instanceof HTMLElement)) {
@@ -643,7 +682,8 @@ const showDomDropPreview = (placement: DomDropPlacement, element: ElementPayload
 };
 
 const applyEditingState = (entry: RegistryEntry) => {
-  const isEditing = entry.element.id === editingElementId;
+  const runtime = getEntryRuntime(entry);
+  const isEditing = runtime.id === editingElementId;
   entry.node.setAttribute(EDITING_ATTR, isEditing ? 'true' : 'false');
   entry.node.style.cursor = isEditing ? 'move' : '';
 };
@@ -653,16 +693,17 @@ const applyEditingStateToAll = () => {
 };
 
 const applyStableFloatingLayer = (entry: RegistryEntry) => {
-  if (!entry.element.floating) {
+  const runtime = getEntryRuntime(entry);
+  if (!runtime.floating) {
     return;
   }
-  const styleRules = mergeStyleRules(entry.element);
+  const styleRules = mergeStyleRules(runtime);
   const configured = styleRules.zIndex?.trim();
   if (configured) {
     entry.node.style.zIndex = configured;
     return;
   }
-  const order = ensureRenderOrder(entry.element.id);
+  const order = ensureRenderOrder(runtime.id);
   entry.node.style.zIndex = String(Number(FLOATING_Z_INDEX) + order);
 };
 
@@ -672,7 +713,10 @@ const reattachContainerChildren = (containerId: string) => {
     return;
   }
   const children = Array.from(registry.values()).filter(
-    (entry) => entry.element.id !== containerId && entry.element.containerId === containerId,
+    (entry) => {
+      const runtime = getEntryRuntime(entry);
+      return runtime.id !== containerId && runtime.containerId === containerId;
+    },
   );
   children.forEach((child) => {
     if (child.node.parentElement === container.content && child.node.isConnected) {
@@ -682,7 +726,7 @@ const reattachContainerChildren = (containerId: string) => {
   });
 };
 
-const postDraftUpdate = (element: ElementPayload) => {
+const postDraftUpdate = (element: StructuredElementRecord) => {
   const runtime = chrome?.runtime;
   if (!runtime?.sendMessage) {
     return;
@@ -693,31 +737,75 @@ const postDraftUpdate = (element: ElementPayload) => {
   });
 };
 
-const buildElementWithStyleRules = (base: ElementPayload, rules: Record<string, string>, patch: Partial<ElementPayload>) => {
+const buildStructuredElementWithStyleRules = (
+  baseElement: StructuredElementRecord,
+  baseRuntime: RuntimeElement,
+  rules: Record<string, string>,
+  patch: Partial<RuntimeElement>,
+): StructuredElementRecord => {
   const normalizedRules = normalizeStyleRules(rules);
-  const next: ElementPayload = {
-    ...base,
-    ...patch,
+  const nextSelector = typeof patch.selector === 'string' ? patch.selector : baseRuntime.selector || '';
+  const nextPosition =
+    patch.position === 'append' || patch.position === 'prepend' || patch.position === 'before' || patch.position === 'after'
+      ? patch.position
+      : baseRuntime.position === 'append' ||
+          baseRuntime.position === 'prepend' ||
+          baseRuntime.position === 'before' ||
+          baseRuntime.position === 'after'
+        ? baseRuntime.position
+        : 'append';
+  const nextBefore =
+    'beforeSelector' in patch
+      ? typeof patch.beforeSelector === 'string' && patch.beforeSelector.trim()
+        ? patch.beforeSelector
+        : undefined
+      : typeof baseRuntime.beforeSelector === 'string' && baseRuntime.beforeSelector.trim()
+        ? baseRuntime.beforeSelector
+        : undefined;
+  const nextAfter =
+    'afterSelector' in patch
+      ? typeof patch.afterSelector === 'string' && patch.afterSelector.trim()
+        ? patch.afterSelector
+        : undefined
+      : typeof baseRuntime.afterSelector === 'string' && baseRuntime.afterSelector.trim()
+        ? baseRuntime.afterSelector
+        : undefined;
+  const nextContainerId =
+    'containerId' in patch
+      ? typeof patch.containerId === 'string' && patch.containerId.trim()
+        ? patch.containerId
+        : undefined
+      : typeof baseRuntime.containerId === 'string' && baseRuntime.containerId.trim()
+        ? baseRuntime.containerId
+        : undefined;
+  const nextFloating =
+    'floating' in patch ? patch.floating === true : baseRuntime.floating === true;
+  const nextMode = nextContainerId ? 'container' : nextFloating ? 'floating' : 'dom';
+
+  return {
+    ...baseElement,
+    placement: {
+      ...baseElement.placement,
+      mode: nextMode,
+      selector: nextSelector,
+      position: nextPosition,
+      relativeTo: {
+        before: nextBefore,
+        after: nextAfter,
+      },
+      containerId: nextContainerId,
+      floating: nextFloating,
+    },
     style: {
-      preset: base.style?.preset,
+      ...baseElement.style,
       inline: normalizedRules,
       customCss: formatCustomCss(normalizedRules),
     },
     updatedAt: Date.now(),
   };
-  if (!next.beforeSelector) {
-    delete next.beforeSelector;
-  }
-  if (!next.afterSelector) {
-    delete next.afterSelector;
-  }
-  if (!next.containerId) {
-    delete next.containerId;
-  }
-  return next;
 };
 
-const filterRules = (element: ElementPayload, omitPositioning: boolean) => {
+const filterRules = (element: RuntimeElement, omitPositioning: boolean) => {
   const rules = mergeStyleRules(element);
   if (!omitPositioning) {
     return rules;
@@ -754,7 +842,7 @@ const resetHostPlacementStyles = (host: HTMLElement) => {
   host.style.zIndex = '';
 };
 
-const resolveExpectedParent = (next: ElementPayload): HTMLElement | null => {
+const resolveExpectedParent = (next: RuntimeElement): HTMLElement | null => {
   if (next.containerId) {
     const container = registry.get(next.containerId);
     return container?.content || null;
@@ -782,8 +870,8 @@ const resolveExpectedParent = (next: ElementPayload): HTMLElement | null => {
   return target;
 };
 
-const isStructuralChange = (entry: RegistryEntry, next: ElementPayload) => {
-  const previous = entry.element;
+const isStructuralChange = (entry: RegistryEntry, next: RuntimeElement) => {
+  const previous = getEntryRuntime(entry);
   if (previous.type !== next.type) {
     return true;
   }
@@ -815,8 +903,9 @@ const isStructuralChange = (entry: RegistryEntry, next: ElementPayload) => {
   return false;
 };
 
-const isContentCompatible = (entry: RegistryEntry, next: ElementPayload) => {
-  if (entry.element.type !== next.type) {
+const isContentCompatible = (entry: RegistryEntry, next: RuntimeElement) => {
+  const current = getEntryRuntime(entry);
+  if (current.type !== next.type) {
     return false;
   }
   const node = entry.content || entry.node;
@@ -841,7 +930,7 @@ const setNodeTextPreservingChildren = (node: HTMLElement, value: string) => {
   node.insertBefore(document.createTextNode(value), node.firstChild);
 };
 
-const syncContentAttributes = (entry: RegistryEntry, next: ElementPayload) => {
+const syncContentAttributes = (entry: RegistryEntry, next: RuntimeElement) => {
   const node = entry.content || entry.node;
   if (next.type === 'button' && node instanceof HTMLButtonElement) {
     setNodeTextPreservingChildren(node, next.text || 'Button');
@@ -863,8 +952,8 @@ const syncContentAttributes = (entry: RegistryEntry, next: ElementPayload) => {
   }
 };
 
-const syncElementStylesInPlace = (entry: RegistryEntry, next: ElementPayload) => {
-  const previous = entry.element;
+const syncElementStylesInPlace = (entry: RegistryEntry, next: RuntimeElement) => {
+  const previous = getEntryRuntime(entry);
   const host = entry.node;
   const content = entry.content || host;
   if (next.floating) {
@@ -879,7 +968,7 @@ const syncElementStylesInPlace = (entry: RegistryEntry, next: ElementPayload) =>
 
 const findAreaDropTarget = (clientX: number, clientY: number, excludeId: string) => {
   for (const [id, entry] of registry) {
-    if (id === excludeId || entry.element.type !== 'area') {
+    if (id === excludeId || getEntryRuntime(entry).type !== 'area') {
       continue;
     }
     const rect = entry.node.getBoundingClientRect();
@@ -892,7 +981,7 @@ const findAreaDropTarget = (clientX: number, clientY: number, excludeId: string)
 
 const buildAreaOrderUpdates = (
   area: RegistryEntry,
-  draggedElement: ElementPayload,
+  draggedElement: StructuredElementRecord,
   clientX: number,
   clientY: number,
 ) => {
@@ -905,11 +994,11 @@ const buildAreaOrderUpdates = (
     .map((node) => (node instanceof HTMLElement ? node.getAttribute(HOST_ATTR) : ''))
     .filter((id): id is string => Boolean(id))
     .filter((id, index, source) => source.indexOf(id) === index)
-    .filter((id) => id !== area.element.id)
+    .filter((id) => id !== getEntryRuntime(area).id)
     .filter((id) => registry.has(id));
 
   const siblingIds = allChildIds.filter((id) => id !== draggedElement.id);
-  const axis = area.element.layout === 'column' ? 'column' : 'row';
+  const axis = getEntryRuntime(area).layout === 'column' ? 'column' : 'row';
 
   let insertIndex = siblingIds.length;
   for (let index = 0; index < siblingIds.length; index += 1) {
@@ -929,26 +1018,27 @@ const buildAreaOrderUpdates = (
   const orderedIds = siblingIds.slice();
   orderedIds.splice(insertIndex, 0, draggedElement.id);
 
-  const updates: ElementPayload[] = [];
+  const updates: StructuredElementRecord[] = [];
   orderedIds.forEach((id, index) => {
-    const base = id === draggedElement.id ? draggedElement : registry.get(id)?.element;
-    if (!base) {
+    const siblingEntry = registry.get(id);
+    const baseElement = id === draggedElement.id ? draggedElement : siblingEntry?.element;
+    if (!baseElement) {
       return;
     }
-    const rules = mergeStyleRules(base);
+    const baseRuntime = toRuntimeElementPayload(baseElement);
+    const rules = mergeStyleRules(baseRuntime);
     const nextOrder = String((index + 1) * 10);
     const previousOrder = rules.order?.trim() || '';
     rules.order = nextOrder;
 
-    const next = buildElementWithStyleRules(base, rules, {
+    const next = buildStructuredElementWithStyleRules(baseElement, baseRuntime, rules, {
       floating: false,
-      containerId: area.element.id,
+      containerId: getEntryRuntime(area).id,
     });
-
     if (
       id === draggedElement.id ||
-      base.floating !== false ||
-      (base.containerId || '') !== area.element.id ||
+      baseRuntime.floating !== false ||
+      (baseRuntime.containerId || '') !== getEntryRuntime(area).id ||
       previousOrder !== nextOrder
     ) {
       updates.push(next);
@@ -1039,7 +1129,7 @@ const resolveDomDropPlacement = (target: HTMLElement | null, clientX: number, cl
   };
 };
 
-const persistElementMutation = (nextElement: ElementPayload) => {
+const persistElementMutation = (nextElement: StructuredElementRecord) => {
   const result = upsertElement(nextElement);
   if (!result.ok) {
     return result;
@@ -1056,8 +1146,9 @@ const attachInteractions = (entry: RegistryEntry) => {
   const root = entry.root;
   const content = entry.content || host;
   const cleanupFns: Array<() => void> = [];
+  const entryId = getEntryRuntime(entry).id;
 
-  const isEditing = () => editingElementId === entry.element.id;
+  const isEditing = () => editingElementId === entryId;
 
   const startResize = (handle: 'e' | 's' | 'se', event: PointerEvent) => {
     if (!isEditing()) {
@@ -1069,10 +1160,11 @@ const attachInteractions = (entry: RegistryEntry) => {
     event.preventDefault();
     event.stopPropagation();
 
-    const liveEntry = registry.get(entry.element.id);
+    const liveEntry = registry.get(entryId);
     if (!liveEntry) {
       return;
     }
+    const liveRuntime = getEntryRuntime(liveEntry);
 
     const liveContent = liveEntry.content || liveEntry.node;
     const sizeTarget = liveContent;
@@ -1113,25 +1205,26 @@ const attachInteractions = (entry: RegistryEntry) => {
       }
       if (!commit) {
         injectElement(liveEntry.element);
-        if (editingElementId === liveEntry.element.id) {
-          setEditingElement(liveEntry.element.id);
+        if (editingElementId === liveRuntime.id) {
+          setEditingElement(liveRuntime.id);
         }
         return;
       }
 
-      const finalEntry = registry.get(entry.element.id);
+      const finalEntry = registry.get(entryId);
       if (!finalEntry) {
         return;
       }
+      const finalRuntime = getEntryRuntime(finalEntry);
       const finalHost = finalEntry.node;
       const finalContent = finalEntry.content || finalHost;
       const finalTarget = finalContent;
       const finalRect = finalTarget.getBoundingClientRect();
-      const styleRules = mergeStyleRules(finalEntry.element);
+      const styleRules = mergeStyleRules(finalRuntime);
       styleRules.width = `${Math.max(MIN_SIZE, Math.round(finalRect.width))}px`;
       styleRules.height = `${Math.max(MIN_SIZE, Math.round(finalRect.height))}px`;
 
-      if (finalEntry.element.floating) {
+      if (finalRuntime.floating) {
         const hostRect = finalHost.getBoundingClientRect();
         styleRules.position = 'absolute';
         styleRules.left = `${Math.round(hostRect.left + window.scrollX)}px`;
@@ -1141,7 +1234,12 @@ const attachInteractions = (entry: RegistryEntry) => {
         }
       }
 
-      const nextElement = buildElementWithStyleRules(finalEntry.element, styleRules, {});
+      const nextElement = buildStructuredElementWithStyleRules(
+        finalEntry.element,
+        finalRuntime,
+        styleRules,
+        {},
+      );
       persistElementMutation(nextElement);
     };
 
@@ -1197,10 +1295,11 @@ const attachInteractions = (entry: RegistryEntry) => {
       return;
     }
 
-    const liveEntry = registry.get(entry.element.id);
+    const liveEntry = registry.get(entryId);
     if (!liveEntry) {
       return;
     }
+    const liveRuntime = getEntryRuntime(liveEntry);
 
     const dragHost = liveEntry.node;
     const pointerId = event.pointerId;
@@ -1253,7 +1352,7 @@ const attachInteractions = (entry: RegistryEntry) => {
       dragHost.style.left = `${Math.round(lastLeft)}px`;
       dragHost.style.top = `${Math.round(lastTop)}px`;
 
-      if (liveEntry.element.type === 'area') {
+      if (liveRuntime.type === 'area') {
         setAreaHighlight(null);
         currentArea = null;
         currentPlacement = null;
@@ -1262,13 +1361,13 @@ const attachInteractions = (entry: RegistryEntry) => {
         return;
       }
 
-      const areaTarget = findAreaDropTarget(moveEvent.clientX, moveEvent.clientY, liveEntry.element.id);
+      const areaTarget = findAreaDropTarget(moveEvent.clientX, moveEvent.clientY, liveRuntime.id);
       if (areaTarget) {
         currentArea = areaTarget;
         currentPlacement = null;
-        setAreaHighlight(areaTarget.element.id);
+        setAreaHighlight(getEntryRuntime(areaTarget).id);
         hideDropIndicator();
-        showAreaDropPreview(areaTarget, liveEntry.element);
+        showAreaDropPreview(areaTarget, liveRuntime);
         return;
       }
 
@@ -1279,7 +1378,7 @@ const attachInteractions = (entry: RegistryEntry) => {
       if (placement) {
         currentPlacement = placement;
         showDropIndicator(placement.indicator);
-        showDomDropPreview(placement, liveEntry.element);
+        showDomDropPreview(placement, liveRuntime);
       } else {
         currentPlacement = null;
         hideDropIndicator();
@@ -1307,33 +1406,39 @@ const attachInteractions = (entry: RegistryEntry) => {
       }
       if (!commit) {
         injectElement(liveEntry.element);
-        if (editingElementId === liveEntry.element.id) {
-          setEditingElement(liveEntry.element.id);
+        if (editingElementId === liveRuntime.id) {
+          setEditingElement(liveRuntime.id);
         }
         return;
       }
 
-      const finalEntry = registry.get(entry.element.id);
+      const finalEntry = registry.get(entryId);
       if (!finalEntry) {
         return;
       }
-      const styleRules = mergeStyleRules(finalEntry.element);
+      const finalRuntime = getEntryRuntime(finalEntry);
+      const styleRules = mergeStyleRules(finalRuntime);
 
-      if (finalEntry.element.type === 'area') {
+      if (finalRuntime.type === 'area') {
         styleRules.position = 'absolute';
         styleRules.left = `${Math.round(lastLeft)}px`;
         styleRules.top = `${Math.round(lastTop)}px`;
         if (!styleRules.zIndex) {
           styleRules.zIndex = FLOATING_Z_INDEX;
         }
-        const nextElement = buildElementWithStyleRules(finalEntry.element, styleRules, {
+        const nextElement = buildStructuredElementWithStyleRules(
+          finalEntry.element,
+          finalRuntime,
+          styleRules,
+          {
           floating: true,
           containerId: undefined,
-          selector: finalEntry.element.selector || 'body',
+          selector: finalRuntime.selector || 'body',
           position: 'append',
           beforeSelector: undefined,
           afterSelector: undefined,
-        });
+          },
+        );
         persistElementMutation(nextElement);
         return;
       }
@@ -1343,14 +1448,20 @@ const attachInteractions = (entry: RegistryEntry) => {
         delete styleRules.left;
         delete styleRules.top;
         delete styleRules.zIndex;
-        const nextElement = buildElementWithStyleRules(finalEntry.element, styleRules, {
+        const currentAreaRuntime = getEntryRuntime(currentArea);
+        const nextElement = buildStructuredElementWithStyleRules(
+          finalEntry.element,
+          finalRuntime,
+          styleRules,
+          {
           floating: false,
-          containerId: currentArea.element.id,
-          selector: currentArea.element.selector || finalEntry.element.selector || 'body',
+          containerId: currentAreaRuntime.id,
+          selector: currentAreaRuntime.selector || finalRuntime.selector || 'body',
           position: 'append',
           beforeSelector: undefined,
           afterSelector: undefined,
-        });
+          },
+        );
         const updates = buildAreaOrderUpdates(currentArea, nextElement, lastPointerX, lastPointerY);
         updates.forEach((item) => {
           persistElementMutation(item);
@@ -1364,14 +1475,19 @@ const attachInteractions = (entry: RegistryEntry) => {
         delete styleRules.top;
         delete styleRules.zIndex;
         delete styleRules.order;
-        const nextElement = buildElementWithStyleRules(finalEntry.element, styleRules, {
+        const nextElement = buildStructuredElementWithStyleRules(
+          finalEntry.element,
+          finalRuntime,
+          styleRules,
+          {
           floating: false,
           containerId: undefined,
           selector: currentPlacement.selector,
           position: currentPlacement.position,
           beforeSelector: currentPlacement.beforeSelector,
           afterSelector: currentPlacement.afterSelector,
-        });
+          },
+        );
         persistElementMutation(nextElement);
         return;
       }
@@ -1383,13 +1499,18 @@ const attachInteractions = (entry: RegistryEntry) => {
       if (!styleRules.zIndex) {
         styleRules.zIndex = FLOATING_Z_INDEX;
       }
-      const nextElement = buildElementWithStyleRules(finalEntry.element, styleRules, {
+      const nextElement = buildStructuredElementWithStyleRules(
+        finalEntry.element,
+        finalRuntime,
+        styleRules,
+        {
         floating: true,
         containerId: undefined,
         position: 'append',
         beforeSelector: undefined,
         afterSelector: undefined,
-      });
+        },
+      );
       persistElementMutation(nextElement);
     };
 
@@ -1450,13 +1571,14 @@ const attachInteractions = (entry: RegistryEntry) => {
   };
 };
 
-const injectElement = (element: ElementPayload) => {
-  if (!element?.id || !element.type) {
+const injectElement = (element: StructuredElementRecord) => {
+  if (!element?.id) {
     return { ok: false, error: 'invalid-element' };
   }
+  const runtimeElement = toRuntimeElementPayload(element);
   ensureRenderOrder(element.id);
 
-  const siteKey = normalizeSiteKey(element.siteUrl || '');
+  const siteKey = normalizeSiteKey(deriveSiteKey(element.context.siteKey || ''));
   const currentSite = normalizeSiteKey(window.location.host || '');
   if (siteKey && currentSite && siteKey !== currentSite && !currentSite.endsWith(siteKey)) {
     return { ok: false, error: 'site-mismatch' };
@@ -1470,13 +1592,13 @@ const injectElement = (element: ElementPayload) => {
   }
   removeExistingHosts(element.id);
 
-  const { host, root, content } = createElementNode(element);
-  if (element.floating) {
+  const { host, root, content } = createElementNode(runtimeElement);
+  if (runtimeElement.floating) {
     host.style.position = host.style.position || 'absolute';
     host.style.zIndex = host.style.zIndex || FLOATING_Z_INDEX;
   }
 
-  const inserted = insertNode(host, element);
+  const inserted = insertNode(host, runtimeElement);
   if (!inserted.ok) {
     host.remove();
     return { ok: false, error: inserted.error || 'insert-failed' };
@@ -1488,38 +1610,39 @@ const injectElement = (element: ElementPayload) => {
   applyEditingState(entry);
   applyStableFloatingLayer(entry);
 
-  if (element.type === 'tooltip') {
-    placeTooltip(element);
+  if (runtimeElement.type === 'tooltip') {
+    placeTooltip(runtimeElement);
   }
-  if (element.type === 'area') {
+  if (runtimeElement.type === 'area') {
     reattachContainerChildren(element.id);
   }
 
   return { ok: true };
 };
 
-const upsertElement = (element: ElementPayload) => {
+const upsertElement = (element: StructuredElementRecord) => {
+  const runtimeElement = toRuntimeElementPayload(element);
   const existing = registry.get(element.id);
   if (!existing) {
     return injectElement(element);
   }
-  if (!isContentCompatible(existing, element)) {
+  if (!isContentCompatible(existing, runtimeElement)) {
     return injectElement(element);
   }
-  if (isStructuralChange(existing, element)) {
+  if (isStructuralChange(existing, runtimeElement)) {
     return injectElement(element);
   }
 
-  syncContentAttributes(existing, element);
-  syncElementStylesInPlace(existing, element);
+  syncContentAttributes(existing, runtimeElement);
+  syncElementStylesInPlace(existing, runtimeElement);
   existing.element = element;
   applyEditingState(existing);
   applyStableFloatingLayer(existing);
 
-  if (element.type === 'tooltip') {
-    placeTooltip(element);
+  if (runtimeElement.type === 'tooltip') {
+    placeTooltip(runtimeElement);
   }
-  if (element.type === 'area') {
+  if (runtimeElement.type === 'area') {
     reattachContainerChildren(element.id);
   }
   return { ok: true };
@@ -1540,7 +1663,7 @@ const removeElement = (id: string) => {
   return true;
 };
 
-const rehydrateElements = (elements: ElementPayload[]) => {
+const rehydrateElements = (elements: StructuredElementRecord[]) => {
   const previousEditingId = editingElementId;
   setRenderOrderFromElements(elements);
   const incomingIds = new Set(elements.map((element) => element.id));
@@ -1550,17 +1673,20 @@ const rehydrateElements = (elements: ElementPayload[]) => {
     }
   });
 
-  const incomingById = new Map(elements.map((element) => [element.id, element]));
+  const incomingRuntimeById = new Map(
+    elements.map((element) => [element.id, toRuntimeElementPayload(element)]),
+  );
   const pending = elements.slice();
   let progressed = true;
   while (pending.length > 0 && progressed) {
     progressed = false;
     for (let index = 0; index < pending.length; ) {
       const element = pending[index];
+      const runtimeElement = incomingRuntimeById.get(element.id);
       if (
-        element.containerId &&
-        incomingById.has(element.containerId) &&
-        !registry.has(element.containerId)
+        runtimeElement?.containerId &&
+        incomingRuntimeById.has(runtimeElement.containerId) &&
+        !registry.has(runtimeElement.containerId)
       ) {
         index += 1;
         continue;
@@ -1652,7 +1778,7 @@ const setEditingElement = (id?: string) => {
 export const handleInjectionMessage = (message: RuntimeMessage) => {
   switch (message.type) {
     case MessageType.CREATE_ELEMENT: {
-      const element = message.data?.element;
+      const element = toStructuredElementPayload(message.data?.element);
       if (!element) {
         return { ok: false, error: 'invalid-element' };
       }
@@ -1660,7 +1786,7 @@ export const handleInjectionMessage = (message: RuntimeMessage) => {
     }
     case MessageType.UPDATE_ELEMENT:
     case MessageType.PREVIEW_ELEMENT: {
-      const element = message.data?.element;
+      const element = toStructuredElementPayload(message.data?.element);
       if (!element) {
         return { ok: false, error: 'invalid-element' };
       }
@@ -1675,8 +1801,12 @@ export const handleInjectionMessage = (message: RuntimeMessage) => {
       return { ok: true };
     }
     case MessageType.REHYDRATE_ELEMENTS: {
-      const elements = message.data?.elements || [];
-      rehydrateElements(Array.isArray(elements) ? elements : []);
+      const elements = Array.isArray(message.data?.elements)
+        ? message.data.elements
+            .map((entry) => toStructuredElementPayload(entry))
+            .filter((entry): entry is StructuredElementRecord => Boolean(entry))
+        : [];
+      rehydrateElements(elements);
       return { ok: true };
     }
     case MessageType.FOCUS_ELEMENT: {
@@ -1720,3 +1850,4 @@ export const registerPageContextIfNeeded = (runtime?: RuntimeMessenger) => {
     data: { url: href, title: document.title || undefined },
   });
 };
+

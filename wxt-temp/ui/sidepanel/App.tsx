@@ -318,7 +318,14 @@ export default function App() {
               onStartPicker={startSelectorPicker}
             />
           )}
-          {activeTab === TAB_IDS.hiddenRules && <HiddenRulesSection onStartPicker={startSelectorPicker} />}
+          {activeTab === TAB_IDS.hiddenRules && (
+            <HiddenRulesSection
+              siteKey={pageContext?.siteKey || ''}
+              pageKey={pageContext?.pageKey || ''}
+              hasActivePage={hasActivePage}
+              onStartPicker={startSelectorPicker}
+            />
+          )}
           {activeTab === TAB_IDS.overview && <OverviewSection />}
         </div>
       </main>

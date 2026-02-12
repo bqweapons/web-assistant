@@ -23,60 +23,49 @@ import Drawer from '../components/Drawer';
 import FlowDrawer from '../components/FlowDrawer';
 import FlowStepsBuilder from '../components/FlowStepsBuilder';
 import SelectMenu from '../components/SelectMenu';
-import { mockFlows } from '../utils/mockData';
 import { t, useLocale } from '../utils/i18n';
 import {
   MessageType,
-  type ElementPayload,
+  type MessageElementPayload,
   type PickerRect,
   type RuntimeMessage,
   type SelectorPickerAccept,
 } from '../../../shared/messages';
 import { getSiteData, setSiteData } from '../../../shared/storage';
+import {
+  buildDefaultSiteUrl,
+  deriveSiteKey,
+  isStructuredElementRecord,
+  type StructuredElementRecord,
+  type StructuredFlowRecord,
+} from '../../../shared/siteDataSchema';
+import { normalizeFlowSteps } from '../../../shared/flowStepMigration';
 
 type ElementInlineStyle = Record<string, string>;
-type ElementStyle = {
-  preset?: string;
-  inline?: ElementInlineStyle;
-  customCss?: string;
-};
+type ElementRecord = StructuredElementRecord;
+type ElementBehaviorType = StructuredElementRecord['behavior']['type'];
+type ElementPosition = StructuredElementRecord['placement']['position'];
+type ElementScope = StructuredElementRecord['scope'];
 
-type ElementRecord = ElementPayload & {
-  text: string;
-  selector: string;
-  position: NonNullable<ElementPayload['position']>;
-  style: ElementStyle;
-  pageUrl: string;
-  siteUrl: string;
-  frameUrl: string;
-  frameSelectors: string[];
-  floating: boolean;
-  createdAt: number;
+type FlowRecord = StructuredFlowRecord & {
+  scope: 'page' | 'site' | 'global';
+  siteKey: string;
+  pageKey: string | null;
+  steps: number | unknown[];
   updatedAt: number;
-  actionFlowId?: string;
-  actionFlowLocked?: boolean;
-  actionFlow?: string;
 };
+type StoredElementRecord = StructuredElementRecord;
 
-type BaseElement = Partial<ElementRecord> & {
-  id?: string;
-  type?: string;
-  position?: string;
-  style?: unknown;
-  stylePreset?: string;
-  customCss?: string;
-};
-
-const isElementType = (value: unknown): value is ElementPayload['type'] =>
+const isElementType = (value: unknown): value is ElementBehaviorType =>
   value === 'button' || value === 'link' || value === 'tooltip' || value === 'area';
 
-const isElementPosition = (value: unknown): value is NonNullable<ElementPayload['position']> =>
+const isElementPosition = (value: unknown): value is ElementPosition =>
   value === 'append' || value === 'prepend' || value === 'before' || value === 'after';
 
-const normalizeElementPosition = (value: unknown): NonNullable<ElementPayload['position']> =>
+const normalizeElementPosition = (value: unknown): ElementPosition =>
   isElementPosition(value) ? value : 'append';
 
-const normalizeElementScope = (value: unknown): NonNullable<ElementPayload['scope']> =>
+const normalizeElementScope = (value: unknown): ElementScope =>
   value === 'site' || value === 'global' ? value : 'page';
 
 const isStyleRecord = (value: unknown): value is Record<string, string> => {
@@ -87,9 +76,14 @@ const normalizeStyle = (
   rawStyle: unknown,
   legacyPreset?: string,
   legacyCustomCss?: string,
-): ElementStyle => {
-  if (isStyleRecord(rawStyle) && ('inline' in rawStyle || 'preset' in rawStyle || 'customCss' in rawStyle)) {
-    const typed = rawStyle as ElementStyle;
+): StructuredElementRecord['style'] => {
+  if (
+    rawStyle &&
+    typeof rawStyle === 'object' &&
+    !Array.isArray(rawStyle) &&
+    ('inline' in rawStyle || 'preset' in rawStyle || 'customCss' in rawStyle)
+  ) {
+    const typed = rawStyle as { preset?: unknown; inline?: unknown; customCss?: unknown };
     return {
       preset: typeof typed.preset === 'string' ? typed.preset : legacyPreset,
       inline: isStyleRecord(typed.inline) ? typed.inline : {},
@@ -103,63 +97,169 @@ const normalizeStyle = (
   };
 };
 
-const normalizeElement = (element: BaseElement): ElementRecord | null => {
-  if (!element?.id || typeof element.id !== 'string' || !isElementType(element.type)) {
+const resolveStructuredPageUrl = (
+  siteKey: string,
+  pageKey?: string | null,
+  scope?: unknown,
+) => {
+  const normalizedScope = scope === 'site' || scope === 'global' ? scope : 'page';
+  const siteUrl = buildDefaultSiteUrl(siteKey);
+  if (normalizedScope !== 'page') {
+    return siteUrl;
+  }
+  if (!pageKey) {
+    return siteUrl;
+  }
+  if (pageKey.startsWith('http://') || pageKey.startsWith('https://') || pageKey.startsWith('file://')) {
+    return pageKey;
+  }
+  if (siteKey.startsWith('/')) {
+    return pageKey.startsWith('/') ? `file://${pageKey}` : `file:///${pageKey}`;
+  }
+  if (pageKey.startsWith('/')) {
+    return `${siteUrl.replace(/\/$/, '')}${pageKey}`;
+  }
+  if (pageKey === siteKey || pageKey.startsWith(`${siteKey}/`)) {
+    return `https://${pageKey}`;
+  }
+  return `${siteUrl.replace(/\/$/, '')}/${pageKey.replace(/^\/+/, '')}`;
+};
+
+const normalizeStoredElement = (
+  element: unknown,
+  fallbackSiteKey = '',
+): StoredElementRecord | null => {
+  if (!isStructuredElementRecord(element)) {
     return null;
   }
-  const { style, stylePreset, customCss, ...rest } = element as BaseElement & {
-    stylePreset?: string;
-    customCss?: string;
-  };
+  const siteKey =
+    deriveSiteKey(element.context.siteKey || '') ||
+    deriveSiteKey(fallbackSiteKey || '') ||
+    fallbackSiteKey;
+  if (!siteKey) {
+    return null;
+  }
+  const scope = normalizeElementScope(element.scope);
   return {
-    ...rest,
-    id: element.id,
-    type: element.type,
+    ...element,
     text: typeof element.text === 'string' ? element.text : '',
-    selector: typeof element.selector === 'string' ? element.selector : '',
-    position: normalizeElementPosition(element.position),
-    pageUrl: typeof element.pageUrl === 'string' ? element.pageUrl : '',
-    siteUrl: typeof element.siteUrl === 'string' ? element.siteUrl : '',
-    frameUrl: typeof element.frameUrl === 'string' ? element.frameUrl : '',
-    frameSelectors: Array.isArray(element.frameSelectors)
-      ? element.frameSelectors.filter((item): item is string => typeof item === 'string')
-      : [],
-    floating: element.floating !== false,
-    scope: normalizeElementScope(element.scope),
+    scope,
+    context: {
+      siteKey,
+      pageKey: scope === 'page' ? element.context.pageKey ?? `${siteKey}/` : null,
+      frame:
+        element.context.frame && typeof element.context.frame === 'object'
+          ? {
+              url: typeof element.context.frame.url === 'string' ? element.context.frame.url : undefined,
+              selectors: Array.isArray(element.context.frame.selectors)
+                ? element.context.frame.selectors.filter((item): item is string => typeof item === 'string')
+                : [],
+            }
+          : null,
+    },
+    placement: {
+      mode:
+        element.placement.mode === 'floating' || element.placement.mode === 'container'
+          ? element.placement.mode
+          : 'dom',
+      selector: typeof element.placement.selector === 'string' ? element.placement.selector : '',
+      position: normalizeElementPosition(element.placement.position),
+      relativeTo: {
+        before:
+          typeof element.placement.relativeTo?.before === 'string'
+            ? element.placement.relativeTo.before
+            : undefined,
+        after:
+          typeof element.placement.relativeTo?.after === 'string'
+            ? element.placement.relativeTo.after
+            : undefined,
+      },
+      containerId:
+        typeof element.placement.containerId === 'string' ? element.placement.containerId : undefined,
+      floating:
+        typeof element.placement.floating === 'boolean'
+          ? element.placement.floating
+          : element.placement.mode === 'floating',
+    },
+    style: normalizeStyle(element.style),
+    behavior: {
+      type: isElementType(element.behavior.type) ? element.behavior.type : 'button',
+      href: typeof element.behavior.href === 'string' ? element.behavior.href : undefined,
+      target:
+        element.behavior.target === 'same-tab'
+          ? 'same-tab'
+          : element.behavior.target === 'new-tab'
+            ? 'new-tab'
+            : undefined,
+      actionSelector:
+        typeof element.behavior.actionSelector === 'string' ? element.behavior.actionSelector : undefined,
+      actionFlowId:
+        typeof element.behavior.actionFlowId === 'string' ? element.behavior.actionFlowId : undefined,
+      actionFlowLocked:
+        typeof element.behavior.actionFlowLocked === 'boolean'
+          ? element.behavior.actionFlowLocked
+          : undefined,
+      actionFlow:
+        typeof element.behavior.actionFlow === 'string' ? element.behavior.actionFlow : undefined,
+      layout: element.behavior.layout === 'column' ? 'column' : element.behavior.layout === 'row' ? 'row' : undefined,
+      tooltipPosition:
+        element.behavior.tooltipPosition === 'top' ||
+        element.behavior.tooltipPosition === 'right' ||
+        element.behavior.tooltipPosition === 'bottom' ||
+        element.behavior.tooltipPosition === 'left'
+          ? element.behavior.tooltipPosition
+          : undefined,
+      tooltipPersistent:
+        typeof element.behavior.tooltipPersistent === 'boolean'
+          ? element.behavior.tooltipPersistent
+          : undefined,
+    },
     createdAt: typeof element.createdAt === 'number' ? element.createdAt : Date.now(),
     updatedAt: typeof element.updatedAt === 'number' ? element.updatedAt : Date.now(),
-    style: normalizeStyle(style, stylePreset, customCss),
   };
 };
 
-const toElementPayload = (element: ElementRecord): ElementPayload => ({
-  id: element.id,
-  type: element.type,
-  text: element.text,
-  selector: element.selector,
-  position: normalizeElementPosition(element.position),
-  beforeSelector: element.beforeSelector,
-  afterSelector: element.afterSelector,
-  containerId: element.containerId,
-  floating: element.floating,
-  layout: element.layout,
-  href: element.href,
-  linkTarget: element.linkTarget,
-  tooltipPosition: element.tooltipPosition,
-  tooltipPersistent: element.tooltipPersistent,
-  style: {
-    preset: element.style?.preset,
-    inline: element.style?.inline || {},
-    customCss: element.style?.customCss || '',
-  },
-  scope: element.scope,
-  siteUrl: element.siteUrl,
-  pageUrl: element.pageUrl,
-  frameUrl: element.frameUrl,
-  frameSelectors: element.frameSelectors,
-  createdAt: element.createdAt,
-  updatedAt: element.updatedAt,
-});
+const toMessageElementPayload = (element: StoredElementRecord): MessageElementPayload => element;
+
+type ElementResolvedContext = {
+  siteKey: string;
+  siteUrl: string;
+  pageKey: string | null;
+  pageUrl: string;
+  frameUrl: string;
+  frameSelectors: string[];
+};
+
+const resolveElementContext = (
+  element: ElementRecord,
+  fallbackSiteKey = '',
+): ElementResolvedContext => {
+  const scope = normalizeElementScope(element.scope);
+  const siteKey =
+    deriveSiteKey(element.context.siteKey || '') ||
+    fallbackSiteKey;
+  const pageKey =
+    scope === 'page'
+      ? element.context.pageKey ?? toStructuredPageKey(resolveStructuredPageUrl(siteKey, element.context.pageKey, scope), scope, siteKey)
+      : null;
+  const siteUrl = buildDefaultSiteUrl(siteKey);
+  const pageUrl = resolveStructuredPageUrl(siteKey, pageKey, scope);
+  const frameUrl =
+    typeof element.context.frame?.url === 'string' && element.context.frame.url.trim()
+      ? element.context.frame.url
+      : pageUrl;
+  const frameSelectors = Array.isArray(element.context.frame?.selectors)
+    ? element.context.frame.selectors.filter((item): item is string => typeof item === 'string')
+    : [];
+  return {
+    siteKey,
+    siteUrl,
+    pageKey,
+    pageUrl,
+    frameUrl,
+    frameSelectors,
+  };
+};
 
 const normalizeSiteKey = (value: string) =>
   value.replace(/^https?:\/\//, '').replace(/^file:\/\//, '').replace(/\/$/, '');
@@ -183,6 +283,100 @@ const normalizePageKey = (value?: string) => {
     return normalizeSiteKey(value);
   }
 };
+
+const toFlowTimestamp = (value: unknown) => {
+  if (typeof value === 'number' && Number.isFinite(value)) {
+    return value;
+  }
+  if (typeof value === 'string') {
+    const numeric = Number(value);
+    if (Number.isFinite(numeric) && numeric > 0) {
+      return numeric;
+    }
+    const normalized = value.includes(' ') ? value.replace(' ', 'T') : value;
+    const parsed = Date.parse(normalized);
+    if (Number.isFinite(parsed)) {
+      return parsed;
+    }
+  }
+  return Date.now();
+};
+
+const normalizeFlowRecord = (value: unknown, fallbackSiteKey: string): FlowRecord | null => {
+  if (!value || typeof value !== 'object') {
+    return null;
+  }
+  const entry = value as Partial<FlowRecord> & { site?: string };
+  if (!entry.id || typeof entry.id !== 'string') {
+    return null;
+  }
+  const resolvedSiteKey =
+    deriveSiteKey(typeof entry.siteKey === 'string' ? entry.siteKey : '') ||
+    deriveSiteKey(typeof entry.site === 'string' ? entry.site : '') ||
+    fallbackSiteKey;
+  if (!resolvedSiteKey) {
+    return null;
+  }
+  return {
+    id: entry.id,
+    name:
+      typeof entry.name === 'string' && entry.name.trim()
+        ? entry.name.trim()
+        : t('sidepanel_flows_new_default', 'New flow'),
+    description: typeof entry.description === 'string' ? entry.description : '',
+    scope: entry.scope === 'page' || entry.scope === 'global' ? entry.scope : 'site',
+    siteKey: resolvedSiteKey,
+    pageKey: typeof entry.pageKey === 'string' ? entry.pageKey : null,
+    steps: normalizeFlowSteps(entry.steps, {
+      flowId: entry.id,
+      keepNumber: true,
+      sanitizeExisting: true,
+    }),
+    updatedAt: toFlowTimestamp(entry.updatedAt),
+  };
+};
+
+const toStructuredPageKey = (
+  pageUrl: string,
+  scope: ElementScope,
+  siteKey: string,
+) => {
+  if (scope !== 'page') {
+    return null;
+  }
+  const trimmed = pageUrl.trim();
+  if (!trimmed) {
+    return siteKey ? `${siteKey}/` : null;
+  }
+  if (trimmed.startsWith('http://') || trimmed.startsWith('https://') || trimmed.startsWith('file://')) {
+    try {
+      const parsed = new URL(trimmed);
+      if (parsed.protocol === 'file:') {
+        return trimmed.split(/[?#]/)[0] || trimmed;
+      }
+      const host = normalizeSiteKey(parsed.host || parsed.hostname || siteKey);
+      const path = parsed.pathname || '/';
+      return `${host}${path.startsWith('/') ? path : `/${path}`}`;
+    } catch {
+      return trimmed;
+    }
+  }
+  if (trimmed.startsWith('/')) {
+    return `${siteKey}${trimmed}`;
+  }
+  return trimmed;
+};
+
+const getElementType = (element: ElementRecord) => element.behavior.type;
+const getElementSelector = (element: ElementRecord) => element.placement.selector || '';
+const getElementPosition = (element: ElementRecord) => normalizeElementPosition(element.placement.position);
+const getElementScope = (element: ElementRecord) => normalizeElementScope(element.scope);
+const getElementFloating = (element: ElementRecord) =>
+  element.placement.mode === 'floating' || element.placement.floating === true;
+const getElementHref = (element: ElementRecord) => element.behavior.href || '';
+const getElementLinkTarget = (element: ElementRecord) => element.behavior.target || 'new-tab';
+const getElementLayout = (element: ElementRecord) => element.behavior.layout || 'row';
+const getElementActionFlowId = (element: ElementRecord) => element.behavior.actionFlowId || '';
 
 type ElementsSectionProps = {
   siteKey?: string;
@@ -215,8 +409,8 @@ export default function ElementsSection({
   onStartElementPicker,
 }: ElementsSectionProps) {
   const locale = useLocale();
-  const [elements, setElements] = useState<ElementRecord[]>([]);
-  const [flows, setFlows] = useState(mockFlows);
+  const [elements, setElements] = useState<StoredElementRecord[]>([]);
+  const [flows, setFlows] = useState<FlowRecord[]>([]);
   const actionClass = 'btn-icon h-8 w-8';
   const selectButtonClass = 'btn-ghost h-9 w-full justify-between px-2 text-xs';
   const [activeElementId, setActiveElementId] = useState<string | null>(null);
@@ -230,12 +424,21 @@ export default function ElementsSection({
       return [];
     }
     return elements.filter(
-      (element) => normalizeSiteKey(element.siteUrl || '') === normalizedSiteKey,
+      (element) => resolveElementContext(element, normalizedSiteKey).siteKey === normalizedSiteKey,
     );
   }, [elements, normalizedSiteKey]);
-  const currentSite = siteKey || siteElements[0]?.siteUrl || 'site';
+  const firstSiteElementContext = useMemo(
+    () => (siteElements[0] ? resolveElementContext(siteElements[0], normalizedSiteKey) : null),
+    [siteElements, normalizedSiteKey],
+  );
+  const currentSite = useMemo(() => {
+    if (normalizedSiteKey) {
+      return buildDefaultSiteUrl(normalizedSiteKey);
+    }
+    return firstSiteElementContext?.siteUrl || 'site';
+  }, [firstSiteElementContext?.siteUrl, normalizedSiteKey]);
   const activeElement = siteElements.find((element) => element.id === activeElementId) ?? null;
-  const [editElement, setEditElement] = useState<ElementRecord | null>(activeElement);
+  const [editElement, setEditElement] = useState<StoredElementRecord | null>(activeElement);
   const [flowDrawerOpen, setFlowDrawerOpen] = useState(false);
   const [draftFlow, setDraftFlow] = useState({
     name: '',
@@ -252,42 +455,49 @@ export default function ElementsSection({
   useEffect(() => {
     if (!normalizedSiteKey) {
       setElements([]);
-      setFlows(mockFlows);
+      setFlows([]);
       return;
     }
     getSiteData(normalizedSiteKey)
       .then((data) => {
         const normalized =
-          (data.elements as BaseElement[] | undefined)
-            ?.map((item) => normalizeElement(item))
-            .filter((item): item is ElementRecord => Boolean(item)) || [];
+          (data.elements as unknown[] | undefined)
+            ?.map((item) => normalizeStoredElement(item))
+            .filter((item): item is StoredElementRecord => Boolean(item)) || [];
         setElements(normalized);
-        setFlows((data.flows as typeof mockFlows | undefined) || mockFlows);
+        const normalizedFlows = (Array.isArray(data.flows) ? data.flows : [])
+          .map((item) => normalizeFlowRecord(item, normalizedSiteKey))
+          .filter((item): item is FlowRecord => Boolean(item));
+        setFlows(normalizedFlows);
       })
       .catch(() => {
         setElements([]);
-        setFlows(mockFlows);
+        setFlows([]);
       });
   }, [normalizedSiteKey]);
   const typeOptions = useMemo(() => {
-    const types = new Set(siteElements.map((element) => element.type));
+    const types = new Set(siteElements.map((element) => getElementType(element)));
     return ['all', ...Array.from(types).sort()];
   }, [siteElements]);
   const normalizedQuery = searchQuery.trim().toLowerCase();
   const filteredElements = useMemo(() => {
     return siteElements.filter((element) => {
-      if (typeFilter !== 'all' && element.type !== typeFilter) {
+      if (typeFilter !== 'all' && getElementType(element) !== typeFilter) {
         return false;
       }
       if (!normalizedQuery) {
         return true;
       }
-      const haystack = `${element.text} ${element.type} ${element.pageUrl} ${element.selector} ${element.href || ''}`.toLowerCase();
+      const context = resolveElementContext(element, normalizedSiteKey);
+      const haystack =
+        `${element.text} ${getElementType(element)} ${context.pageUrl} ${getElementSelector(element)} ${getElementHref(element)}`.toLowerCase();
       return haystack.includes(normalizedQuery);
     });
-  }, [siteElements, normalizedQuery, typeFilter]);
+  }, [siteElements, normalizedQuery, typeFilter, normalizedSiteKey]);
   const elementsByPage = filteredElements.reduce<Record<string, typeof filteredElements>>((acc, element) => {
-    const pageKey = element.pageUrl || element.siteUrl || 'unknown';
+    const context = resolveElementContext(element, normalizedSiteKey);
+    const pageGroupKey = context.pageKey || context.siteKey || 'unknown';
+    const pageKey = pageGroupKey;
     if (!acc[pageKey]) {
       acc[pageKey] = [];
     }
@@ -367,15 +577,17 @@ export default function ElementsSection({
       return;
     }
     const currentPageKey = normalizePageKey(pageUrl || pageKey);
-    const payload: ElementPayload[] = siteElements.map((element) => toElementPayload(element)).filter((element) => {
-      if (element.scope !== 'page') {
-        return true;
-      }
-      if (!element.pageUrl) {
-        return true;
-      }
-      return normalizePageKey(element.pageUrl) === currentPageKey;
-    });
+    const payload: MessageElementPayload[] = siteElements
+      .filter((element) => {
+        if (element.scope !== 'page') {
+          return true;
+        }
+        if (!element.context.pageKey) {
+          return true;
+        }
+        return normalizePageKey(element.context.pageKey) === currentPageKey;
+      })
+      .map((element) => toMessageElementPayload(element));
     sendElementMessage(MessageType.REHYDRATE_ELEMENTS, { elements: payload })
       .then(() => setInjectionError(''))
       .catch((error) => {
@@ -385,7 +597,7 @@ export default function ElementsSection({
   }, [hasActivePage, normalizedSiteKey, pageUrl, pageKey, sendElementMessage, siteElements]);
 
   const persistSiteData = useCallback(
-    async (nextElements: ElementRecord[], nextFlows: typeof flows) => {
+    async (nextElements: StoredElementRecord[], nextFlows: typeof flows) => {
       if (!normalizedSiteKey) {
         return;
       }
@@ -406,11 +618,11 @@ export default function ElementsSection({
       if (!rawMessage?.forwarded || rawMessage.type !== MessageType.ELEMENT_DRAFT_UPDATED) {
         return;
       }
-      const normalized = normalizeElement((rawMessage.data?.element || null) as BaseElement);
+      const normalized = normalizeStoredElement(rawMessage.data?.element || null, normalizedSiteKey);
       if (!normalized) {
         return;
       }
-      if (normalizeSiteKey(normalized.siteUrl || '') !== normalizedSiteKey) {
+      if (resolveElementContext(normalized, normalizedSiteKey).siteKey !== normalizedSiteKey) {
         return;
       }
       setElements((prev) => {
@@ -425,7 +637,7 @@ export default function ElementsSection({
         }
         return next;
       });
-      setEditElement((prev) => (prev?.id === normalized.id ? { ...prev, ...normalized } : prev));
+      setEditElement((prev) => (prev?.id === normalized.id ? normalized : prev));
       setInjectionError('');
     };
     runtime.onMessage.addListener(handleRuntimeMessage);
@@ -503,21 +715,29 @@ export default function ElementsSection({
   ];
   const areaChildCounts = useMemo(() => {
     return siteElements.reduce<Record<string, number>>((acc, element) => {
-      if (element.containerId) {
-        acc[element.containerId] = (acc[element.containerId] ?? 0) + 1;
+      if (element.placement.containerId) {
+        acc[element.placement.containerId] = (acc[element.placement.containerId] ?? 0) + 1;
       }
       return acc;
     }, {});
   }, [siteElements]);
   const flowSiteKey = useMemo(
-    () => normalizeSiteKey(editElement?.siteUrl || activeElement?.siteUrl || siteKey || ''),
-    [editElement?.siteUrl, activeElement?.siteUrl, siteKey],
+    () => {
+      if (editElement) {
+        return resolveElementContext(editElement, normalizedSiteKey).siteKey;
+      }
+      if (activeElement) {
+        return resolveElementContext(activeElement, normalizedSiteKey).siteKey;
+      }
+      return normalizeSiteKey(siteKey || '');
+    },
+    [activeElement, editElement, normalizedSiteKey, siteKey],
   );
   const filteredFlows = useMemo(() => {
     if (!flowSiteKey) {
       return flows;
     }
-    return flows.filter((flow) => normalizeSiteKey(flow.site) === flowSiteKey);
+    return flows.filter((flow) => flow.siteKey === flowSiteKey);
   }, [flows, flowSiteKey]);
   const actionFlowOptions = useMemo(
     () => [
@@ -601,16 +821,37 @@ export default function ElementsSection({
   const handleCreateFlow = () => {
     const name = draftFlow.name.trim() || t('sidepanel_flows_new_default', 'New flow');
     const description = draftFlow.description.trim();
+    const flowSiteKey =
+      (activeElement ? resolveElementContext(activeElement, normalizedSiteKey).siteKey : '') ||
+      normalizedSiteKey ||
+      deriveSiteKey(siteKey || '') ||
+      '';
+    if (!flowSiteKey) {
+      return;
+    }
     const nextFlow = {
       id: `flow-${Date.now()}`,
       name,
       description,
-      site: activeElement?.siteUrl || 'site',
+      scope: 'site' as const,
+      siteKey: flowSiteKey,
+      pageKey: null,
       steps: Number.isFinite(draftFlow.steps) ? Math.max(0, draftFlow.steps) : 0,
-      updatedAt: formatTimestamp(Date.now()),
+      updatedAt: Date.now(),
     };
     setFlows((prev) => [...prev, nextFlow]);
-    setEditElement((prev) => (prev ? { ...prev, actionFlowId: nextFlow.id } : prev));
+    setEditElement((prev) =>
+      prev
+        ? {
+            ...prev,
+            behavior: {
+              ...prev.behavior,
+              actionFlowId: nextFlow.id,
+            },
+            updatedAt: Date.now(),
+          }
+        : prev,
+    );
     setFlowDrawerOpen(false);
   };
 
@@ -644,18 +885,18 @@ export default function ElementsSection({
     </>
   );
 
-  const getElementLabel = (element: typeof elements[number]) => {
+  const getElementLabel = (element: ElementRecord) => {
     const text = element.text?.trim();
     if (text) {
       return text;
     }
-    const selector = element.selector?.trim();
+    const selector = getElementSelector(element).trim();
     if (selector) {
       return selector;
     }
     return t('sidepanel_elements_default_label', '{type} element').replace(
       '{type}',
-      getElementTypeLabel(element.type),
+      getElementTypeLabel(getElementType(element)),
     );
   };
 
@@ -750,23 +991,23 @@ export default function ElementsSection({
       return rest.length ? `/${rest.join('/')}` : '/';
     }
   };
-  const getElementDetail = (element: typeof elements[number]) => {
-    const type = element.type.toLowerCase();
+  const getElementDetail = (element: ElementRecord) => {
+    const type = getElementType(element).toLowerCase();
     if (type === 'button') {
-      if (element.actionFlowId) {
+      if (element.behavior.actionFlowId) {
         return t('sidepanel_elements_action_flow_value', 'Action flow: {value}').replace(
           '{value}',
-          element.actionFlowId,
+          element.behavior.actionFlowId,
         );
       }
-      return element.actionFlow
+      return element.behavior.actionFlow
         ? t('sidepanel_elements_action_flow_configured', 'Action flow: Configured')
         : t('sidepanel_elements_action_flow_unassigned', 'Action flow: Unassigned');
     }
     if (type === 'link') {
       return t('sidepanel_elements_link_value', 'Link: {value}').replace(
         '{value}',
-        element.href || t('sidepanel_field_unassigned', 'Unassigned'),
+        getElementHref(element) || t('sidepanel_field_unassigned', 'Unassigned'),
       );
     }
     if (type === 'area') {
@@ -776,33 +1017,38 @@ export default function ElementsSection({
         String(count),
       );
     }
-    return element.selector
-      ? t('sidepanel_elements_selector_value', 'Selector: {value}').replace('{value}', element.selector)
+    const selector = getElementSelector(element);
+    return selector
+      ? t('sidepanel_elements_selector_value', 'Selector: {value}').replace('{value}', selector)
       : t('sidepanel_elements_detail_not_set', 'Detail: Not set');
   };
-  const getElementDetailRows = (element: typeof elements[number]) => {
+  const getElementDetailRows = (element: ElementRecord) => {
+    const context = resolveElementContext(element, normalizedSiteKey);
     const rows = [
-      { label: t('sidepanel_field_type', 'Type'), value: getElementTypeLabel(element.type) },
+      { label: t('sidepanel_field_type', 'Type'), value: getElementTypeLabel(getElementType(element)) },
       {
         label: t('sidepanel_field_scope', 'Scope'),
         value:
-          element.scope === 'site'
+          getElementScope(element) === 'site'
             ? t('sidepanel_scope_site', 'Site')
-            : element.scope === 'global'
+            : getElementScope(element) === 'global'
               ? t('sidepanel_scope_global', 'Global')
               : t('sidepanel_scope_page', 'Page'),
       },
-      { label: t('sidepanel_field_site', 'Site'), value: element.siteUrl || t('sidepanel_label_unknown', 'Unknown') },
-      { label: t('sidepanel_field_page', 'Page'), value: getPageLabel(element.pageUrl, element.siteUrl || currentSite) },
-      { label: t('sidepanel_field_selector', 'Selector'), value: element.selector || t('sidepanel_field_not_set', 'Not set') },
+      { label: t('sidepanel_field_site', 'Site'), value: context.siteUrl || t('sidepanel_label_unknown', 'Unknown') },
+      { label: t('sidepanel_field_page', 'Page'), value: getPageLabel(context.pageUrl, context.siteUrl || currentSite) },
+      {
+        label: t('sidepanel_field_selector', 'Selector'),
+        value: getElementSelector(element) || t('sidepanel_field_not_set', 'Not set'),
+      },
     ];
-    const type = element.type.toLowerCase();
+    const type = getElementType(element).toLowerCase();
     if (type === 'button') {
       rows.push({
         label: t('sidepanel_field_action_flow', 'Action flow'),
         value:
-          element.actionFlowId ||
-          (element.actionFlow
+          element.behavior.actionFlowId ||
+          (element.behavior.actionFlow
             ? t('sidepanel_field_configured', 'Configured')
             : t('sidepanel_field_not_set', 'Not set')),
       });
@@ -810,14 +1056,14 @@ export default function ElementsSection({
     if (type === 'link') {
       rows.push({
         label: t('sidepanel_field_link', 'Link'),
-        value: element.href || t('sidepanel_field_not_set', 'Not set'),
+        value: getElementHref(element) || t('sidepanel_field_not_set', 'Not set'),
       });
     }
     if (type === 'area') {
       rows.push({
         label: t('sidepanel_field_layout', 'Layout'),
         value:
-          element.layout === 'column'
+          getElementLayout(element) === 'column'
             ? t('sidepanel_layout_column', 'Column')
             : t('sidepanel_layout_row', 'Row'),
       });
@@ -1130,15 +1376,25 @@ export default function ElementsSection({
     setEditElement({
       ...activeElement,
       text: activeElement.text || '',
-      href: activeElement.href || '',
-      selector: activeElement.selector || '',
-      position: activeElement.position || 'append',
-      actionFlowId: activeElement.actionFlowId || '',
-      actionFlowLocked: Boolean(activeElement.actionFlowLocked),
       scope: activeElement.scope || 'page',
-      floating: activeElement.floating !== false,
-      linkTarget: activeElement.linkTarget || 'new-tab',
-      layout: activeElement.layout || 'row',
+      placement: {
+        ...activeElement.placement,
+        selector: activeElement.placement.selector || '',
+        position: normalizeElementPosition(activeElement.placement.position),
+        floating:
+          typeof activeElement.placement.floating === 'boolean'
+            ? activeElement.placement.floating
+            : activeElement.placement.mode === 'floating',
+      },
+      behavior: {
+        ...activeElement.behavior,
+        type: isElementType(activeElement.behavior.type) ? activeElement.behavior.type : 'button',
+        href: activeElement.behavior.href || '',
+        target: activeElement.behavior.target || 'new-tab',
+        layout: activeElement.behavior.layout || 'row',
+        actionFlowId: activeElement.behavior.actionFlowId || '',
+        actionFlowLocked: Boolean(activeElement.behavior.actionFlowLocked),
+      },
       style: {
         preset: resolvedPreset,
         inline: resolvedInline,
@@ -1160,18 +1416,20 @@ export default function ElementsSection({
 
   const createElementId = () =>
     `element-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+  const defaultSiteKey = normalizedSiteKey || firstSiteElementContext?.siteKey || '';
   const defaultSiteUrl =
-    siteElements[0]?.siteUrl || (siteKey ? `https://${siteKey}` : 'https://example.com');
+    firstSiteElementContext?.siteUrl ||
+    (defaultSiteKey ? buildDefaultSiteUrl(defaultSiteKey) : 'https://example.com');
+  const defaultPageKey =
+    pageKey ||
+    firstSiteElementContext?.pageKey ||
+    (defaultSiteKey ? `${defaultSiteKey}/` : null);
   const defaultPageUrl =
     pageUrl ||
-    (pageKey
-      ? pageKey.startsWith('http://') || pageKey.startsWith('https://') || pageKey.startsWith('file://')
-        ? pageKey
-        : `https://${pageKey}`
-      : '') ||
-    siteElements[0]?.pageUrl ||
+    resolveStructuredPageUrl(defaultSiteKey, defaultPageKey, 'page') ||
+    firstSiteElementContext?.pageUrl ||
     defaultSiteUrl;
-  const defaultFrameUrl = siteElements[0]?.frameUrl || defaultPageUrl;
+  const defaultFrameUrl = firstSiteElementContext?.frameUrl || defaultPageUrl;
 
   const handleAddElementType = async (value: string) => {
     setAddElementType(value);
@@ -1206,21 +1464,32 @@ export default function ElementsSection({
       };
       const newArea: ElementRecord = {
         id: createElementId(),
-        type: 'area' as const,
         text: t('sidepanel_elements_add_area', 'Area'),
-        selector: 'body',
-        position: 'append',
-        layout: 'row' as const,
+        scope: 'page',
+        context: {
+          siteKey: defaultSiteKey,
+          pageKey: defaultPageKey,
+          frame: {
+            url: defaultFrameUrl,
+            selectors: [],
+          },
+        },
+        placement: {
+          mode: 'floating',
+          selector: 'body',
+          position: 'append',
+          relativeTo: {},
+          floating: true,
+        },
         style: {
           preset: detectStylePreset(areaInline),
           inline: areaInline,
           customCss: formatCustomCss(areaInline),
         },
-        pageUrl: defaultPageUrl,
-        siteUrl: defaultSiteUrl,
-        frameUrl: defaultFrameUrl,
-        frameSelectors: [] as string[],
-        floating: true,
+        behavior: {
+          type: 'area',
+          layout: 'row',
+        },
         createdAt: now,
         updatedAt: now,
       };
@@ -1228,7 +1497,7 @@ export default function ElementsSection({
         const next = [newArea, ...prev];
         return next;
       });
-      sendElementMessage(MessageType.CREATE_ELEMENT, { element: toElementPayload(newArea) })
+      sendElementMessage(MessageType.CREATE_ELEMENT, { element: toMessageElementPayload(newArea) })
         .then(() => {
           setInjectionError('');
           syncElementsToContent();
@@ -1294,50 +1563,61 @@ export default function ElementsSection({
             };
     const newElement: ElementRecord = {
       id: createElementId(),
-      type: normalizedType,
       text:
         normalizedType === 'tooltip'
           ? t('sidepanel_elements_add_tooltip', 'Tooltip')
           : normalizedType === 'link'
             ? t('sidepanel_elements_add_link', 'Link')
-          : t('sidepanel_elements_add_button', 'Button'),
-      selector,
-      beforeSelector: attachToArea ? undefined : beforeSelector,
-      afterSelector: attachToArea ? undefined : afterSelector,
-      containerId: attachToArea ? containerId : undefined,
-      position:
-        attachToArea
-          ? 'append'
-          : selectorPayload.beforeSelector || selectorPayload.afterSelector
-          ? selectorPayload.beforeSelector
-            ? 'before'
-            : 'after'
-          : normalizedType === 'tooltip'
-            ? 'after'
-            : 'append',
+            : t('sidepanel_elements_add_button', 'Button'),
+      scope: 'page',
+      context: {
+        siteKey: defaultSiteKey,
+        pageKey: defaultPageKey,
+        frame: {
+          url: defaultFrameUrl,
+          selectors: [],
+        },
+      },
+      placement: {
+        mode: attachToArea ? 'container' : 'dom',
+        selector,
+        containerId: attachToArea ? containerId : undefined,
+        position:
+          attachToArea
+            ? 'append'
+            : selectorPayload.beforeSelector || selectorPayload.afterSelector
+              ? selectorPayload.beforeSelector
+                ? 'before'
+                : 'after'
+              : normalizedType === 'tooltip'
+                ? 'after'
+                : 'append',
+        relativeTo: {
+          before: attachToArea ? undefined : beforeSelector,
+          after: attachToArea ? undefined : afterSelector,
+        },
+        floating: false,
+      },
       style: {
         preset: detectStylePreset(elementInline),
         inline: elementInline,
         customCss: formatCustomCss(elementInline),
       },
-      pageUrl: defaultPageUrl,
-      siteUrl: defaultSiteUrl,
-      frameUrl: defaultFrameUrl,
-      frameSelectors: [] as string[],
-      floating: false,
-      scope: 'page',
+      behavior: {
+        type: normalizedType,
+        tooltipPosition: normalizedType === 'tooltip' ? 'top' : undefined,
+        tooltipPersistent: normalizedType === 'tooltip' ? false : undefined,
+        href: normalizedType === 'link' ? 'https://example.com' : undefined,
+        target: normalizedType === 'link' ? 'new-tab' : undefined,
+      },
       createdAt: now,
       updatedAt: now,
-      tooltipPosition: normalizedType === 'tooltip' ? ('top' as const) : undefined,
-      tooltipPersistent: normalizedType === 'tooltip' ? false : undefined,
-      href: normalizedType === 'link' ? 'https://example.com' : undefined,
-      linkTarget: normalizedType === 'link' ? ('new-tab' as const) : undefined,
     };
     setElements((prev) => {
       const next = [newElement, ...prev];
       return next;
     });
-    sendElementMessage(MessageType.CREATE_ELEMENT, { element: toElementPayload(newElement) })
+    sendElementMessage(MessageType.CREATE_ELEMENT, { element: toMessageElementPayload(newElement) })
       .then(() => {
         setInjectionError('');
         syncElementsToContent();
@@ -1362,12 +1642,16 @@ export default function ElementsSection({
     if (!editElement) {
       return;
     }
+    const savedElement: StoredElementRecord = {
+      ...editElement,
+      updatedAt: Date.now(),
+    };
     setElements((prev) => {
-      const next = prev.map((item) => (item.id === editElement.id ? { ...item, ...editElement } : item));
+      const next = prev.map((item) => (item.id === editElement.id ? savedElement : item));
       persistSiteData(next, flows).catch(() => undefined);
       return next;
     });
-    sendElementMessage(MessageType.UPDATE_ELEMENT, { element: toElementPayload(editElement) })
+    sendElementMessage(MessageType.UPDATE_ELEMENT, { element: toMessageElementPayload(editElement) })
       .then(() => {
         setInjectionError('');
         syncElementsToContent();
@@ -1430,9 +1714,10 @@ export default function ElementsSection({
       afterSelector?: string;
       containerId?: string;
     } | null = null;
+    const editingType = editElement ? getElementType(editElement) : undefined;
     if (onStartElementPicker) {
       result = await onStartElementPicker({
-        disallowInput: editElement?.type === 'button' || editElement?.type === 'link',
+        disallowInput: editingType === 'button' || editingType === 'link',
       });
     } else if (onStartPicker) {
       const selector = await onStartPicker('selector');
@@ -1444,18 +1729,25 @@ export default function ElementsSection({
     const attachToArea = Boolean(result.containerId);
     setEditElement({
       ...editElement,
-      selector: result.selector,
-      beforeSelector: attachToArea ? '' : result.beforeSelector || '',
-      afterSelector: attachToArea ? '' : result.afterSelector || '',
-      containerId: attachToArea ? result.containerId : undefined,
-      position:
-        attachToArea
-          ? 'append'
-          : result.beforeSelector
-            ? 'before'
-            : result.afterSelector
-              ? 'after'
-              : editElement.position,
+      placement: {
+        ...editElement.placement,
+        selector: result.selector,
+        relativeTo: {
+          before: attachToArea ? undefined : result.beforeSelector || undefined,
+          after: attachToArea ? undefined : result.afterSelector || undefined,
+        },
+        containerId: attachToArea ? result.containerId : undefined,
+        mode: attachToArea ? 'container' : 'dom',
+        position:
+          attachToArea
+            ? 'append'
+            : result.beforeSelector
+              ? 'before'
+              : result.afterSelector
+                ? 'after'
+                : getElementPosition(editElement),
+      },
+      updatedAt: Date.now(),
     });
     setInjectionError('');
   };
@@ -1514,7 +1806,7 @@ export default function ElementsSection({
       previewTimerRef.current = null;
     }
     const handle = window.setTimeout(() => {
-      sendElementMessage(MessageType.PREVIEW_ELEMENT, { element: toElementPayload(editElement) }).catch((error) =>
+      sendElementMessage(MessageType.PREVIEW_ELEMENT, { element: toMessageElementPayload(editElement) }).catch((error) =>
         setInjectionError(error instanceof Error ? error.message : String(error)),
       );
       if (previewTimerRef.current === handle) {
@@ -1538,7 +1830,7 @@ export default function ElementsSection({
     >
       <div className="flex items-start justify-between gap-2">
         <div className="flex min-w-0 flex-1 items-center gap-2">
-          <span className="badge-pill shrink-0">{getElementTypeLabel(element.type)}</span>
+          <span className="badge-pill shrink-0">{getElementTypeLabel(getElementType(element))}</span>
           <h3 className="min-w-0 flex-1 truncate text-sm font-semibold text-card-foreground">
             {getElementLabel(element)}
           </h3>
@@ -1677,7 +1969,9 @@ export default function ElementsSection({
       ) : (
         <div className="grid gap-3">
           {pageEntries.map(([page, pageElements]) => {
-            const pageSite = pageElements[0]?.siteUrl || currentSite;
+            const pageSite = pageElements[0]
+              ? resolveElementContext(pageElements[0], normalizedSiteKey).siteUrl
+              : currentSite;
             return (
               <div key={page} className="grid gap-2">
               <div className="flex items-center justify-between gap-2">
@@ -1707,18 +2001,19 @@ export default function ElementsSection({
               <div className="grid gap-2">
                 {(() => {
                   const areaGroups = pageElements
-                    .filter((element) => element.type === 'area')
+                    .filter((element) => getElementType(element) === 'area')
                     .map((area) => ({
                       area,
                       children: pageElements.filter(
-                        (element) => element.id !== area.id && element.containerId === area.id,
+                        (element) =>
+                          element.id !== area.id && element.placement.containerId === area.id,
                       ),
                     }));
                   const groupedChildIds = new Set(
                     areaGroups.flatMap((group) => group.children.map((child) => child.id)),
                   );
                   const ungroupedElements = pageElements.filter(
-                    (element) => element.type !== 'area' && !groupedChildIds.has(element.id),
+                    (element) => getElementType(element) !== 'area' && !groupedChildIds.has(element.id),
                   );
 
                   return (
@@ -1757,7 +2052,7 @@ export default function ElementsSection({
           activeElement ? (
             <>
               <span className="badge-pill shrink-0">
-                {getElementTypeLabel(activeElement.type)}
+                {getElementTypeLabel(getElementType(activeElement))}
               </span>
               <span>{getElementLabel(activeElement)}</span>
             </>
@@ -1803,7 +2098,13 @@ export default function ElementsSection({
                   <input
                     className="input"
                     value={editElement.text}
-                    onChange={(event) => setEditElement({ ...editElement, text: event.target.value })}
+                    onChange={(event) =>
+                      setEditElement({
+                        ...editElement,
+                        text: event.target.value,
+                        updatedAt: Date.now(),
+                      })
+                    }
                     placeholder={t('sidepanel_elements_name_placeholder', 'Element text')}
                   />
                 </label>
@@ -1813,7 +2114,17 @@ export default function ElementsSection({
                     className="h-4 w-4"
                   checked={editElement.scope === 'site'}
                   onChange={(event) =>
-                    setEditElement({ ...editElement, scope: event.target.checked ? 'site' : 'page' })
+                    setEditElement({
+                      ...editElement,
+                      scope: event.target.checked ? 'site' : 'page',
+                      context: {
+                        ...editElement.context,
+                        pageKey: event.target.checked
+                          ? null
+                          : editElement.context.pageKey || defaultPageKey,
+                      },
+                      updatedAt: Date.now(),
+                    })
                   }
                 />
                   <span>{t('sidepanel_elements_apply_site', 'Apply to entire site')}</span>
@@ -1825,11 +2136,11 @@ export default function ElementsSection({
                 {t('sidepanel_elements_action_title', 'Action')}
               </div>
               <div className="mt-2 grid gap-2 sm:grid-cols-2">
-                {editElement.type.toLowerCase() === 'button' ? (
+                {getElementType(editElement).toLowerCase() === 'button' ? (
                   <div className="grid gap-1 sm:col-span-2">
                     <span>{t('sidepanel_field_action_flow', 'Action flow')}</span>
                     <SelectMenu
-                      value={editElement.actionFlowId || ''}
+                      value={getElementActionFlowId(editElement)}
                       options={actionFlowOptions}
                       useInputStyle={false}
                       buttonClassName={selectButtonClass}
@@ -1838,26 +2149,42 @@ export default function ElementsSection({
                           setFlowDrawerOpen(true);
                           return;
                         }
-                        setEditElement({ ...editElement, actionFlowId: value });
+                        setEditElement({
+                          ...editElement,
+                          behavior: {
+                            ...editElement.behavior,
+                            actionFlowId: value,
+                          },
+                          updatedAt: Date.now(),
+                        });
                       }}
                     />
                   </div>
                 ) : null}
-                {editElement.type.toLowerCase() === 'link' ? (
+                {getElementType(editElement).toLowerCase() === 'link' ? (
                   <>
                     <label className="grid gap-1 sm:col-span-2">
                       <span>{t('sidepanel_elements_link_url', 'Link URL')}</span>
                       <input
                         className="input"
-                        value={editElement.href}
-                        onChange={(event) => setEditElement({ ...editElement, href: event.target.value })}
+                        value={getElementHref(editElement)}
+                        onChange={(event) =>
+                          setEditElement({
+                            ...editElement,
+                            behavior: {
+                              ...editElement.behavior,
+                              href: event.target.value,
+                            },
+                            updatedAt: Date.now(),
+                          })
+                        }
                         placeholder={t('sidepanel_elements_link_placeholder', 'https://example.com')}
                       />
                     </label>
                     <div className="grid gap-1 sm:col-span-2">
                       <span>{t('sidepanel_elements_link_target', 'Link target')}</span>
                       <SelectMenu
-                        value={editElement.linkTarget || 'new-tab'}
+                        value={getElementLinkTarget(editElement)}
                         options={[
                           { value: 'new-tab', label: t('sidepanel_elements_link_new_tab', 'Open in new tab') },
                           { value: 'same-tab', label: t('sidepanel_elements_link_same_tab', 'Open in same tab') },
@@ -1867,18 +2194,22 @@ export default function ElementsSection({
                         onChange={(value) =>
                           setEditElement({
                             ...editElement,
-                            linkTarget: value === 'same-tab' ? 'same-tab' : 'new-tab',
+                            behavior: {
+                              ...editElement.behavior,
+                              target: value === 'same-tab' ? 'same-tab' : 'new-tab',
+                            },
+                            updatedAt: Date.now(),
                           })
                         }
                       />
                     </div>
                   </>
                 ) : null}
-                {editElement.type.toLowerCase() === 'area' ? (
+                {getElementType(editElement).toLowerCase() === 'area' ? (
                   <div className="grid gap-1 sm:col-span-2">
                     <span>{t('sidepanel_field_layout', 'Layout')}</span>
                     <SelectMenu
-                      value={editElement.layout || 'row'}
+                      value={getElementLayout(editElement)}
                       options={[
                         { value: 'row', label: t('sidepanel_layout_row', 'Row') },
                         { value: 'column', label: t('sidepanel_layout_column', 'Column') },
@@ -1888,7 +2219,11 @@ export default function ElementsSection({
                       onChange={(value) =>
                         setEditElement({
                           ...editElement,
-                          layout: value === 'column' ? 'column' : 'row',
+                          behavior: {
+                            ...editElement.behavior,
+                            layout: value === 'column' ? 'column' : 'row',
+                          },
+                          updatedAt: Date.now(),
                         })
                       }
                     />

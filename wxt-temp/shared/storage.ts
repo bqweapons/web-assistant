@@ -1,69 +1,17 @@
-import { normalizeFlowSteps } from './flowStepMigration';
+import {
+  deriveSiteKey,
+  normalizeStructuredStoragePayload,
+  type StructuredSiteData,
+  type StructuredStoragePayload,
+} from './siteDataSchema';
+
 export const STORAGE_KEY = 'ladybird_sites';
 
-export type SiteData = {
-  elements: unknown[];
-  flows: unknown[];
-  hidden: unknown[];
-};
+export type SiteData = StructuredSiteData;
 
-export type StoragePayload = {
-  sites: Record<string, SiteData>;
-};
+export type StoragePayload = StructuredStoragePayload;
 
-const isRecord = (value: unknown): value is Record<string, unknown> =>
-  Boolean(value) && typeof value === 'object' && !Array.isArray(value);
-
-const migrateLegacyFlowSteps = (payload: StoragePayload): { payload: StoragePayload; changed: boolean } => {
-  const currentSites = payload?.sites || {};
-  let changed = false;
-  const nextSites: Record<string, SiteData> = {};
-
-  Object.entries(currentSites).forEach(([siteKey, siteData]) => {
-    const flows = Array.isArray(siteData?.flows) ? siteData.flows : [];
-    let siteChanged = false;
-    const nextFlows = flows.map((flow, index) => {
-      if (!isRecord(flow)) {
-        return flow;
-      }
-      const flowId =
-        typeof flow.id === 'string' && flow.id.trim() ? flow.id.trim() : `${siteKey}-flow-${index + 1}`;
-      if (!Array.isArray(flow.steps)) {
-        return flow;
-      }
-      const nextSteps = normalizeFlowSteps(flow.steps, {
-        flowId,
-        keepNumber: true,
-        sanitizeExisting: false,
-      });
-      if (nextSteps === flow.steps) {
-        return flow;
-      }
-      siteChanged = true;
-      return {
-        ...flow,
-        steps: nextSteps,
-      };
-    });
-
-    if (siteChanged) {
-      changed = true;
-      nextSites[siteKey] = {
-        elements: Array.isArray(siteData?.elements) ? siteData.elements : [],
-        flows: nextFlows,
-        hidden: Array.isArray(siteData?.hidden) ? siteData.hidden : [],
-      };
-      return;
-    }
-
-    nextSites[siteKey] = siteData;
-  });
-
-  if (!changed) {
-    return { payload, changed: false };
-  }
-  return { payload: { sites: nextSites }, changed: true };
-};
+const EMPTY_SITE_DATA: SiteData = { elements: [], flows: [], hidden: [] };
 
 const getLocalStorage = () => {
   if (typeof chrome !== 'undefined' && chrome.storage?.local) {
@@ -72,67 +20,96 @@ const getLocalStorage = () => {
   return null;
 };
 
-const readFromLocalStorage = async () => {
+const writeStructuredPayload = async (payload: StructuredStoragePayload) => {
   const storage = getLocalStorage();
   if (storage) {
-    const result = await storage.get(STORAGE_KEY);
-    const payload = (result?.[STORAGE_KEY] as StoragePayload | undefined) || { sites: {} };
-    const migrated = migrateLegacyFlowSteps(payload);
-    if (migrated.changed) {
-      await writeToLocalStorage(migrated.payload);
-      return migrated.payload;
-    }
-    return payload;
-  }
-  try {
-    const raw = localStorage.getItem(STORAGE_KEY);
-    const payload = raw ? (JSON.parse(raw) as StoragePayload) : { sites: {} };
-    const migrated = migrateLegacyFlowSteps(payload);
-    if (migrated.changed) {
-      await writeToLocalStorage(migrated.payload);
-      return migrated.payload;
-    }
-    return payload;
-  } catch {
-    return { sites: {} };
-  }
-};
-
-const writeToLocalStorage = async (data: StoragePayload) => {
-  const storage = getLocalStorage();
-  if (storage) {
-    await storage.set({ [STORAGE_KEY]: data });
+    await storage.set({ [STORAGE_KEY]: payload });
     return;
   }
   try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(payload));
   } catch {
     // ignore
   }
 };
 
+const readStructuredPayload = async (): Promise<StructuredStoragePayload> => {
+  const storage = getLocalStorage();
+  if (storage) {
+    const result = await storage.get(STORAGE_KEY);
+    const rawPayload = result?.[STORAGE_KEY] as unknown;
+    const normalized = normalizeStructuredStoragePayload(rawPayload);
+    if (normalized.changed) {
+      await writeStructuredPayload(normalized.payload);
+    }
+    return normalized.payload;
+  }
+  try {
+    const rawText = localStorage.getItem(STORAGE_KEY);
+    const parsed = rawText ? (JSON.parse(rawText) as unknown) : { sites: {} };
+    const normalized = normalizeStructuredStoragePayload(parsed);
+    if (normalized.changed) {
+      await writeStructuredPayload(normalized.payload);
+    }
+    return normalized.payload;
+  } catch {
+    return { sites: {} };
+  }
+};
+
 export const getSiteData = async (siteKey: string): Promise<SiteData> => {
-  const payload = await readFromLocalStorage();
-  return payload.sites?.[siteKey] || { elements: [], flows: [], hidden: [] };
+  const payload = await readStructuredPayload();
+  const normalizedSiteKey = deriveSiteKey(siteKey) || siteKey.trim();
+  const siteData = payload.sites?.[normalizedSiteKey];
+  if (!siteData) {
+    return EMPTY_SITE_DATA;
+  }
+  return {
+    elements: Array.isArray(siteData.elements) ? siteData.elements : [],
+    flows: Array.isArray(siteData.flows) ? siteData.flows : [],
+    hidden: Array.isArray(siteData.hidden) ? siteData.hidden : [],
+  };
 };
 
 export const getAllSitesData = async (): Promise<Record<string, SiteData>> => {
-  const payload = await readFromLocalStorage();
-  return payload.sites || {};
+  const payload = await readStructuredPayload();
+  const next: Record<string, SiteData> = {};
+  Object.entries(payload.sites || {}).forEach(([siteKey, siteData]) => {
+    next[siteKey] = {
+      elements: Array.isArray(siteData.elements) ? siteData.elements : [],
+      flows: Array.isArray(siteData.flows) ? siteData.flows : [],
+      hidden: Array.isArray(siteData.hidden) ? siteData.hidden : [],
+    };
+  });
+  return next;
 };
 
 export const setSiteData = async (siteKey: string, data: Partial<SiteData>) => {
-  const payload = await readFromLocalStorage();
-  const current = payload.sites?.[siteKey] || { elements: [], flows: [], hidden: [] };
-  payload.sites = payload.sites || {};
-  payload.sites[siteKey] = {
-    elements: data.elements ?? current.elements,
-    flows: data.flows ?? current.flows,
-    hidden: data.hidden ?? current.hidden,
+  const normalizedSiteKey = deriveSiteKey(siteKey) || siteKey.trim();
+  if (!normalizedSiteKey) {
+    return;
+  }
+  const payload = await readStructuredPayload();
+  const current = payload.sites?.[normalizedSiteKey] || {
+    elements: [],
+    flows: [],
+    hidden: [],
   };
-  await writeToLocalStorage(payload);
+  const raw = {
+    sites: {
+      ...(payload.sites || {}),
+      [normalizedSiteKey]: {
+        elements: data.elements ?? current.elements,
+        flows: data.flows ?? current.flows,
+        hidden: data.hidden ?? current.hidden,
+      },
+    },
+  };
+  const normalized = normalizeStructuredStoragePayload(raw);
+  await writeStructuredPayload(normalized.payload);
 };
 
 export const setAllSitesData = async (sites: Record<string, SiteData>) => {
-  await writeToLocalStorage({ sites: sites || {} });
+  const normalized = normalizeStructuredStoragePayload({ sites: sites || {} });
+  await writeStructuredPayload(normalized.payload);
 };
