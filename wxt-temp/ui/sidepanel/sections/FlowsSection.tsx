@@ -1,61 +1,152 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Check, CheckCircle2, Play, Search, Trash2 } from 'lucide-react';
 import Card from '../components/Card';
 import FlowDrawer from '../components/FlowDrawer';
-import FlowStepsBuilder from '../components/FlowStepsBuilder';
-import { mockFlows } from '../utils/mockData';
+import FlowStepsBuilder, { type StepData as FlowStepData } from '../components/FlowStepsBuilder';
 import { t } from '../utils/i18n';
 import type { SelectorPickerAccept } from '../../../shared/messages';
-import { getSiteData, setSiteData } from '../../../shared/storage';
+import { getSiteData, setSiteData, STORAGE_KEY } from '../../../shared/storage';
+
+type FlowRecord = {
+  id: string;
+  name: string;
+  description: string;
+  site: string;
+  steps: number | FlowStepData[];
+  updatedAt: string;
+};
 
 type FlowsSectionProps = {
+  siteKey?: string;
+  hasActivePage?: boolean;
   createFlowOpen?: boolean;
   onCreateFlowClose?: () => void;
   onStartPicker?: (accept: SelectorPickerAccept) => Promise<string | null>;
 };
 
+const normalizeSiteKey = (value: string) =>
+  value.replace(/^https?:\/\//, '').replace(/^file:\/\//, '').replace(/\/$/, '');
+
+const formatTimestamp = (value: number) => {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) {
+    return '';
+  }
+  const pad = (segment: number) => String(segment).padStart(2, '0');
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())} ${pad(
+    date.getHours(),
+  )}:${pad(date.getMinutes())}`;
+};
+
+const getStepCount = (value: number | unknown[]) => {
+  if (Array.isArray(value)) {
+    return value.length;
+  }
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : 0;
+};
+
+const isRecord = (value: unknown): value is Record<string, unknown> =>
+  Boolean(value) && typeof value === 'object' && !Array.isArray(value);
+
+const isStepField = (value: unknown): value is FlowStepData['fields'][number] =>
+  isRecord(value) &&
+  typeof value.id === 'string' &&
+  typeof value.label === 'string' &&
+  typeof value.value === 'string';
+
+const isFlowStepData = (value: unknown): value is FlowStepData =>
+  isRecord(value) &&
+  typeof value.id === 'string' &&
+  typeof value.type === 'string' &&
+  typeof value.title === 'string' &&
+  typeof value.summary === 'string' &&
+  Array.isArray(value.fields) &&
+  value.fields.every((field) => isStepField(field));
+
+const toEditableSteps = (value: unknown): FlowStepData[] => {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+  return value.filter((step): step is FlowStepData => isFlowStepData(step));
+};
+
+const normalizeFlow = (value: unknown, fallbackSite: string): FlowRecord | null => {
+  if (!isRecord(value)) {
+    return null;
+  }
+  const id = typeof value.id === 'string' && value.id.trim() ? value.id.trim() : '';
+  if (!id) {
+    return null;
+  }
+  const updatedAt =
+    typeof value.updatedAt === 'string'
+      ? value.updatedAt
+      : typeof value.updatedAt === 'number'
+        ? formatTimestamp(value.updatedAt)
+        : formatTimestamp(Date.now());
+  const rawSteps = Array.isArray(value.steps) ? value.steps : null;
+  const editableSteps = toEditableSteps(rawSteps);
+  const normalizedSteps: number | FlowStepData[] =
+    editableSteps.length > 0
+      ? editableSteps
+      : rawSteps
+        ? rawSteps.length
+        : Number(value.steps) || 0;
+  return {
+    id,
+    name: typeof value.name === 'string' && value.name.trim() ? value.name.trim() : t('sidepanel_flows_new_default', 'New flow'),
+    description: typeof value.description === 'string' ? value.description : '',
+    site: typeof value.site === 'string' && value.site.trim() ? value.site.trim() : fallbackSite,
+    steps: normalizedSteps,
+    updatedAt,
+  };
+};
+
 export default function FlowsSection({
+  siteKey = '',
+  hasActivePage = false,
   createFlowOpen = false,
   onCreateFlowClose,
   onStartPicker,
 }: FlowsSectionProps) {
-  const currentSite = mockFlows[0]?.site ?? 'file://';
-  const [flows, setFlows] = useState(mockFlows);
+  const normalizedSiteKey = useMemo(() => normalizeSiteKey(siteKey), [siteKey]);
+  const currentSite = useMemo(() => {
+    if (!normalizedSiteKey) {
+      return 'site';
+    }
+    return siteKey.startsWith('http://') || siteKey.startsWith('https://') || siteKey.startsWith('file://')
+      ? siteKey
+      : `https://${normalizedSiteKey}`;
+  }, [normalizedSiteKey, siteKey]);
+
+  const [flows, setFlows] = useState<FlowRecord[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [sortMode, setSortMode] = useState('recent');
   const actionClass = 'btn-icon h-8 w-8';
   const [activeFlowId, setActiveFlowId] = useState<string | null>(null);
-  const [draftFlowSite] = useState(currentSite);
   const activeFlow = flows.find((flow) => flow.id === activeFlowId) ?? null;
-  const [editFlow, setEditFlow] = useState(activeFlow);
+  const [editFlow, setEditFlow] = useState<FlowRecord | null>(activeFlow);
   const [draftFlow, setDraftFlow] = useState({
     name: '',
     description: '',
-    steps: 0,
+    steps: [] as FlowStepData[],
   });
-
-  const getStepCount = (value: number | unknown[]) => {
-    if (Array.isArray(value)) {
-      return value.length;
-    }
-    const parsed = Number(value);
-    return Number.isFinite(parsed) ? parsed : 0;
-  };
 
   const normalizedQuery = searchQuery.trim().toLowerCase();
 
   const filteredFlows = useMemo(() => {
     return flows.filter((flow) => {
-      if (flow.site !== currentSite) {
+      if (normalizedSiteKey && normalizeSiteKey(flow.site) !== normalizedSiteKey) {
         return false;
       }
       if (!normalizedQuery) {
         return true;
       }
-      const haystack = `${flow.name} ${flow.description ?? ''} ${flow.site}`.toLowerCase();
+      const haystack = `${flow.name} ${flow.description} ${flow.site}`.toLowerCase();
       return haystack.includes(normalizedQuery);
     });
-  }, [currentSite, flows, normalizedQuery]);
+  }, [flows, normalizedQuery, normalizedSiteKey]);
 
   const visibleFlows = useMemo(() => {
     const items = [...filteredFlows];
@@ -87,34 +178,54 @@ export default function FlowsSection({
   useEffect(() => {
     if (createFlowOpen) {
       setActiveFlowId(null);
-      setDraftFlow({ name: '', description: '', steps: 0 });
+      setDraftFlow({ name: '', description: '', steps: [] });
     }
   }, [createFlowOpen]);
 
-  useEffect(() => {
-    const siteKey = currentSite.replace(/^https?:\/\//, '').replace(/\/$/, '');
-    getSiteData(siteKey)
-      .then((data) => {
-        setFlows((data.flows as typeof mockFlows | undefined) || mockFlows);
-      })
-      .catch(() => setFlows(mockFlows));
-  }, [currentSite]);
-
-  const persistFlows = (nextFlows: typeof flows) => {
-    const siteKey = currentSite.replace(/^https?:\/\//, '').replace(/\/$/, '');
-    setSiteData(siteKey, { flows: nextFlows }).catch(() => undefined);
-  };
-
-  const formatTimestamp = (value: number) => {
-    const date = new Date(value);
-    if (Number.isNaN(date.getTime())) {
-      return '';
+  const loadFlows = useCallback(() => {
+    if (!normalizedSiteKey) {
+      setFlows([]);
+      return;
     }
-    const pad = (segment: number) => String(segment).padStart(2, '0');
-    return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())} ${pad(
-      date.getHours(),
-    )}:${pad(date.getMinutes())}`;
-  };
+    getSiteData(normalizedSiteKey)
+      .then((data) => {
+        const next =
+          (Array.isArray(data.flows) ? data.flows : [])
+            .map((item) => normalizeFlow(item, currentSite))
+            .filter((item): item is FlowRecord => Boolean(item));
+        setFlows(next);
+      })
+      .catch(() => setFlows([]));
+  }, [currentSite, normalizedSiteKey]);
+
+  useEffect(() => {
+    loadFlows();
+  }, [loadFlows]);
+
+  useEffect(() => {
+    const storage = chrome?.storage?.onChanged;
+    if (!storage || !normalizedSiteKey) {
+      return;
+    }
+    const handleStorageChange = (changes: Record<string, unknown>, areaName: string) => {
+      if (areaName !== 'local' || !changes[STORAGE_KEY]) {
+        return;
+      }
+      loadFlows();
+    };
+    storage.addListener(handleStorageChange);
+    return () => storage.removeListener(handleStorageChange);
+  }, [loadFlows, normalizedSiteKey]);
+
+  const persistFlows = useCallback(
+    (nextFlows: FlowRecord[]) => {
+      if (!normalizedSiteKey) {
+        return;
+      }
+      setSiteData(normalizedSiteKey, { flows: nextFlows }).catch(() => undefined);
+    },
+    [normalizedSiteKey],
+  );
 
   const formatDisplayTimestamp = (value: string) => value.replace(/:\d{2}$/, '');
 
@@ -122,34 +233,36 @@ export default function FlowsSection({
     if (!editFlow) {
       return;
     }
-    setFlows((prev) =>
-      prev.map((item) =>
-        item.id === editFlow.id
-          ? { ...item, ...editFlow, updatedAt: formatTimestamp(Date.now()) }
-          : item,
-      ),
-    );
-    persistFlows(
-      flows.map((item) =>
-        item.id === editFlow.id ? { ...item, ...editFlow, updatedAt: formatTimestamp(Date.now()) } : item,
-      ),
-    );
+    const updatedAt = formatTimestamp(Date.now());
+    setFlows((prev) => {
+      const next = prev.map((item) =>
+        item.id === editFlow.id ? { ...item, ...editFlow, updatedAt } : item,
+      );
+      persistFlows(next);
+      return next;
+    });
     setActiveFlowId(null);
   };
 
   const handleCreateFlow = () => {
+    if (!normalizedSiteKey) {
+      return;
+    }
     const name = draftFlow.name.trim() || t('sidepanel_flows_new_default', 'New flow');
     const description = draftFlow.description.trim();
-    const nextFlow = {
+    const nextFlow: FlowRecord = {
       id: `flow-${Date.now()}`,
       name,
       description,
-      site: draftFlowSite || currentSite,
-      steps: Number.isFinite(draftFlow.steps) ? Math.max(0, draftFlow.steps) : 0,
+      site: currentSite,
+      steps: draftFlow.steps,
       updatedAt: formatTimestamp(Date.now()),
     };
-    setFlows((prev) => [...prev, nextFlow]);
-    persistFlows([...flows, nextFlow]);
+    setFlows((prev) => {
+      const next = [...prev, nextFlow];
+      persistFlows(next);
+      return next;
+    });
     onCreateFlowClose?.();
   };
 
@@ -244,7 +357,11 @@ export default function FlowsSection({
         </div>
       </div>
 
-      {flows.length === 0 ? (
+      {!hasActivePage ? (
+        <Card className="bg-muted text-center text-sm text-muted-foreground">
+          {t('sidepanel_elements_no_active_page', 'No active page detected. Open a site tab and refresh to manage elements.')}
+        </Card>
+      ) : flows.length === 0 ? (
         <Card className="bg-muted text-center text-sm text-muted-foreground">
           {t('sidepanel_flows_empty', 'No flows yet. Create one to define automated actions.')}
         </Card>
@@ -280,22 +397,24 @@ export default function FlowsSection({
                   >
                     <Play className="h-4 w-4" />
                   </button>
-          <button
-            type="button"
-            className={`${actionClass} btn-icon-danger`}
-            aria-label={t('sidepanel_flows_delete', 'Delete flow')}
-            title={t('sidepanel_flows_delete', 'Delete flow')}
-            onClick={(event) => {
-              event.stopPropagation();
-              const next = flows.filter((item) => item.id !== flow.id);
-              setFlows(next);
-              persistFlows(next);
-            }}
-          >
-            <Trash2 className="h-4 w-4" />
-          </button>
-        </div>
-      </div>
+                  <button
+                    type="button"
+                    className={`${actionClass} btn-icon-danger`}
+                    aria-label={t('sidepanel_flows_delete', 'Delete flow')}
+                    title={t('sidepanel_flows_delete', 'Delete flow')}
+                    onClick={(event) => {
+                      event.stopPropagation();
+                      setFlows((prev) => {
+                        const next = prev.filter((item) => item.id !== flow.id);
+                        persistFlows(next);
+                        return next;
+                      });
+                    }}
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </button>
+                </div>
+              </div>
               <div className="mt-2 flex items-center justify-between text-xs text-muted-foreground">
                 <span className="badge-pill">
                   {t('sidepanel_steps_count', '{count} steps').replace(
@@ -344,7 +463,13 @@ export default function FlowsSection({
               </span>
               <span className="text-foreground">{editFlow.site}</span>
             </div>
-            <FlowStepsBuilder onStartPicker={onStartPicker} />
+            <FlowStepsBuilder
+              steps={Array.isArray(editFlow.steps) ? editFlow.steps : []}
+              onChange={(steps) => {
+                setEditFlow((prev) => (prev ? { ...prev, steps } : prev));
+              }}
+              onStartPicker={onStartPicker}
+            />
           </div>
         ) : null}
       </FlowDrawer>
@@ -361,7 +486,7 @@ export default function FlowsSection({
             <span className="font-semibold text-muted-foreground">
               {t('sidepanel_field_site', 'Site')}
             </span>
-            <span className="text-foreground">{draftFlowSite}</span>
+            <span className="text-foreground">{currentSite}</span>
           </div>
           <label className="block text-xs font-semibold text-muted-foreground">
             {t('sidepanel_field_name', 'Name')}
@@ -382,7 +507,13 @@ export default function FlowsSection({
               placeholder={t('sidepanel_flows_description_placeholder', 'Describe what the flow does')}
             />
           </label>
-          <FlowStepsBuilder onStartPicker={onStartPicker} />
+          <FlowStepsBuilder
+            steps={draftFlow.steps}
+            onChange={(steps) => {
+              setDraftFlow((prev) => ({ ...prev, steps }));
+            }}
+            onStartPicker={onStartPicker}
+          />
         </div>
       </FlowDrawer>
     </section>

@@ -285,8 +285,9 @@ export default function App() {
           <div className="mt-2">
             <button
               type="button"
-              className="btn-primary w-full"
+              className="btn-primary w-full disabled:cursor-not-allowed disabled:opacity-60"
               onClick={() => setCreateFlowOpen(true)}
+              disabled={!hasActivePage}
             >
               {t('sidepanel_flows_create', 'Create flow')}
             </button>
@@ -310,6 +311,8 @@ export default function App() {
           )}
           {activeTab === TAB_IDS.flows && (
             <FlowsSection
+              siteKey={pageContext?.siteKey || ''}
+              hasActivePage={hasActivePage}
               createFlowOpen={createFlowOpen}
               onCreateFlowClose={() => setCreateFlowOpen(false)}
               onStartPicker={startSelectorPicker}

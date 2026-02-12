@@ -1,3 +1,4 @@
+import { normalizeFlowSteps } from './flowStepMigration';
 export const STORAGE_KEY = 'ladybird_sites';
 
 export type SiteData = {
@@ -8,6 +9,60 @@ export type SiteData = {
 
 export type StoragePayload = {
   sites: Record<string, SiteData>;
+};
+
+const isRecord = (value: unknown): value is Record<string, unknown> =>
+  Boolean(value) && typeof value === 'object' && !Array.isArray(value);
+
+const migrateLegacyFlowSteps = (payload: StoragePayload): { payload: StoragePayload; changed: boolean } => {
+  const currentSites = payload?.sites || {};
+  let changed = false;
+  const nextSites: Record<string, SiteData> = {};
+
+  Object.entries(currentSites).forEach(([siteKey, siteData]) => {
+    const flows = Array.isArray(siteData?.flows) ? siteData.flows : [];
+    let siteChanged = false;
+    const nextFlows = flows.map((flow, index) => {
+      if (!isRecord(flow)) {
+        return flow;
+      }
+      const flowId =
+        typeof flow.id === 'string' && flow.id.trim() ? flow.id.trim() : `${siteKey}-flow-${index + 1}`;
+      if (!Array.isArray(flow.steps)) {
+        return flow;
+      }
+      const nextSteps = normalizeFlowSteps(flow.steps, {
+        flowId,
+        keepNumber: true,
+        sanitizeExisting: false,
+      });
+      if (nextSteps === flow.steps) {
+        return flow;
+      }
+      siteChanged = true;
+      return {
+        ...flow,
+        steps: nextSteps,
+      };
+    });
+
+    if (siteChanged) {
+      changed = true;
+      nextSites[siteKey] = {
+        elements: Array.isArray(siteData?.elements) ? siteData.elements : [],
+        flows: nextFlows,
+        hidden: Array.isArray(siteData?.hidden) ? siteData.hidden : [],
+      };
+      return;
+    }
+
+    nextSites[siteKey] = siteData;
+  });
+
+  if (!changed) {
+    return { payload, changed: false };
+  }
+  return { payload: { sites: nextSites }, changed: true };
 };
 
 const getLocalStorage = () => {
@@ -21,11 +76,23 @@ const readFromLocalStorage = async () => {
   const storage = getLocalStorage();
   if (storage) {
     const result = await storage.get(STORAGE_KEY);
-    return (result?.[STORAGE_KEY] as StoragePayload | undefined) || { sites: {} };
+    const payload = (result?.[STORAGE_KEY] as StoragePayload | undefined) || { sites: {} };
+    const migrated = migrateLegacyFlowSteps(payload);
+    if (migrated.changed) {
+      await writeToLocalStorage(migrated.payload);
+      return migrated.payload;
+    }
+    return payload;
   }
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
-    return raw ? (JSON.parse(raw) as StoragePayload) : { sites: {} };
+    const payload = raw ? (JSON.parse(raw) as StoragePayload) : { sites: {} };
+    const migrated = migrateLegacyFlowSteps(payload);
+    if (migrated.changed) {
+      await writeToLocalStorage(migrated.payload);
+      return migrated.payload;
+    }
+    return payload;
   } catch {
     return { sites: {} };
   }

@@ -1,4 +1,5 @@
 import type { SiteData } from './storage';
+import { normalizeFlowSteps } from './flowStepMigration';
 
 export const EXPORT_JSON_VERSION = '1.0.2';
 
@@ -292,12 +293,13 @@ const normalizeImportedFlow = (raw: unknown, siteKey: string): JsonRecord | null
       : typeof raw.updatedAt === 'number'
         ? formatFlowTimestamp(raw.updatedAt)
         : formatFlowTimestamp(Date.now());
-  const steps = Array.isArray(raw.steps)
-    ? raw.steps
-    : typeof raw.steps === 'number'
-      ? raw.steps
-      : [];
-  return {
+  const steps = normalizeFlowSteps(raw.steps, {
+    flowId: id,
+    keepNumber: true,
+    sanitizeExisting: true,
+    idFactory: createId,
+  });
+  const normalized: JsonRecord = {
     ...raw,
     id,
     name: typeof raw.name === 'string' && raw.name.trim() ? raw.name.trim() : 'Imported flow',
@@ -306,6 +308,9 @@ const normalizeImportedFlow = (raw: unknown, siteKey: string): JsonRecord | null
     steps,
     updatedAt,
   };
+  delete normalized.scope;
+  delete normalized.siteKey;
+  return normalized;
 };
 
 const normalizeImportedHiddenRule = (raw: unknown, siteKey: string): JsonRecord | null => {
@@ -398,7 +403,12 @@ const buildLegacySiteData = (bucketKey: string, entries: unknown[], warnings: st
       name: flowNameSource ? `Imported flow - ${flowNameSource}` : `Imported flow ${index + 1}`,
       description: 'Generated from legacy actionFlow.',
       site: siteKey,
-      steps: parsed.steps,
+      steps: normalizeFlowSteps(parsed.steps, {
+        flowId,
+        keepNumber: true,
+        sanitizeExisting: true,
+        idFactory: createId,
+      }),
       updatedAt: formatFlowTimestamp(updatedAt),
     });
   });
@@ -523,10 +533,38 @@ const mergeById = (currentList: unknown[], incomingList: unknown[]) => {
     idToIndex.set(id, index);
   });
 
+  const getUpdatedAtTimestamp = (value: unknown) => {
+    if (!isRecord(value)) {
+      return 0;
+    }
+    if (typeof value.updatedAt === 'number' && Number.isFinite(value.updatedAt)) {
+      return value.updatedAt;
+    }
+    if (typeof value.updatedAt === 'string') {
+      const numeric = Number(value.updatedAt);
+      if (Number.isFinite(numeric) && numeric > 0) {
+        return numeric;
+      }
+      const normalized = value.updatedAt.includes(' ')
+        ? value.updatedAt.replace(' ', 'T')
+        : value.updatedAt;
+      const parsed = Date.parse(normalized);
+      if (Number.isFinite(parsed)) {
+        return parsed;
+      }
+    }
+    return 0;
+  };
+
   incomingList.forEach((item) => {
     const id = getItemId(item);
     if (id && idToIndex.has(id)) {
-      merged[idToIndex.get(id) as number] = item;
+      const currentIndex = idToIndex.get(id) as number;
+      const currentItem = merged[currentIndex];
+      const shouldReplace = getUpdatedAtTimestamp(item) >= getUpdatedAtTimestamp(currentItem);
+      if (shouldReplace) {
+        merged[currentIndex] = item;
+      }
       return;
     }
     merged.push(item);
@@ -538,10 +576,31 @@ const mergeById = (currentList: unknown[], incomingList: unknown[]) => {
   return merged;
 };
 
-export const buildExportPayload = (sites: Record<string, SiteData>): ExportPayload => ({
-  version: EXPORT_JSON_VERSION,
-  sites,
-});
+export const buildExportPayload = (sites: Record<string, SiteData>): ExportPayload => {
+  const normalizedSites: Record<string, SiteData> = {};
+  Object.entries(sites || {}).forEach(([rawSiteKey, rawSiteData]) => {
+    const siteKey = deriveSiteKey(rawSiteKey) || rawSiteKey.trim();
+    if (!siteKey) {
+      return;
+    }
+    const siteData = rawSiteData || { elements: [], flows: [], hidden: [] };
+    const fallbackSiteUrl = buildDefaultSiteUrl(siteKey);
+    const elements = asArray(siteData.elements)
+      .map((entry) => normalizeImportedElement(entry, siteKey, fallbackSiteUrl))
+      .filter((item): item is JsonRecord => Boolean(item));
+    const flows = asArray(siteData.flows)
+      .map((entry) => normalizeImportedFlow(entry, siteKey))
+      .filter((item): item is JsonRecord => Boolean(item));
+    const hidden = asArray(siteData.hidden)
+      .map((entry) => normalizeImportedHiddenRule(entry, siteKey))
+      .filter((item): item is JsonRecord => Boolean(item));
+    normalizedSites[siteKey] = { elements, flows, hidden };
+  });
+  return {
+    version: EXPORT_JSON_VERSION,
+    sites: normalizedSites,
+  };
+};
 
 export const parseImportPayload = (raw: unknown): ParsedImportPayload => {
   if (isRecord(raw) && typeof raw.version !== 'undefined') {

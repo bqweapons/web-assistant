@@ -31,7 +31,7 @@ type DataSourceMeta = {
   rawText?: string;
 };
 
-type StepData = {
+export type StepData = {
   id: string;
   type: string;
   title: string;
@@ -522,10 +522,11 @@ const STEP_TYPE_LABELS: Record<string, string> = {
 
 type FlowStepsBuilderProps = {
   steps?: StepData[];
+  onChange?: (steps: StepData[]) => void;
   onStartPicker?: (accept: SelectorPickerAccept) => Promise<string | null>;
 };
 
-export default function FlowStepsBuilder({ steps = DEFAULT_STEPS, onStartPicker }: FlowStepsBuilderProps) {
+export default function FlowStepsBuilder({ steps = DEFAULT_STEPS, onChange, onStartPicker }: FlowStepsBuilderProps) {
   const [draftSteps, setDraftSteps] = useState<StepData[]>(steps);
   const [activeStepId, setActiveStepId] = useState('');
   const [activeFieldTarget, setActiveFieldTarget] = useState<{ stepId: string; fieldId: string } | null>(null);
@@ -541,6 +542,8 @@ export default function FlowStepsBuilder({ steps = DEFAULT_STEPS, onStartPicker 
           | { scope: 'branch'; parentId: string; branchId: string };
       }
   >(null);
+  const syncingFromPropsRef = useRef(false);
+  const initializedRef = useRef(false);
 
   const getFieldLabel = (label: string) => {
     const key = FIELD_LABEL_KEYS[label];
@@ -571,6 +574,7 @@ export default function FlowStepsBuilder({ steps = DEFAULT_STEPS, onStartPicker 
   };
 
   useEffect(() => {
+    syncingFromPropsRef.current = true;
     setDraftSteps(steps);
     setActiveStepId((prev) => {
       if (prev && findStepById(steps, prev)) {
@@ -579,6 +583,18 @@ export default function FlowStepsBuilder({ steps = DEFAULT_STEPS, onStartPicker 
       return '';
     });
   }, [steps]);
+
+  useEffect(() => {
+    if (!initializedRef.current) {
+      initializedRef.current = true;
+      return;
+    }
+    if (syncingFromPropsRef.current) {
+      syncingFromPropsRef.current = false;
+      return;
+    }
+    onChange?.(draftSteps);
+  }, [draftSteps, onChange]);
 
   const isSameContext = (
     left:
