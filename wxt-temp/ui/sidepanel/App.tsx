@@ -7,10 +7,11 @@ import OverviewSection from './sections/OverviewSection';
 import SettingsSection from './sections/SettingsSection';
 import SettingsPopover from './components/SettingsPopover';
 import PickerOverlay from './components/PickerOverlay';
-import { EyeOff, Layers, LayoutDashboard, Moon, Settings, Sun, Workflow } from 'lucide-react';
+import { EyeOff, Layers, LayoutDashboard, Moon, RefreshCw, Settings, Sun, Workflow } from 'lucide-react';
 import { t, useLocale } from './utils/i18n';
 import {
   MessageType,
+  type PageContextPayload,
   type PickerAccept,
   type PickerResultPayload,
   type RuntimeMessage,
@@ -62,6 +63,9 @@ export default function App() {
   const [pickerActive, setPickerActive] = useState(false);
   const [pickerError, setPickerError] = useState('');
   const [pickerAccept, setPickerAccept] = useState<PickerAccept>('selector');
+  const [pageContext, setPageContext] = useState<PageContextPayload | null>(null);
+  const [contextLoading, setContextLoading] = useState(false);
+  const [contextError, setContextError] = useState('');
   const pickerResolveRef = useRef<((value: PickerResultPayload | null) => void) | null>(null);
 
   useEffect(() => {
@@ -89,6 +93,30 @@ export default function App() {
       });
     });
   }, []);
+
+  const refreshPageContext = useCallback(async () => {
+    setContextLoading(true);
+    setContextError('');
+    try {
+      const data = (await sendRuntimeMessage({
+        type: MessageType.GET_ACTIVE_PAGE_CONTEXT,
+      })) as PageContextPayload | null | undefined;
+      if (data && typeof data === 'object') {
+        setPageContext(data);
+      } else {
+        setPageContext(null);
+      }
+    } catch (error) {
+      setContextError(error instanceof Error ? error.message : String(error));
+      setPageContext((prev) => (prev ? { ...prev, hasAccess: false } : null));
+    } finally {
+      setContextLoading(false);
+    }
+  }, [sendRuntimeMessage]);
+
+  useEffect(() => {
+    refreshPageContext();
+  }, [refreshPageContext]);
 
   const finalizePicker = useCallback((value: PickerResultPayload | null) => {
     if (pickerResolveRef.current) {
@@ -191,6 +219,11 @@ export default function App() {
             setPickerError(t('sidepanel_picker_invalid_non_input', 'Please select a non-input element.'));
           }
           break;
+        case MessageType.ACTIVE_PAGE_CONTEXT:
+          setPageContext(rawMessage.data || null);
+          setContextError('');
+          setContextLoading(false);
+          break;
         default:
           break;
       }
@@ -203,9 +236,38 @@ export default function App() {
     return () => runtime.onMessage.removeListener(handleMessage);
   }, [finalizePicker, locale, pickerAccept]);
 
+  const hasActivePage = Boolean(pageContext?.hasAccess && pageContext.siteKey);
+
+  const headerContext = useMemo(() => {
+    if (hasActivePage) {
+      if (pageContext?.url) {
+        try {
+          const parsed = new URL(pageContext.url);
+          const path = parsed.pathname && parsed.pathname !== '/' ? parsed.pathname : '/';
+          const normalizedPath = path === '/' ? '' : path;
+          return `${pageContext.siteKey}${normalizedPath}`;
+        } catch {
+          return pageContext?.pageKey || pageContext?.siteKey || '';
+        }
+      }
+      return pageContext?.pageKey || pageContext?.siteKey || '';
+    }
+    return t('sidepanel_app_context_none', 'No active page');
+  }, [hasActivePage, locale, pageContext?.pageKey, pageContext?.siteKey, pageContext?.url]);
 
   const headerActions = useMemo(
     () => [
+      {
+        label: contextLoading
+          ? `${t('sidepanel_action_refresh', 'Refresh')}...`
+          : t('sidepanel_action_refresh', 'Refresh'),
+        onClick: () => {
+          if (!contextLoading) {
+            refreshPageContext();
+          }
+        },
+        icon: <RefreshCw className={`h-4 w-4 ${contextLoading ? 'animate-spin' : ''}`} />,
+      },
       {
         label: isDark
           ? t('sidepanel_action_light_mode', 'Light mode')
@@ -219,14 +281,14 @@ export default function App() {
         icon: <Settings className="h-4 w-4" />,
       },
     ],
-    [isDark, locale],
+    [contextLoading, isDark, locale, refreshPageContext],
   );
 
   return (
     <div className="relative flex h-screen flex-col bg-background text-foreground">
       <AppHeader
         title={t('sidepanel_app_title', 'Ladybird')}
-        context={t('sidepanel_app_context_none', 'No active page')}
+        context={headerContext}
         actions={headerActions}
         tabs={tabs}
         activeTabId={activeTab}
@@ -249,6 +311,13 @@ export default function App() {
         <div className="mt-2">
           {activeTab === TAB_IDS.elements && (
             <ElementsSection
+              siteKey={pageContext?.siteKey || ''}
+              pageKey={pageContext?.pageKey || ''}
+              pageUrl={pageContext?.url || ''}
+              hasActivePage={hasActivePage}
+              isSyncing={contextLoading}
+              lastSyncedAt={pageContext?.timestamp}
+              onRefresh={refreshPageContext}
               onStartPicker={startSelectorPicker}
               onStartAreaPicker={startAreaPicker}
               onStartElementPicker={startSelectorPickerWithNeighbors}

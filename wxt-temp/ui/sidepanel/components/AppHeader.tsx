@@ -16,6 +16,7 @@ export default function AppHeader({ title, context, actions, tabs, activeTabId, 
             />
             <div>
               <h1 className="text-xl font-semibold text-foreground">{title}</h1>
+              <p className="text-xs text-muted-foreground">{context}</p>
             </div>
           </div>
           <div className="flex items-center gap-2">

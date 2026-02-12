@@ -23,6 +23,9 @@
   "sidepanel_action_open": {
     "message": "Open"
   },
+  "sidepanel_action_refresh": {
+    "message": "Refresh"
+  },
   "sidepanel_action_run": {
     "message": "Run"
   },
@@ -163,6 +166,24 @@
   },
   "sidepanel_elements_empty_filtered": {
     "message": "No matches. Try a different search or filter."
+  },
+  "sidepanel_elements_empty_site": {
+    "message": "No elements for this site yet. Add one to get started."
+  },
+  "sidepanel_elements_no_active_page": {
+    "message": "No active page detected. Open a site tab and refresh to manage elements."
+  },
+  "sidepanel_elements_site_status": {
+    "message": "Current site: {site}"
+  },
+  "sidepanel_elements_site_missing": {
+    "message": "No active page detected. Open a page and refresh."
+  },
+  "sidepanel_elements_last_synced": {
+    "message": "Last synced: {value}"
+  },
+  "sidepanel_elements_syncing": {
+    "message": "Refreshing..."
   },
   "sidepanel_elements_font_decrease": {
     "message": "Decrease font size"
@@ -415,6 +436,9 @@
   },
   "sidepanel_flows_empty": {
     "message": "No flows yet. Create one to define automated actions."
+  },
+  "sidepanel_flows_badge": {
+    "message": "Flow"
   },
   "sidepanel_flows_empty_filtered": {
     "message": "No matches. Try a different search or filter."
@@ -865,5 +889,41 @@
   },
   "sidepanel_tab_overview_tooltip": {
     "message": "Summary across sites."
+  },
+  "sidepanel_elements_injection_error": {
+    "message": "Failed to inject element: {error}"
+  },
+  "sidepanel_elements_injection_error_site": {
+    "message": "Current page does not match element site."
+  },
+  "sidepanel_elements_injection_error_container": {
+    "message": "Container not found on page."
+  },
+  "sidepanel_elements_injection_error_target": {
+    "message": "Target element not found."
+  },
+  "sidepanel_elements_insert_position": {
+    "message": "Insert position"
+  },
+  "sidepanel_elements_insert_hint": {
+    "message": "Controls how the element is inserted relative to the target."
+  },
+  "sidepanel_elements_place_append": {
+    "message": "Append inside target"
+  },
+  "sidepanel_elements_place_prepend": {
+    "message": "Prepend inside target"
+  },
+  "sidepanel_elements_place_before": {
+    "message": "Insert before target"
+  },
+  "sidepanel_elements_place_after": {
+    "message": "Insert after target"
+  },
+  "sidepanel_elements_pick_selector": {
+    "message": "Pick selector"
+  },
+  "sidepanel_elements_selector_placeholder": {
+    "message": "CSS selector for target"
   }
 }

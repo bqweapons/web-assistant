@@ -6,6 +6,7 @@ import FlowStepsBuilder from '../components/FlowStepsBuilder';
 import { mockFlows } from '../utils/mockData';
 import { t } from '../utils/i18n';
 import type { SelectorPickerAccept } from '../../../shared/messages';
+import { getSiteData, setSiteData } from '../../../shared/storage';
 
 type FlowsSectionProps = {
   createFlowOpen?: boolean;
@@ -90,6 +91,20 @@ export default function FlowsSection({
     }
   }, [createFlowOpen]);
 
+  useEffect(() => {
+    const siteKey = currentSite.replace(/^https?:\/\//, '').replace(/\/$/, '');
+    getSiteData(siteKey)
+      .then((data) => {
+        setFlows((data.flows as typeof mockFlows | undefined) || mockFlows);
+      })
+      .catch(() => setFlows(mockFlows));
+  }, [currentSite]);
+
+  const persistFlows = (nextFlows: typeof flows) => {
+    const siteKey = currentSite.replace(/^https?:\/\//, '').replace(/\/$/, '');
+    setSiteData(siteKey, { flows: nextFlows }).catch(() => undefined);
+  };
+
   const formatTimestamp = (value: number) => {
     const date = new Date(value);
     if (Number.isNaN(date.getTime())) {
@@ -114,6 +129,11 @@ export default function FlowsSection({
           : item,
       ),
     );
+    persistFlows(
+      flows.map((item) =>
+        item.id === editFlow.id ? { ...item, ...editFlow, updatedAt: formatTimestamp(Date.now()) } : item,
+      ),
+    );
     setActiveFlowId(null);
   };
 
@@ -129,6 +149,7 @@ export default function FlowsSection({
       updatedAt: formatTimestamp(Date.now()),
     };
     setFlows((prev) => [...prev, nextFlow]);
+    persistFlows([...flows, nextFlow]);
     onCreateFlowClose?.();
   };
 
@@ -234,16 +255,20 @@ export default function FlowsSection({
       ) : (
         <div className="grid gap-2">
           {visibleFlows.map((flow) => (
-            <Card
-              key={flow.id}
-              onClick={() => setActiveFlowId(flow.id)}
-            >
+            <Card key={flow.id} onClick={() => setActiveFlowId(flow.id)}>
               <div className="flex items-start justify-between gap-2">
-                <div className="min-w-0">
-                  <h3 className="truncate text-sm font-semibold text-card-foreground">{flow.name}</h3>
-                  <p className="mt-1 text-xs text-muted-foreground">
-                    {flow.description || t('sidepanel_flows_no_description', 'No description')}
-                  </p>
+                <div className="flex min-w-0 items-start gap-2">
+                  <span className="badge-pill shrink-0">
+                    {t('sidepanel_flows_badge', 'Flow')}
+                  </span>
+                  <div className="min-w-0">
+                    <h3 className="truncate text-sm font-semibold text-card-foreground">
+                      {flow.name}
+                    </h3>
+                    <p className="mt-1 line-clamp-2 text-xs text-muted-foreground">
+                      {flow.description || t('sidepanel_flows_no_description', 'No description')}
+                    </p>
+                  </div>
                 </div>
                 <div className="flex shrink-0 items-center gap-1">
                   <button
@@ -255,17 +280,22 @@ export default function FlowsSection({
                   >
                     <Play className="h-4 w-4" />
                   </button>
-                  <button
-                    type="button"
-                    className={`${actionClass} btn-icon-danger`}
-                    aria-label={t('sidepanel_flows_delete', 'Delete flow')}
-                    title={t('sidepanel_flows_delete', 'Delete flow')}
-                    onClick={(event) => event.stopPropagation()}
-                  >
-                    <Trash2 className="h-4 w-4" />
-                  </button>
-                </div>
-              </div>
+          <button
+            type="button"
+            className={`${actionClass} btn-icon-danger`}
+            aria-label={t('sidepanel_flows_delete', 'Delete flow')}
+            title={t('sidepanel_flows_delete', 'Delete flow')}
+            onClick={(event) => {
+              event.stopPropagation();
+              const next = flows.filter((item) => item.id !== flow.id);
+              setFlows(next);
+              persistFlows(next);
+            }}
+          >
+            <Trash2 className="h-4 w-4" />
+          </button>
+        </div>
+      </div>
               <div className="mt-2 flex items-center justify-between text-xs text-muted-foreground">
                 <span className="badge-pill">
                   {t('sidepanel_steps_count', '{count} steps').replace(
@@ -273,7 +303,7 @@ export default function FlowsSection({
                     String(getStepCount(flow.steps)),
                   )}
                 </span>
-                <span>{formatDisplayTimestamp(flow.updatedAt)}</span>
+                <span className="truncate">{formatDisplayTimestamp(flow.updatedAt)}</span>
               </div>
             </Card>
           ))}

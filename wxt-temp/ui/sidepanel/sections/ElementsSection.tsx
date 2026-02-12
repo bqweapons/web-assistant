@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   AlignCenter,
   AlignLeft,
@@ -11,6 +11,7 @@ import {
   Crosshair,
   ExternalLink,
   Italic,
+  RefreshCw,
   Link as LinkIcon,
   Search,
   Trash2,
@@ -24,9 +25,67 @@ import FlowStepsBuilder from '../components/FlowStepsBuilder';
 import SelectMenu from '../components/SelectMenu';
 import { mockElements, mockFlows } from '../utils/mockData';
 import { t, useLocale } from '../utils/i18n';
-import type { PickerRect, SelectorPickerAccept } from '../../../shared/messages';
+import { MessageType, type ElementPayload, type PickerRect, type SelectorPickerAccept } from '../../../shared/messages';
+import { getSiteData, setSiteData } from '../../../shared/storage';
+
+type ElementInlineStyle = Record<string, string>;
+type ElementStyle = {
+  preset?: string;
+  inline?: ElementInlineStyle;
+  customCss?: string;
+};
+
+type BaseElement = (typeof mockElements)[number];
+type ElementRecord = Omit<BaseElement, 'style' | 'stylePreset' | 'customCss'> & {
+  style: ElementStyle;
+};
+
+const isStyleRecord = (value: unknown): value is Record<string, string> => {
+  return Boolean(value) && typeof value === 'object' && !Array.isArray(value);
+};
+
+const normalizeStyle = (
+  rawStyle: unknown,
+  legacyPreset?: string,
+  legacyCustomCss?: string,
+): ElementStyle => {
+  if (isStyleRecord(rawStyle) && ('inline' in rawStyle || 'preset' in rawStyle || 'customCss' in rawStyle)) {
+    const typed = rawStyle as ElementStyle;
+    return {
+      preset: typeof typed.preset === 'string' ? typed.preset : legacyPreset,
+      inline: isStyleRecord(typed.inline) ? typed.inline : {},
+      customCss: typeof typed.customCss === 'string' ? typed.customCss : legacyCustomCss || '',
+    };
+  }
+  return {
+    preset: legacyPreset,
+    inline: isStyleRecord(rawStyle) ? rawStyle : {},
+    customCss: legacyCustomCss || '',
+  };
+};
+
+const normalizeElement = (element: BaseElement): ElementRecord => {
+  const { style, stylePreset, customCss, ...rest } = element as BaseElement & {
+    stylePreset?: string;
+    customCss?: string;
+  };
+  return {
+    ...rest,
+    style: normalizeStyle(style, stylePreset, customCss),
+  };
+};
+
+const normalizeSiteKey = (value: string) =>
+  value.replace(/^https?:\/\//, '').replace(/^file:\/\//, '').replace(/\/$/, '');
 
 type ElementsSectionProps = {
+  siteKey?: string;
+  pageKey?: string;
+  pageUrl?: string;
+  hasActivePage?: boolean;
+  isSyncing?: boolean;
+  lastSyncedAt?: number;
+  onRefresh?: () => void;
   onStartPicker?: (accept: SelectorPickerAccept) => Promise<string | null>;
   onStartAreaPicker?: () => Promise<PickerRect | null>;
   onStartElementPicker?: (options?: { disallowInput?: boolean }) => Promise<{
@@ -37,13 +96,19 @@ type ElementsSectionProps = {
 };
 
 export default function ElementsSection({
+  siteKey,
+  pageKey,
+  pageUrl,
+  hasActivePage = false,
+  isSyncing = false,
+  lastSyncedAt,
+  onRefresh,
   onStartPicker,
   onStartAreaPicker,
   onStartElementPicker,
 }: ElementsSectionProps) {
   const locale = useLocale();
-  const [elements, setElements] = useState(mockElements);
-  const currentSite = elements[0]?.siteUrl ?? 'site';
+  const [elements, setElements] = useState<ElementRecord[]>([]);
   const [flows, setFlows] = useState(mockFlows);
   const actionClass = 'btn-icon h-8 w-8';
   const selectButtonClass = 'btn-ghost h-9 w-full justify-between px-2 text-xs';
@@ -51,21 +116,53 @@ export default function ElementsSection({
   const [addElementType, setAddElementType] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
   const [typeFilter, setTypeFilter] = useState('all');
-  const activeElement = elements.find((element) => element.id === activeElementId) ?? null;
-  const [editElement, setEditElement] = useState(activeElement);
+  const normalizedSiteKey = useMemo(() => normalizeSiteKey(siteKey || ''), [siteKey]);
+  const siteElements = useMemo(() => {
+    if (!normalizedSiteKey) {
+      return [];
+    }
+    return elements.filter(
+      (element) => normalizeSiteKey(element.siteUrl || '') === normalizedSiteKey,
+    );
+  }, [elements, normalizedSiteKey]);
+  const currentSite = siteKey || siteElements[0]?.siteUrl || 'site';
+  const activeElement = siteElements.find((element) => element.id === activeElementId) ?? null;
+  const [editElement, setEditElement] = useState<ElementRecord | null>(activeElement);
   const [flowDrawerOpen, setFlowDrawerOpen] = useState(false);
   const [draftFlow, setDraftFlow] = useState({
     name: '',
     description: '',
     steps: 0,
   });
+  useEffect(() => {
+    setActiveElementId(null);
+    setSearchQuery('');
+    setTypeFilter('all');
+  }, [normalizedSiteKey]);
+
+  useEffect(() => {
+    if (!normalizedSiteKey) {
+      setElements([]);
+      setFlows(mockFlows);
+      return;
+    }
+    getSiteData(normalizedSiteKey)
+      .then((data) => {
+        setElements((data.elements as BaseElement[] | undefined)?.map(normalizeElement) || []);
+        setFlows((data.flows as typeof mockFlows | undefined) || mockFlows);
+      })
+      .catch(() => {
+        setElements([]);
+        setFlows(mockFlows);
+      });
+  }, [normalizedSiteKey]);
   const typeOptions = useMemo(() => {
-    const types = new Set(elements.map((element) => element.type));
+    const types = new Set(siteElements.map((element) => element.type));
     return ['all', ...Array.from(types).sort()];
-  }, [elements]);
+  }, [siteElements]);
   const normalizedQuery = searchQuery.trim().toLowerCase();
   const filteredElements = useMemo(() => {
-    return elements.filter((element) => {
+    return siteElements.filter((element) => {
       if (typeFilter !== 'all' && element.type !== typeFilter) {
         return false;
       }
@@ -75,7 +172,7 @@ export default function ElementsSection({
       const haystack = `${element.text} ${element.type} ${element.pageUrl} ${element.selector} ${element.href || ''}`.toLowerCase();
       return haystack.includes(normalizedQuery);
     });
-  }, [elements, normalizedQuery, typeFilter]);
+  }, [siteElements, normalizedQuery, typeFilter]);
   const elementsByPage = filteredElements.reduce<Record<string, typeof filteredElements>>((acc, element) => {
     const pageKey = element.pageUrl || element.siteUrl || 'unknown';
     if (!acc[pageKey]) {
@@ -86,9 +183,97 @@ export default function ElementsSection({
   }, {});
   const pageEntries = Object.entries(elementsByPage).sort((a, b) => a[0].localeCompare(b[0]));
   const pageCount = pageEntries.length;
-  const totalCount = elements.length;
+  const totalCount = siteElements.length;
   const filteredCount = filteredElements.length;
   const showClear = Boolean(searchQuery) || typeFilter !== 'all';
+  const creationDisabled = !hasActivePage || !normalizedSiteKey;
+  const [injectionError, setInjectionError] = useState('');
+  const getInjectionErrorMessage = (code: string) => {
+    const normalized = code.trim().toLowerCase();
+    if (
+      normalized === 'content-unavailable' ||
+      normalized.includes('receiving end does not exist') ||
+      normalized.includes('could not establish connection')
+    ) {
+      return t(
+        'sidepanel_elements_injection_error_content',
+        'Cannot connect to the page script. Reload the page and try again.',
+      );
+    }
+    if (normalized === 'site-mismatch') {
+      return t('sidepanel_elements_injection_error_site', 'Current page does not match element site.');
+    }
+    if (normalized === 'container-not-found') {
+      return t('sidepanel_elements_injection_error_container', 'Container not found on page.');
+    }
+    if (normalized === 'target-not-found') {
+      return t('sidepanel_elements_injection_error_target', 'Target element not found.');
+    }
+    return t('sidepanel_elements_injection_error', 'Failed to inject element: {error}').replace(
+      '{error}',
+      code,
+    );
+  };
+  const sendRuntimeMessage = useCallback((message: unknown) => {
+    return new Promise<unknown>((resolve, reject) => {
+      const runtime = chrome?.runtime;
+      if (!runtime?.sendMessage) {
+        reject(new Error('Messaging API unavailable.'));
+        return;
+      }
+      runtime.sendMessage(message, (response) => {
+        const lastError = runtime.lastError?.message;
+        if (lastError) {
+          reject(new Error(lastError));
+          return;
+        }
+        resolve(response);
+      });
+    });
+  }, []);
+
+  const sendElementMessage = useCallback(
+    async (type: MessageType, payload: { element?: ElementPayload; id?: string; elements?: ElementPayload[] }) => {
+      try {
+        const response = (await sendRuntimeMessage({ type, data: payload })) as { ok?: boolean; error?: string };
+        if (response?.ok === false && response.error) {
+          throw new Error(response.error);
+        }
+      } catch (error) {
+        console.warn('Failed to send element message', type, error);
+        throw error;
+      }
+    },
+    [sendRuntimeMessage],
+  );
+
+  const syncElementsToContent = useCallback(() => {
+    if (!hasActivePage || !normalizedSiteKey) {
+      return;
+    }
+    const payload: ElementPayload[] = siteElements.map((element) => ({
+      ...element,
+    }));
+    sendElementMessage(MessageType.REHYDRATE_ELEMENTS, { elements: payload })
+      .then(() => setInjectionError(''))
+      .catch((error) => {
+        const message = error instanceof Error ? error.message : String(error);
+        setInjectionError(message);
+      });
+  }, [hasActivePage, normalizedSiteKey, sendElementMessage, siteElements]);
+
+  const persistSiteData = useCallback(
+    async (nextElements: ElementRecord[], nextFlows: typeof flows) => {
+      if (!normalizedSiteKey) {
+        return;
+      }
+      await setSiteData(normalizedSiteKey, {
+        elements: nextElements,
+        flows: nextFlows,
+      });
+    },
+    [normalizedSiteKey],
+  );
   const stylePresets: Array<{ value: string; label: string; styles: Record<string, string> | null }> = [
       { value: '', label: t('sidepanel_elements_style_custom', 'Custom'), styles: null },
     {
@@ -149,18 +334,16 @@ export default function ElementsSection({
     },
   ];
   const areaChildCounts = useMemo(() => {
-    return elements.reduce<Record<string, number>>((acc, element) => {
+    return siteElements.reduce<Record<string, number>>((acc, element) => {
       if (element.containerId) {
         acc[element.containerId] = (acc[element.containerId] ?? 0) + 1;
       }
       return acc;
     }, {});
-  }, [elements]);
-  const normalizeSiteKey = (value: string) =>
-    value.replace(/^https?:\/\//, '').replace(/^file:\/\//, '').replace(/\/$/, '');
+  }, [siteElements]);
   const flowSiteKey = useMemo(
-    () => normalizeSiteKey(editElement?.siteUrl || activeElement?.siteUrl || ''),
-    [editElement?.siteUrl, activeElement?.siteUrl],
+    () => normalizeSiteKey(editElement?.siteUrl || activeElement?.siteUrl || siteKey || ''),
+    [editElement?.siteUrl, activeElement?.siteUrl, siteKey],
   );
   const filteredFlows = useMemo(() => {
     if (!flowSiteKey) {
@@ -187,6 +370,12 @@ export default function ElementsSection({
     { value: 'absolute', label: t('sidepanel_elements_position_absolute', 'Absolute') },
     { value: 'fixed', label: t('sidepanel_elements_position_fixed', 'Fixed') },
     { value: 'sticky', label: t('sidepanel_elements_position_sticky', 'Sticky') },
+  ];
+  const placementOptions = [
+    { value: 'append', label: t('sidepanel_elements_place_append', 'Append inside target') },
+    { value: 'prepend', label: t('sidepanel_elements_place_prepend', 'Prepend inside target') },
+    { value: 'before', label: t('sidepanel_elements_place_before', 'Insert before target') },
+    { value: 'after', label: t('sidepanel_elements_place_after', 'Insert after target') },
   ];
   const shadowOptions = [
     { value: '', label: t('sidepanel_elements_shadow_none', 'None') },
@@ -376,6 +565,20 @@ export default function ElementsSection({
     }
     return pageUrl;
   };
+  const getPagePathLabel = (pageUrl: string, siteUrl: string) => {
+    try {
+      const href = getPageHref(pageUrl, siteUrl);
+      const parsed = new URL(href);
+      const path = parsed.pathname || '/';
+      return path || '/';
+    } catch {
+      if (pageUrl.startsWith('/')) {
+        return pageUrl || '/';
+      }
+      const [, ...rest] = pageUrl.split('/');
+      return rest.length ? `/${rest.join('/')}` : '/';
+    }
+  };
   const getElementDetail = (element: typeof elements[number]) => {
     const type = element.type.toLowerCase();
     if (type === 'button') {
@@ -504,13 +707,15 @@ export default function ElementsSection({
       return;
     }
     const preset = stylePresets.find((option) => option.value === presetValue);
-    const nextStyle = preset?.styles ? { ...preset.styles } : {};
+    const nextInline = preset?.styles ? { ...preset.styles } : {};
     const nextCustomCss = preset?.styles ? formatCustomCss(preset.styles) : '';
     setEditElement({
       ...editElement,
-      stylePreset: presetValue,
-      style: nextStyle,
-      customCss: nextCustomCss,
+      style: {
+        preset: presetValue,
+        inline: nextInline,
+        customCss: nextCustomCss,
+      },
     });
   };
 
@@ -542,15 +747,15 @@ export default function ElementsSection({
   };
 
   const customStyleOverrides = useMemo(
-    () => (editElement?.customCss ? parseCustomCss(editElement.customCss) : {}),
-    [editElement?.customCss],
+    () => (editElement?.style?.customCss ? parseCustomCss(editElement.style.customCss) : {}),
+    [editElement?.style?.customCss],
   );
 
   const applyCustomCssUpdates = (updates: Record<string, string | undefined>) => {
     if (!editElement) {
       return;
     }
-    const currentCustom = parseCustomCss(editElement.customCss || '');
+    const currentCustom = parseCustomCss(editElement.style?.customCss || '');
     const nextCustom = { ...currentCustom };
     Object.entries(updates).forEach(([key, value]) => {
       const nextValue = value?.trim();
@@ -561,20 +766,37 @@ export default function ElementsSection({
       }
     });
     const nextCustomCss = formatCustomCss(nextCustom);
-    const nextStyle = { ...(editElement.style || {}) };
+    const nextInline = { ...(editElement.style?.inline || {}) };
     Object.entries(updates).forEach(([key, value]) => {
       const nextValue = value?.trim();
       if (nextValue) {
-        nextStyle[key] = nextValue;
+        nextInline[key] = nextValue;
       } else {
-        delete nextStyle[key];
+        delete nextInline[key];
       }
     });
     setEditElement({
       ...editElement,
-      customCss: nextCustomCss,
-      style: nextStyle,
-      stylePreset: detectStylePreset(nextStyle),
+      style: {
+        preset: detectStylePreset(nextInline),
+        inline: nextInline,
+        customCss: nextCustomCss,
+      },
+    });
+  };
+
+  const applyCustomCssText = (raw: string) => {
+    if (!editElement) {
+      return;
+    }
+    const parsed = parseCustomCss(raw);
+    setEditElement({
+      ...editElement,
+      style: {
+        preset: detectStylePreset(parsed),
+        inline: parsed,
+        customCss: raw,
+      },
     });
   };
 
@@ -582,7 +804,7 @@ export default function ElementsSection({
     if (customStyleOverrides[key] !== undefined) {
       return customStyleOverrides[key];
     }
-    return editElement?.style?.[key] || '';
+    return editElement?.style?.inline?.[key] || '';
   };
 
   const getNumericValue = (value: string) => {
@@ -728,7 +950,10 @@ export default function ElementsSection({
       setEditElement(null);
       return;
     }
-    const resolvedStyle = activeElement.style || {};
+    const resolvedInline = activeElement.style?.inline || {};
+    const resolvedCustomCss = activeElement.style?.customCss || '';
+    const resolvedPreset =
+      activeElement.style?.preset || detectStylePreset(resolvedInline);
     setEditElement({
       ...activeElement,
       text: activeElement.text || '',
@@ -741,9 +966,11 @@ export default function ElementsSection({
       floating: activeElement.floating !== false,
       linkTarget: activeElement.linkTarget || 'new-tab',
       layout: activeElement.layout || 'row',
-      customCss: activeElement.customCss || '',
-      style: resolvedStyle,
-      stylePreset: activeElement.stylePreset || detectStylePreset(resolvedStyle),
+      style: {
+        preset: resolvedPreset,
+        inline: resolvedInline,
+        customCss: resolvedCustomCss,
+      },
     });
   }, [activeElement]);
 
@@ -754,15 +981,32 @@ export default function ElementsSection({
     setDraftFlow({ name: '', description: '', steps: 0 });
   }, [flowDrawerOpen]);
 
+  useEffect(() => {
+    syncElementsToContent();
+  }, [syncElementsToContent]);
+
   const createElementId = () =>
     `element-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
-  const defaultSiteUrl = elements[0]?.siteUrl || 'https://example.com';
-  const defaultPageUrl = elements[0]?.pageUrl || defaultSiteUrl;
-  const defaultFrameUrl = elements[0]?.frameUrl || defaultPageUrl;
+  const defaultSiteUrl =
+    siteElements[0]?.siteUrl || (siteKey ? `https://${siteKey}` : 'https://example.com');
+  const defaultPageUrl =
+    pageUrl ||
+    (pageKey
+      ? pageKey.startsWith('http://') || pageKey.startsWith('https://') || pageKey.startsWith('file://')
+        ? pageKey
+        : `https://${pageKey}`
+      : '') ||
+    siteElements[0]?.pageUrl ||
+    defaultSiteUrl;
+  const defaultFrameUrl = siteElements[0]?.frameUrl || defaultPageUrl;
 
   const handleAddElementType = async (value: string) => {
     setAddElementType(value);
     if (!value) {
+      return;
+    }
+    if (!hasActivePage || !normalizedSiteKey) {
+      setAddElementType('');
       return;
     }
     if (value === 'area') {
@@ -776,6 +1020,17 @@ export default function ElementsSection({
         return;
       }
       const now = Date.now();
+      const areaInline = {
+        backgroundColor: '#f59e0b30',
+        borderRadius: '14px',
+        color: '#0f172a',
+        height: `${Math.max(1, Math.round(rect.height))}px`,
+        left: `${Math.round(rect.x)}px`,
+        position: 'absolute',
+        top: `${Math.round(rect.y)}px`,
+        width: `${Math.max(1, Math.round(rect.width))}px`,
+        zIndex: '2147482000',
+      };
       const newArea = {
         id: createElementId(),
         type: 'area' as const,
@@ -784,15 +1039,9 @@ export default function ElementsSection({
         position: 'append',
         layout: 'row' as const,
         style: {
-          backgroundColor: '#f59e0b30',
-          borderRadius: '14px',
-          color: '#0f172a',
-          height: `${Math.max(1, Math.round(rect.height))}px`,
-          left: `${Math.round(rect.x)}px`,
-          position: 'absolute',
-          top: `${Math.round(rect.y)}px`,
-          width: `${Math.max(1, Math.round(rect.width))}px`,
-          zIndex: '2147482000',
+          preset: detectStylePreset(areaInline),
+          inline: areaInline,
+          customCss: formatCustomCss(areaInline),
         },
         pageUrl: defaultPageUrl,
         siteUrl: defaultSiteUrl,
@@ -802,7 +1051,20 @@ export default function ElementsSection({
         createdAt: now,
         updatedAt: now,
       };
-      setElements((prev) => [newArea, ...prev]);
+    setElements((prev) => {
+      const next = [newArea, ...prev];
+      persistSiteData(next, flows).catch(() => undefined);
+      return next;
+    });
+    sendElementMessage(MessageType.CREATE_ELEMENT, { element: newArea })
+      .then(() => {
+        setInjectionError('');
+        syncElementsToContent();
+      })
+      .catch((error) => {
+        const message = error instanceof Error ? error.message : String(error);
+        setInjectionError(message);
+      });
       setActiveElementId(newArea.id);
       setAddElementType('');
       return;
@@ -822,6 +1084,29 @@ export default function ElementsSection({
     }
     const { selector, beforeSelector, afterSelector } = selectorPayload;
     const now = Date.now();
+    const elementInline =
+      normalizedType === 'tooltip'
+        ? {
+            backgroundColor: '#0f172a',
+            borderRadius: '10px',
+            color: '#ffffff',
+            fontSize: '11px',
+            fontWeight: '600',
+            padding: '6px 10px',
+          }
+        : normalizedType === 'link'
+          ? {
+              color: '#2563eb',
+              textDecoration: 'underline',
+            }
+          : {
+              backgroundColor: '#1b84ff',
+              borderRadius: '8px',
+              color: '#ffffff',
+              fontSize: '12px',
+              fontWeight: '600',
+              padding: '8px 16px',
+            };
     const newElement = {
       id: createElementId(),
       type: normalizedType,
@@ -834,30 +1119,19 @@ export default function ElementsSection({
       selector,
       beforeSelector,
       afterSelector,
-      position: 'append',
-      style:
-        normalizedType === 'tooltip'
-          ? {
-              backgroundColor: '#0f172a',
-              borderRadius: '10px',
-              color: '#ffffff',
-              fontSize: '11px',
-              fontWeight: '600',
-              padding: '6px 10px',
-            }
-          : normalizedType === 'link'
-            ? {
-                color: '#2563eb',
-                textDecoration: 'underline',
-              }
-          : {
-              backgroundColor: '#1b84ff',
-              borderRadius: '8px',
-              color: '#ffffff',
-              fontSize: '12px',
-              fontWeight: '600',
-              padding: '8px 16px',
-            },
+      position:
+        selectorPayload.beforeSelector || selectorPayload.afterSelector
+          ? selectorPayload.beforeSelector
+            ? 'before'
+            : 'after'
+          : addElementType === 'tooltip'
+            ? 'after'
+            : 'append',
+      style: {
+        preset: detectStylePreset(elementInline),
+        inline: elementInline,
+        customCss: formatCustomCss(elementInline),
+      },
       pageUrl: defaultPageUrl,
       siteUrl: defaultSiteUrl,
       frameUrl: defaultFrameUrl,
@@ -870,7 +1144,20 @@ export default function ElementsSection({
       href: normalizedType === 'link' ? 'https://example.com' : undefined,
       linkTarget: normalizedType === 'link' ? ('new-tab' as const) : undefined,
     };
-    setElements((prev) => [newElement, ...prev]);
+    setElements((prev) => {
+      const next = [newElement, ...prev];
+      persistSiteData(next, flows).catch(() => undefined);
+      return next;
+    });
+    sendElementMessage(MessageType.CREATE_ELEMENT, { element: newElement })
+      .then(() => {
+        setInjectionError('');
+        syncElementsToContent();
+      })
+      .catch((error) => {
+        const message = error instanceof Error ? error.message : String(error);
+        setInjectionError(message);
+      });
     setActiveElementId(newElement.id);
     setAddElementType('');
   };
@@ -879,15 +1166,96 @@ export default function ElementsSection({
     if (!editElement) {
       return;
     }
-    setElements((prev) =>
-      prev.map((item) => (item.id === editElement.id ? { ...item, ...editElement } : item)),
-    );
+    setElements((prev) => {
+      const next = prev.map((item) => (item.id === editElement.id ? { ...item, ...editElement } : item));
+      persistSiteData(next, flows).catch(() => undefined);
+      return next;
+    });
+    sendElementMessage(MessageType.UPDATE_ELEMENT, { element: editElement })
+      .then(() => {
+        setInjectionError('');
+        syncElementsToContent();
+      })
+      .catch((error) => {
+        const message = error instanceof Error ? error.message : String(error);
+        setInjectionError(message);
+      });
     setActiveElementId(null);
   };
 
+  const handleDeleteElement = (event: React.MouseEvent, id: string) => {
+    event.stopPropagation();
+    setElements((prev) => {
+      const next = prev.filter((item) => item.id !== id);
+      persistSiteData(next, flows).catch(() => undefined);
+      return next;
+    });
+    sendElementMessage(MessageType.DELETE_ELEMENT, { id })
+      .then(() => {
+        setInjectionError('');
+        syncElementsToContent();
+      })
+      .catch((error) => {
+        const message = error instanceof Error ? error.message : String(error);
+        setInjectionError(message);
+      });
+  };
+
+  const handleFocusElement = (event: React.MouseEvent, id: string) => {
+    event.stopPropagation();
+    sendElementMessage(MessageType.FOCUS_ELEMENT, { id }).catch((error) =>
+      setInjectionError(error instanceof Error ? error.message : String(error)),
+    );
+  };
+
+  const handlePickSelector = async () => {
+    if (!onStartElementPicker && !onStartPicker) {
+      return;
+    }
+    const result = onStartElementPicker
+      ? await onStartElementPicker({ disallowInput: editElement?.type === 'button' || editElement?.type === 'link' })
+      : await onStartPicker?.('selector').then((selector) => (selector ? { selector } : null));
+    if (!result?.selector || !editElement) {
+      return;
+    }
+    setEditElement({
+      ...editElement,
+      selector: result.selector,
+      beforeSelector: result.beforeSelector || '',
+      afterSelector: result.afterSelector || '',
+    });
+    setInjectionError('');
+  };
+
+  const closeDetails = () => {
+    setInjectionError('');
+    setActiveElementId(null);
+    syncElementsToContent();
+  };
+
+  useEffect(() => {
+    if (!editElement || !activeElement) {
+      return;
+    }
+    const handle = window.setTimeout(() => {
+      sendElementMessage(MessageType.PREVIEW_ELEMENT, { element: editElement }).catch((error) =>
+        setInjectionError(error instanceof Error ? error.message : String(error)),
+      );
+    }, 150);
+    return () => {
+      window.clearTimeout(handle);
+    };
+  }, [activeElement, editElement, sendElementMessage]);
+
   return (
     <div className="flex flex-col gap-2">
+      {injectionError ? (
+        <div className="rounded border border-destructive/50 bg-destructive/10 px-3 py-2 text-xs text-destructive">
+          {getInjectionErrorMessage(injectionError)}
+        </div>
+      ) : null}
       <SelectMenu
+        disabled={creationDisabled}
         value={addElementType}
         placeholder={t('sidepanel_elements_add_placeholder', 'Add element to page')}
         iconPosition="right"
@@ -939,6 +1307,7 @@ export default function ElementsSection({
             placeholder={t('sidepanel_elements_search_placeholder', 'Search by name, type, or page')}
             value={searchQuery}
             onChange={(event) => setSearchQuery(event.target.value)}
+            disabled={creationDisabled}
           />
         </div>
         <div className="flex items-center gap-2">
@@ -946,6 +1315,7 @@ export default function ElementsSection({
             className="input select w-full sm:w-40"
             value={typeFilter}
             onChange={(event) => setTypeFilter(event.target.value)}
+            disabled={creationDisabled}
           >
             {typeOptions.map((type) => (
               <option key={type} value={type}>
@@ -970,9 +1340,16 @@ export default function ElementsSection({
         </div>
       </div>
 
-      {elements.length === 0 ? (
+      {creationDisabled ? (
         <Card className="bg-muted text-center text-sm text-muted-foreground">
-          {t('sidepanel_elements_empty', 'No elements yet. Create your first element to get started.')}
+          {t(
+            'sidepanel_elements_no_active_page',
+            'No active page detected. Open a site tab and refresh to manage elements.',
+          )}
+        </Card>
+      ) : siteElements.length === 0 ? (
+        <Card className="bg-muted text-center text-sm text-muted-foreground">
+          {t('sidepanel_elements_empty_site', 'No elements for this site yet. Add one to get started.')}
         </Card>
       ) : filteredElements.length === 0 ? (
         <Card className="bg-muted text-center text-sm text-muted-foreground">
@@ -989,8 +1366,11 @@ export default function ElementsSection({
                   <span className="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-full border border-border bg-muted text-muted-foreground">
                     <LinkIcon className="h-3.5 w-3.5" />
                   </span>
-                  <p className="truncate text-sm font-semibold text-card-foreground">
-                    {getPageLabel(page, pageSite)}
+                  <p
+                    className="max-w-[220px] truncate text-sm font-semibold text-card-foreground"
+                    title={getPageLabel(page, pageSite)}
+                  >
+                    {getPagePathLabel(page, pageSite)}
                   </p>
                 </div>
                 <div className="flex items-center gap-2">
@@ -1024,7 +1404,7 @@ export default function ElementsSection({
                           type="button"
                           className={actionClass}
                           aria-label={t('sidepanel_elements_locate', 'Locate element')}
-                          onClick={(event) => event.stopPropagation()}
+                          onClick={(event) => handleFocusElement(event, element.id)}
                         >
                           <Crosshair className="h-4 w-4" />
                         </button>
@@ -1032,7 +1412,7 @@ export default function ElementsSection({
                           type="button"
                           className={`${actionClass} btn-icon-danger`}
                           aria-label={t('sidepanel_elements_delete', 'Delete element')}
-                          onClick={(event) => event.stopPropagation()}
+                          onClick={(event) => handleDeleteElement(event, element.id)}
                         >
                           <Trash2 className="h-4 w-4" />
                         </button>
@@ -1073,7 +1453,7 @@ export default function ElementsSection({
             <button
               type="button"
               className="btn-icon h-8 w-8"
-              onClick={() => setActiveElementId(null)}
+              onClick={closeDetails}
               aria-label={t('sidepanel_action_cancel', 'Cancel')}
               title={t('sidepanel_action_cancel', 'Cancel')}
             >
@@ -1081,18 +1461,18 @@ export default function ElementsSection({
             </button>
             <button
               type="button"
-              className="btn-icon h-8 w-8 border-transparent bg-primary text-primary-foreground hover:brightness-95"
-              onClick={handleElementSave}
-              aria-label={t('sidepanel_action_save', 'Save')}
-              title={t('sidepanel_action_save', 'Save')}
-            >
-              <Check className="h-4 w-4" />
-            </button>
-          </>
-        }
-        showClose={false}
-        onClose={() => setActiveElementId(null)}
+        className="btn-icon h-8 w-8 border-transparent bg-primary text-primary-foreground hover:brightness-95"
+        onClick={handleElementSave}
+        aria-label={t('sidepanel_action_save', 'Save')}
+        title={t('sidepanel_action_save', 'Save')}
       >
+        <Check className="h-4 w-4" />
+      </button>
+    </>
+  }
+  showClose={false}
+  onClose={closeDetails}
+>
         {editElement ? (
           <div className="grid gap-3 text-xs text-muted-foreground">
             <div className="rounded border border-border bg-card p-3">
@@ -1113,13 +1493,58 @@ export default function ElementsSection({
                   <input
                     type="checkbox"
                     className="h-4 w-4"
-                    checked={editElement.scope === 'site'}
-                    onChange={(event) =>
-                      setEditElement({ ...editElement, scope: event.target.checked ? 'site' : 'page' })
-                    }
-                  />
+                  checked={editElement.scope === 'site'}
+                  onChange={(event) =>
+                    setEditElement({ ...editElement, scope: event.target.checked ? 'site' : 'page' })
+                  }
+                />
                   <span>{t('sidepanel_elements_apply_site', 'Apply to entire site')}</span>
                 </label>
+                <label className="grid gap-1 sm:col-span-2">
+                  <div className="flex items-center justify-between gap-2">
+                    <span>{t('sidepanel_field_selector', 'Selector')}</span>
+                    <button
+                      type="button"
+                      className="btn-icon h-7 w-7"
+                      aria-label={t('sidepanel_elements_pick_selector', 'Pick selector')}
+                      title={t('sidepanel_elements_pick_selector', 'Pick selector')}
+                      onClick={handlePickSelector}
+                    >
+                      <Crosshair className="h-4 w-4" />
+                    </button>
+                  </div>
+                  <input
+                    className="input"
+                    value={editElement.selector || ''}
+                    onChange={(event) =>
+                      setEditElement({
+                        ...editElement,
+                        selector: event.target.value,
+                      })
+                    }
+                    placeholder={t('sidepanel_elements_selector_placeholder', 'CSS selector for target')}
+                  />
+                </label>
+                {editElement.type.toLowerCase() !== 'area' ? (
+                  <label className="grid gap-1 sm:col-span-2">
+                    <span>{t('sidepanel_elements_insert_position', 'Insert position')}</span>
+                    <SelectMenu
+                      value={editElement.position || 'append'}
+                      options={placementOptions}
+                      useInputStyle={false}
+                      buttonClassName={selectButtonClass}
+                      onChange={(value) =>
+                        setEditElement({
+                          ...editElement,
+                          position: placementOptions.some((opt) => opt.value === value) ? value : 'append',
+                        })
+                      }
+                    />
+                    <span className="text-[11px] text-muted-foreground">
+                      {t('sidepanel_elements_insert_hint', 'Controls how the element is inserted relative to the target.')}
+                    </span>
+                  </label>
+                ) : null}
               </div>
             </div>
             <div className="rounded border border-border bg-card p-3">
@@ -1208,7 +1633,7 @@ export default function ElementsSection({
                     {t('sidepanel_elements_style_preset', 'Preset')}
                   </span>
                   <SelectMenu
-                    value={editElement.stylePreset || ''}
+                    value={editElement.style?.preset || ''}
                     options={stylePresets.map((preset) => ({
                       value: preset.value,
                       label: preset.label,
@@ -1488,13 +1913,8 @@ export default function ElementsSection({
                   <textarea
                     className="input min-h-[88px] font-mono text-[11px]"
                     rows={3}
-                    value={editElement.customCss || ''}
-                    onChange={(event) =>
-                      setEditElement({
-                        ...editElement,
-                        customCss: event.target.value,
-                      })
-                    }
+                    value={editElement.style?.customCss || ''}
+                    onChange={(event) => applyCustomCssText(event.target.value)}
                     placeholder={t('sidepanel_elements_custom_styles_placeholder', 'color: #0f172a; padding: 8px;')}
                   />
                 </label>

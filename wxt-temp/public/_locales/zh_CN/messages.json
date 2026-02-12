@@ -865,5 +865,65 @@
   },
   "sidepanel_tab_overview_tooltip": {
     "message": "跨站点汇总。"
+  },
+  "sidepanel_action_refresh": {
+    "message": "刷新"
+  },
+  "sidepanel_elements_site_status": {
+    "message": "当前站点：{site}"
+  },
+  "sidepanel_elements_site_missing": {
+    "message": "未检测到有效页面，请打开网页后刷新。"
+  },
+  "sidepanel_elements_last_synced": {
+    "message": "上次同步：{value}"
+  },
+  "sidepanel_elements_syncing": {
+    "message": "正在刷新..."
+  },
+  "sidepanel_elements_no_active_page": {
+    "message": "未检测到活动页面。请打开站点标签页并刷新后管理元素。"
+  },
+  "sidepanel_elements_empty_site": {
+    "message": "该站点暂无元素，先添加一个吧。"
+  },
+  "sidepanel_flows_badge": {
+    "message": "流程"
+  },
+  "sidepanel_elements_injection_error": {
+    "message": "元素注入失败：{error}"
+  },
+  "sidepanel_elements_injection_error_site": {
+    "message": "当前页面与元素站点不匹配。"
+  },
+  "sidepanel_elements_injection_error_container": {
+    "message": "页面上未找到容器。"
+  },
+  "sidepanel_elements_injection_error_target": {
+    "message": "目标元素未找到。"
+  },
+  "sidepanel_elements_insert_position": {
+    "message": "插入位置"
+  },
+  "sidepanel_elements_insert_hint": {
+    "message": "控制元素相对目标的插入方式。"
+  },
+  "sidepanel_elements_place_append": {
+    "message": "追加到目标内部"
+  },
+  "sidepanel_elements_place_prepend": {
+    "message": "插入到目标内部开头"
+  },
+  "sidepanel_elements_place_before": {
+    "message": "插入到目标之前"
+  },
+  "sidepanel_elements_place_after": {
+    "message": "插入到目标之后"
+  },
+  "sidepanel_elements_pick_selector": {
+    "message": "选择选择器"
+  },
+  "sidepanel_elements_selector_placeholder": {
+    "message": "目标的 CSS 选择器"
   }
 }

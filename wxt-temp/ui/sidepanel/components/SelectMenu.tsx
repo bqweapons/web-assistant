@@ -20,6 +20,7 @@ type SelectMenuProps = {
   buttonClassName?: string;
   menuClassName?: string;
   centerLabel?: boolean;
+  disabled?: boolean;
 };
 
 const cx = (...classes: Array<string | false | null | undefined>) =>
@@ -35,6 +36,7 @@ export default function SelectMenu({
   buttonClassName = '',
   menuClassName = '',
   centerLabel = false,
+  disabled = false,
 }: SelectMenuProps) {
   const [open, setOpen] = useState(false);
   const [openUpward, setOpenUpward] = useState(false);
@@ -45,7 +47,12 @@ export default function SelectMenu({
   const label = selected?.label || placeholder;
 
   const closeMenu = () => setOpen(false);
-  const toggleMenu = () => setOpen((prev) => !prev);
+  const toggleMenu = () => {
+    if (disabled) {
+      return;
+    }
+    setOpen((prev) => !prev);
+  };
 
   useEffect(() => {
     if (!open) {
@@ -128,7 +135,8 @@ export default function SelectMenu({
   const iconClassName = cx('h-4 w-4 transition', open && 'rotate-180');
   const triggerClassName = cx(
     useInputStyle && 'input',
-    'flex items-center gap-2 cursor-pointer',
+    'flex items-center gap-2',
+    disabled ? 'cursor-not-allowed opacity-50' : 'cursor-pointer',
     centerLabel ? 'justify-center text-center' : 'text-left',
     buttonClassName,
   );
@@ -145,6 +153,7 @@ export default function SelectMenu({
         className={triggerClassName}
         aria-haspopup="listbox"
         aria-expanded={open}
+        disabled={disabled}
         onClick={toggleMenu}
       >
         {iconPosition === 'left' ? <ChevronDown className={iconClassName} /> : null}

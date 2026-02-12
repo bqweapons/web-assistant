@@ -865,5 +865,65 @@
   },
   "sidepanel_tab_overview_tooltip": {
     "message": "サイト横断の概要。"
+  },
+  "sidepanel_action_refresh": {
+    "message": "再読み込み"
+  },
+  "sidepanel_elements_site_status": {
+    "message": "現在のサイト: {site}"
+  },
+  "sidepanel_elements_site_missing": {
+    "message": "有効なページがありません。ページを開いて更新してください。"
+  },
+  "sidepanel_elements_last_synced": {
+    "message": "最終同期: {value}"
+  },
+  "sidepanel_elements_syncing": {
+    "message": "更新中..."
+  },
+  "sidepanel_elements_no_active_page": {
+    "message": "有効なページが検出されません。サイトのタブを開いて更新してください。"
+  },
+  "sidepanel_elements_empty_site": {
+    "message": "このサイトにはまだ要素がありません。まずは追加してください。"
+  },
+  "sidepanel_flows_badge": {
+    "message": "フロー"
+  },
+  "sidepanel_elements_injection_error": {
+    "message": "要素の注入に失敗しました: {error}"
+  },
+  "sidepanel_elements_injection_error_site": {
+    "message": "現在のページが要素のサイトと一致しません。"
+  },
+  "sidepanel_elements_injection_error_container": {
+    "message": "ページ上にコンテナが見つかりません。"
+  },
+  "sidepanel_elements_injection_error_target": {
+    "message": "ターゲット要素が見つかりません。"
+  },
+  "sidepanel_elements_insert_position": {
+    "message": "挿入位置"
+  },
+  "sidepanel_elements_insert_hint": {
+    "message": "ターゲットに対してどこに挿入するかを指定します。"
+  },
+  "sidepanel_elements_place_append": {
+    "message": "ターゲットの末尾に追加"
+  },
+  "sidepanel_elements_place_prepend": {
+    "message": "ターゲットの先頭に追加"
+  },
+  "sidepanel_elements_place_before": {
+    "message": "ターゲットの前に挿入"
+  },
+  "sidepanel_elements_place_after": {
+    "message": "ターゲットの後に挿入"
+  },
+  "sidepanel_elements_pick_selector": {
+    "message": "セレクターを選択"
+  },
+  "sidepanel_elements_selector_placeholder": {
+    "message": "ターゲットのCSSセレクター"
   }
 }
