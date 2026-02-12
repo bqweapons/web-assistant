@@ -193,8 +193,13 @@ export default defineBackground(() => {
         return true;
       }
       case MessageType.PAGE_CONTEXT_PING: {
+        const frameId = typeof sender?.frameId === 'number' ? sender.frameId : 0;
+        if (frameId !== 0 || sender?.tab?.active === false) {
+          sendResponse?.({ ok: true });
+          return true;
+        }
         const context = derivePageContext(
-          message.data?.url || sender?.tab?.url || '',
+          sender?.tab?.url || message.data?.url || '',
           sender?.tab?.id,
           sender?.tab?.title,
         );
@@ -209,6 +214,9 @@ export default defineBackground(() => {
 
   if (tabsApi?.onUpdated) {
     tabsApi.onUpdated.addListener((tabId, changeInfo, tab) => {
+      if (!tab.active) {
+        return;
+      }
       if (!changeInfo.url && changeInfo.status !== 'complete') {
         return;
       }

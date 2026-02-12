@@ -1,9 +1,9 @@
 import {
   deriveSiteKey,
-  normalizeStructuredStoragePayload,
   type StructuredSiteData,
   type StructuredStoragePayload,
 } from './siteDataSchema';
+import { normalizeStructuredStoragePayload } from './siteDataMigration';
 
 export const STORAGE_KEY = 'ladybird_sites';
 

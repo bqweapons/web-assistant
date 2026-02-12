@@ -2,11 +2,21 @@ import { normalizeFlowSteps } from './flowStepMigration';
 import {
   buildDefaultSiteUrl,
   deriveSiteKey,
-  normalizeStructuredStoragePayload,
   type StructuredSiteData,
 } from './siteDataSchema';
+import { normalizeStructuredStoragePayload } from './siteDataMigration';
+import {
+  countSitesData,
+  formatCustomCss,
+  isRecord,
+  normalizeStringRecord,
+  parseTimestamp,
+  stableStringify,
+} from './siteDataUtils';
 
-export const EXPORT_JSON_VERSION = '1.0.2';
+const CANONICAL_EXPORT_VERSION = '1.0.2';
+export const EXPORT_JSON_VERSION = CANONICAL_EXPORT_VERSION;
+const COMPATIBLE_IMPORT_VERSIONS = new Set<string>([EXPORT_JSON_VERSION]);
 
 type JsonRecord = Record<string, unknown>;
 
@@ -29,18 +39,6 @@ export type ParsedImportPayload = {
   summary: ImportSummary;
 };
 
-const isRecord = (value: unknown): value is JsonRecord =>
-  Boolean(value) && typeof value === 'object' && !Array.isArray(value);
-
-const toKebabCase = (value: string) => value.replace(/[A-Z]/g, (match) => `-${match.toLowerCase()}`);
-
-const formatCustomCss = (rules: Record<string, string>) =>
-  Object.entries(rules)
-    .map(([key, value]) => [key.trim(), value.trim()] as const)
-    .filter(([key, value]) => Boolean(key) && Boolean(value))
-    .map(([key, value]) => `${toKebabCase(key)}: ${value};`)
-    .join('\n');
-
 const createId = (prefix: string) => {
   if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
     return `${prefix}-${crypto.randomUUID()}`;
@@ -53,24 +51,6 @@ const isElementType = (value: unknown): value is 'button' | 'link' | 'tooltip' |
 
 const isElementPosition = (value: unknown): value is 'append' | 'prepend' | 'before' | 'after' =>
   value === 'append' || value === 'prepend' || value === 'before' || value === 'after';
-
-const normalizeStringRecord = (value: unknown) => {
-  if (!isRecord(value)) {
-    return {} as Record<string, string>;
-  }
-  const next: Record<string, string> = {};
-  Object.entries(value).forEach(([key, raw]) => {
-    if (typeof raw !== 'string') {
-      return;
-    }
-    const trimmed = raw.trim();
-    if (!trimmed) {
-      return;
-    }
-    next[key] = trimmed;
-  });
-  return next;
-};
 
 const normalizeStyle = (
   rawStyle: unknown,
@@ -106,24 +86,6 @@ const normalizeStyle = (
   };
 };
 
-const asTimestamp = (value: unknown, fallback: number) => {
-  if (typeof value === 'number' && Number.isFinite(value)) {
-    return value;
-  }
-  if (typeof value === 'string') {
-    const numeric = Number(value);
-    if (Number.isFinite(numeric) && numeric > 0) {
-      return numeric;
-    }
-    const normalized = value.includes(' ') ? value.replace(' ', 'T') : value;
-    const parsed = Date.parse(normalized);
-    if (Number.isFinite(parsed)) {
-      return parsed;
-    }
-  }
-  return fallback;
-};
-
 const resolveLegacyPageKey = (pageUrl: string, scope: 'page' | 'site' | 'global', siteKey: string) => {
   if (scope !== 'page') {
     return null;
@@ -148,7 +110,62 @@ const resolveLegacyPageKey = (pageUrl: string, scope: 'page' | 'site' | 'global'
   if (trimmed.startsWith('/')) {
     return `${siteKey}${trimmed}`;
   }
-  return trimmed;
+  const withoutScheme = trimmed.replace(/^https?:\/\//, '').replace(/^file:\/\//, '');
+  const withoutQuery = (withoutScheme.split(/[?#]/)[0] || withoutScheme).trim();
+  if (!withoutQuery) {
+    return siteKey ? `${siteKey}/` : null;
+  }
+  const slashIndex = withoutQuery.indexOf('/');
+  if (slashIndex === -1) {
+    const normalizedHost = deriveSiteKey(withoutQuery) || deriveSiteKey(siteKey) || siteKey;
+    return normalizedHost ? `${normalizedHost}/` : null;
+  }
+  const normalizedHost =
+    deriveSiteKey(withoutQuery.slice(0, slashIndex)) || deriveSiteKey(siteKey) || siteKey;
+  const pathRaw = withoutQuery.slice(slashIndex);
+  const path = pathRaw ? `/${pathRaw.replace(/^\/+/, '')}` : '/';
+  return normalizedHost ? `${normalizedHost}${path}` : path;
+};
+
+const isLegacyRootUrlWithoutTrailingSlash = (value: string, expectedSiteKey: string) => {
+  const trimmed = value.trim();
+  if (!trimmed || trimmed.endsWith('/')) {
+    return false;
+  }
+  try {
+    const parsed = new URL(trimmed);
+    if (parsed.protocol === 'file:') {
+      return false;
+    }
+    if (parsed.search || parsed.hash) {
+      return false;
+    }
+    const path = parsed.pathname || '/';
+    if (path !== '/' && path !== '') {
+      return false;
+    }
+    const host = deriveSiteKey(parsed.host || parsed.hostname || expectedSiteKey);
+    return Boolean(host) && host === expectedSiteKey;
+  } catch {
+    return false;
+  }
+};
+
+const resolveLegacyImportedScope = (
+  rawScope: unknown,
+  rawPageUrl: unknown,
+  normalizedSiteKey: string,
+): 'page' | 'site' | 'global' => {
+  if (rawScope === 'site' || rawScope === 'global' || rawScope === 'page') {
+    return rawScope;
+  }
+  if (
+    typeof rawPageUrl === 'string' &&
+    isLegacyRootUrlWithoutTrailingSlash(rawPageUrl, normalizedSiteKey)
+  ) {
+    return 'site';
+  }
+  return 'page';
 };
 
 const normalizeImportedElement = (
@@ -162,9 +179,10 @@ const normalizeImportedElement = (
   const now = Date.now();
   const type = isElementType(raw.type) ? raw.type : 'button';
   const id = typeof raw.id === 'string' && raw.id.trim() ? raw.id.trim() : createId('element-import');
-  const scope = raw.scope === 'site' || raw.scope === 'global' ? raw.scope : 'page';
   const siteUrl =
     typeof raw.siteUrl === 'string' && raw.siteUrl.trim() ? raw.siteUrl.trim() : fallbackSiteUrl;
+  const normalizedSiteKey = deriveSiteKey(siteUrl) || siteKey;
+  const scope = resolveLegacyImportedScope(raw.scope, raw.pageUrl, normalizedSiteKey);
   const pageUrl =
     typeof raw.pageUrl === 'string' && raw.pageUrl.trim() ? raw.pageUrl.trim() : siteUrl || fallbackSiteUrl;
   const frameUrl =
@@ -172,7 +190,6 @@ const normalizeImportedElement = (
   const frameSelectors = Array.isArray(raw.frameSelectors)
     ? raw.frameSelectors.filter((item): item is string => typeof item === 'string')
     : [];
-  const normalizedSiteKey = deriveSiteKey(siteUrl) || siteKey;
   const floating = typeof raw.floating === 'boolean' ? raw.floating : type === 'area';
   const containerId =
     typeof raw.containerId === 'string' && raw.containerId.trim() && raw.containerId.trim() !== id
@@ -204,7 +221,6 @@ const normalizeImportedElement = (
         after: typeof raw.afterSelector === 'string' ? raw.afterSelector : undefined,
       },
       containerId,
-      floating,
     },
     style,
     behavior: {
@@ -215,8 +231,6 @@ const normalizeImportedElement = (
       actionFlowId:
         typeof raw.actionFlowId === 'string' && raw.actionFlowId.trim() ? raw.actionFlowId.trim() : undefined,
       actionFlowLocked: typeof raw.actionFlowLocked === 'boolean' ? raw.actionFlowLocked : undefined,
-      actionFlow:
-        typeof raw.actionFlow === 'string' && raw.actionFlow.trim() ? raw.actionFlow : undefined,
       layout: raw.layout === 'column' ? 'column' : raw.layout === 'row' ? 'row' : undefined,
       tooltipPosition:
         raw.tooltipPosition === 'top' ||
@@ -227,28 +241,10 @@ const normalizeImportedElement = (
           : undefined,
       tooltipPersistent: typeof raw.tooltipPersistent === 'boolean' ? raw.tooltipPersistent : undefined,
     },
-    createdAt: asTimestamp(raw.createdAt, now),
-    updatedAt: asTimestamp(raw.updatedAt, now),
+    createdAt: parseTimestamp(raw.createdAt, now),
+    updatedAt: parseTimestamp(raw.updatedAt, now),
   };
 };
-
-const sortValue = (value: unknown): unknown => {
-  if (Array.isArray(value)) {
-    return value.map((item) => sortValue(item));
-  }
-  if (!isRecord(value)) {
-    return value;
-  }
-  const next: JsonRecord = {};
-  Object.keys(value)
-    .sort()
-    .forEach((key) => {
-      next[key] = sortValue(value[key]);
-    });
-  return next;
-};
-
-const stableStringify = (value: unknown) => JSON.stringify(sortValue(value));
 
 const hashString = (input: string) => {
   let hash = 0x811c9dc5;
@@ -328,21 +324,30 @@ const buildLegacySiteData = (
   }
   const fallbackSiteUrl =
     (typeof bucketKey === 'string' && bucketKey.trim() ? bucketKey.trim() : '') || buildDefaultSiteUrl(siteKey);
-  const elements = entries
-    .map((entry) => normalizeImportedElement(entry, siteKey, fallbackSiteUrl))
-    .filter((item): item is StructuredSiteData['elements'][number] => Boolean(item));
-
+  const elements: StructuredSiteData['elements'] = [];
   const flows: StructuredSiteData['flows'] = [];
   const signatureToFlowId = new Map<string, string>();
   const usedFlowIds = new Set<string>();
 
-  elements.forEach((element, index) => {
+  entries.forEach((entry, index) => {
+    const element = normalizeImportedElement(entry, siteKey, fallbackSiteUrl);
+    if (!element) {
+      return;
+    }
+    elements.push(element);
+
     if (element.behavior.type !== 'button') {
       return;
     }
-    const parsed = parseLegacyActionFlow(element.behavior.actionFlow);
+    const legacyActionFlow =
+      isRecord(entry) && typeof entry.actionFlow === 'string'
+        ? entry.actionFlow
+        : isRecord(entry) && isRecord(entry.behavior) && typeof entry.behavior.actionFlow === 'string'
+          ? entry.behavior.actionFlow
+          : '';
+    const parsed = parseLegacyActionFlow(legacyActionFlow);
     if (!parsed) {
-      if (typeof element.behavior.actionFlow === 'string' && element.behavior.actionFlow.trim()) {
+      if (legacyActionFlow.trim()) {
         warnings.push(`Skipped invalid actionFlow on element "${String(element.id)}" in site "${siteKey}".`);
       }
       return;
@@ -363,7 +368,7 @@ const buildLegacySiteData = (
     element.behavior.actionFlowId = flowId;
 
     const flowNameSource = typeof element.text === 'string' ? element.text.trim() : '';
-    const updatedAt = asTimestamp(element.updatedAt, Date.now());
+    const updatedAt = parseTimestamp(element.updatedAt, Date.now());
     flows.push({
       id: flowId,
       name: flowNameSource ? `Imported flow - ${flowNameSource}` : `Imported flow ${index + 1}`,
@@ -371,12 +376,15 @@ const buildLegacySiteData = (
       scope: 'site',
       siteKey,
       pageKey: null,
-      steps: normalizeFlowSteps(parsed.steps, {
-        flowId,
-        keepNumber: true,
-        sanitizeExisting: true,
-        idFactory: createId,
-      }),
+      steps: (() => {
+        const normalized = normalizeFlowSteps(parsed.steps, {
+          flowId,
+          keepNumber: false,
+          sanitizeExisting: true,
+          idFactory: createId,
+        });
+        return Array.isArray(normalized) ? normalized : [];
+      })(),
       updatedAt,
     });
   });
@@ -391,45 +399,51 @@ const isLegacyPayload = (raw: unknown): raw is Record<string, unknown[]> => {
   return Object.values(raw).every((value) => Array.isArray(value));
 };
 
-const parseVersionedPayload = (raw: JsonRecord): ParsedImportPayload => {
-  const version = typeof raw.version === 'string' ? raw.version : '';
-  if (version !== EXPORT_JSON_VERSION) {
-    throw new Error(`Unsupported import version "${String(raw.version)}".`);
-  }
-  if (!isRecord(raw.sites)) {
-    throw new Error('Invalid import payload: "sites" must be an object.');
-  }
-  const normalized = normalizeStructuredStoragePayload({ sites: raw.sites });
-  const sites = normalized.payload.sites;
-  const warnings: string[] = [];
-  let elementCount = 0;
-  let flowCount = 0;
-  let hiddenCount = 0;
+const normalizeSitesObject = (rawSites: Record<string, unknown>) =>
+  normalizeStructuredStoragePayload({ sites: rawSites }).payload.sites;
 
-  Object.values(sites).forEach((siteData) => {
-    elementCount += Array.isArray(siteData.elements) ? siteData.elements.length : 0;
-    flowCount += Array.isArray(siteData.flows) ? siteData.flows.length : 0;
-    hiddenCount += Array.isArray(siteData.hidden) ? siteData.hidden.length : 0;
-  });
-
+const buildParsedResultFromSites = (
+  sites: Record<string, StructuredSiteData>,
+  sourceVersion: string,
+  warnings: string[],
+): ParsedImportPayload => {
+  const summary = countSitesData(sites);
   return {
     sites,
     summary: {
-      sourceVersion: version,
-      siteCount: Object.keys(sites).length,
-      elementCount,
-      flowCount,
-      hiddenCount,
+      sourceVersion,
+      ...summary,
       warnings,
     },
   };
 };
 
+const parseVersionedPayload = (raw: JsonRecord): ParsedImportPayload => {
+  const version = typeof raw.version === 'string' ? raw.version : '';
+  if (!isRecord(raw.sites)) {
+    throw new Error('Invalid import payload: "sites" must be an object.');
+  }
+  const warnings: string[] = [];
+  if (!COMPATIBLE_IMPORT_VERSIONS.has(version)) {
+    warnings.push(`Imported unknown payload version "${version}" using compatibility normalization.`);
+  }
+  const sites = normalizeSitesObject(raw.sites);
+  return buildParsedResultFromSites(sites, version, warnings);
+};
+
+const parseUnversionedSitesPayload = (raw: JsonRecord): ParsedImportPayload => {
+  if (!isRecord(raw.sites)) {
+    throw new Error('Invalid import payload: "sites" must be an object.');
+  }
+  const sites = normalizeSitesObject(raw.sites);
+  return buildParsedResultFromSites(sites, 'unversioned', [
+    'Imported unversioned payload and normalized to canonical schema.',
+  ]);
+};
+
 const parseLegacyPayload = (raw: Record<string, unknown[]>): ParsedImportPayload => {
   const legacySites: Record<string, LegacySiteData> = {};
   const warnings: string[] = [];
-  let elementCount = 0;
-  let flowCount = 0;
 
   Object.entries(raw).forEach(([bucketKey, entries]) => {
     const normalized = buildLegacySiteData(bucketKey, entries, warnings);
@@ -437,25 +451,11 @@ const parseLegacyPayload = (raw: Record<string, unknown[]>): ParsedImportPayload
       return;
     }
     const [siteKey, siteData] = normalized;
-    elementCount += siteData.elements.length;
-    flowCount += siteData.flows.length;
     legacySites[siteKey] = siteData;
   });
 
-  const normalized = normalizeStructuredStoragePayload({ sites: legacySites });
-  const sites = normalized.payload.sites;
-
-  return {
-    sites,
-    summary: {
-      sourceVersion: 'legacy',
-      siteCount: Object.keys(sites).length,
-      elementCount,
-      flowCount,
-      hiddenCount: 0,
-      warnings,
-    },
-  };
+  const sites = normalizeSitesObject(legacySites);
+  return buildParsedResultFromSites(sites, 'legacy', warnings);
 };
 
 const asArray = <T>(value: unknown): T[] => (Array.isArray(value) ? (value as T[]) : []);
@@ -482,23 +482,7 @@ const mergeById = <T>(currentList: T[], incomingList: T[]) => {
     if (!isRecord(value)) {
       return 0;
     }
-    if (typeof value.updatedAt === 'number' && Number.isFinite(value.updatedAt)) {
-      return value.updatedAt;
-    }
-    if (typeof value.updatedAt === 'string') {
-      const numeric = Number(value.updatedAt);
-      if (Number.isFinite(numeric) && numeric > 0) {
-        return numeric;
-      }
-      const normalized = value.updatedAt.includes(' ')
-        ? value.updatedAt.replace(' ', 'T')
-        : value.updatedAt;
-      const parsed = Date.parse(normalized);
-      if (Number.isFinite(parsed)) {
-        return parsed;
-      }
-    }
-    return 0;
+    return parseTimestamp(value.updatedAt, 0);
   };
 
   incomingList.forEach((item) => {
@@ -532,6 +516,9 @@ export const buildExportPayload = (sites: Record<string, StructuredSiteData>): E
 export const parseImportPayload = (raw: unknown): ParsedImportPayload => {
   if (isRecord(raw) && typeof raw.version !== 'undefined') {
     return parseVersionedPayload(raw);
+  }
+  if (isRecord(raw) && isRecord(raw.sites)) {
+    return parseUnversionedSitesPayload(raw);
   }
   if (isLegacyPayload(raw)) {
     return parseLegacyPayload(raw);

@@ -39,7 +39,7 @@ import {
   type StructuredElementRecord,
   type StructuredFlowRecord,
 } from '../../../shared/siteDataSchema';
-import { normalizeFlowSteps } from '../../../shared/flowStepMigration';
+import { normalizeFlowSteps, type FlowStepData } from '../../../shared/flowStepMigration';
 
 type ElementInlineStyle = Record<string, string>;
 type ElementRecord = StructuredElementRecord;
@@ -51,10 +51,19 @@ type FlowRecord = StructuredFlowRecord & {
   scope: 'page' | 'site' | 'global';
   siteKey: string;
   pageKey: string | null;
-  steps: number | unknown[];
+  steps: FlowStepData[];
   updatedAt: number;
 };
 type StoredElementRecord = StructuredElementRecord;
+
+let lastElementsRehydrateSignature = '';
+let pendingElementsRehydrateSignature: string | null = null;
+
+const buildElementsRehydrateSignature = (
+  siteKey: string,
+  pageKey: string,
+  payload: MessageElementPayload[],
+) => JSON.stringify({ siteKey, pageKey, payload });
 
 const isElementType = (value: unknown): value is ElementBehaviorType =>
   value === 'button' || value === 'link' || value === 'tooltip' || value === 'area';
@@ -176,10 +185,6 @@ const normalizeStoredElement = (
       },
       containerId:
         typeof element.placement.containerId === 'string' ? element.placement.containerId : undefined,
-      floating:
-        typeof element.placement.floating === 'boolean'
-          ? element.placement.floating
-          : element.placement.mode === 'floating',
     },
     style: normalizeStyle(element.style),
     behavior: {
@@ -199,8 +204,6 @@ const normalizeStoredElement = (
         typeof element.behavior.actionFlowLocked === 'boolean'
           ? element.behavior.actionFlowLocked
           : undefined,
-      actionFlow:
-        typeof element.behavior.actionFlow === 'string' ? element.behavior.actionFlow : undefined,
       layout: element.behavior.layout === 'column' ? 'column' : element.behavior.layout === 'row' ? 'row' : undefined,
       tooltipPosition:
         element.behavior.tooltipPosition === 'top' ||
@@ -264,23 +267,41 @@ const resolveElementContext = (
 const normalizeSiteKey = (value: string) =>
   value.replace(/^https?:\/\//, '').replace(/^file:\/\//, '').replace(/\/$/, '');
 
-const normalizePageKey = (value?: string) => {
+const normalizePageKey = (value?: string, fallbackSiteKey?: string) => {
   if (!value) {
     return '';
   }
+  const trimmed = value.trim();
+  if (!trimmed) {
+    return '';
+  }
   try {
-    const parsed = new URL(value);
+    const parsed = new URL(trimmed);
     if (parsed.protocol === 'file:') {
-      return `${normalizeSiteKey(value.split(/[?#]/)[0] || value)}`;
+      return `${normalizeSiteKey(trimmed.split(/[?#]/)[0] || trimmed)}`;
     }
-    const siteKey = normalizeSiteKey(parsed.host || parsed.hostname || value);
+    const siteKey = normalizeSiteKey(parsed.host || parsed.hostname || trimmed);
     const path = parsed.pathname || '/';
     return `${siteKey}${path.startsWith('/') ? path : `/${path}`}`;
   } catch {
-    if (value.startsWith('/')) {
-      return value;
+    if (trimmed.startsWith('/')) {
+      const baseSiteKey = normalizeSiteKey(fallbackSiteKey || '');
+      return baseSiteKey ? `${baseSiteKey}${trimmed}` : trimmed;
     }
-    return normalizeSiteKey(value);
+    const withoutScheme = trimmed.replace(/^https?:\/\//, '').replace(/^file:\/\//, '');
+    const withoutQuery = (withoutScheme.split(/[?#]/)[0] || withoutScheme).trim();
+    if (!withoutQuery) {
+      return '';
+    }
+    const slashIndex = withoutQuery.indexOf('/');
+    if (slashIndex === -1) {
+      const siteOnly = normalizeSiteKey(withoutQuery);
+      return siteOnly ? `${siteOnly}/` : '';
+    }
+    const siteKey = normalizeSiteKey(withoutQuery.slice(0, slashIndex));
+    const pathRaw = withoutQuery.slice(slashIndex);
+    const path = pathRaw ? `/${pathRaw.replace(/^\/+/, '')}` : '/';
+    return siteKey ? `${siteKey}${path}` : path;
   }
 };
 
@@ -327,11 +348,11 @@ const normalizeFlowRecord = (value: unknown, fallbackSiteKey: string): FlowRecor
     scope: entry.scope === 'page' || entry.scope === 'global' ? entry.scope : 'site',
     siteKey: resolvedSiteKey,
     pageKey: typeof entry.pageKey === 'string' ? entry.pageKey : null,
-    steps: normalizeFlowSteps(entry.steps, {
+    steps: (normalizeFlowSteps(entry.steps, {
       flowId: entry.id,
-      keepNumber: true,
+      keepNumber: false,
       sanitizeExisting: true,
-    }),
+    }) as FlowStepData[]),
     updatedAt: toFlowTimestamp(entry.updatedAt),
   };
 };
@@ -364,15 +385,27 @@ const toStructuredPageKey = (
   if (trimmed.startsWith('/')) {
     return `${siteKey}${trimmed}`;
   }
-  return trimmed;
+  const withoutScheme = trimmed.replace(/^https?:\/\//, '').replace(/^file:\/\//, '');
+  const withoutQuery = (withoutScheme.split(/[?#]/)[0] || withoutScheme).trim();
+  if (!withoutQuery) {
+    return siteKey ? `${siteKey}/` : null;
+  }
+  const slashIndex = withoutQuery.indexOf('/');
+  if (slashIndex === -1) {
+    const normalizedHost = normalizeSiteKey(withoutQuery);
+    return normalizedHost ? `${normalizedHost}/` : null;
+  }
+  const normalizedHost = normalizeSiteKey(withoutQuery.slice(0, slashIndex));
+  const pathRaw = withoutQuery.slice(slashIndex);
+  const path = pathRaw ? `/${pathRaw.replace(/^\/+/, '')}` : '/';
+  return normalizedHost ? `${normalizedHost}${path}` : path;
 };
 
 const getElementType = (element: ElementRecord) => element.behavior.type;
 const getElementSelector = (element: ElementRecord) => element.placement.selector || '';
 const getElementPosition = (element: ElementRecord) => normalizeElementPosition(element.placement.position);
 const getElementScope = (element: ElementRecord) => normalizeElementScope(element.scope);
-const getElementFloating = (element: ElementRecord) =>
-  element.placement.mode === 'floating' || element.placement.floating === true;
+const getElementFloating = (element: ElementRecord) => element.placement.mode === 'floating';
 const getElementHref = (element: ElementRecord) => element.behavior.href || '';
 const getElementLinkTarget = (element: ElementRecord) => element.behavior.target || 'new-tab';
 const getElementLayout = (element: ElementRecord) => element.behavior.layout || 'row';
@@ -443,7 +476,7 @@ export default function ElementsSection({
   const [draftFlow, setDraftFlow] = useState({
     name: '',
     description: '',
-    steps: 0,
+    steps: [] as FlowStepData[],
   });
   useEffect(() => {
     setActiveElementId(null);
@@ -574,9 +607,11 @@ export default function ElementsSection({
 
   const syncElementsToContent = useCallback(() => {
     if (!hasActivePage || !normalizedSiteKey) {
+      lastElementsRehydrateSignature = '';
+      pendingElementsRehydrateSignature = null;
       return;
     }
-    const currentPageKey = normalizePageKey(pageUrl || pageKey);
+    const currentPageKey = normalizePageKey(pageUrl || pageKey, normalizedSiteKey);
     const payload: MessageElementPayload[] = siteElements
       .filter((element) => {
         if (element.scope !== 'page') {
@@ -585,12 +620,29 @@ export default function ElementsSection({
         if (!element.context.pageKey) {
           return true;
         }
-        return normalizePageKey(element.context.pageKey) === currentPageKey;
+        return normalizePageKey(element.context.pageKey, normalizedSiteKey) === currentPageKey;
       })
       .map((element) => toMessageElementPayload(element));
+    const signature = buildElementsRehydrateSignature(normalizedSiteKey, currentPageKey, payload);
+    if (
+      signature === lastElementsRehydrateSignature ||
+      signature === pendingElementsRehydrateSignature
+    ) {
+      return;
+    }
+    pendingElementsRehydrateSignature = signature;
     sendElementMessage(MessageType.REHYDRATE_ELEMENTS, { elements: payload })
-      .then(() => setInjectionError(''))
+      .then(() => {
+        if (pendingElementsRehydrateSignature === signature) {
+          pendingElementsRehydrateSignature = null;
+        }
+        lastElementsRehydrateSignature = signature;
+        setInjectionError('');
+      })
       .catch((error) => {
+        if (pendingElementsRehydrateSignature === signature) {
+          pendingElementsRehydrateSignature = null;
+        }
         const message = error instanceof Error ? error.message : String(error);
         setInjectionError(message);
       });
@@ -748,7 +800,7 @@ export default function ElementsSection({
         label: flow.name,
         rightLabel: t('sidepanel_steps_count', '{count} steps').replace(
           '{count}',
-          String(Array.isArray(flow.steps) ? flow.steps.length : Number(flow.steps) || 0),
+          String(flow.steps.length),
         ),
       })),
     ],
@@ -836,7 +888,7 @@ export default function ElementsSection({
       scope: 'site' as const,
       siteKey: flowSiteKey,
       pageKey: null,
-      steps: Number.isFinite(draftFlow.steps) ? Math.max(0, draftFlow.steps) : 0,
+      steps: draftFlow.steps,
       updatedAt: Date.now(),
     };
     setFlows((prev) => [...prev, nextFlow]);
@@ -855,13 +907,7 @@ export default function ElementsSection({
     setFlowDrawerOpen(false);
   };
 
-  const getFlowStepCount = (value: number | unknown[]) => {
-    if (Array.isArray(value)) {
-      return value.length;
-    }
-    const parsed = Number(value);
-    return Number.isFinite(parsed) ? parsed : 0;
-  };
+  const getFlowStepCount = (value: FlowStepData[]) => value.length;
 
   const renderFlowSummary = (steps: number, onSave: () => void) => (
     <>
@@ -1000,9 +1046,7 @@ export default function ElementsSection({
           element.behavior.actionFlowId,
         );
       }
-      return element.behavior.actionFlow
-        ? t('sidepanel_elements_action_flow_configured', 'Action flow: Configured')
-        : t('sidepanel_elements_action_flow_unassigned', 'Action flow: Unassigned');
+      return t('sidepanel_elements_action_flow_unassigned', 'Action flow: Unassigned');
     }
     if (type === 'link') {
       return t('sidepanel_elements_link_value', 'Link: {value}').replace(
@@ -1046,11 +1090,7 @@ export default function ElementsSection({
     if (type === 'button') {
       rows.push({
         label: t('sidepanel_field_action_flow', 'Action flow'),
-        value:
-          element.behavior.actionFlowId ||
-          (element.behavior.actionFlow
-            ? t('sidepanel_field_configured', 'Configured')
-            : t('sidepanel_field_not_set', 'Not set')),
+        value: element.behavior.actionFlowId || t('sidepanel_field_not_set', 'Not set'),
       });
     }
     if (type === 'link') {
@@ -1381,10 +1421,6 @@ export default function ElementsSection({
         ...activeElement.placement,
         selector: activeElement.placement.selector || '',
         position: normalizeElementPosition(activeElement.placement.position),
-        floating:
-          typeof activeElement.placement.floating === 'boolean'
-            ? activeElement.placement.floating
-            : activeElement.placement.mode === 'floating',
       },
       behavior: {
         ...activeElement.behavior,
@@ -1407,7 +1443,7 @@ export default function ElementsSection({
     if (!flowDrawerOpen) {
       return;
     }
-    setDraftFlow({ name: '', description: '', steps: 0 });
+    setDraftFlow({ name: '', description: '', steps: [] });
   }, [flowDrawerOpen]);
 
   useEffect(() => {
@@ -1479,7 +1515,6 @@ export default function ElementsSection({
           selector: 'body',
           position: 'append',
           relativeTo: {},
-          floating: true,
         },
         style: {
           preset: detectStylePreset(areaInline),
@@ -1578,10 +1613,10 @@ export default function ElementsSection({
           selectors: [],
         },
       },
-      placement: {
-        mode: attachToArea ? 'container' : 'dom',
-        selector,
-        containerId: attachToArea ? containerId : undefined,
+        placement: {
+          mode: attachToArea ? 'container' : 'dom',
+          selector,
+          containerId: attachToArea ? containerId : undefined,
         position:
           attachToArea
             ? 'append'
@@ -1596,7 +1631,6 @@ export default function ElementsSection({
           before: attachToArea ? undefined : beforeSelector,
           after: attachToArea ? undefined : afterSelector,
         },
-        floating: false,
       },
       style: {
         preset: detectStylePreset(elementInline),
@@ -1642,8 +1676,27 @@ export default function ElementsSection({
     if (!editElement) {
       return;
     }
+    const normalizedScope = normalizeElementScope(editElement.scope);
+    const normalizedElementSiteKey =
+      deriveSiteKey(editElement.context.siteKey || '') || normalizedSiteKey;
+    const fallbackPageKey =
+      normalizePageKey(pageUrl || pageKey, normalizedElementSiteKey) ||
+      (normalizedElementSiteKey ? `${normalizedElementSiteKey}/` : '');
+    const normalizedPageKey =
+      normalizedScope === 'page'
+        ? normalizePageKey(
+            editElement.context.pageKey || fallbackPageKey,
+            normalizedElementSiteKey,
+          ) || fallbackPageKey
+        : null;
     const savedElement: StoredElementRecord = {
       ...editElement,
+      scope: normalizedScope,
+      context: {
+        ...editElement.context,
+        siteKey: normalizedElementSiteKey || editElement.context.siteKey,
+        pageKey: normalizedPageKey,
+      },
       updatedAt: Date.now(),
     };
     setElements((prev) => {
@@ -1651,7 +1704,7 @@ export default function ElementsSection({
       persistSiteData(next, flows).catch(() => undefined);
       return next;
     });
-    sendElementMessage(MessageType.UPDATE_ELEMENT, { element: toMessageElementPayload(editElement) })
+    sendElementMessage(MessageType.UPDATE_ELEMENT, { element: toMessageElementPayload(savedElement) })
       .then(() => {
         setInjectionError('');
         syncElementsToContent();
@@ -2561,19 +2614,11 @@ export default function ElementsSection({
               placeholder={t('sidepanel_flows_description_prompt', 'What does this flow do?')}
             />
           </label>
-          <label className="block text-xs font-semibold text-muted-foreground">
-            {t('sidepanel_steps_title', 'Steps')}
-            <input
-              className="input mt-1"
-              type="number"
-              min="0"
-              value={draftFlow.steps}
-              onChange={(event) =>
-                setDraftFlow({ ...draftFlow, steps: Number(event.target.value) || 0 })
-              }
-            />
-          </label>
-          <FlowStepsBuilder onStartPicker={onStartPicker} />
+          <FlowStepsBuilder
+            steps={draftFlow.steps}
+            onChange={(steps) => setDraftFlow((prev) => ({ ...prev, steps }))}
+            onStartPicker={onStartPicker}
+          />
         </div>
       </FlowDrawer>
     </div>

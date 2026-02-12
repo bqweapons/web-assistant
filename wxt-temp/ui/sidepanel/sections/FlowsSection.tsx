@@ -13,7 +13,7 @@ type FlowRecord = StructuredFlowRecord & {
   scope: 'page' | 'site' | 'global';
   siteKey: string;
   pageKey: string | null;
-  steps: number | FlowStepData[];
+  steps: FlowStepData[];
   updatedAt: number;
 };
 
@@ -36,23 +36,10 @@ const formatTimestamp = (value: number) => {
   )}:${pad(date.getMinutes())}`;
 };
 
-const getStepCount = (value: number | unknown[]) => {
-  if (Array.isArray(value)) {
-    return value.length;
-  }
-  const parsed = Number(value);
-  return Number.isFinite(parsed) ? parsed : 0;
-};
+const getStepCount = (value: FlowStepData[]) => value.length;
 
 const isRecord = (value: unknown): value is Record<string, unknown> =>
   Boolean(value) && typeof value === 'object' && !Array.isArray(value);
-
-const toEditableSteps = (value: unknown): FlowStepData[] => {
-  if (!Array.isArray(value)) {
-    return [];
-  }
-  return value as FlowStepData[];
-};
 
 const toTimestamp = (value: unknown) => {
   if (typeof value === 'number' && Number.isFinite(value)) {
@@ -87,7 +74,7 @@ const normalizeFlow = (value: unknown, fallbackSiteKey: string): FlowRecord | nu
   }
   const normalizedSteps = normalizeFlowSteps(value.steps, {
     flowId: id,
-    keepNumber: true,
+    keepNumber: false,
     sanitizeExisting: true,
   });
   return {
@@ -100,7 +87,7 @@ const normalizeFlow = (value: unknown, fallbackSiteKey: string): FlowRecord | nu
     scope: value.scope === 'page' || value.scope === 'global' ? value.scope : 'site',
     siteKey: resolvedSiteKey,
     pageKey: typeof value.pageKey === 'string' ? value.pageKey : null,
-    steps: Array.isArray(normalizedSteps) ? (normalizedSteps as FlowStepData[]) : Number(normalizedSteps) || 0,
+    steps: Array.isArray(normalizedSteps) ? (normalizedSteps as FlowStepData[]) : [],
     updatedAt: toTimestamp(value.updatedAt),
   };
 };
@@ -426,7 +413,7 @@ export default function FlowsSection({
         title={activeFlow?.name ?? t('sidepanel_flows_detail_title', 'Flow details')}
         subtitle={t('sidepanel_flows_detail_subtitle', 'Edit the flow settings below.')}
         onClose={() => setActiveFlowId(null)}
-        summary={renderSummary(getStepCount(editFlow?.steps || 0), handleFlowSave)}
+        summary={renderSummary(getStepCount(editFlow?.steps || []), handleFlowSave)}
       >
         {editFlow ? (
           <div className="space-y-4 text-xs text-muted-foreground">
@@ -454,7 +441,7 @@ export default function FlowsSection({
               <span className="text-foreground">{getSiteLabel(editFlow.siteKey)}</span>
             </div>
             <FlowStepsBuilder
-              steps={toEditableSteps(editFlow.steps)}
+              steps={editFlow.steps}
               onChange={(steps) => {
                 setEditFlow((prev) => (prev ? { ...prev, steps } : prev));
               }}

@@ -4,10 +4,6 @@ import {
   isStructuredElementRecord,
   type StructuredElementRecord,
 } from '../../shared/siteDataSchema';
-import {
-  structuredElementToRuntimeElement,
-  type RuntimeElementRecord,
-} from '../../shared/elementRuntimeAdapter';
 
 type RegistryEntry = {
   element: StructuredElementRecord;
@@ -17,7 +13,7 @@ type RegistryEntry = {
   cleanup?: () => void;
 };
 
-type RuntimeElement = RuntimeElementRecord;
+type RuntimeElement = StructuredElementRecord;
 
 type RuntimeMessenger = { sendMessage?: (message: unknown) => void };
 
@@ -37,6 +33,15 @@ type DomDropPlacement = {
   indicator: DropIndicator;
 };
 
+type ElementMutationPatch = {
+  selector?: string;
+  position?: StructuredElementRecord['placement']['position'];
+  beforeSelector?: string;
+  afterSelector?: string;
+  containerId?: string;
+  mode?: StructuredElementRecord['placement']['mode'];
+};
+
 const registry = new Map<string, RegistryEntry>();
 const HOST_ATTR = 'data-ladybird-element';
 const EDITING_ATTR = 'data-ladybird-editing';
@@ -53,6 +58,9 @@ let dropPreviewHost: HTMLElement | null = null;
 let dropPreviewSourceId: string | null = null;
 let renderOrderCounter = 0;
 const renderOrderById = new Map<string, number>();
+let reconcileTimer: number | null = null;
+let reconcileObserver: MutationObserver | null = null;
+const pendingReattachIds = new Set<string>();
 
 const cssEscape =
   typeof CSS !== 'undefined' && typeof CSS.escape === 'function'
@@ -62,33 +70,29 @@ const cssEscape =
 const normalizeSiteKey = (value: string) =>
   value.replace(/^https?:\/\//, '').replace(/^file:\/\//, '').replace(/\/$/, '');
 
-const resolveCurrentSiteKey = () => {
-  const href = window.location.href || '';
-  if (!href) {
-    return '';
-  }
-  try {
-    const parsed = new URL(href);
-    if (parsed.protocol === 'file:') {
-      return normalizeSiteKey(href.split(/[?#]/)[0] || href);
-    }
-    return normalizeSiteKey(parsed.host || parsed.hostname || href);
-  } catch {
-    return normalizeSiteKey(href);
-  }
-};
-
 const toStructuredElementPayload = (value: unknown): StructuredElementRecord | null => {
   return isStructuredElementRecord(value) ? value : null;
 };
 
-const toRuntimeElementPayload = (value: StructuredElementRecord): RuntimeElement => {
-  const fallbackSiteKey = resolveCurrentSiteKey();
-  const siteKey = deriveSiteKey(value.context.siteKey || '') || fallbackSiteKey;
-  return structuredElementToRuntimeElement(value, siteKey) as RuntimeElement;
-};
+const toRuntimeElementPayload = (value: StructuredElementRecord): RuntimeElement => value;
 
 const getEntryRuntime = (entry: RegistryEntry): RuntimeElement => toRuntimeElementPayload(entry.element);
+
+const getElementType = (element: RuntimeElement): RuntimeElement['behavior']['type'] => element.behavior.type;
+const getElementSelector = (element: RuntimeElement) => element.placement.selector || '';
+const getElementPosition = (element: RuntimeElement) => element.placement.position || 'append';
+const getElementBeforeSelector = (element: RuntimeElement) => element.placement.relativeTo.before;
+const getElementAfterSelector = (element: RuntimeElement) => element.placement.relativeTo.after;
+const getElementContainerId = (element: RuntimeElement) => element.placement.containerId;
+const getElementMode = (element: RuntimeElement) =>
+  element.placement.mode === 'floating' || element.placement.mode === 'container'
+    ? element.placement.mode
+    : 'dom';
+const isElementFloating = (element: RuntimeElement) => getElementMode(element) === 'floating';
+const getElementLayout = (element: RuntimeElement) => element.behavior.layout;
+const getElementHref = (element: RuntimeElement) => element.behavior.href;
+const getElementLinkTarget = (element: RuntimeElement) => element.behavior.target;
+const getElementTooltipPosition = (element: RuntimeElement) => element.behavior.tooltipPosition;
 
 const parseCustomCss = (raw?: string) => {
   if (!raw) {
@@ -244,7 +248,7 @@ const applyInlineStyles = (
     // @ts-ignore style indexing
     node.style[key] = value;
   });
-  if (element.floating && !omitPositioning) {
+  if (isElementFloating(element) && !omitPositioning) {
     node.style.position = node.style.position || 'absolute';
   }
 };
@@ -252,7 +256,7 @@ const applyInlineStyles = (
 const applyHostPlacementStyles = (host: HTMLElement, element: RuntimeElement) => {
   const merged = mergeStyleRules(element);
   const nextPosition = merged.position?.trim();
-  host.style.position = nextPosition || (element.floating ? 'absolute' : host.style.position || 'relative');
+  host.style.position = nextPosition || (isElementFloating(element) ? 'absolute' : host.style.position || 'relative');
   host.style.left = merged.left?.trim() || '';
   host.style.top = merged.top?.trim() || '';
   host.style.right = merged.right?.trim() || '';
@@ -263,7 +267,7 @@ const applyHostPlacementStyles = (host: HTMLElement, element: RuntimeElement) =>
 const applyHostContainerOrderStyle = (host: HTMLElement, element: RuntimeElement) => {
   const rules = mergeStyleRules(element);
   const order = rules.order?.trim() || '';
-  host.style.order = element.containerId ? order : '';
+  host.style.order = getElementContainerId(element) ? order : '';
 };
 
 const stripPositioningFromStyle = (style?: RuntimeElement['style']) => {
@@ -289,7 +293,7 @@ const createHostWithShadow = (element: RuntimeElement) => {
   const host = document.createElement('div');
   host.setAttribute(HOST_ATTR, element.id);
   host.setAttribute(EDITING_ATTR, 'false');
-  host.dataset.type = element.type;
+  host.dataset.type = getElementType(element);
   host.dataset.shadow = 'true';
   host.style.position = 'relative';
   host.style.boxSizing = 'border-box';
@@ -406,7 +410,7 @@ const createElementNode = (element: RuntimeElement) => {
   const { host, root } = createHostWithShadow(element);
   let node: HTMLElement;
 
-  switch (element.type) {
+  switch (getElementType(element)) {
     case 'button': {
       const button = document.createElement('button');
       button.type = 'button';
@@ -417,9 +421,9 @@ const createElementNode = (element: RuntimeElement) => {
     }
     case 'link': {
       const anchor = document.createElement('a');
-      anchor.textContent = element.text || element.href || 'Link';
-      anchor.href = element.href || '#';
-      anchor.target = element.linkTarget === 'same-tab' ? '_self' : '_blank';
+      anchor.textContent = element.text || getElementHref(element) || 'Link';
+      anchor.href = getElementHref(element) || '#';
+      anchor.target = getElementLinkTarget(element) === 'same-tab' ? '_self' : '_blank';
       anchor.rel = 'noreferrer noopener';
       anchor.className = 'ladybird-reset ladybird-edit-target ladybird-link';
       node = anchor;
@@ -438,13 +442,13 @@ const createElementNode = (element: RuntimeElement) => {
     default: {
       const area = document.createElement('div');
       area.className = 'ladybird-reset ladybird-edit-target ladybird-area';
-      area.style.flexDirection = element.layout === 'column' ? 'column' : 'row';
+      area.style.flexDirection = getElementLayout(element) === 'column' ? 'column' : 'row';
       node = area;
       break;
     }
   }
 
-  if (element.floating) {
+  if (isElementFloating(element)) {
     applyHostPlacementStyles(host, element);
     applyInlineStyles(node, element, { omitPositioning: true });
   } else {
@@ -467,27 +471,109 @@ const resolveTarget = (selector?: string) => {
   }
 };
 
-const removeExistingHosts = (id: string) => {
+const removeExistingHosts = (id: string, exceptNode?: HTMLElement) => {
   const selector = `[${HOST_ATTR}="${id}"]`;
   document.querySelectorAll(selector).forEach((node) => {
-    if (node instanceof HTMLElement) {
+    if (node instanceof HTMLElement && node !== exceptNode) {
       node.remove();
     }
   });
 };
 
+const queueDetachedEntryReconcile = (id: string) => {
+  if (!id || !registry.has(id)) {
+    return;
+  }
+  pendingReattachIds.add(id);
+  if (reconcileTimer != null) {
+    return;
+  }
+  reconcileTimer = window.setTimeout(() => {
+    reconcileTimer = null;
+    const pendingIds = Array.from(pendingReattachIds);
+    pendingReattachIds.clear();
+    pendingIds.forEach((pendingId) => {
+      const entry = registry.get(pendingId);
+      if (!entry || entry.node.isConnected) {
+        return;
+      }
+      injectElement(entry.element);
+    });
+  }, 220);
+};
+
+const collectRemovedHostIds = (node: Node, sink: Set<string>) => {
+  if (!(node instanceof HTMLElement)) {
+    return;
+  }
+  const directId = node.getAttribute(HOST_ATTR);
+  if (directId) {
+    sink.add(directId);
+  }
+  node.querySelectorAll(`[${HOST_ATTR}]`).forEach((entry) => {
+    if (entry instanceof HTMLElement) {
+      const nestedId = entry.getAttribute(HOST_ATTR);
+      if (nestedId) {
+        sink.add(nestedId);
+      }
+    }
+  });
+};
+
+const ensureDetachedEntryObserver = () => {
+  if (reconcileObserver || typeof MutationObserver === 'undefined') {
+    return;
+  }
+  const root = document.documentElement;
+  if (!root) {
+    return;
+  }
+  reconcileObserver = new MutationObserver((mutations) => {
+    if (registry.size === 0) {
+      return;
+    }
+    const removedHostIds = new Set<string>();
+    mutations.forEach((mutation) => {
+      mutation.removedNodes.forEach((node) => {
+        collectRemovedHostIds(node, removedHostIds);
+      });
+    });
+    removedHostIds.forEach((id) => {
+      const entry = registry.get(id);
+      if (!entry || entry.node.isConnected) {
+        return;
+      }
+      queueDetachedEntryReconcile(id);
+    });
+  });
+  reconcileObserver.observe(root, { childList: true, subtree: true });
+};
+
+const stopDetachedEntryObserver = () => {
+  if (reconcileTimer != null) {
+    window.clearTimeout(reconcileTimer);
+    reconcileTimer = null;
+  }
+  pendingReattachIds.clear();
+  if (reconcileObserver) {
+    reconcileObserver.disconnect();
+    reconcileObserver = null;
+  }
+};
+
 const insertNode = (host: HTMLElement, element: RuntimeElement) => {
-  const containerEntry = element.containerId ? registry.get(element.containerId) : null;
+  const containerId = getElementContainerId(element);
+  const containerEntry = containerId ? registry.get(containerId) : null;
   const containerTarget = containerEntry?.content || containerEntry?.node || null;
   if (containerTarget) {
     containerTarget.appendChild(host);
     return { ok: true };
   }
-  if (element.containerId && !containerTarget) {
+  if (containerId && !containerTarget) {
     return { ok: false, error: 'container-not-found' };
   }
 
-  if (element.floating) {
+  if (isElementFloating(element)) {
     if (!host.style.position || host.style.position === 'relative') {
       host.style.position = 'absolute';
     }
@@ -498,13 +584,13 @@ const insertNode = (host: HTMLElement, element: RuntimeElement) => {
     return { ok: true };
   }
 
-  const beforeNode = element.beforeSelector ? resolveTarget(element.beforeSelector) : null;
+  const beforeNode = getElementBeforeSelector(element) ? resolveTarget(getElementBeforeSelector(element)) : null;
   if (beforeNode?.parentElement) {
     beforeNode.parentElement.insertBefore(host, beforeNode);
     return { ok: true };
   }
 
-  const afterNode = element.afterSelector ? resolveTarget(element.afterSelector) : null;
+  const afterNode = getElementAfterSelector(element) ? resolveTarget(getElementAfterSelector(element)) : null;
   if (afterNode?.parentElement) {
     if (afterNode.nextSibling) {
       afterNode.parentElement.insertBefore(host, afterNode.nextSibling);
@@ -514,16 +600,17 @@ const insertNode = (host: HTMLElement, element: RuntimeElement) => {
     return { ok: true };
   }
 
-  const target = resolveTarget(element.selector);
+  const selector = getElementSelector(element);
+  const target = resolveTarget(selector);
   if (!target || !target.parentElement) {
-    if (!element.selector && element.type !== 'tooltip') {
+    if (!selector && getElementType(element) !== 'tooltip') {
       document.body.appendChild(host);
       return { ok: true };
     }
     return { ok: false, error: 'target-not-found' };
   }
 
-  const position = element.position || 'append';
+  const position = getElementPosition(element);
   if (position === 'prepend') {
     target.insertBefore(host, target.firstChild);
     return { ok: true };
@@ -546,7 +633,7 @@ const insertNode = (host: HTMLElement, element: RuntimeElement) => {
 };
 
 const placeTooltip = (element: RuntimeElement) => {
-  const target = resolveTarget(element.selector);
+  const target = resolveTarget(getElementSelector(element));
   const entry = registry.get(element.id);
   const tooltip = entry?.content || null;
   if (!(target instanceof HTMLElement) || !(tooltip instanceof HTMLElement)) {
@@ -554,7 +641,7 @@ const placeTooltip = (element: RuntimeElement) => {
   }
   const rect = target.getBoundingClientRect();
   const offset = 6;
-  const position = element.tooltipPosition || 'top';
+  const position = getElementTooltipPosition(element) || 'top';
   const top =
     position === 'top'
       ? rect.top - offset
@@ -630,7 +717,11 @@ const ensureDropPreviewHost = (element: RuntimeElement) => {
   removeDropPreviewHost();
   const previewElement: RuntimeElement = {
     ...element,
-    floating: false,
+    placement: {
+      ...element.placement,
+      mode: 'dom',
+      containerId: undefined,
+    },
     style: stripPositioningFromStyle(element.style),
   };
   const { host } = createElementNode({
@@ -694,7 +785,7 @@ const applyEditingStateToAll = () => {
 
 const applyStableFloatingLayer = (entry: RegistryEntry) => {
   const runtime = getEntryRuntime(entry);
-  if (!runtime.floating) {
+  if (!isElementFloating(runtime)) {
     return;
   }
   const styleRules = mergeStyleRules(runtime);
@@ -715,7 +806,7 @@ const reattachContainerChildren = (containerId: string) => {
   const children = Array.from(registry.values()).filter(
     (entry) => {
       const runtime = getEntryRuntime(entry);
-      return runtime.id !== containerId && runtime.containerId === containerId;
+      return runtime.id !== containerId && getElementContainerId(runtime) === containerId;
     },
   );
   children.forEach((child) => {
@@ -741,46 +832,38 @@ const buildStructuredElementWithStyleRules = (
   baseElement: StructuredElementRecord,
   baseRuntime: RuntimeElement,
   rules: Record<string, string>,
-  patch: Partial<RuntimeElement>,
+  patch: ElementMutationPatch,
 ): StructuredElementRecord => {
   const normalizedRules = normalizeStyleRules(rules);
-  const nextSelector = typeof patch.selector === 'string' ? patch.selector : baseRuntime.selector || '';
+  const nextSelector = typeof patch.selector === 'string' ? patch.selector : getElementSelector(baseRuntime);
   const nextPosition =
     patch.position === 'append' || patch.position === 'prepend' || patch.position === 'before' || patch.position === 'after'
       ? patch.position
-      : baseRuntime.position === 'append' ||
-          baseRuntime.position === 'prepend' ||
-          baseRuntime.position === 'before' ||
-          baseRuntime.position === 'after'
-        ? baseRuntime.position
-        : 'append';
-  const nextBefore =
-    'beforeSelector' in patch
-      ? typeof patch.beforeSelector === 'string' && patch.beforeSelector.trim()
-        ? patch.beforeSelector
-        : undefined
-      : typeof baseRuntime.beforeSelector === 'string' && baseRuntime.beforeSelector.trim()
-        ? baseRuntime.beforeSelector
-        : undefined;
-  const nextAfter =
-    'afterSelector' in patch
-      ? typeof patch.afterSelector === 'string' && patch.afterSelector.trim()
-        ? patch.afterSelector
-        : undefined
-      : typeof baseRuntime.afterSelector === 'string' && baseRuntime.afterSelector.trim()
-        ? baseRuntime.afterSelector
-        : undefined;
-  const nextContainerId =
-    'containerId' in patch
-      ? typeof patch.containerId === 'string' && patch.containerId.trim()
-        ? patch.containerId
-        : undefined
-      : typeof baseRuntime.containerId === 'string' && baseRuntime.containerId.trim()
-        ? baseRuntime.containerId
-        : undefined;
-  const nextFloating =
-    'floating' in patch ? patch.floating === true : baseRuntime.floating === true;
-  const nextMode = nextContainerId ? 'container' : nextFloating ? 'floating' : 'dom';
+      : getElementPosition(baseRuntime);
+  const hasBeforePatch = Object.prototype.hasOwnProperty.call(patch, 'beforeSelector');
+  const hasAfterPatch = Object.prototype.hasOwnProperty.call(patch, 'afterSelector');
+  const hasContainerPatch = Object.prototype.hasOwnProperty.call(patch, 'containerId');
+  const nextBefore = hasBeforePatch
+    ? typeof patch.beforeSelector === 'string' && patch.beforeSelector.trim()
+      ? patch.beforeSelector
+      : undefined
+    : getElementBeforeSelector(baseRuntime);
+  const nextAfter = hasAfterPatch
+    ? typeof patch.afterSelector === 'string' && patch.afterSelector.trim()
+      ? patch.afterSelector
+      : undefined
+    : getElementAfterSelector(baseRuntime);
+  const nextContainerId = hasContainerPatch
+    ? typeof patch.containerId === 'string' && patch.containerId.trim()
+      ? patch.containerId
+      : undefined
+    : getElementContainerId(baseRuntime);
+  let nextMode = patch.mode || getElementMode(baseRuntime);
+  if (nextContainerId) {
+    nextMode = 'container';
+  } else if (nextMode === 'container') {
+    nextMode = 'dom';
+  }
 
   return {
     ...baseElement,
@@ -794,7 +877,6 @@ const buildStructuredElementWithStyleRules = (
         after: nextAfter,
       },
       containerId: nextContainerId,
-      floating: nextFloating,
     },
     style: {
       ...baseElement.style,
@@ -843,27 +925,30 @@ const resetHostPlacementStyles = (host: HTMLElement) => {
 };
 
 const resolveExpectedParent = (next: RuntimeElement): HTMLElement | null => {
-  if (next.containerId) {
-    const container = registry.get(next.containerId);
+  const containerId = getElementContainerId(next);
+  if (containerId) {
+    const container = registry.get(containerId);
     return container?.content || null;
   }
-  if (next.floating) {
+  if (isElementFloating(next)) {
     return document.body;
   }
 
-  const beforeNode = next.beforeSelector ? resolveTarget(next.beforeSelector) : null;
+  const nextBeforeSelector = getElementBeforeSelector(next);
+  const beforeNode = nextBeforeSelector ? resolveTarget(nextBeforeSelector) : null;
   if (beforeNode?.parentElement) {
     return beforeNode.parentElement;
   }
-  const afterNode = next.afterSelector ? resolveTarget(next.afterSelector) : null;
+  const nextAfterSelector = getElementAfterSelector(next);
+  const afterNode = nextAfterSelector ? resolveTarget(nextAfterSelector) : null;
   if (afterNode?.parentElement) {
     return afterNode.parentElement;
   }
-  const target = resolveTarget(next.selector);
+  const target = resolveTarget(getElementSelector(next));
   if (!target) {
     return null;
   }
-  const position = next.position || 'append';
+  const position = getElementPosition(next);
   if (position === 'before' || position === 'after') {
     return target.parentElement;
   }
@@ -872,25 +957,25 @@ const resolveExpectedParent = (next: RuntimeElement): HTMLElement | null => {
 
 const isStructuralChange = (entry: RegistryEntry, next: RuntimeElement) => {
   const previous = getEntryRuntime(entry);
-  if (previous.type !== next.type) {
+  if (getElementType(previous) !== getElementType(next)) {
     return true;
   }
-  if (Boolean(previous.floating) !== Boolean(next.floating)) {
+  if (isElementFloating(previous) !== isElementFloating(next)) {
     return true;
   }
-  if ((previous.containerId || '') !== (next.containerId || '')) {
+  if ((getElementContainerId(previous) || '') !== (getElementContainerId(next) || '')) {
     return true;
   }
-  if ((previous.selector || '') !== (next.selector || '')) {
+  if ((getElementSelector(previous) || '') !== (getElementSelector(next) || '')) {
     return true;
   }
-  if ((previous.position || 'append') !== (next.position || 'append')) {
+  if ((getElementPosition(previous) || 'append') !== (getElementPosition(next) || 'append')) {
     return true;
   }
-  if ((previous.beforeSelector || '') !== (next.beforeSelector || '')) {
+  if ((getElementBeforeSelector(previous) || '') !== (getElementBeforeSelector(next) || '')) {
     return true;
   }
-  if ((previous.afterSelector || '') !== (next.afterSelector || '')) {
+  if ((getElementAfterSelector(previous) || '') !== (getElementAfterSelector(next) || '')) {
     return true;
   }
   const expectedParent = resolveExpectedParent(next);
@@ -905,14 +990,14 @@ const isStructuralChange = (entry: RegistryEntry, next: RuntimeElement) => {
 
 const isContentCompatible = (entry: RegistryEntry, next: RuntimeElement) => {
   const current = getEntryRuntime(entry);
-  if (current.type !== next.type) {
+  if (getElementType(current) !== getElementType(next)) {
     return false;
   }
   const node = entry.content || entry.node;
-  if (next.type === 'button') {
+  if (getElementType(next) === 'button') {
     return node instanceof HTMLButtonElement;
   }
-  if (next.type === 'link') {
+  if (getElementType(next) === 'link') {
     return node instanceof HTMLAnchorElement;
   }
   return node instanceof HTMLElement;
@@ -932,23 +1017,23 @@ const setNodeTextPreservingChildren = (node: HTMLElement, value: string) => {
 
 const syncContentAttributes = (entry: RegistryEntry, next: RuntimeElement) => {
   const node = entry.content || entry.node;
-  if (next.type === 'button' && node instanceof HTMLButtonElement) {
+  if (getElementType(next) === 'button' && node instanceof HTMLButtonElement) {
     setNodeTextPreservingChildren(node, next.text || 'Button');
     return;
   }
-  if (next.type === 'link' && node instanceof HTMLAnchorElement) {
-    setNodeTextPreservingChildren(node, next.text || next.href || 'Link');
-    node.href = next.href || '#';
-    node.target = next.linkTarget === 'same-tab' ? '_self' : '_blank';
+  if (getElementType(next) === 'link' && node instanceof HTMLAnchorElement) {
+    setNodeTextPreservingChildren(node, next.text || getElementHref(next) || 'Link');
+    node.href = getElementHref(next) || '#';
+    node.target = getElementLinkTarget(next) === 'same-tab' ? '_self' : '_blank';
     node.rel = 'noreferrer noopener';
     return;
   }
-  if (next.type === 'tooltip' && node instanceof HTMLElement) {
+  if (getElementType(next) === 'tooltip' && node instanceof HTMLElement) {
     setNodeTextPreservingChildren(node, next.text || 'Tooltip');
     return;
   }
-  if (next.type === 'area' && node instanceof HTMLElement) {
-    node.style.flexDirection = next.layout === 'column' ? 'column' : 'row';
+  if (getElementType(next) === 'area' && node instanceof HTMLElement) {
+    node.style.flexDirection = getElementLayout(next) === 'column' ? 'column' : 'row';
   }
 };
 
@@ -956,7 +1041,7 @@ const syncElementStylesInPlace = (entry: RegistryEntry, next: RuntimeElement) =>
   const previous = getEntryRuntime(entry);
   const host = entry.node;
   const content = entry.content || host;
-  if (next.floating) {
+  if (isElementFloating(next)) {
     applyHostPlacementStyles(host, next);
     applyRuleMapToNode(content, filterRules(previous, true), filterRules(next, true));
   } else {
@@ -968,7 +1053,7 @@ const syncElementStylesInPlace = (entry: RegistryEntry, next: RuntimeElement) =>
 
 const findAreaDropTarget = (clientX: number, clientY: number, excludeId: string) => {
   for (const [id, entry] of registry) {
-    if (id === excludeId || getEntryRuntime(entry).type !== 'area') {
+    if (id === excludeId || getElementType(getEntryRuntime(entry)) !== 'area') {
       continue;
     }
     const rect = entry.node.getBoundingClientRect();
@@ -998,7 +1083,7 @@ const buildAreaOrderUpdates = (
     .filter((id) => registry.has(id));
 
   const siblingIds = allChildIds.filter((id) => id !== draggedElement.id);
-  const axis = getEntryRuntime(area).layout === 'column' ? 'column' : 'row';
+  const axis = getElementLayout(getEntryRuntime(area)) === 'column' ? 'column' : 'row';
 
   let insertIndex = siblingIds.length;
   for (let index = 0; index < siblingIds.length; index += 1) {
@@ -1032,13 +1117,13 @@ const buildAreaOrderUpdates = (
     rules.order = nextOrder;
 
     const next = buildStructuredElementWithStyleRules(baseElement, baseRuntime, rules, {
-      floating: false,
+      mode: 'container',
       containerId: getEntryRuntime(area).id,
     });
     if (
       id === draggedElement.id ||
-      baseRuntime.floating !== false ||
-      (baseRuntime.containerId || '') !== getEntryRuntime(area).id ||
+      isElementFloating(baseRuntime) ||
+      (getElementContainerId(baseRuntime) || '') !== getEntryRuntime(area).id ||
       previousOrder !== nextOrder
     ) {
       updates.push(next);
@@ -1224,7 +1309,7 @@ const attachInteractions = (entry: RegistryEntry) => {
       styleRules.width = `${Math.max(MIN_SIZE, Math.round(finalRect.width))}px`;
       styleRules.height = `${Math.max(MIN_SIZE, Math.round(finalRect.height))}px`;
 
-      if (finalRuntime.floating) {
+      if (isElementFloating(finalRuntime)) {
         const hostRect = finalHost.getBoundingClientRect();
         styleRules.position = 'absolute';
         styleRules.left = `${Math.round(hostRect.left + window.scrollX)}px`;
@@ -1352,7 +1437,7 @@ const attachInteractions = (entry: RegistryEntry) => {
       dragHost.style.left = `${Math.round(lastLeft)}px`;
       dragHost.style.top = `${Math.round(lastTop)}px`;
 
-      if (liveRuntime.type === 'area') {
+      if (getElementType(liveRuntime) === 'area') {
         setAreaHighlight(null);
         currentArea = null;
         currentPlacement = null;
@@ -1419,7 +1504,7 @@ const attachInteractions = (entry: RegistryEntry) => {
       const finalRuntime = getEntryRuntime(finalEntry);
       const styleRules = mergeStyleRules(finalRuntime);
 
-      if (finalRuntime.type === 'area') {
+      if (getElementType(finalRuntime) === 'area') {
         styleRules.position = 'absolute';
         styleRules.left = `${Math.round(lastLeft)}px`;
         styleRules.top = `${Math.round(lastTop)}px`;
@@ -1431,12 +1516,12 @@ const attachInteractions = (entry: RegistryEntry) => {
           finalRuntime,
           styleRules,
           {
-          floating: true,
-          containerId: undefined,
-          selector: finalRuntime.selector || 'body',
-          position: 'append',
-          beforeSelector: undefined,
-          afterSelector: undefined,
+            mode: 'floating',
+            containerId: undefined,
+            selector: getElementSelector(finalRuntime) || 'body',
+            position: 'append',
+            beforeSelector: undefined,
+            afterSelector: undefined,
           },
         );
         persistElementMutation(nextElement);
@@ -1454,12 +1539,12 @@ const attachInteractions = (entry: RegistryEntry) => {
           finalRuntime,
           styleRules,
           {
-          floating: false,
-          containerId: currentAreaRuntime.id,
-          selector: currentAreaRuntime.selector || finalRuntime.selector || 'body',
-          position: 'append',
-          beforeSelector: undefined,
-          afterSelector: undefined,
+            mode: 'container',
+            containerId: currentAreaRuntime.id,
+            selector: getElementSelector(currentAreaRuntime) || getElementSelector(finalRuntime) || 'body',
+            position: 'append',
+            beforeSelector: undefined,
+            afterSelector: undefined,
           },
         );
         const updates = buildAreaOrderUpdates(currentArea, nextElement, lastPointerX, lastPointerY);
@@ -1480,12 +1565,12 @@ const attachInteractions = (entry: RegistryEntry) => {
           finalRuntime,
           styleRules,
           {
-          floating: false,
-          containerId: undefined,
-          selector: currentPlacement.selector,
-          position: currentPlacement.position,
-          beforeSelector: currentPlacement.beforeSelector,
-          afterSelector: currentPlacement.afterSelector,
+            mode: 'dom',
+            containerId: undefined,
+            selector: currentPlacement.selector,
+            position: currentPlacement.position,
+            beforeSelector: currentPlacement.beforeSelector,
+            afterSelector: currentPlacement.afterSelector,
           },
         );
         persistElementMutation(nextElement);
@@ -1504,11 +1589,11 @@ const attachInteractions = (entry: RegistryEntry) => {
         finalRuntime,
         styleRules,
         {
-        floating: true,
-        containerId: undefined,
-        position: 'append',
-        beforeSelector: undefined,
-        afterSelector: undefined,
+          mode: 'floating',
+          containerId: undefined,
+          position: 'append',
+          beforeSelector: undefined,
+          afterSelector: undefined,
         },
       );
       persistElementMutation(nextElement);
@@ -1584,16 +1669,8 @@ const injectElement = (element: StructuredElementRecord) => {
     return { ok: false, error: 'site-mismatch' };
   }
 
-  const existing = registry.get(element.id);
-  if (existing) {
-    existing.cleanup?.();
-    existing.node.remove();
-    registry.delete(element.id);
-  }
-  removeExistingHosts(element.id);
-
   const { host, root, content } = createElementNode(runtimeElement);
-  if (runtimeElement.floating) {
+  if (isElementFloating(runtimeElement)) {
     host.style.position = host.style.position || 'absolute';
     host.style.zIndex = host.style.zIndex || FLOATING_Z_INDEX;
   }
@@ -1604,16 +1681,27 @@ const injectElement = (element: StructuredElementRecord) => {
     return { ok: false, error: inserted.error || 'insert-failed' };
   }
 
+  const existing = registry.get(element.id);
+  if (existing) {
+    existing.cleanup?.();
+    if (existing.node !== host) {
+      existing.node.remove();
+    }
+    registry.delete(element.id);
+  }
+  removeExistingHosts(element.id, host);
+
   const entry: RegistryEntry = { element, node: host, root, content };
   entry.cleanup = attachInteractions(entry);
   registry.set(element.id, entry);
   applyEditingState(entry);
   applyStableFloatingLayer(entry);
+  ensureDetachedEntryObserver();
 
-  if (runtimeElement.type === 'tooltip') {
+  if (getElementType(runtimeElement) === 'tooltip') {
     placeTooltip(runtimeElement);
   }
-  if (runtimeElement.type === 'area') {
+  if (getElementType(runtimeElement) === 'area') {
     reattachContainerChildren(element.id);
   }
 
@@ -1639,10 +1727,10 @@ const upsertElement = (element: StructuredElementRecord) => {
   applyEditingState(existing);
   applyStableFloatingLayer(existing);
 
-  if (runtimeElement.type === 'tooltip') {
+  if (getElementType(runtimeElement) === 'tooltip') {
     placeTooltip(runtimeElement);
   }
-  if (runtimeElement.type === 'area') {
+  if (getElementType(runtimeElement) === 'area') {
     reattachContainerChildren(element.id);
   }
   return { ok: true };
@@ -1659,6 +1747,9 @@ const removeElement = (id: string) => {
   renderOrderById.delete(id);
   if (editingElementId === id) {
     editingElementId = null;
+  }
+  if (registry.size === 0) {
+    stopDetachedEntryObserver();
   }
   return true;
 };
@@ -1684,9 +1775,10 @@ const rehydrateElements = (elements: StructuredElementRecord[]) => {
       const element = pending[index];
       const runtimeElement = incomingRuntimeById.get(element.id);
       if (
-        runtimeElement?.containerId &&
-        incomingRuntimeById.has(runtimeElement.containerId) &&
-        !registry.has(runtimeElement.containerId)
+        runtimeElement &&
+        getElementContainerId(runtimeElement) &&
+        incomingRuntimeById.has(getElementContainerId(runtimeElement) as string) &&
+        !registry.has(getElementContainerId(runtimeElement) as string)
       ) {
         index += 1;
         continue;
@@ -1835,10 +1927,14 @@ export const resetInjectionRegistry = () => {
     dropIndicatorNode.remove();
   }
   dropIndicatorNode = null;
+  stopDetachedEntryObserver();
 };
 
 export const registerPageContextIfNeeded = (runtime?: RuntimeMessenger) => {
   if (!runtime?.sendMessage) {
+    return;
+  }
+  if (window.top !== window) {
     return;
   }
   const href = window.location.href;

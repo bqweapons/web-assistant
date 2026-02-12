@@ -60,7 +60,20 @@ const normalizeStoredPageKey = (value?: string | null) => {
     return `${site}${trimmed}`;
   }
   if (!/^https?:\/\//.test(trimmed) && !trimmed.startsWith('file://')) {
-    return trimmed.replace(/^https?:\/\//, '').replace(/^file:\/\//, '').replace(/\/$/, '');
+    const withoutScheme = trimmed.replace(/^https?:\/\//, '').replace(/^file:\/\//, '');
+    const withoutQuery = (withoutScheme.split(/[?#]/)[0] || withoutScheme).trim();
+    if (!withoutQuery) {
+      return '';
+    }
+    const slashIndex = withoutQuery.indexOf('/');
+    if (slashIndex === -1) {
+      const siteOnly = normalizeSiteKey(withoutQuery);
+      return siteOnly ? `${siteOnly}/` : '';
+    }
+    const siteKey = normalizeSiteKey(withoutQuery.slice(0, slashIndex));
+    const pathRaw = withoutQuery.slice(slashIndex);
+    const path = pathRaw ? `/${pathRaw.replace(/^\/+/, '')}` : '/';
+    return siteKey ? `${siteKey}${path}` : path;
   }
   try {
     return resolvePageKeyFromLocation(new URL(trimmed, window.location.href).toString());
@@ -112,6 +125,9 @@ const rehydratePersistedElements = async () => {
 
 const startPageContextWatcher = (runtime?: RuntimeMessenger) => {
   if (!runtime?.sendMessage) {
+    return () => undefined;
+  }
+  if (window.top !== window) {
     return () => undefined;
   }
   let lastUrl = '';
