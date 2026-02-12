@@ -149,6 +149,9 @@
   "sidepanel_elements_delete": {
     "message": "删除元素"
   },
+  "sidepanel_elements_delete_confirm": {
+    "message": "确认删除“{name}”？此操作无法撤销。"
+  },
   "sidepanel_elements_detail_not_set": {
     "message": "详情：未设置"
   },
@@ -880,6 +883,9 @@
   },
   "sidepanel_elements_syncing": {
     "message": "正在刷新..."
+  },
+  "sidepanel_elements_group_ungrouped": {
+    "message": "未分组"
   },
   "sidepanel_elements_no_active_page": {
     "message": "未检测到活动页面。请打开站点标签页并刷新后管理元素。"

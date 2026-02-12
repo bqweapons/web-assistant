@@ -238,23 +238,7 @@ export default function App() {
   }, [finalizePicker, locale, pickerAccept]);
 
   const hasActivePage = Boolean(pageContext?.hasAccess && pageContext.siteKey);
-
-  const headerContext = useMemo(() => {
-    if (hasActivePage) {
-      if (pageContext?.url) {
-        try {
-          const parsed = new URL(pageContext.url);
-          const path = parsed.pathname && parsed.pathname !== '/' ? parsed.pathname : '/';
-          const normalizedPath = path === '/' ? '' : path;
-          return `${pageContext.siteKey}${normalizedPath}`;
-        } catch {
-          return pageContext?.pageKey || pageContext?.siteKey || '';
-        }
-      }
-      return pageContext?.pageKey || pageContext?.siteKey || '';
-    }
-    return t('sidepanel_app_context_none', 'No active page');
-  }, [hasActivePage, locale, pageContext?.pageKey, pageContext?.siteKey, pageContext?.url]);
+  const headerContext = '';
 
   const headerActions = useMemo(
     () => [

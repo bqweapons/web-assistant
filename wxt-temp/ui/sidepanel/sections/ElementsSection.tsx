@@ -1379,6 +1379,15 @@ export default function ElementsSection({
 
   const handleDeleteElement = (event: React.MouseEvent, id: string) => {
     event.stopPropagation();
+    const targetElement = siteElements.find((item) => item.id === id) || null;
+    const targetLabel = targetElement ? getElementLabel(targetElement) : t('sidepanel_elements_delete', 'Delete element');
+    const confirmMessage = t(
+      'sidepanel_elements_delete_confirm',
+      'Delete "{name}"? This action cannot be undone.',
+    ).replace('{name}', targetLabel);
+    if (!window.confirm(confirmMessage)) {
+      return;
+    }
     if (activeElementId === id) {
       setActiveElementId(null);
     }
@@ -1518,6 +1527,47 @@ export default function ElementsSection({
     };
   }, [activeElement, editElement, sendElementMessage]);
 
+  const renderElementCard = (element: ElementRecord) => (
+    <Card
+      key={element.id}
+      className="p-4"
+      onClick={() => handleSelectElement(element.id)}
+    >
+      <div className="flex items-start justify-between gap-2">
+        <div className="flex min-w-0 flex-1 items-center gap-2">
+          <span className="badge-pill shrink-0">{getElementTypeLabel(element.type)}</span>
+          <h3 className="min-w-0 flex-1 truncate text-sm font-semibold text-card-foreground">
+            {getElementLabel(element)}
+          </h3>
+        </div>
+        <div className="flex shrink-0 items-center gap-1">
+          <button
+            type="button"
+            className={actionClass}
+            aria-label={t('sidepanel_elements_locate', 'Locate element')}
+            onClick={(event) => handleFocusElement(event, element.id)}
+          >
+            <Crosshair className="h-4 w-4" />
+          </button>
+          <button
+            type="button"
+            className={`${actionClass} btn-icon-danger`}
+            aria-label={t('sidepanel_elements_delete', 'Delete element')}
+            onClick={(event) => handleDeleteElement(event, element.id)}
+          >
+            <Trash2 className="h-4 w-4" />
+          </button>
+        </div>
+      </div>
+      <div className="mt-2 flex items-center justify-between gap-2">
+        <p className="min-w-0 flex-1 truncate text-xs text-muted-foreground">
+          {getElementDetail(element)}
+        </p>
+        <p className="shrink-0 text-xs text-muted-foreground">{formatTimestamp(element.updatedAt)}</p>
+      </div>
+    </Card>
+  );
+
   return (
     <div className="flex flex-col gap-2">
       {injectionError ? (
@@ -1548,11 +1598,6 @@ export default function ElementsSection({
             value: 'link',
             label: t('sidepanel_elements_add_link', 'Link'),
             rightLabel: t('sidepanel_elements_add_link_hint', 'Insert a clickable link'),
-          },
-          {
-            value: 'tooltip',
-            label: t('sidepanel_elements_add_tooltip', 'Tooltip'),
-            rightLabel: t('sidepanel_elements_add_tooltip_hint', 'Show helper text on hover'),
           },
         ]}
         onChange={handleAddElementType}
@@ -1657,46 +1702,45 @@ export default function ElementsSection({
                 </div>
               </div>
               <div className="grid gap-2">
-                {pageElements.map((element) => (
-                  <Card
-                    key={element.id}
-                    className="p-4"
-                    onClick={() => handleSelectElement(element.id)}
-                  >
-                    <div className="flex items-start justify-between gap-2">
-                      <div className="flex min-w-0 flex-1 items-center gap-2">
-                        <span className="badge-pill shrink-0">{getElementTypeLabel(element.type)}</span>
-                        <h3 className="min-w-0 flex-1 truncate text-sm font-semibold text-card-foreground">
-                          {getElementLabel(element)}
-                        </h3>
-                      </div>
-                      <div className="flex shrink-0 items-center gap-1">
-                        <button
-                          type="button"
-                          className={actionClass}
-                          aria-label={t('sidepanel_elements_locate', 'Locate element')}
-                          onClick={(event) => handleFocusElement(event, element.id)}
-                        >
-                          <Crosshair className="h-4 w-4" />
-                        </button>
-                        <button
-                          type="button"
-                          className={`${actionClass} btn-icon-danger`}
-                          aria-label={t('sidepanel_elements_delete', 'Delete element')}
-                          onClick={(event) => handleDeleteElement(event, element.id)}
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </button>
-                      </div>
-                    </div>
-                    <div className="mt-2 flex items-center justify-between gap-2">
-                      <p className="min-w-0 flex-1 truncate text-xs text-muted-foreground">
-                        {getElementDetail(element)}
-                      </p>
-                      <p className="shrink-0 text-xs text-muted-foreground">{formatTimestamp(element.updatedAt)}</p>
-                    </div>
-                  </Card>
-                ))}
+                {(() => {
+                  const areaGroups = pageElements
+                    .filter((element) => element.type === 'area')
+                    .map((area) => ({
+                      area,
+                      children: pageElements.filter(
+                        (element) => element.id !== area.id && element.containerId === area.id,
+                      ),
+                    }));
+                  const groupedChildIds = new Set(
+                    areaGroups.flatMap((group) => group.children.map((child) => child.id)),
+                  );
+                  const ungroupedElements = pageElements.filter(
+                    (element) => element.type !== 'area' && !groupedChildIds.has(element.id),
+                  );
+
+                  return (
+                    <>
+                      {areaGroups.map((group) => (
+                        <div key={group.area.id} className="grid gap-2 rounded border border-border/70 p-2">
+                          {renderElementCard(group.area)}
+                          {group.children.length > 0 ? (
+                            <div className="ml-3 grid gap-2 border-l border-border pl-3">
+                              {group.children.map((element) => renderElementCard(element))}
+                            </div>
+                          ) : null}
+                        </div>
+                      ))}
+                      {ungroupedElements.length > 0 ? (
+                        <div className="grid gap-2">
+                          <div className="px-1 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+                            {t('sidepanel_elements_group_ungrouped', 'Ungrouped')}
+                          </div>
+                          {ungroupedElements.map((element) => renderElementCard(element))}
+                        </div>
+                      ) : null}
+                    </>
+                  );
+                })()}
               </div>
               </div>
             );

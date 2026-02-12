@@ -149,6 +149,9 @@
   "sidepanel_elements_delete": {
     "message": "要素を削除"
   },
+  "sidepanel_elements_delete_confirm": {
+    "message": "\"{name}\" を削除しますか？この操作は取り消せません。"
+  },
   "sidepanel_elements_detail_not_set": {
     "message": "詳細: 未設定"
   },
@@ -880,6 +883,9 @@
   },
   "sidepanel_elements_syncing": {
     "message": "更新中..."
+  },
+  "sidepanel_elements_group_ungrouped": {
+    "message": "未グループ"
   },
   "sidepanel_elements_no_active_page": {
     "message": "有効なページが検出されません。サイトのタブを開いて更新してください。"

@@ -152,6 +152,9 @@
   "sidepanel_elements_delete": {
     "message": "Delete element"
   },
+  "sidepanel_elements_delete_confirm": {
+    "message": "Delete \"{name}\"? This action cannot be undone."
+  },
   "sidepanel_elements_detail_not_set": {
     "message": "Detail: Not set"
   },
@@ -184,6 +187,9 @@
   },
   "sidepanel_elements_syncing": {
     "message": "Refreshing..."
+  },
+  "sidepanel_elements_group_ungrouped": {
+    "message": "Ungrouped"
   },
   "sidepanel_elements_font_decrease": {
     "message": "Decrease font size"

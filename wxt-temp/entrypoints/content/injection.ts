@@ -829,21 +829,33 @@ const isContentCompatible = (entry: RegistryEntry, next: ElementPayload) => {
   return node instanceof HTMLElement;
 };
 
+const setNodeTextPreservingChildren = (node: HTMLElement, value: string) => {
+  const textNodes = Array.from(node.childNodes).filter(
+    (child): child is Text => child.nodeType === Node.TEXT_NODE,
+  );
+  if (textNodes.length > 0) {
+    textNodes[0].nodeValue = value;
+    textNodes.slice(1).forEach((textNode) => textNode.remove());
+    return;
+  }
+  node.insertBefore(document.createTextNode(value), node.firstChild);
+};
+
 const syncContentAttributes = (entry: RegistryEntry, next: ElementPayload) => {
   const node = entry.content || entry.node;
   if (next.type === 'button' && node instanceof HTMLButtonElement) {
-    node.textContent = next.text || 'Button';
+    setNodeTextPreservingChildren(node, next.text || 'Button');
     return;
   }
   if (next.type === 'link' && node instanceof HTMLAnchorElement) {
-    node.textContent = next.text || next.href || 'Link';
+    setNodeTextPreservingChildren(node, next.text || next.href || 'Link');
     node.href = next.href || '#';
     node.target = next.linkTarget === 'same-tab' ? '_self' : '_blank';
     node.rel = 'noreferrer noopener';
     return;
   }
   if (next.type === 'tooltip' && node instanceof HTMLElement) {
-    node.textContent = next.text || 'Tooltip';
+    setNodeTextPreservingChildren(node, next.text || 'Tooltip');
     return;
   }
   if (next.type === 'area' && node instanceof HTMLElement) {

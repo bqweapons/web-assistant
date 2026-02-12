@@ -4,6 +4,7 @@ import { t } from '../utils/i18n';
 
 export default function AppHeader({ title, context, actions, tabs, activeTabId, onTabChange }: AppHeaderProps) {
   const showTabs = tabs && activeTabId && onTabChange;
+  const hasContext = context.trim().length > 0;
   return (
     <header className="sticky top-0 z-10 bg-background px-4 pt-4 backdrop-blur">
       <div className="flex flex-col gap-3">
@@ -16,7 +17,7 @@ export default function AppHeader({ title, context, actions, tabs, activeTabId, 
             />
             <div>
               <h1 className="text-xl font-semibold text-foreground">{title}</h1>
-              <p className="text-xs text-muted-foreground">{context}</p>
+              {hasContext ? <p className="text-xs text-muted-foreground">{context}</p> : null}
             </div>
           </div>
           <div className="flex items-center gap-2">
