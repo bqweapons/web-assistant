@@ -12,6 +12,16 @@ export type SiteData = StructuredSiteData;
 export type StoragePayload = StructuredStoragePayload;
 
 const EMPTY_SITE_DATA: SiteData = { elements: [], flows: [], hidden: [] };
+let writeQueue: Promise<void> = Promise.resolve();
+
+const enqueueWrite = async <T>(operation: () => Promise<T>): Promise<T> => {
+  const run = writeQueue.then(operation, operation);
+  writeQueue = run.then(
+    () => undefined,
+    () => undefined,
+  );
+  return run;
+};
 
 const getLocalStorage = () => {
   if (typeof chrome !== 'undefined' && chrome.storage?.local) {
@@ -89,27 +99,31 @@ export const setSiteData = async (siteKey: string, data: Partial<SiteData>) => {
   if (!normalizedSiteKey) {
     return;
   }
-  const payload = await readStructuredPayload();
-  const current = payload.sites?.[normalizedSiteKey] || {
-    elements: [],
-    flows: [],
-    hidden: [],
-  };
-  const raw = {
-    sites: {
-      ...(payload.sites || {}),
-      [normalizedSiteKey]: {
-        elements: data.elements ?? current.elements,
-        flows: data.flows ?? current.flows,
-        hidden: data.hidden ?? current.hidden,
+  await enqueueWrite(async () => {
+    const payload = await readStructuredPayload();
+    const current = payload.sites?.[normalizedSiteKey] || {
+      elements: [],
+      flows: [],
+      hidden: [],
+    };
+    const raw = {
+      sites: {
+        ...(payload.sites || {}),
+        [normalizedSiteKey]: {
+          elements: data.elements ?? current.elements,
+          flows: data.flows ?? current.flows,
+          hidden: data.hidden ?? current.hidden,
+        },
       },
-    },
-  };
-  const normalized = normalizeStructuredStoragePayload(raw);
-  await writeStructuredPayload(normalized.payload);
+    };
+    const normalized = normalizeStructuredStoragePayload(raw);
+    await writeStructuredPayload(normalized.payload);
+  });
 };
 
 export const setAllSitesData = async (sites: Record<string, SiteData>) => {
-  const normalized = normalizeStructuredStoragePayload({ sites: sites || {} });
-  await writeStructuredPayload(normalized.payload);
+  await enqueueWrite(async () => {
+    const normalized = normalizeStructuredStoragePayload({ sites: sites || {} });
+    await writeStructuredPayload(normalized.payload);
+  });
 };

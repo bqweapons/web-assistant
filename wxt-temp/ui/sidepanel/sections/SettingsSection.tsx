@@ -12,6 +12,9 @@ export default function SettingsSection() {
   const [isImporting, setIsImporting] = useState(false);
   const [isExporting, setIsExporting] = useState(false);
   const [feedback, setFeedback] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
+  const storeUrl = chrome?.runtime?.id
+    ? `https://chromewebstore.google.com/detail/${chrome.runtime.id}`
+    : 'https://chromewebstore.google.com/';
 
   const handleExport = async () => {
     if (isExporting) {
@@ -89,6 +92,52 @@ export default function SettingsSection() {
       event.target.value = '';
       setIsImporting(false);
     }
+  };
+
+  const copyToClipboard = async (value: string) => {
+    if (navigator?.clipboard?.writeText) {
+      await navigator.clipboard.writeText(value);
+      return;
+    }
+    const textarea = document.createElement('textarea');
+    textarea.value = value;
+    textarea.setAttribute('readonly', 'true');
+    textarea.style.position = 'fixed';
+    textarea.style.opacity = '0';
+    document.body.appendChild(textarea);
+    textarea.select();
+    document.execCommand('copy');
+    textarea.remove();
+  };
+
+  const handleCopyStoreLink = async () => {
+    try {
+      await copyToClipboard(storeUrl);
+      setFeedback({
+        type: 'success',
+        message: 'Store link copied.',
+      });
+    } catch (error) {
+      setFeedback({
+        type: 'error',
+        message: `Copy failed: ${error instanceof Error ? error.message : String(error)}`,
+      });
+    }
+  };
+
+  const handleOpenStore = () => {
+    const nextWindow = window.open(storeUrl, '_blank', 'noopener,noreferrer');
+    if (!nextWindow) {
+      setFeedback({
+        type: 'error',
+        message: 'Unable to open store link.',
+      });
+      return;
+    }
+    setFeedback({
+      type: 'success',
+      message: 'Opened store link in a new tab.',
+    });
   };
 
   return (
@@ -208,11 +257,11 @@ export default function SettingsSection() {
             </div>
           </div>
           <div className="flex flex-nowrap gap-2">
-            <button type="button" className="btn-primary gap-2">
+            <button type="button" className="btn-primary gap-2" onClick={() => void handleCopyStoreLink()}>
               <Copy className="h-4 w-4" />
               {t('sidepanel_settings_share_copy', 'Copy link')}
             </button>
-            <button type="button" className="btn-ghost gap-2">
+            <button type="button" className="btn-ghost gap-2" onClick={handleOpenStore}>
               <ExternalLink className="h-4 w-4" />
               {t('sidepanel_settings_share_open', 'Open store')}
             </button>

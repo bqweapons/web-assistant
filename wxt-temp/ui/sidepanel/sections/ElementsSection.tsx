@@ -444,6 +444,7 @@ export default function ElementsSection({
   const locale = useLocale();
   const [elements, setElements] = useState<StoredElementRecord[]>([]);
   const [flows, setFlows] = useState<FlowRecord[]>([]);
+  const [siteDataReady, setSiteDataReady] = useState(false);
   const actionClass = 'btn-icon h-8 w-8';
   const selectButtonClass = 'btn-ghost h-9 w-full justify-between px-2 text-xs';
   const [activeElementId, setActiveElementId] = useState<string | null>(null);
@@ -489,8 +490,10 @@ export default function ElementsSection({
     if (!normalizedSiteKey) {
       setElements([]);
       setFlows([]);
+      setSiteDataReady(false);
       return;
     }
+    setSiteDataReady(false);
     getSiteData(normalizedSiteKey)
       .then((data) => {
         const normalized =
@@ -502,10 +505,12 @@ export default function ElementsSection({
           .map((item) => normalizeFlowRecord(item, normalizedSiteKey))
           .filter((item): item is FlowRecord => Boolean(item));
         setFlows(normalizedFlows);
+        setSiteDataReady(true);
       })
       .catch(() => {
         setElements([]);
         setFlows([]);
+        setSiteDataReady(true);
       });
   }, [normalizedSiteKey]);
   const typeOptions = useMemo(() => {
@@ -611,6 +616,9 @@ export default function ElementsSection({
       pendingElementsRehydrateSignature = null;
       return;
     }
+    if (!siteDataReady) {
+      return;
+    }
     const currentPageKey = normalizePageKey(pageUrl || pageKey, normalizedSiteKey);
     const payload: MessageElementPayload[] = siteElements
       .filter((element) => {
@@ -646,7 +654,7 @@ export default function ElementsSection({
         const message = error instanceof Error ? error.message : String(error);
         setInjectionError(message);
       });
-  }, [hasActivePage, normalizedSiteKey, pageUrl, pageKey, sendElementMessage, siteElements]);
+  }, [hasActivePage, normalizedSiteKey, pageUrl, pageKey, sendElementMessage, siteElements, siteDataReady]);
 
   const persistSiteData = useCallback(
     async (nextElements: StoredElementRecord[], nextFlows: typeof flows) => {
@@ -891,7 +899,11 @@ export default function ElementsSection({
       steps: draftFlow.steps,
       updatedAt: Date.now(),
     };
-    setFlows((prev) => [...prev, nextFlow]);
+    setFlows((prev) => {
+      const next = [...prev, nextFlow];
+      persistSiteData(elements, next).catch(() => undefined);
+      return next;
+    });
     setEditElement((prev) =>
       prev
         ? {

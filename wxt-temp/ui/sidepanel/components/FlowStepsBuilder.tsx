@@ -1323,12 +1323,19 @@ export default function FlowStepsBuilder({ steps = DEFAULT_STEPS, onChange, onSt
               handleDrop();
             }}
           >
-            <button
-              type="button"
+            <div
+              role="button"
+              tabIndex={0}
               className={`group flex w-full cursor-pointer items-center gap-2 rounded-lg px-3 py-2 text-left text-xs transition ${
                 isActive ? 'bg-primary/10 text-foreground' : 'text-muted-foreground'
               }`}
               onClick={() => setActiveStepId(isActive ? '' : step.id)}
+              onKeyDown={(event) => {
+                if (event.key === 'Enter' || event.key === ' ') {
+                  event.preventDefault();
+                  setActiveStepId(isActive ? '' : step.id);
+                }
+              }}
               draggable={Boolean(listContext)}
               onDragStart={(event) => {
                 if (!listContext) {
@@ -1362,7 +1369,7 @@ export default function FlowStepsBuilder({ steps = DEFAULT_STEPS, onChange, onSt
               >
                 <Trash2 className="h-3.5 w-3.5" />
               </button>
-            </button>
+            </div>
             {isActive ? (
               <div className="px-3 pb-3">
                 <div className="mt-3 grid gap-2 text-xs text-muted-foreground">
