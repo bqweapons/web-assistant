@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   AlignCenter,
   AlignLeft,
@@ -198,6 +198,7 @@ type ElementsSectionProps = {
     selector: string;
     beforeSelector?: string;
     afterSelector?: string;
+    containerId?: string;
   } | null>;
 };
 
@@ -219,6 +220,7 @@ export default function ElementsSection({
   const actionClass = 'btn-icon h-8 w-8';
   const selectButtonClass = 'btn-ghost h-9 w-full justify-between px-2 text-xs';
   const [activeElementId, setActiveElementId] = useState<string | null>(null);
+  const [draftElementId, setDraftElementId] = useState<string | null>(null);
   const [addElementType, setAddElementType] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
   const [typeFilter, setTypeFilter] = useState('all');
@@ -242,6 +244,7 @@ export default function ElementsSection({
   });
   useEffect(() => {
     setActiveElementId(null);
+    setDraftElementId(null);
     setSearchQuery('');
     setTypeFilter('all');
   }, [normalizedSiteKey]);
@@ -298,6 +301,8 @@ export default function ElementsSection({
   const showClear = Boolean(searchQuery) || typeFilter !== 'all';
   const creationDisabled = !hasActivePage || !normalizedSiteKey;
   const [injectionError, setInjectionError] = useState('');
+  const previewTimerRef = useRef<number | null>(null);
+  const suppressPreviewElementIdRef = useRef<string | null>(null);
   const getInjectionErrorMessage = (code: string) => {
     const normalized = code.trim().toLowerCase();
     if (
@@ -415,7 +420,9 @@ export default function ElementsSection({
         }
         const next = prev.slice();
         next[index] = normalized;
-        persistSiteData(next, flows).catch(() => undefined);
+        if (normalized.id !== draftElementId) {
+          persistSiteData(next, flows).catch(() => undefined);
+        }
         return next;
       });
       setEditElement((prev) => (prev?.id === normalized.id ? { ...prev, ...normalized } : prev));
@@ -423,7 +430,7 @@ export default function ElementsSection({
     };
     runtime.onMessage.addListener(handleRuntimeMessage);
     return () => runtime.onMessage.removeListener(handleRuntimeMessage);
-  }, [flows, normalizedSiteKey, persistSiteData]);
+  }, [draftElementId, flows, normalizedSiteKey, persistSiteData]);
 
   useEffect(() => {
     if (!hasActivePage || !normalizedSiteKey) {
@@ -1109,8 +1116,10 @@ export default function ElementsSection({
   useEffect(() => {
     if (!activeElement) {
       setEditElement(null);
+      suppressPreviewElementIdRef.current = null;
       return;
     }
+    suppressPreviewElementIdRef.current = null;
     const resolvedInline = activeElement.style?.inline || {};
     const resolvedCustomCss = activeElement.style?.customCss || '';
     const resolvedPreset =
@@ -1214,7 +1223,6 @@ export default function ElementsSection({
       };
       setElements((prev) => {
         const next = [newArea, ...prev];
-        persistSiteData(next, flows).catch(() => undefined);
         return next;
       });
       sendElementMessage(MessageType.CREATE_ELEMENT, { element: toElementPayload(newArea) })
@@ -1227,6 +1235,7 @@ export default function ElementsSection({
           setInjectionError(message);
         });
       setActiveElementId(newArea.id);
+      setDraftElementId(newArea.id);
       setAddElementType('');
       return;
     }
@@ -1236,7 +1245,12 @@ export default function ElementsSection({
     }
     const normalizedType: 'tooltip' | 'button' | 'link' =
       value === 'tooltip' ? 'tooltip' : value === 'link' ? 'link' : 'button';
-    let selectorPayload: { selector: string; beforeSelector?: string; afterSelector?: string } | null = null;
+    let selectorPayload: {
+      selector: string;
+      beforeSelector?: string;
+      afterSelector?: string;
+      containerId?: string;
+    } | null = null;
     if (onStartElementPicker) {
       selectorPayload = await onStartElementPicker({
         disallowInput: normalizedType === 'button' || normalizedType === 'link',
@@ -1249,7 +1263,8 @@ export default function ElementsSection({
       setAddElementType('');
       return;
     }
-    const { selector, beforeSelector, afterSelector } = selectorPayload;
+    const { selector, beforeSelector, afterSelector, containerId } = selectorPayload;
+    const attachToArea = Boolean(containerId);
     const now = Date.now();
     const elementInline: ElementInlineStyle =
       normalizedType === 'tooltip'
@@ -1284,14 +1299,17 @@ export default function ElementsSection({
             ? t('sidepanel_elements_add_link', 'Link')
           : t('sidepanel_elements_add_button', 'Button'),
       selector,
-      beforeSelector,
-      afterSelector,
+      beforeSelector: attachToArea ? undefined : beforeSelector,
+      afterSelector: attachToArea ? undefined : afterSelector,
+      containerId: attachToArea ? containerId : undefined,
       position:
-        selectorPayload.beforeSelector || selectorPayload.afterSelector
+        attachToArea
+          ? 'append'
+          : selectorPayload.beforeSelector || selectorPayload.afterSelector
           ? selectorPayload.beforeSelector
             ? 'before'
             : 'after'
-          : addElementType === 'tooltip'
+          : normalizedType === 'tooltip'
             ? 'after'
             : 'append',
       style: {
@@ -1314,7 +1332,6 @@ export default function ElementsSection({
     };
     setElements((prev) => {
       const next = [newElement, ...prev];
-      persistSiteData(next, flows).catch(() => undefined);
       return next;
     });
     sendElementMessage(MessageType.CREATE_ELEMENT, { element: toElementPayload(newElement) })
@@ -1327,6 +1344,7 @@ export default function ElementsSection({
         setInjectionError(message);
     });
     setActiveElementId(newElement.id);
+    setDraftElementId(newElement.id);
     setAddElementType('');
   };
 
@@ -1355,6 +1373,7 @@ export default function ElementsSection({
         const message = error instanceof Error ? error.message : String(error);
         setInjectionError(message);
       });
+    setDraftElementId((prev) => (prev === editElement.id ? null : prev));
     setActiveElementId(null);
   };
 
@@ -1362,6 +1381,9 @@ export default function ElementsSection({
     event.stopPropagation();
     if (activeElementId === id) {
       setActiveElementId(null);
+    }
+    if (draftElementId === id) {
+      setDraftElementId(null);
     }
     setElements((prev) => {
       const next = prev.filter((item) => item.id !== id);
@@ -1390,7 +1412,12 @@ export default function ElementsSection({
     if (!onStartElementPicker && !onStartPicker) {
       return;
     }
-    let result: { selector: string; beforeSelector?: string; afterSelector?: string } | null = null;
+    let result: {
+      selector: string;
+      beforeSelector?: string;
+      afterSelector?: string;
+      containerId?: string;
+    } | null = null;
     if (onStartElementPicker) {
       result = await onStartElementPicker({
         disallowInput: editElement?.type === 'button' || editElement?.type === 'link',
@@ -1402,32 +1429,92 @@ export default function ElementsSection({
     if (!result?.selector || !editElement) {
       return;
     }
+    const attachToArea = Boolean(result.containerId);
     setEditElement({
       ...editElement,
       selector: result.selector,
-      beforeSelector: result.beforeSelector || '',
-      afterSelector: result.afterSelector || '',
+      beforeSelector: attachToArea ? '' : result.beforeSelector || '',
+      afterSelector: attachToArea ? '' : result.afterSelector || '',
+      containerId: attachToArea ? result.containerId : undefined,
+      position:
+        attachToArea
+          ? 'append'
+          : result.beforeSelector
+            ? 'before'
+            : result.afterSelector
+              ? 'after'
+              : editElement.position,
     });
     setInjectionError('');
   };
 
-  const closeDetails = () => {
+  const closeDetails = useCallback(() => {
     setInjectionError('');
+    const closingId = activeElementId;
+    const isDraft = Boolean(closingId && draftElementId && closingId === draftElementId);
+    if (previewTimerRef.current != null) {
+      window.clearTimeout(previewTimerRef.current);
+      previewTimerRef.current = null;
+    }
+    if (closingId) {
+      suppressPreviewElementIdRef.current = closingId;
+    }
+    setEditElement(null);
+    if (closingId && isDraft) {
+      setElements((prev) => {
+        const next = prev.filter((item) => item.id !== closingId);
+        persistSiteData(next, flows).catch(() => undefined);
+        return next;
+      });
+      sendElementMessage(MessageType.DELETE_ELEMENT, { id: closingId })
+        .then(() => {
+          setInjectionError('');
+          syncElementsToContent();
+        })
+        .catch((error) => {
+          const message = error instanceof Error ? error.message : String(error);
+          setInjectionError(message);
+        });
+      setDraftElementId(null);
+    } else {
+      syncElementsToContent();
+    }
     setActiveElementId(null);
-    syncElementsToContent();
-  };
+  }, [
+    activeElementId,
+    draftElementId,
+    flows,
+    persistSiteData,
+    previewTimerRef,
+    sendElementMessage,
+    syncElementsToContent,
+  ]);
 
   useEffect(() => {
     if (!editElement || !activeElement) {
       return;
     }
+    if (suppressPreviewElementIdRef.current === editElement.id) {
+      return;
+    }
+    if (previewTimerRef.current != null) {
+      window.clearTimeout(previewTimerRef.current);
+      previewTimerRef.current = null;
+    }
     const handle = window.setTimeout(() => {
       sendElementMessage(MessageType.PREVIEW_ELEMENT, { element: toElementPayload(editElement) }).catch((error) =>
         setInjectionError(error instanceof Error ? error.message : String(error)),
       );
+      if (previewTimerRef.current === handle) {
+        previewTimerRef.current = null;
+      }
     }, 150);
+    previewTimerRef.current = handle;
     return () => {
       window.clearTimeout(handle);
+      if (previewTimerRef.current === handle) {
+        previewTimerRef.current = null;
+      }
     };
   }, [activeElement, editElement, sendElementMessage]);
 
@@ -1684,51 +1771,6 @@ export default function ElementsSection({
                 />
                   <span>{t('sidepanel_elements_apply_site', 'Apply to entire site')}</span>
                 </label>
-                <label className="grid gap-1 sm:col-span-2">
-                  <div className="flex items-center justify-between gap-2">
-                    <span>{t('sidepanel_field_selector', 'Selector')}</span>
-                    <button
-                      type="button"
-                      className="btn-icon h-7 w-7"
-                      aria-label={t('sidepanel_elements_pick_selector', 'Pick selector')}
-                      title={t('sidepanel_elements_pick_selector', 'Pick selector')}
-                      onClick={handlePickSelector}
-                    >
-                      <Crosshair className="h-4 w-4" />
-                    </button>
-                  </div>
-                  <input
-                    className="input"
-                    value={editElement.selector || ''}
-                    onChange={(event) =>
-                      setEditElement({
-                        ...editElement,
-                        selector: event.target.value,
-                      })
-                    }
-                    placeholder={t('sidepanel_elements_selector_placeholder', 'CSS selector for target')}
-                  />
-                </label>
-                {editElement.type.toLowerCase() !== 'area' ? (
-                  <label className="grid gap-1 sm:col-span-2">
-                    <span>{t('sidepanel_elements_insert_position', 'Insert position')}</span>
-                    <SelectMenu
-                      value={editElement.position || 'append'}
-                      options={placementOptions}
-                      useInputStyle={false}
-                      buttonClassName={selectButtonClass}
-                      onChange={(value) =>
-                        setEditElement({
-                          ...editElement,
-                          position: normalizeElementPosition(value),
-                        })
-                      }
-                    />
-                    <span className="text-[11px] text-muted-foreground">
-                      {t('sidepanel_elements_insert_hint', 'Controls how the element is inserted relative to the target.')}
-                    </span>
-                  </label>
-                ) : null}
               </div>
             </div>
             <div className="rounded border border-border bg-card p-3">
@@ -1794,7 +1836,7 @@ export default function ElementsSection({
                         { value: 'row', label: t('sidepanel_layout_row', 'Row') },
                         { value: 'column', label: t('sidepanel_layout_column', 'Column') },
                       ]}
-                      useInputStyle={false}
+                      useInputStyle
                       buttonClassName={selectButtonClass}
                       onChange={(value) =>
                         setEditElement({
@@ -1952,7 +1994,7 @@ export default function ElementsSection({
                       <ChevronDown className="h-4 w-4 text-muted-foreground transition group-open:rotate-180" />
                     </div>
                   </summary>
-                  <div className="mt-2 flex flex-wrap items-center gap-2 rounded border border-border bg-muted p-2">
+                  <div className="mt-2 flex flex-wrap items-center gap-2 rounded border border-border p-2">
                     <div className="flex items-center gap-2">
                       <span className="text-[10px] font-semibold uppercase text-muted-foreground">
                         {t('sidepanel_elements_style_border', 'Border')}
@@ -1986,8 +2028,8 @@ export default function ElementsSection({
                         value={shadowOptions.some((option) => option.value === boxShadowValue) ? boxShadowValue : ''}
                         options={shadowOptions}
                         placeholder={t('sidepanel_elements_shadow_custom', 'Custom')}
-                        useInputStyle={false}
-                        buttonClassName="btn-ghost h-8 px-2 text-xs"
+                        useInputStyle
+                        buttonClassName="h-8 w-28 px-2 text-xs"
                         onChange={(value) => applyCustomCssUpdates({ boxShadow: value })}
                       />
                     </div>
@@ -2013,7 +2055,7 @@ export default function ElementsSection({
                       <ChevronDown className="h-4 w-4 text-muted-foreground transition group-open:rotate-180" />
                     </div>
                   </summary>
-                  <div className="mt-2 flex flex-wrap items-center gap-2 rounded border border-border bg-muted p-2">
+                  <div className="mt-2 flex flex-wrap items-center gap-2 rounded border border-border p-2">
                     <div className="flex items-center gap-2">
                       <span className="text-[10px] font-semibold uppercase text-muted-foreground">
                         {t('sidepanel_elements_position_mode', 'Mode')}
@@ -2022,8 +2064,8 @@ export default function ElementsSection({
                         value={positionValue}
                         options={positionOptions}
                         placeholder={t('sidepanel_elements_position_auto', 'Auto')}
-                        useInputStyle={false}
-                        buttonClassName="btn-ghost h-8 px-2 text-xs"
+                        useInputStyle
+                        buttonClassName="h-8 w-24 px-2 text-xs"
                         onChange={(value) => applyCustomCssUpdates({ position: value })}
                       />
                     </div>

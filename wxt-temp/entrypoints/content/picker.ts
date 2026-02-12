@@ -3,6 +3,52 @@ import type { PickerAccept, PickerRect, PickerResultPayload } from '../../shared
 const HIGHLIGHT_BORDER_COLOR = '#1b84ff';
 const HIGHLIGHT_FILL_COLOR = 'rgba(27, 132, 255, 0.2)';
 const INPUT_TYPES = new Set(['text', 'password', 'email', 'number', 'search']);
+const HOST_ATTR = 'data-ladybird-element';
+const INSERTION_MARKER_SIZE = 10;
+
+const resolveLadybirdHost = (target: Element | EventTarget | null) => {
+  if (!(target instanceof Element)) {
+    return null;
+  }
+  if (target instanceof HTMLElement && target.hasAttribute(HOST_ATTR)) {
+    return target;
+  }
+  const closest = target.closest(`[${HOST_ATTR}]`);
+  if (closest instanceof HTMLElement) {
+    return closest;
+  }
+  const root = target.getRootNode();
+  if (root instanceof ShadowRoot && root.host instanceof HTMLElement && root.host.hasAttribute(HOST_ATTR)) {
+    return root.host;
+  }
+  return null;
+};
+
+const resolveAreaContainerId = (target: Element, event?: MouseEvent) => {
+  const path = typeof event?.composedPath === 'function' ? event.composedPath() : [];
+  for (const node of path) {
+    const host = resolveLadybirdHost(node);
+    if (!(host instanceof HTMLElement)) {
+      continue;
+    }
+    if ((host.dataset.type || '').toLowerCase() !== 'area') {
+      continue;
+    }
+    const id = host.getAttribute(HOST_ATTR) || '';
+    if (id) {
+      return id;
+    }
+  }
+  const host = resolveLadybirdHost(target);
+  if (!(host instanceof HTMLElement)) {
+    return undefined;
+  }
+  if ((host.dataset.type || '').toLowerCase() !== 'area') {
+    return undefined;
+  }
+  const id = host.getAttribute(HOST_ATTR) || '';
+  return id || undefined;
+};
 
 const cssEscape =
   typeof CSS !== 'undefined' && typeof CSS.escape === 'function'
@@ -73,17 +119,62 @@ const resolveSiblingSelector = (element: Element | null) => {
   }
 };
 
-const resolveInsertionSelectors = (target: Element, clientY: number) => {
+const resolveInsertionSelectors = (target: Element, clientX: number, clientY: number) => {
   const selector = generateSelector(target);
   const rect = target.getBoundingClientRect();
-  const placeBefore = clientY <= rect.top + rect.height / 2;
+  const parent = target.parentElement;
+  let axis: 'horizontal' | 'vertical' = 'vertical';
+  if (parent) {
+    const parentStyle = window.getComputedStyle(parent);
+    if (parentStyle.display.includes('flex')) {
+      const direction = parentStyle.flexDirection || '';
+      if (direction.startsWith('row')) {
+        axis = 'horizontal';
+      } else if (direction.startsWith('column')) {
+        axis = 'vertical';
+      }
+    }
+  }
+  if (!parent || axis === 'vertical') {
+    const display = window.getComputedStyle(target).display;
+    if (display.startsWith('inline')) {
+      axis = 'horizontal';
+    } else {
+      const centerX = rect.left + rect.width / 2;
+      const centerY = rect.top + rect.height / 2;
+      const deltaX = Math.abs(clientX - centerX);
+      const deltaY = Math.abs(clientY - centerY);
+      axis = deltaX > deltaY ? 'horizontal' : 'vertical';
+    }
+  }
+  const placeBefore =
+    axis === 'horizontal'
+      ? clientX <= rect.left + rect.width / 2
+      : clientY <= rect.top + rect.height / 2;
+  const markerSize = INSERTION_MARKER_SIZE;
+  const half = markerSize / 2;
+  const indicatorWidth = axis === 'horizontal' ? markerSize : Math.max(markerSize, rect.width);
+  const indicatorHeight = axis === 'horizontal' ? Math.max(markerSize, rect.height) : markerSize;
+  const unclampedTop =
+    axis === 'horizontal'
+      ? rect.top
+      : (placeBefore ? rect.top : rect.bottom) - half;
+  const unclampedLeft =
+    axis === 'horizontal'
+      ? (placeBefore ? rect.left : rect.right) - half
+      : rect.left;
+  const maxTop = Math.max(0, window.innerHeight - indicatorHeight);
+  const maxLeft = Math.max(0, window.innerWidth - indicatorWidth);
+  const indicatorTop = Math.min(Math.max(unclampedTop, 0), maxTop);
+  const indicatorLeft = Math.min(Math.max(unclampedLeft, 0), maxLeft);
   return {
     selector,
     beforeSelector: placeBefore ? selector : resolveSiblingSelector(target.nextElementSibling),
     afterSelector: placeBefore ? resolveSiblingSelector(target.previousElementSibling) : selector,
-    indicatorTop: placeBefore ? rect.top : rect.bottom,
-    indicatorLeft: rect.left,
-    indicatorWidth: rect.width,
+    indicatorTop,
+    indicatorLeft,
+    indicatorWidth,
+    indicatorHeight,
   };
 };
 
@@ -94,7 +185,7 @@ const resolveTarget = (target: EventTarget | null) => {
   if (target.closest('[data-picker-overlay]')) {
     return null;
   }
-  return target;
+  return resolveLadybirdHost(target) || target;
 };
 
 const isInputTarget = (element: Element) => {
@@ -135,18 +226,20 @@ const createOverlay = () => {
   });
   container.appendChild(highlight);
 
-  const insertionLine = document.createElement('div');
-  Object.assign(insertionLine.style, {
+  const insertionGhost = document.createElement('div');
+  Object.assign(insertionGhost.style, {
     position: 'absolute',
     pointerEvents: 'none',
     backgroundColor: HIGHLIGHT_BORDER_COLOR,
-    borderRadius: '999px',
-    height: '3px',
-    width: '0',
+    border: 'none',
+    borderRadius: '2px',
+    boxSizing: 'border-box',
+    height: '20px',
+    width: '10px',
     opacity: '0',
     transition: 'all 0.05s ease-out',
   });
-  container.appendChild(insertionLine);
+  container.appendChild(insertionGhost);
 
   return {
     container,
@@ -162,18 +255,19 @@ const createOverlay = () => {
     },
     hide() {
       highlight.style.opacity = '0';
-      insertionLine.style.opacity = '0';
+      insertionGhost.style.opacity = '0';
     },
-    showInsertion(indicator: { top: number; left: number; width: number }) {
-      Object.assign(insertionLine.style, {
+    showInsertion(indicator: { top: number; left: number; width: number; height: number }) {
+      Object.assign(insertionGhost.style, {
         opacity: '1',
-        top: `${indicator.top - 1}px`,
+        top: `${indicator.top}px`,
         left: `${indicator.left}px`,
-        width: `${Math.max(24, indicator.width)}px`,
+        width: `${Math.max(INSERTION_MARKER_SIZE, indicator.width)}px`,
+        height: `${Math.max(INSERTION_MARKER_SIZE, indicator.height)}px`,
       });
     },
     hideInsertion() {
-      insertionLine.style.opacity = '0';
+      insertionGhost.style.opacity = '0';
     },
     dispose() {
       container.remove();
@@ -200,6 +294,7 @@ export const startPicker = (options: {
   }
 
   let disposed = false;
+  let session: PickerSession | null = null;
 
   const isAllowed = (element: Element) => {
     if (accept === 'input') {
@@ -222,12 +317,18 @@ export const startPicker = (options: {
     }
     overlay.show(hovered);
     if (accept === 'selector') {
+      const containerId = resolveAreaContainerId(hovered, event);
+      if (containerId) {
+        overlay.hideInsertion();
+        return;
+      }
       try {
-        const placement = resolveInsertionSelectors(hovered, event.clientY);
+        const placement = resolveInsertionSelectors(hovered, event.clientX, event.clientY);
         overlay.showInsertion({
           top: placement.indicatorTop,
           left: placement.indicatorLeft,
           width: placement.indicatorWidth,
+          height: placement.indicatorHeight,
         });
       } catch {
         overlay.hideInsertion();
@@ -256,20 +357,26 @@ export const startPicker = (options: {
     event.preventDefault();
     event.stopPropagation();
     const selector = generateSelector(target);
+    const containerId = resolveAreaContainerId(target, event);
     let beforeSelector = resolveSiblingSelector(target.previousElementSibling);
     let afterSelector = resolveSiblingSelector(target.nextElementSibling);
     if (accept === 'selector') {
-      const placement = resolveInsertionSelectors(target, event.clientY);
-      beforeSelector = placement.beforeSelector;
-      afterSelector = placement.afterSelector;
-      overlay.showInsertion({
-        top: placement.indicatorTop,
-        left: placement.indicatorLeft,
-        width: placement.indicatorWidth,
-      });
+      if (!containerId) {
+        const placement = resolveInsertionSelectors(target, event.clientX, event.clientY);
+        beforeSelector = placement.beforeSelector;
+        afterSelector = placement.afterSelector;
+        overlay.showInsertion({
+          top: placement.indicatorTop,
+          left: placement.indicatorLeft,
+          width: placement.indicatorWidth,
+          height: placement.indicatorHeight,
+        });
+      } else {
+        overlay.hideInsertion();
+      }
     }
     overlay.show(target);
-    onResult({ selector, beforeSelector, afterSelector });
+    onResult({ selector, beforeSelector, afterSelector, containerId });
     dispose();
   };
 
@@ -347,6 +454,7 @@ export const startPicker = (options: {
     if (event.key === 'Escape') {
       event.preventDefault();
       event.stopPropagation();
+      event.stopImmediatePropagation();
       onCancel();
       dispose();
     }
@@ -356,6 +464,7 @@ export const startPicker = (options: {
     document.removeEventListener('mousemove', handleMouseMove, true);
     document.removeEventListener('click', handleClick, true);
     document.removeEventListener('keydown', handleKeyDown, true);
+    window.removeEventListener('keydown', handleKeyDown, true);
     document.removeEventListener('mousedown', handleMouseDown, true);
     document.removeEventListener('mousemove', handleAreaMove, true);
     document.removeEventListener('mouseup', handleMouseUp, true);
@@ -371,6 +480,9 @@ export const startPicker = (options: {
     if (document.body) {
       document.body.style.cursor = '';
     }
+    if (currentSession && session && currentSession === session) {
+      currentSession = null;
+    }
   };
 
   document.addEventListener('mousemove', handleMouseMove, true);
@@ -379,9 +491,11 @@ export const startPicker = (options: {
   document.addEventListener('mousemove', handleAreaMove, true);
   document.addEventListener('mouseup', handleMouseUp, true);
   document.addEventListener('keydown', handleKeyDown, true);
+  window.addEventListener('keydown', handleKeyDown, true);
 
-  currentSession = { stop: dispose };
-  return currentSession;
+  session = { stop: dispose };
+  currentSession = session;
+  return session;
 };
 
 export const stopPicker = () => {

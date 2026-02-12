@@ -38,6 +38,7 @@ export type PickerResultPayload = {
   selector?: string;
   beforeSelector?: string;
   afterSelector?: string;
+  containerId?: string;
   rect?: PickerRect;
 };
 

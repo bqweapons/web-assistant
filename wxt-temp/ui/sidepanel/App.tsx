@@ -163,6 +163,7 @@ export default function App() {
               selector: result.selector,
               beforeSelector: result.beforeSelector,
               afterSelector: result.afterSelector,
+              containerId: result.containerId,
             }
           : null,
       ),

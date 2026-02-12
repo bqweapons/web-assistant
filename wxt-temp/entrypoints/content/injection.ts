@@ -18,6 +18,7 @@ type DropIndicator = {
 };
 
 type DomDropPlacement = {
+  reference: HTMLElement;
   selector: string;
   position: 'before' | 'after' | 'append';
   beforeSelector?: string;
@@ -32,10 +33,15 @@ const HIGHLIGHT_COLOR = 'rgba(27, 132, 255, 0.55)';
 const FLOATING_Z_INDEX = '2147482000';
 const DRAG_Z_INDEX = '2147483200';
 const MIN_SIZE = 24;
+const POSITIONING_KEYS = new Set(['position', 'left', 'top', 'right', 'bottom', 'zIndex']);
 
 let editingElementId: string | null = null;
 let highlightedAreaId: string | null = null;
 let dropIndicatorNode: HTMLElement | null = null;
+let dropPreviewHost: HTMLElement | null = null;
+let dropPreviewSourceId: string | null = null;
+let renderOrderCounter = 0;
+const renderOrderById = new Map<string, number>();
 
 const cssEscape =
   typeof CSS !== 'undefined' && typeof CSS.escape === 'function'
@@ -101,6 +107,25 @@ const normalizeStyleRules = (rules: Record<string, string>) => {
   return next;
 };
 
+const setRenderOrderFromElements = (elements: ElementPayload[]) => {
+  renderOrderById.clear();
+  elements.forEach((element, index) => {
+    renderOrderById.set(element.id, index);
+  });
+  renderOrderCounter = elements.length;
+};
+
+const ensureRenderOrder = (id: string) => {
+  const existing = renderOrderById.get(id);
+  if (typeof existing === 'number') {
+    return existing;
+  }
+  const next = renderOrderCounter;
+  renderOrderCounter += 1;
+  renderOrderById.set(id, next);
+  return next;
+};
+
 const isIdUnique = (id: string, contextDocument: Document) => {
   try {
     return contextDocument.querySelectorAll(`#${cssEscape(id)}`).length === 1;
@@ -157,7 +182,12 @@ const selectorForSibling = (node: Element | null) => {
   }
 };
 
-const applyInlineStyles = (node: HTMLElement, element: ElementPayload) => {
+const applyInlineStyles = (
+  node: HTMLElement,
+  element: ElementPayload,
+  options?: { omitPositioning?: boolean },
+) => {
+  const omitPositioning = options?.omitPositioning === true;
   const inline = element.style?.inline || {};
   const custom = parseCustomCss(element.style?.customCss || '');
   const merged: Record<string, string> = { ...inline, ...custom };
@@ -165,13 +195,55 @@ const applyInlineStyles = (node: HTMLElement, element: ElementPayload) => {
     if (!value) {
       return;
     }
+    if (
+      omitPositioning &&
+      POSITIONING_KEYS.has(key)
+    ) {
+      return;
+    }
     // eslint-disable-next-line @typescript-eslint/ban-ts-comment
     // @ts-ignore style indexing
     node.style[key] = value;
   });
-  if (element.floating) {
+  if (element.floating && !omitPositioning) {
     node.style.position = node.style.position || 'absolute';
   }
+};
+
+const applyHostPlacementStyles = (host: HTMLElement, element: ElementPayload) => {
+  const merged = mergeStyleRules(element);
+  const nextPosition = merged.position?.trim();
+  host.style.position = nextPosition || (element.floating ? 'absolute' : host.style.position || 'relative');
+  host.style.left = merged.left?.trim() || '';
+  host.style.top = merged.top?.trim() || '';
+  host.style.right = merged.right?.trim() || '';
+  host.style.bottom = merged.bottom?.trim() || '';
+  host.style.zIndex = merged.zIndex?.trim() || '';
+};
+
+const applyHostContainerOrderStyle = (host: HTMLElement, element: ElementPayload) => {
+  const rules = mergeStyleRules(element);
+  const order = rules.order?.trim() || '';
+  host.style.order = element.containerId ? order : '';
+};
+
+const stripPositioningFromStyle = (style?: ElementPayload['style']) => {
+  const merged = {
+    ...(style?.inline || {}),
+    ...parseCustomCss(style?.customCss || ''),
+  };
+  delete merged.position;
+  delete merged.left;
+  delete merged.top;
+  delete merged.right;
+  delete merged.bottom;
+  delete merged.zIndex;
+  const normalized = normalizeStyleRules(merged);
+  return {
+    preset: style?.preset,
+    inline: normalized,
+    customCss: formatCustomCss(normalized),
+  };
 };
 
 const createHostWithShadow = (element: ElementPayload) => {
@@ -182,7 +254,7 @@ const createHostWithShadow = (element: ElementPayload) => {
   host.dataset.shadow = 'true';
   host.style.position = 'relative';
   host.style.boxSizing = 'border-box';
-  host.style.display = 'block';
+  host.style.display = 'inline-block';
   host.style.pointerEvents = 'auto';
 
   const root = host.attachShadow({ mode: 'open' });
@@ -190,10 +262,11 @@ const createHostWithShadow = (element: ElementPayload) => {
   style.textContent = `
     :host {
       all: initial;
-      display: block;
+      display: inline-block;
       box-sizing: border-box;
       position: relative;
       pointer-events: auto;
+      vertical-align: top;
     }
     * { box-sizing: border-box; }
     .ladybird-reset {
@@ -333,11 +406,12 @@ const createElementNode = (element: ElementPayload) => {
   }
 
   if (element.floating) {
-    applyInlineStyles(host, element);
-    applyInlineStyles(node, element);
+    applyHostPlacementStyles(host, element);
+    applyInlineStyles(node, element, { omitPositioning: true });
   } else {
     applyInlineStyles(node, element);
   }
+  applyHostContainerOrderStyle(host, element);
 
   root.appendChild(node);
   return { host, root, content: node };
@@ -492,19 +566,80 @@ const ensureDropIndicator = () => {
 };
 
 const showDropIndicator = (indicator: DropIndicator) => {
-  const node = ensureDropIndicator();
-  node.style.opacity = '1';
-  node.style.left = `${Math.round(indicator.left)}px`;
-  node.style.top = `${Math.round(indicator.top)}px`;
-  node.style.width = `${Math.max(2, Math.round(indicator.width))}px`;
-  node.style.height = `${Math.max(2, Math.round(indicator.height))}px`;
+  void indicator;
 };
 
 const hideDropIndicator = () => {
-  if (!dropIndicatorNode) {
+  if (dropIndicatorNode?.isConnected) {
+    dropIndicatorNode.remove();
+  }
+  dropIndicatorNode = null;
+};
+
+const removeDropPreviewHost = () => {
+  if (dropPreviewHost?.isConnected) {
+    dropPreviewHost.remove();
+  }
+  dropPreviewHost = null;
+  dropPreviewSourceId = null;
+};
+
+const ensureDropPreviewHost = (element: ElementPayload) => {
+  if (dropPreviewHost && dropPreviewSourceId === element.id && dropPreviewHost.isConnected) {
+    return dropPreviewHost;
+  }
+  removeDropPreviewHost();
+  const previewElement: ElementPayload = {
+    ...element,
+    floating: false,
+    style: stripPositioningFromStyle(element.style),
+  };
+  const { host } = createElementNode({
+    ...previewElement,
+  });
+  host.dataset.ladybirdDropPreview = 'true';
+  host.setAttribute(EDITING_ATTR, 'false');
+  host.style.pointerEvents = 'none';
+  host.style.opacity = '0.5';
+  host.style.filter = 'saturate(0.9)';
+  host.style.zIndex = '2147483300';
+  dropPreviewHost = host;
+  dropPreviewSourceId = element.id;
+  return host;
+};
+
+const showAreaDropPreview = (dropTarget: RegistryEntry, element: ElementPayload) => {
+  if (!(dropTarget.content instanceof HTMLElement)) {
     return;
   }
-  dropIndicatorNode.style.opacity = '0';
+  const preview = ensureDropPreviewHost(element);
+  if (preview.parentElement !== dropTarget.content) {
+    dropTarget.content.appendChild(preview);
+  }
+};
+
+const showDomDropPreview = (placement: DomDropPlacement, element: ElementPayload) => {
+  const preview = ensureDropPreviewHost(element);
+  const reference = placement.reference;
+  if (!(reference instanceof HTMLElement)) {
+    removeDropPreviewHost();
+    return;
+  }
+  if (placement.position === 'append') {
+    if (preview.parentElement !== reference || reference.lastChild !== preview) {
+      reference.appendChild(preview);
+    }
+    return;
+  }
+  if (!reference.parentElement) {
+    removeDropPreviewHost();
+    return;
+  }
+  if (placement.position === 'before') {
+    reference.parentElement.insertBefore(preview, reference);
+    return;
+  }
+  reference.parentElement.insertBefore(preview, reference.nextSibling);
 };
 
 const applyEditingState = (entry: RegistryEntry) => {
@@ -515,6 +650,36 @@ const applyEditingState = (entry: RegistryEntry) => {
 
 const applyEditingStateToAll = () => {
   registry.forEach((entry) => applyEditingState(entry));
+};
+
+const applyStableFloatingLayer = (entry: RegistryEntry) => {
+  if (!entry.element.floating) {
+    return;
+  }
+  const styleRules = mergeStyleRules(entry.element);
+  const configured = styleRules.zIndex?.trim();
+  if (configured) {
+    entry.node.style.zIndex = configured;
+    return;
+  }
+  const order = ensureRenderOrder(entry.element.id);
+  entry.node.style.zIndex = String(Number(FLOATING_Z_INDEX) + order);
+};
+
+const reattachContainerChildren = (containerId: string) => {
+  const container = registry.get(containerId);
+  if (!(container?.content instanceof HTMLElement)) {
+    return;
+  }
+  const children = Array.from(registry.values()).filter(
+    (entry) => entry.element.id !== containerId && entry.element.containerId === containerId,
+  );
+  children.forEach((child) => {
+    if (child.node.parentElement === container.content && child.node.isConnected) {
+      return;
+    }
+    upsertElement(child.element);
+  });
 };
 
 const postDraftUpdate = (element: ElementPayload) => {
@@ -552,6 +717,154 @@ const buildElementWithStyleRules = (base: ElementPayload, rules: Record<string, 
   return next;
 };
 
+const filterRules = (element: ElementPayload, omitPositioning: boolean) => {
+  const rules = mergeStyleRules(element);
+  if (!omitPositioning) {
+    return rules;
+  }
+  const filtered: Record<string, string> = {};
+  Object.entries(rules).forEach(([key, value]) => {
+    if (!POSITIONING_KEYS.has(key)) {
+      filtered[key] = value;
+    }
+  });
+  return filtered;
+};
+
+const applyRuleMapToNode = (
+  node: HTMLElement,
+  previous: Record<string, string>,
+  next: Record<string, string>,
+) => {
+  const keys = new Set([...Object.keys(previous), ...Object.keys(next)]);
+  keys.forEach((key) => {
+    const value = next[key];
+    // eslint-disable-next-line @typescript-eslint/ban-ts-comment
+    // @ts-ignore style indexing
+    node.style[key] = value ? value : '';
+  });
+};
+
+const resetHostPlacementStyles = (host: HTMLElement) => {
+  host.style.position = 'relative';
+  host.style.left = '';
+  host.style.top = '';
+  host.style.right = '';
+  host.style.bottom = '';
+  host.style.zIndex = '';
+};
+
+const resolveExpectedParent = (next: ElementPayload): HTMLElement | null => {
+  if (next.containerId) {
+    const container = registry.get(next.containerId);
+    return container?.content || null;
+  }
+  if (next.floating) {
+    return document.body;
+  }
+
+  const beforeNode = next.beforeSelector ? resolveTarget(next.beforeSelector) : null;
+  if (beforeNode?.parentElement) {
+    return beforeNode.parentElement;
+  }
+  const afterNode = next.afterSelector ? resolveTarget(next.afterSelector) : null;
+  if (afterNode?.parentElement) {
+    return afterNode.parentElement;
+  }
+  const target = resolveTarget(next.selector);
+  if (!target) {
+    return null;
+  }
+  const position = next.position || 'append';
+  if (position === 'before' || position === 'after') {
+    return target.parentElement;
+  }
+  return target;
+};
+
+const isStructuralChange = (entry: RegistryEntry, next: ElementPayload) => {
+  const previous = entry.element;
+  if (previous.type !== next.type) {
+    return true;
+  }
+  if (Boolean(previous.floating) !== Boolean(next.floating)) {
+    return true;
+  }
+  if ((previous.containerId || '') !== (next.containerId || '')) {
+    return true;
+  }
+  if ((previous.selector || '') !== (next.selector || '')) {
+    return true;
+  }
+  if ((previous.position || 'append') !== (next.position || 'append')) {
+    return true;
+  }
+  if ((previous.beforeSelector || '') !== (next.beforeSelector || '')) {
+    return true;
+  }
+  if ((previous.afterSelector || '') !== (next.afterSelector || '')) {
+    return true;
+  }
+  const expectedParent = resolveExpectedParent(next);
+  if (!(expectedParent instanceof HTMLElement)) {
+    return true;
+  }
+  if (entry.node.parentElement !== expectedParent) {
+    return true;
+  }
+  return false;
+};
+
+const isContentCompatible = (entry: RegistryEntry, next: ElementPayload) => {
+  if (entry.element.type !== next.type) {
+    return false;
+  }
+  const node = entry.content || entry.node;
+  if (next.type === 'button') {
+    return node instanceof HTMLButtonElement;
+  }
+  if (next.type === 'link') {
+    return node instanceof HTMLAnchorElement;
+  }
+  return node instanceof HTMLElement;
+};
+
+const syncContentAttributes = (entry: RegistryEntry, next: ElementPayload) => {
+  const node = entry.content || entry.node;
+  if (next.type === 'button' && node instanceof HTMLButtonElement) {
+    node.textContent = next.text || 'Button';
+    return;
+  }
+  if (next.type === 'link' && node instanceof HTMLAnchorElement) {
+    node.textContent = next.text || next.href || 'Link';
+    node.href = next.href || '#';
+    node.target = next.linkTarget === 'same-tab' ? '_self' : '_blank';
+    node.rel = 'noreferrer noopener';
+    return;
+  }
+  if (next.type === 'tooltip' && node instanceof HTMLElement) {
+    node.textContent = next.text || 'Tooltip';
+    return;
+  }
+  if (next.type === 'area' && node instanceof HTMLElement) {
+    node.style.flexDirection = next.layout === 'column' ? 'column' : 'row';
+  }
+};
+
+const syncElementStylesInPlace = (entry: RegistryEntry, next: ElementPayload) => {
+  const previous = entry.element;
+  const host = entry.node;
+  const content = entry.content || host;
+  if (next.floating) {
+    applyHostPlacementStyles(host, next);
+    applyRuleMapToNode(content, filterRules(previous, true), filterRules(next, true));
+  } else {
+    resetHostPlacementStyles(host);
+    applyRuleMapToNode(content, filterRules(previous, false), filterRules(next, false));
+  }
+  applyHostContainerOrderStyle(host, next);
+};
+
 const findAreaDropTarget = (clientX: number, clientY: number, excludeId: string) => {
   for (const [id, entry] of registry) {
     if (id === excludeId || entry.element.type !== 'area') {
@@ -563,6 +876,74 @@ const findAreaDropTarget = (clientX: number, clientY: number, excludeId: string)
     }
   }
   return null;
+};
+
+const buildAreaOrderUpdates = (
+  area: RegistryEntry,
+  draggedElement: ElementPayload,
+  clientX: number,
+  clientY: number,
+) => {
+  const content = area.content;
+  if (!(content instanceof HTMLElement)) {
+    return [draggedElement];
+  }
+
+  const allChildIds = Array.from(content.querySelectorAll(`[${HOST_ATTR}]`))
+    .map((node) => (node instanceof HTMLElement ? node.getAttribute(HOST_ATTR) : ''))
+    .filter((id): id is string => Boolean(id))
+    .filter((id, index, source) => source.indexOf(id) === index)
+    .filter((id) => id !== area.element.id)
+    .filter((id) => registry.has(id));
+
+  const siblingIds = allChildIds.filter((id) => id !== draggedElement.id);
+  const axis = area.element.layout === 'column' ? 'column' : 'row';
+
+  let insertIndex = siblingIds.length;
+  for (let index = 0; index < siblingIds.length; index += 1) {
+    const siblingEntry = registry.get(siblingIds[index]);
+    if (!siblingEntry?.node) {
+      continue;
+    }
+    const rect = siblingEntry.node.getBoundingClientRect();
+    const center = axis === 'column' ? rect.top + rect.height / 2 : rect.left + rect.width / 2;
+    const pointer = axis === 'column' ? clientY : clientX;
+    if (pointer <= center) {
+      insertIndex = index;
+      break;
+    }
+  }
+
+  const orderedIds = siblingIds.slice();
+  orderedIds.splice(insertIndex, 0, draggedElement.id);
+
+  const updates: ElementPayload[] = [];
+  orderedIds.forEach((id, index) => {
+    const base = id === draggedElement.id ? draggedElement : registry.get(id)?.element;
+    if (!base) {
+      return;
+    }
+    const rules = mergeStyleRules(base);
+    const nextOrder = String((index + 1) * 10);
+    const previousOrder = rules.order?.trim() || '';
+    rules.order = nextOrder;
+
+    const next = buildElementWithStyleRules(base, rules, {
+      floating: false,
+      containerId: area.element.id,
+    });
+
+    if (
+      id === draggedElement.id ||
+      base.floating !== false ||
+      (base.containerId || '') !== area.element.id ||
+      previousOrder !== nextOrder
+    ) {
+      updates.push(next);
+    }
+  });
+
+  return updates.length > 0 ? updates : [draggedElement];
 };
 
 const findDomDropTarget = (clientX: number, clientY: number, draggedHost: HTMLElement) => {
@@ -580,6 +961,9 @@ const findDomDropTarget = (clientX: number, clientY: number, draggedHost: HTMLEl
       if (candidate.closest('[data-ladybird-drop-indicator]')) {
         continue;
       }
+      if (candidate.closest('[data-ladybird-drop-preview]')) {
+        continue;
+      }
       return candidate;
     }
     return null;
@@ -588,7 +972,7 @@ const findDomDropTarget = (clientX: number, clientY: number, draggedHost: HTMLEl
   }
 };
 
-const resolveDomDropPlacement = (target: HTMLElement | null, clientY: number): DomDropPlacement | null => {
+const resolveDomDropPlacement = (target: HTMLElement | null, clientX: number, clientY: number): DomDropPlacement | null => {
   if (!(target instanceof HTMLElement)) {
     return null;
   }
@@ -596,6 +980,7 @@ const resolveDomDropPlacement = (target: HTMLElement | null, clientY: number): D
   if (target === document.documentElement || target === document.body) {
     const rect = document.body.getBoundingClientRect();
     return {
+      reference: document.body,
       selector: 'body',
       position: 'append',
       indicator: {
@@ -618,24 +1003,32 @@ const resolveDomDropPlacement = (target: HTMLElement | null, clientY: number): D
   }
 
   const rect = target.getBoundingClientRect();
-  const midpoint = rect.top + rect.height / 2;
-  const placeBefore = clientY <= midpoint;
+  const edges: Array<{ edge: 'top' | 'bottom' | 'left' | 'right'; distance: number }> = [
+    { edge: 'top', distance: Math.abs(clientY - rect.top) },
+    { edge: 'bottom', distance: Math.abs(clientY - rect.bottom) },
+    { edge: 'left', distance: Math.abs(clientX - rect.left) },
+    { edge: 'right', distance: Math.abs(clientX - rect.right) },
+  ];
+  const nearestEdge = edges.sort((a, b) => a.distance - b.distance)[0]?.edge;
+  const placeBefore = nearestEdge === 'top' || nearestEdge === 'left';
+  const showVerticalLine = nearestEdge === 'left' || nearestEdge === 'right';
   return {
+    reference: target,
     selector,
     position: placeBefore ? 'before' : 'after',
     beforeSelector: placeBefore ? selector : selectorForSibling(target.nextElementSibling),
     afterSelector: placeBefore ? selectorForSibling(target.previousElementSibling) : selector,
     indicator: {
-      left: rect.left,
-      top: placeBefore ? rect.top - 1 : rect.bottom - 1,
-      width: Math.max(24, rect.width),
-      height: 3,
+      left: showVerticalLine ? (placeBefore ? rect.left - 1 : rect.right - 1) : rect.left,
+      top: showVerticalLine ? rect.top : placeBefore ? rect.top - 1 : rect.bottom - 1,
+      width: showVerticalLine ? 3 : Math.max(24, rect.width),
+      height: showVerticalLine ? Math.max(24, rect.height) : 3,
     },
   };
 };
 
 const persistElementMutation = (nextElement: ElementPayload) => {
-  const result = injectElement(nextElement);
+  const result = upsertElement(nextElement);
   if (!result.ok) {
     return result;
   }
@@ -649,6 +1042,7 @@ const persistElementMutation = (nextElement: ElementPayload) => {
 const attachInteractions = (entry: RegistryEntry) => {
   const host = entry.node;
   const root = entry.root;
+  const content = entry.content || host;
   const cleanupFns: Array<() => void> = [];
 
   const isEditing = () => editingElementId === entry.element.id;
@@ -668,9 +1062,8 @@ const attachInteractions = (entry: RegistryEntry) => {
       return;
     }
 
-    const liveHost = liveEntry.node;
-    const liveContent = liveEntry.content || liveHost;
-    const sizeTarget = liveEntry.element.floating ? liveHost : liveContent;
+    const liveContent = liveEntry.content || liveEntry.node;
+    const sizeTarget = liveContent;
     const initialRect = sizeTarget.getBoundingClientRect();
     const pointerId = event.pointerId;
     const startX = event.clientX;
@@ -720,7 +1113,7 @@ const attachInteractions = (entry: RegistryEntry) => {
       }
       const finalHost = finalEntry.node;
       const finalContent = finalEntry.content || finalHost;
-      const finalTarget = finalEntry.element.floating ? finalHost : finalContent;
+      const finalTarget = finalContent;
       const finalRect = finalTarget.getBoundingClientRect();
       const styleRules = mergeStyleRules(finalEntry.element);
       styleRules.width = `${Math.max(MIN_SIZE, Math.round(finalRect.width))}px`;
@@ -766,13 +1159,17 @@ const attachInteractions = (entry: RegistryEntry) => {
   };
 
   if (root) {
+    const currentPosition = content.style.position;
+    if (!currentPosition || currentPosition === 'static') {
+      content.style.position = 'relative';
+    }
     (['e', 's', 'se'] as const).forEach((handle) => {
       const handleNode = document.createElement('div');
       handleNode.className = 'ladybird-resize-handle';
       handleNode.dataset.ladybirdResizeHandle = handle;
       const listener = (event: PointerEvent) => startResize(handle, event);
       handleNode.addEventListener('pointerdown', listener);
-      root.appendChild(handleNode);
+      content.appendChild(handleNode);
       cleanupFns.push(() => {
         handleNode.removeEventListener('pointerdown', listener);
         handleNode.remove();
@@ -802,6 +1199,8 @@ const attachInteractions = (entry: RegistryEntry) => {
     const startY = event.clientY;
     let lastLeft = startLeft;
     let lastTop = startTop;
+    let lastPointerX = event.clientX;
+    let lastPointerY = event.clientY;
     let activated = false;
 
     let currentArea: RegistryEntry | null = null;
@@ -826,6 +1225,8 @@ const attachInteractions = (entry: RegistryEntry) => {
       if (moveEvent.pointerId !== pointerId) {
         return;
       }
+      lastPointerX = moveEvent.clientX;
+      lastPointerY = moveEvent.clientY;
       const deltaX = moveEvent.clientX - startX;
       const deltaY = moveEvent.clientY - startY;
       if (!activated) {
@@ -845,6 +1246,7 @@ const attachInteractions = (entry: RegistryEntry) => {
         currentArea = null;
         currentPlacement = null;
         hideDropIndicator();
+        removeDropPreviewHost();
         return;
       }
 
@@ -854,19 +1256,22 @@ const attachInteractions = (entry: RegistryEntry) => {
         currentPlacement = null;
         setAreaHighlight(areaTarget.element.id);
         hideDropIndicator();
+        showAreaDropPreview(areaTarget, liveEntry.element);
         return;
       }
 
       setAreaHighlight(null);
       currentArea = null;
       const domTarget = findDomDropTarget(moveEvent.clientX, moveEvent.clientY, dragHost);
-      const placement = resolveDomDropPlacement(domTarget, moveEvent.clientY);
+      const placement = resolveDomDropPlacement(domTarget, moveEvent.clientX, moveEvent.clientY);
       if (placement) {
         currentPlacement = placement;
         showDropIndicator(placement.indicator);
+        showDomDropPreview(placement, liveEntry.element);
       } else {
         currentPlacement = null;
         hideDropIndicator();
+        removeDropPreviewHost();
       }
     };
 
@@ -877,6 +1282,7 @@ const attachInteractions = (entry: RegistryEntry) => {
       dragHost.classList.remove('ladybird-dragging');
       document.documentElement.style.userSelect = '';
       hideDropIndicator();
+      removeDropPreviewHost();
       setAreaHighlight(null);
       try {
         dragHost.releasePointerCapture(pointerId);
@@ -933,7 +1339,10 @@ const attachInteractions = (entry: RegistryEntry) => {
           beforeSelector: undefined,
           afterSelector: undefined,
         });
-        persistElementMutation(nextElement);
+        const updates = buildAreaOrderUpdates(currentArea, nextElement, lastPointerX, lastPointerY);
+        updates.forEach((item) => {
+          persistElementMutation(item);
+        });
         return;
       }
 
@@ -942,6 +1351,7 @@ const attachInteractions = (entry: RegistryEntry) => {
         delete styleRules.left;
         delete styleRules.top;
         delete styleRules.zIndex;
+        delete styleRules.order;
         const nextElement = buildElementWithStyleRules(finalEntry.element, styleRules, {
           floating: false,
           containerId: undefined,
@@ -957,6 +1367,7 @@ const attachInteractions = (entry: RegistryEntry) => {
       styleRules.position = 'absolute';
       styleRules.left = `${Math.round(lastLeft)}px`;
       styleRules.top = `${Math.round(lastTop)}px`;
+      delete styleRules.order;
       if (!styleRules.zIndex) {
         styleRules.zIndex = FLOATING_Z_INDEX;
       }
@@ -1031,6 +1442,7 @@ const injectElement = (element: ElementPayload) => {
   if (!element?.id || !element.type) {
     return { ok: false, error: 'invalid-element' };
   }
+  ensureRenderOrder(element.id);
 
   const siteKey = normalizeSiteKey(element.siteUrl || '');
   const currentSite = normalizeSiteKey(window.location.host || '');
@@ -1062,11 +1474,42 @@ const injectElement = (element: ElementPayload) => {
   entry.cleanup = attachInteractions(entry);
   registry.set(element.id, entry);
   applyEditingState(entry);
+  applyStableFloatingLayer(entry);
 
   if (element.type === 'tooltip') {
     placeTooltip(element);
   }
+  if (element.type === 'area') {
+    reattachContainerChildren(element.id);
+  }
 
+  return { ok: true };
+};
+
+const upsertElement = (element: ElementPayload) => {
+  const existing = registry.get(element.id);
+  if (!existing) {
+    return injectElement(element);
+  }
+  if (!isContentCompatible(existing, element)) {
+    return injectElement(element);
+  }
+  if (isStructuralChange(existing, element)) {
+    return injectElement(element);
+  }
+
+  syncContentAttributes(existing, element);
+  syncElementStylesInPlace(existing, element);
+  existing.element = element;
+  applyEditingState(existing);
+  applyStableFloatingLayer(existing);
+
+  if (element.type === 'tooltip') {
+    placeTooltip(element);
+  }
+  if (element.type === 'area') {
+    reattachContainerChildren(element.id);
+  }
   return { ok: true };
 };
 
@@ -1078,6 +1521,7 @@ const removeElement = (id: string) => {
   entry.cleanup?.();
   entry.node.remove();
   registry.delete(id);
+  renderOrderById.delete(id);
   if (editingElementId === id) {
     editingElementId = null;
   }
@@ -1085,13 +1529,43 @@ const removeElement = (id: string) => {
 };
 
 const rehydrateElements = (elements: ElementPayload[]) => {
-  Array.from(registry.keys()).forEach((id) => removeElement(id));
-  elements.forEach((element) => {
-    injectElement(element);
+  const previousEditingId = editingElementId;
+  setRenderOrderFromElements(elements);
+  const incomingIds = new Set(elements.map((element) => element.id));
+  Array.from(registry.keys()).forEach((id) => {
+    if (!incomingIds.has(id)) {
+      removeElement(id);
+    }
   });
-  if (editingElementId && !registry.has(editingElementId)) {
-    editingElementId = null;
+
+  const incomingById = new Map(elements.map((element) => [element.id, element]));
+  const pending = elements.slice();
+  let progressed = true;
+  while (pending.length > 0 && progressed) {
+    progressed = false;
+    for (let index = 0; index < pending.length; ) {
+      const element = pending[index];
+      if (
+        element.containerId &&
+        incomingById.has(element.containerId) &&
+        !registry.has(element.containerId)
+      ) {
+        index += 1;
+        continue;
+      }
+      const result = upsertElement(element);
+      if (!result.ok) {
+        index += 1;
+        continue;
+      }
+      pending.splice(index, 1);
+      progressed = true;
+    }
   }
+  pending.forEach((element) => {
+    upsertElement(element);
+  });
+  editingElementId = previousEditingId && registry.has(previousEditingId) ? previousEditingId : null;
   applyEditingStateToAll();
 };
 
@@ -1100,22 +1574,26 @@ const blinkHighlight = (node: HTMLElement) => {
   const overlay = document.createElement('div');
   overlay.style.position = 'fixed';
   overlay.style.pointerEvents = 'none';
-  overlay.style.border = `2px solid ${HIGHLIGHT_COLOR}`;
-  overlay.style.borderRadius = '8px';
+  overlay.style.boxSizing = 'border-box';
+  overlay.style.background = HIGHLIGHT_COLOR;
+  overlay.style.backdropFilter = 'saturate(1.1)';
+  overlay.style.border = '2px solid rgba(27, 132, 255, 0.65)';
   overlay.style.zIndex = '2147483646';
-  overlay.style.top = `${Math.round(rect.top)}px`;
-  overlay.style.left = `${Math.round(rect.left)}px`;
-  overlay.style.width = `${Math.round(rect.width)}px`;
-  overlay.style.height = `${Math.round(rect.height)}px`;
-  overlay.style.opacity = '1';
-  overlay.style.transition = 'opacity 120ms ease';
+  overlay.style.top = `${Math.round(rect.top) - 5}px`;
+  overlay.style.left = `${Math.round(rect.left) - 5}px`;
+  overlay.style.width = `${Math.round(rect.width) + 10}px`;
+  overlay.style.height = `${Math.round(rect.height) + 10}px`;
+  overlay.style.opacity = '0.38';
+  overlay.style.transition = 'opacity 100ms ease, transform 100ms ease';
+  overlay.style.transform = 'scale(1)';
   document.body.appendChild(overlay);
 
   let visible = true;
   let ticks = 0;
   const timer = window.setInterval(() => {
     visible = !visible;
-    overlay.style.opacity = visible ? '1' : '0.15';
+    overlay.style.opacity = visible ? '0.38' : '0.08';
+    overlay.style.transform = visible ? 'scale(1)' : 'scale(0.995)';
     ticks += 1;
     if (ticks >= 6) {
       window.clearInterval(timer);
@@ -1129,9 +1607,23 @@ const highlightElement = (id: string) => {
   if (!entry?.node) {
     return false;
   }
-  const target = entry.node;
-  target.scrollIntoView({ behavior: 'smooth', block: 'center', inline: 'center' });
-  blinkHighlight(target);
+  const preferred = entry.content || entry.node;
+  const preferredRect = preferred.getBoundingClientRect();
+  const target =
+    preferredRect.width > 0 && preferredRect.height > 0
+      ? preferred
+      : entry.node;
+  const rect = target.getBoundingClientRect();
+  const nextTop = rect.top + window.scrollY - (window.innerHeight - rect.height) / 2;
+  const nextLeft = rect.left + window.scrollX - (window.innerWidth - rect.width) / 2;
+  window.scrollTo({
+    top: Math.max(0, Math.round(nextTop)),
+    left: Math.max(0, Math.round(nextLeft)),
+    behavior: 'auto',
+  });
+  requestAnimationFrame(() => {
+    blinkHighlight(target);
+  });
   return true;
 };
 
@@ -1140,20 +1632,27 @@ const setEditingElement = (id?: string) => {
   applyEditingStateToAll();
   if (!editingElementId) {
     hideDropIndicator();
+    removeDropPreviewHost();
     setAreaHighlight(null);
   }
 };
 
 export const handleInjectionMessage = (message: RuntimeMessage) => {
   switch (message.type) {
-    case MessageType.CREATE_ELEMENT:
+    case MessageType.CREATE_ELEMENT: {
+      const element = message.data?.element;
+      if (!element) {
+        return { ok: false, error: 'invalid-element' };
+      }
+      return injectElement(element);
+    }
     case MessageType.UPDATE_ELEMENT:
     case MessageType.PREVIEW_ELEMENT: {
       const element = message.data?.element;
       if (!element) {
         return { ok: false, error: 'invalid-element' };
       }
-      return injectElement(element);
+      return upsertElement(element);
     }
     case MessageType.DELETE_ELEMENT: {
       const id = message.data?.id;
@@ -1188,6 +1687,8 @@ export const handleInjectionMessage = (message: RuntimeMessage) => {
 export const resetInjectionRegistry = () => {
   setEditingElement(undefined);
   Array.from(registry.keys()).forEach((id) => removeElement(id));
+  renderOrderById.clear();
+  renderOrderCounter = 0;
   if (dropIndicatorNode?.isConnected) {
     dropIndicatorNode.remove();
   }
