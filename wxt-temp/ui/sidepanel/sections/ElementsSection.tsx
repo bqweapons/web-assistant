@@ -23,7 +23,7 @@ import Drawer from '../components/Drawer';
 import FlowDrawer from '../components/FlowDrawer';
 import FlowStepsBuilder from '../components/FlowStepsBuilder';
 import SelectMenu from '../components/SelectMenu';
-import { mockElements, mockFlows } from '../utils/mockData';
+import { mockFlows } from '../utils/mockData';
 import { t, useLocale } from '../utils/i18n';
 import { MessageType, type ElementPayload, type PickerRect, type SelectorPickerAccept } from '../../../shared/messages';
 import { getSiteData, setSiteData } from '../../../shared/storage';
@@ -35,10 +35,43 @@ type ElementStyle = {
   customCss?: string;
 };
 
-type BaseElement = (typeof mockElements)[number];
-type ElementRecord = Omit<BaseElement, 'style' | 'stylePreset' | 'customCss'> & {
+type ElementRecord = ElementPayload & {
+  text: string;
+  selector: string;
+  position: NonNullable<ElementPayload['position']>;
   style: ElementStyle;
+  pageUrl: string;
+  siteUrl: string;
+  frameUrl: string;
+  frameSelectors: string[];
+  floating: boolean;
+  createdAt: number;
+  updatedAt: number;
+  actionFlowId?: string;
+  actionFlowLocked?: boolean;
+  actionFlow?: string;
 };
+
+type BaseElement = Partial<ElementRecord> & {
+  id?: string;
+  type?: string;
+  position?: string;
+  style?: unknown;
+  stylePreset?: string;
+  customCss?: string;
+};
+
+const isElementType = (value: unknown): value is ElementPayload['type'] =>
+  value === 'button' || value === 'link' || value === 'tooltip' || value === 'area';
+
+const isElementPosition = (value: unknown): value is NonNullable<ElementPayload['position']> =>
+  value === 'append' || value === 'prepend' || value === 'before' || value === 'after';
+
+const normalizeElementPosition = (value: unknown): NonNullable<ElementPayload['position']> =>
+  isElementPosition(value) ? value : 'append';
+
+const normalizeElementScope = (value: unknown): NonNullable<ElementPayload['scope']> =>
+  value === 'site' || value === 'global' ? value : 'page';
 
 const isStyleRecord = (value: unknown): value is Record<string, string> => {
   return Boolean(value) && typeof value === 'object' && !Array.isArray(value);
@@ -64,19 +97,86 @@ const normalizeStyle = (
   };
 };
 
-const normalizeElement = (element: BaseElement): ElementRecord => {
+const normalizeElement = (element: BaseElement): ElementRecord | null => {
+  if (!element?.id || typeof element.id !== 'string' || !isElementType(element.type)) {
+    return null;
+  }
   const { style, stylePreset, customCss, ...rest } = element as BaseElement & {
     stylePreset?: string;
     customCss?: string;
   };
   return {
     ...rest,
+    id: element.id,
+    type: element.type,
+    text: typeof element.text === 'string' ? element.text : '',
+    selector: typeof element.selector === 'string' ? element.selector : '',
+    position: normalizeElementPosition(element.position),
+    pageUrl: typeof element.pageUrl === 'string' ? element.pageUrl : '',
+    siteUrl: typeof element.siteUrl === 'string' ? element.siteUrl : '',
+    frameUrl: typeof element.frameUrl === 'string' ? element.frameUrl : '',
+    frameSelectors: Array.isArray(element.frameSelectors)
+      ? element.frameSelectors.filter((item): item is string => typeof item === 'string')
+      : [],
+    floating: element.floating !== false,
+    scope: normalizeElementScope(element.scope),
+    createdAt: typeof element.createdAt === 'number' ? element.createdAt : Date.now(),
+    updatedAt: typeof element.updatedAt === 'number' ? element.updatedAt : Date.now(),
     style: normalizeStyle(style, stylePreset, customCss),
   };
 };
 
+const toElementPayload = (element: ElementRecord): ElementPayload => ({
+  id: element.id,
+  type: element.type,
+  text: element.text,
+  selector: element.selector,
+  position: normalizeElementPosition(element.position),
+  beforeSelector: element.beforeSelector,
+  afterSelector: element.afterSelector,
+  containerId: element.containerId,
+  floating: element.floating,
+  layout: element.layout,
+  href: element.href,
+  linkTarget: element.linkTarget,
+  tooltipPosition: element.tooltipPosition,
+  tooltipPersistent: element.tooltipPersistent,
+  style: {
+    preset: element.style?.preset,
+    inline: element.style?.inline || {},
+    customCss: element.style?.customCss || '',
+  },
+  scope: element.scope,
+  siteUrl: element.siteUrl,
+  pageUrl: element.pageUrl,
+  frameUrl: element.frameUrl,
+  frameSelectors: element.frameSelectors,
+  createdAt: element.createdAt,
+  updatedAt: element.updatedAt,
+});
+
 const normalizeSiteKey = (value: string) =>
   value.replace(/^https?:\/\//, '').replace(/^file:\/\//, '').replace(/\/$/, '');
+
+const normalizePageKey = (value?: string) => {
+  if (!value) {
+    return '';
+  }
+  try {
+    const parsed = new URL(value);
+    if (parsed.protocol === 'file:') {
+      return `${normalizeSiteKey(value.split(/[?#]/)[0] || value)}`;
+    }
+    const siteKey = normalizeSiteKey(parsed.host || parsed.hostname || value);
+    const path = parsed.pathname || '/';
+    return `${siteKey}${path.startsWith('/') ? path : `/${path}`}`;
+  } catch {
+    if (value.startsWith('/')) {
+      return value;
+    }
+    return normalizeSiteKey(value);
+  }
+};
 
 type ElementsSectionProps = {
   siteKey?: string;
@@ -148,7 +248,11 @@ export default function ElementsSection({
     }
     getSiteData(normalizedSiteKey)
       .then((data) => {
-        setElements((data.elements as BaseElement[] | undefined)?.map(normalizeElement) || []);
+        const normalized =
+          (data.elements as BaseElement[] | undefined)
+            ?.map((item) => normalizeElement(item))
+            .filter((item): item is ElementRecord => Boolean(item)) || [];
+        setElements(normalized);
         setFlows((data.flows as typeof mockFlows | undefined) || mockFlows);
       })
       .catch(() => {
@@ -251,16 +355,23 @@ export default function ElementsSection({
     if (!hasActivePage || !normalizedSiteKey) {
       return;
     }
-    const payload: ElementPayload[] = siteElements.map((element) => ({
-      ...element,
-    }));
+    const currentPageKey = normalizePageKey(pageUrl || pageKey);
+    const payload: ElementPayload[] = siteElements.map((element) => toElementPayload(element)).filter((element) => {
+      if (element.scope !== 'page') {
+        return true;
+      }
+      if (!element.pageUrl) {
+        return true;
+      }
+      return normalizePageKey(element.pageUrl) === currentPageKey;
+    });
     sendElementMessage(MessageType.REHYDRATE_ELEMENTS, { elements: payload })
       .then(() => setInjectionError(''))
       .catch((error) => {
         const message = error instanceof Error ? error.message : String(error);
         setInjectionError(message);
       });
-  }, [hasActivePage, normalizedSiteKey, sendElementMessage, siteElements]);
+  }, [hasActivePage, normalizedSiteKey, pageUrl, pageKey, sendElementMessage, siteElements]);
 
   const persistSiteData = useCallback(
     async (nextElements: ElementRecord[], nextFlows: typeof flows) => {
@@ -1020,7 +1131,7 @@ export default function ElementsSection({
         return;
       }
       const now = Date.now();
-      const areaInline = {
+      const areaInline: ElementInlineStyle = {
         backgroundColor: '#f59e0b30',
         borderRadius: '14px',
         color: '#0f172a',
@@ -1031,7 +1142,7 @@ export default function ElementsSection({
         width: `${Math.max(1, Math.round(rect.width))}px`,
         zIndex: '2147482000',
       };
-      const newArea = {
+      const newArea: ElementRecord = {
         id: createElementId(),
         type: 'area' as const,
         text: t('sidepanel_elements_add_area', 'Area'),
@@ -1051,20 +1162,20 @@ export default function ElementsSection({
         createdAt: now,
         updatedAt: now,
       };
-    setElements((prev) => {
-      const next = [newArea, ...prev];
-      persistSiteData(next, flows).catch(() => undefined);
-      return next;
-    });
-    sendElementMessage(MessageType.CREATE_ELEMENT, { element: newArea })
-      .then(() => {
-        setInjectionError('');
-        syncElementsToContent();
-      })
-      .catch((error) => {
-        const message = error instanceof Error ? error.message : String(error);
-        setInjectionError(message);
+      setElements((prev) => {
+        const next = [newArea, ...prev];
+        persistSiteData(next, flows).catch(() => undefined);
+        return next;
       });
+      sendElementMessage(MessageType.CREATE_ELEMENT, { element: toElementPayload(newArea) })
+        .then(() => {
+          setInjectionError('');
+          syncElementsToContent();
+        })
+        .catch((error) => {
+          const message = error instanceof Error ? error.message : String(error);
+          setInjectionError(message);
+        });
       setActiveElementId(newArea.id);
       setAddElementType('');
       return;
@@ -1075,16 +1186,22 @@ export default function ElementsSection({
     }
     const normalizedType: 'tooltip' | 'button' | 'link' =
       value === 'tooltip' ? 'tooltip' : value === 'link' ? 'link' : 'button';
-    const selectorPayload = onStartElementPicker
-      ? await onStartElementPicker({ disallowInput: normalizedType === 'button' || normalizedType === 'link' })
-      : await onStartPicker('selector').then((selector) => (selector ? { selector } : null));
+    let selectorPayload: { selector: string; beforeSelector?: string; afterSelector?: string } | null = null;
+    if (onStartElementPicker) {
+      selectorPayload = await onStartElementPicker({
+        disallowInput: normalizedType === 'button' || normalizedType === 'link',
+      });
+    } else if (onStartPicker) {
+      const selector = await onStartPicker('selector');
+      selectorPayload = selector ? { selector } : null;
+    }
     if (!selectorPayload?.selector) {
       setAddElementType('');
       return;
     }
     const { selector, beforeSelector, afterSelector } = selectorPayload;
     const now = Date.now();
-    const elementInline =
+    const elementInline: ElementInlineStyle =
       normalizedType === 'tooltip'
         ? {
             backgroundColor: '#0f172a',
@@ -1107,7 +1224,7 @@ export default function ElementsSection({
               fontWeight: '600',
               padding: '8px 16px',
             };
-    const newElement = {
+    const newElement: ElementRecord = {
       id: createElementId(),
       type: normalizedType,
       text:
@@ -1137,6 +1254,7 @@ export default function ElementsSection({
       frameUrl: defaultFrameUrl,
       frameSelectors: [] as string[],
       floating: false,
+      scope: 'page',
       createdAt: now,
       updatedAt: now,
       tooltipPosition: normalizedType === 'tooltip' ? ('top' as const) : undefined,
@@ -1149,7 +1267,7 @@ export default function ElementsSection({
       persistSiteData(next, flows).catch(() => undefined);
       return next;
     });
-    sendElementMessage(MessageType.CREATE_ELEMENT, { element: newElement })
+    sendElementMessage(MessageType.CREATE_ELEMENT, { element: toElementPayload(newElement) })
       .then(() => {
         setInjectionError('');
         syncElementsToContent();
@@ -1171,7 +1289,7 @@ export default function ElementsSection({
       persistSiteData(next, flows).catch(() => undefined);
       return next;
     });
-    sendElementMessage(MessageType.UPDATE_ELEMENT, { element: editElement })
+    sendElementMessage(MessageType.UPDATE_ELEMENT, { element: toElementPayload(editElement) })
       .then(() => {
         setInjectionError('');
         syncElementsToContent();
@@ -1212,9 +1330,15 @@ export default function ElementsSection({
     if (!onStartElementPicker && !onStartPicker) {
       return;
     }
-    const result = onStartElementPicker
-      ? await onStartElementPicker({ disallowInput: editElement?.type === 'button' || editElement?.type === 'link' })
-      : await onStartPicker?.('selector').then((selector) => (selector ? { selector } : null));
+    let result: { selector: string; beforeSelector?: string; afterSelector?: string } | null = null;
+    if (onStartElementPicker) {
+      result = await onStartElementPicker({
+        disallowInput: editElement?.type === 'button' || editElement?.type === 'link',
+      });
+    } else if (onStartPicker) {
+      const selector = await onStartPicker('selector');
+      result = selector ? { selector } : null;
+    }
     if (!result?.selector || !editElement) {
       return;
     }
@@ -1238,7 +1362,7 @@ export default function ElementsSection({
       return;
     }
     const handle = window.setTimeout(() => {
-      sendElementMessage(MessageType.PREVIEW_ELEMENT, { element: editElement }).catch((error) =>
+      sendElementMessage(MessageType.PREVIEW_ELEMENT, { element: toElementPayload(editElement) }).catch((error) =>
         setInjectionError(error instanceof Error ? error.message : String(error)),
       );
     }, 150);
@@ -1536,7 +1660,7 @@ export default function ElementsSection({
                       onChange={(value) =>
                         setEditElement({
                           ...editElement,
-                          position: placementOptions.some((opt) => opt.value === value) ? value : 'append',
+                          position: normalizeElementPosition(value),
                         })
                       }
                     />

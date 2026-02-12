@@ -1,12 +1,12 @@
-const STORAGE_KEY = 'ladybird_sites';
+export const STORAGE_KEY = 'ladybird_sites';
 
-type SiteData = {
+export type SiteData = {
   elements: unknown[];
   flows: unknown[];
   hidden: unknown[];
 };
 
-type StoragePayload = {
+export type StoragePayload = {
   sites: Record<string, SiteData>;
 };
 
@@ -47,6 +47,11 @@ const writeToLocalStorage = async (data: StoragePayload) => {
 export const getSiteData = async (siteKey: string): Promise<SiteData> => {
   const payload = await readFromLocalStorage();
   return payload.sites?.[siteKey] || { elements: [], flows: [], hidden: [] };
+};
+
+export const getAllSitesData = async (): Promise<Record<string, SiteData>> => {
+  const payload = await readFromLocalStorage();
+  return payload.sites || {};
 };
 
 export const setSiteData = async (siteKey: string, data: Partial<SiteData>) => {

@@ -1,9 +1,118 @@
-import { MessageType, type RuntimeMessage } from '../shared/messages';
+import { MessageType, type ElementPayload, type RuntimeMessage } from '../shared/messages';
+import { getSiteData, STORAGE_KEY } from '../shared/storage';
 import { startPicker, stopPicker } from './content/picker';
 import { handleInjectionMessage, registerPageContextIfNeeded, resetInjectionRegistry } from './content/injection';
 
 const CONTENT_RUNTIME_READY_KEY = '__ladybirdContentRuntimeReady__';
 type RuntimeMessenger = { sendMessage?: (message: unknown) => void };
+const normalizeSiteKey = (value: string) =>
+  value.replace(/^https?:\/\//, '').replace(/^file:\/\//, '').replace(/\/$/, '');
+
+const resolveSiteKeyFromLocation = (href: string) => {
+  if (!href) {
+    return '';
+  }
+  try {
+    const parsed = new URL(href);
+    if (parsed.protocol === 'file:') {
+      return normalizeSiteKey(href);
+    }
+    const host = parsed.host || parsed.hostname || '';
+    return normalizeSiteKey(host || href);
+  } catch {
+    return '';
+  }
+};
+
+const resolvePageKeyFromLocation = (href: string) => {
+  if (!href) {
+    return '';
+  }
+  try {
+    const parsed = new URL(href);
+    if (parsed.protocol === 'file:') {
+      return normalizeSiteKey(href.split(/[?#]/)[0] || href);
+    }
+    const host = parsed.host || parsed.hostname || '';
+    const siteKey = normalizeSiteKey(host || href);
+    const path = parsed.pathname || '/';
+    const cleanPath = path.startsWith('/') ? path : `/${path}`;
+    return `${siteKey}${cleanPath}`;
+  } catch {
+    return '';
+  }
+};
+
+const resolveElementPageKey = (pageUrl?: string) => {
+  if (!pageUrl || typeof pageUrl !== 'string') {
+    return '';
+  }
+  if (pageUrl.startsWith('/')) {
+    const siteKey = resolveSiteKeyFromLocation(window.location.href);
+    return `${siteKey}${pageUrl}`;
+  }
+  if (!/^https?:\/\//.test(pageUrl) && !pageUrl.startsWith('file://')) {
+    return normalizeSiteKey(pageUrl);
+  }
+  try {
+    return resolvePageKeyFromLocation(new URL(pageUrl, window.location.href).toString());
+  } catch {
+    return '';
+  }
+};
+
+const toElementPayload = (value: unknown): ElementPayload | null => {
+  if (!value || typeof value !== 'object') {
+    return null;
+  }
+  const candidate = value as Partial<ElementPayload>;
+  if (!candidate.id || typeof candidate.id !== 'string') {
+    return null;
+  }
+  if (
+    candidate.type !== 'button' &&
+    candidate.type !== 'link' &&
+    candidate.type !== 'tooltip' &&
+    candidate.type !== 'area'
+  ) {
+    return null;
+  }
+  return candidate as ElementPayload;
+};
+
+const rehydratePersistedElements = async () => {
+  if (window.top !== window) {
+    return;
+  }
+  const siteKey = resolveSiteKeyFromLocation(window.location.href);
+  const pageKey = resolvePageKeyFromLocation(window.location.href);
+  if (!siteKey) {
+    return;
+  }
+  try {
+    const data = await getSiteData(siteKey);
+    const elements = Array.isArray(data.elements)
+      ? data.elements
+          .map(toElementPayload)
+          .filter((item): item is ElementPayload => Boolean(item))
+          .filter((item) => {
+            if (item.scope !== 'page') {
+              return true;
+            }
+            if (!item.pageUrl) {
+              return true;
+            }
+            return resolveElementPageKey(item.pageUrl) === pageKey;
+          })
+      : [];
+    handleInjectionMessage({
+      type: MessageType.REHYDRATE_ELEMENTS,
+      data: { elements },
+    });
+  } catch (error) {
+    console.warn('Failed to rehydrate persisted elements', error);
+  }
+};
 
 const startPageContextWatcher = (runtime?: RuntimeMessenger) => {
   if (!runtime?.sendMessage) {
@@ -72,6 +181,15 @@ export default defineContentScript({
     markerHost[CONTENT_RUNTIME_READY_KEY] = true;
     const stopWatcher = startPageContextWatcher(runtime);
     registerPageContextIfNeeded(runtime);
+    rehydratePersistedElements().catch(() => undefined);
+    const storageApi = chrome?.storage?.onChanged;
+    const handleStorageChange = (changes: Record<string, unknown>, areaName: string) => {
+      if (areaName !== 'local' || !changes[STORAGE_KEY]) {
+        return;
+      }
+      rehydratePersistedElements().catch(() => undefined);
+    };
+    storageApi?.addListener(handleStorageChange);
     runtime.onMessage.addListener((rawMessage, _sender, sendResponse) => {
       const message = rawMessage as RuntimeMessage | undefined;
       if (!message?.type || message.forwarded) {
@@ -128,6 +246,7 @@ export default defineContentScript({
     return () => {
       stopWatcher();
       resetInjectionRegistry();
+      storageApi?.removeListener(handleStorageChange);
       markerHost[CONTENT_RUNTIME_READY_KEY] = false;
     };
   },

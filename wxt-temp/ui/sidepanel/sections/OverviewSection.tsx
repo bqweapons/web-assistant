@@ -1,20 +1,70 @@
-import { Globe } from 'lucide-react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import { Globe, RefreshCw } from 'lucide-react';
 import Card from '../components/Card';
 import StatCard from '../components/StatCard';
 import { t } from '../utils/i18n';
+import { getAllSitesData, STORAGE_KEY, type SiteData } from '../../../shared/storage';
 
 export default function OverviewSection() {
-  const siteStats = [
-    { site: 'file://', elements: 5, flows: 4, hidden: 0 },
-    { site: 'https://note.com', elements: 4, flows: 0, hidden: 0 },
-    { site: 'https://mail.google.com', elements: 2, flows: 0, hidden: 0 },
-    { site: 'https://avanade.service-now.com', elements: 1, flows: 0, hidden: 0 },
-    { site: 'https://pay.openai.com', elements: 1, flows: 0, hidden: 0 },
-    { site: 'https://type.jp', elements: 1, flows: 0, hidden: 0 },
-    { site: 'https://51cg1.com', elements: 0, flows: 0, hidden: 4 },
-    { site: 'https://www.yahoo.co.jp', elements: 0, flows: 0, hidden: 2 },
-    { site: 'https://missav.ai', elements: 0, flows: 0, hidden: 1 },
-  ];
+  const [siteStats, setSiteStats] = useState<
+    Array<{ siteKey: string; elements: number; flows: number; hidden: number }>
+  >([]);
+  const [loading, setLoading] = useState(false);
+
+  const toCount = (value: unknown) => (Array.isArray(value) ? value.length : 0);
+
+  const buildStats = (sites: Record<string, SiteData>) => {
+    return Object.entries(sites)
+      .map(([siteKey, data]) => ({
+        siteKey,
+        elements: toCount(data?.elements),
+        flows: toCount(data?.flows),
+        hidden: toCount(data?.hidden),
+      }))
+      .filter((item) => item.elements + item.flows + item.hidden > 0);
+  };
+
+  const refreshStats = useCallback(async () => {
+    setLoading(true);
+    try {
+      const sites = await getAllSitesData();
+      setSiteStats(buildStats(sites));
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    refreshStats().catch(() => undefined);
+  }, [refreshStats]);
+
+  useEffect(() => {
+    const storage = chrome?.storage?.onChanged;
+    if (!storage) {
+      return;
+    }
+    const handleStorageChange = (changes: Record<string, unknown>, areaName: string) => {
+      if (areaName !== 'local' || !changes[STORAGE_KEY]) {
+        return;
+      }
+      refreshStats().catch(() => undefined);
+    };
+    storage.addListener(handleStorageChange);
+    return () => storage.removeListener(handleStorageChange);
+  }, [refreshStats]);
+
+  const getSiteHref = (siteKey: string) => {
+    if (!siteKey) {
+      return '';
+    }
+    if (siteKey.startsWith('http://') || siteKey.startsWith('https://') || siteKey.startsWith('file://')) {
+      return siteKey;
+    }
+    if (siteKey.startsWith('/')) {
+      return `file://${siteKey}`;
+    }
+    return `https://${siteKey}`;
+  };
 
   const totals = siteStats.reduce(
     (acc, site) => ({
@@ -25,11 +75,19 @@ export default function OverviewSection() {
     { elements: 0, flows: 0, hidden: 0 },
   );
 
-  const sortedSites = [...siteStats].sort((a, b) => {
-    const aTotal = a.elements + a.flows + a.hidden;
-    const bTotal = b.elements + b.flows + b.hidden;
-    return bTotal - aTotal;
-  });
+  const sortedSites = useMemo(
+    () =>
+      [...siteStats].sort((a, b) => {
+        const aTotal = a.elements + a.flows + a.hidden;
+        const bTotal = b.elements + b.flows + b.hidden;
+        if (bTotal !== aTotal) {
+          return bTotal - aTotal;
+        }
+        return a.siteKey.localeCompare(b.siteKey);
+      }),
+    [siteStats],
+  );
+
   return (
     <section className="flex flex-col gap-3">
       <div className="flex items-center justify-between gap-3">
@@ -41,9 +99,21 @@ export default function OverviewSection() {
             {t('sidepanel_overview_subtitle', 'Summary by site from the latest export snapshot.')}
           </p>
         </div>
-        <div className="inline-flex items-center gap-2 rounded-full border border-border bg-background px-3 py-1 text-xs text-muted-foreground">
-          <Globe className="h-3.5 w-3.5" />
-          {t('sidepanel_overview_sites_count', '{count} sites').replace('{count}', String(siteStats.length))}
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            className="btn-icon h-7 w-7"
+            onClick={() => refreshStats().catch(() => undefined)}
+            aria-label={t('sidepanel_action_refresh', 'Refresh')}
+            title={t('sidepanel_action_refresh', 'Refresh')}
+            disabled={loading}
+          >
+            <RefreshCw className={`h-3.5 w-3.5 ${loading ? 'animate-spin' : ''}`} />
+          </button>
+          <div className="inline-flex items-center gap-2 rounded-full border border-border bg-background px-3 py-1 text-xs text-muted-foreground">
+            <Globe className="h-3.5 w-3.5" />
+            {t('sidepanel_overview_sites_count', '{count} sites').replace('{count}', String(siteStats.length))}
+          </div>
         </div>
       </div>
 
@@ -65,22 +135,23 @@ export default function OverviewSection() {
           </div>
         </div>
         <div className="divide-y divide-border">
+          {sortedSites.length === 0 ? (
+            <div className="px-4 py-6 text-center text-xs text-muted-foreground">
+              {t('sidepanel_overview_empty', 'No saved site data yet.')}
+            </div>
+          ) : null}
           {sortedSites.map((site) => {
             const total = site.elements + site.flows + site.hidden;
+            const href = getSiteHref(site.siteKey);
             return (
-              <div key={site.site} className="flex flex-col gap-2 px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
+              <div key={site.siteKey} className="flex flex-col gap-2 px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
                 <div className="flex items-start gap-3">
                   <div className="mt-0.5 flex h-9 w-9 items-center justify-center rounded-full border border-border bg-muted text-muted-foreground">
                     <Globe className="h-4 w-4" />
                   </div>
                   <div>
-                    <a
-                      className="text-sm font-semibold text-card-foreground underline-offset-2 hover:underline"
-                      href={site.site}
-                      target="_blank"
-                      rel="noreferrer"
-                    >
-                      {site.site}
+                    <a className="text-sm font-semibold text-card-foreground underline-offset-2 hover:underline" href={href} target="_blank" rel="noreferrer">
+                      {site.siteKey}
                     </a>
                     <p className="text-xs text-muted-foreground">
                       {t('sidepanel_overview_total_items', '{count} total items').replace(
