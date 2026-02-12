@@ -65,3 +65,7 @@ export const setSiteData = async (siteKey: string, data: Partial<SiteData>) => {
   };
   await writeToLocalStorage(payload);
 };
+
+export const setAllSitesData = async (sites: Record<string, SiteData>) => {
+  await writeToLocalStorage({ sites: sites || {} });
+};

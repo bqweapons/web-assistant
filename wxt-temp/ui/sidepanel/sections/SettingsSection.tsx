@@ -1,10 +1,95 @@
+import { useRef, useState, type ChangeEvent } from 'react';
 import { Copy, Download, ExternalLink, Languages, Share2, Upload } from 'lucide-react';
 import Card from '../components/Card';
 import { LOCALE_OPTIONS, SupportedLocale, getLocaleLabel, setLocale, t, useLocale } from '../utils/i18n';
+import { getAllSitesData, setAllSitesData } from '../../../shared/storage';
+import { buildExportPayload, mergeSitesData, parseImportPayload } from '../../../shared/importExport';
 
 export default function SettingsSection() {
   const locale = useLocale();
   const localeLabel = getLocaleLabel(locale);
+  const importInputRef = useRef<HTMLInputElement | null>(null);
+  const [isImporting, setIsImporting] = useState(false);
+  const [isExporting, setIsExporting] = useState(false);
+  const [feedback, setFeedback] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
+
+  const handleExport = async () => {
+    if (isExporting) {
+      return;
+    }
+    setIsExporting(true);
+    setFeedback(null);
+    try {
+      const sites = await getAllSitesData();
+      const payload = buildExportPayload(sites);
+      const content = JSON.stringify(payload, null, 2);
+      const filename = `page-augmentor-export-${new Date().toISOString().replace(/[:.]/g, '-')}.json`;
+      const blob = new Blob([content], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const anchor = document.createElement('a');
+      anchor.href = url;
+      anchor.download = filename;
+      anchor.rel = 'noopener';
+      document.body.append(anchor);
+      anchor.click();
+      anchor.remove();
+      window.setTimeout(() => URL.revokeObjectURL(url), 1000);
+      setFeedback({
+        type: 'success',
+        message: `Exported ${Object.keys(sites).length} site(s).`,
+      });
+    } catch (error) {
+      setFeedback({
+        type: 'error',
+        message: `Export failed: ${error instanceof Error ? error.message : String(error)}`,
+      });
+    } finally {
+      setIsExporting(false);
+    }
+  };
+
+  const triggerImport = () => {
+    if (isImporting) {
+      return;
+    }
+    importInputRef.current?.click();
+  };
+
+  const handleImportChange = async (event: ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) {
+      return;
+    }
+    setIsImporting(true);
+    setFeedback(null);
+    try {
+      const text = await file.text();
+      const raw = JSON.parse(text) as unknown;
+      const parsed = parseImportPayload(raw);
+      const currentSites = await getAllSitesData();
+      const mergedSites = mergeSitesData(currentSites, parsed.sites);
+      await setAllSitesData(mergedSites);
+      const warningSuffix =
+        parsed.summary.warnings.length > 0
+          ? ` (${parsed.summary.warnings.length} warning(s))`
+          : '';
+      setFeedback({
+        type: 'success',
+        message:
+          `Imported ${parsed.summary.siteCount} site(s), ` +
+          `${parsed.summary.elementCount} element(s), ${parsed.summary.flowCount} flow(s).` +
+          warningSuffix,
+      });
+    } catch (error) {
+      setFeedback({
+        type: 'error',
+        message: `Import failed: ${error instanceof Error ? error.message : String(error)}`,
+      });
+    } finally {
+      event.target.value = '';
+      setIsImporting(false);
+    }
+  };
 
   return (
     <section className="flex flex-col gap-3">
@@ -33,15 +118,41 @@ export default function SettingsSection() {
             </div>
           </div>
           <div className="flex flex-nowrap gap-2">
-            <button type="button" className="btn-ghost gap-2 flex-1">
+            <input
+              ref={importInputRef}
+              type="file"
+              accept="application/json,.json"
+              className="hidden"
+              onChange={(event) => {
+                void handleImportChange(event);
+              }}
+            />
+            <button
+              type="button"
+              className="btn-ghost gap-2 flex-1 disabled:cursor-not-allowed disabled:opacity-60"
+              onClick={triggerImport}
+              disabled={isImporting}
+            >
               <Upload className="h-4 w-4" />
-              {t('sidepanel_settings_data_import', 'Import')}
+              {isImporting ? `${t('sidepanel_settings_data_import', 'Import')}...` : t('sidepanel_settings_data_import', 'Import')}
             </button>
-            <button type="button" className="btn-primary gap-2 flex-1">
+            <button
+              type="button"
+              className="btn-primary gap-2 flex-1 disabled:cursor-not-allowed disabled:opacity-60"
+              onClick={() => {
+                void handleExport();
+              }}
+              disabled={isExporting}
+            >
               <Download className="h-4 w-4" />
-              {t('sidepanel_settings_data_export', 'Export')}
+              {isExporting ? `${t('sidepanel_settings_data_export', 'Export')}...` : t('sidepanel_settings_data_export', 'Export')}
             </button>
           </div>
+          {feedback ? (
+            <p className={`text-xs ${feedback.type === 'error' ? 'text-red-600' : 'text-emerald-600'}`}>
+              {feedback.message}
+            </p>
+          ) : null}
         </div>
       </Card>
 

@@ -526,7 +526,10 @@ export default function ElementsSection({
       ...filteredFlows.map((flow) => ({
         value: flow.id,
         label: flow.name,
-        rightLabel: t('sidepanel_steps_count', '{count} steps').replace('{count}', String(flow.steps)),
+        rightLabel: t('sidepanel_steps_count', '{count} steps').replace(
+          '{count}',
+          String(Array.isArray(flow.steps) ? flow.steps.length : Number(flow.steps) || 0),
+        ),
       })),
     ],
     [filteredFlows, locale],
