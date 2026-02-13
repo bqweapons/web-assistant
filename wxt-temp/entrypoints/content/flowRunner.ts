@@ -216,6 +216,17 @@ const executeInput = async (payload: FlowRunExecuteStepPayload): Promise<FlowRun
   });
 };
 
+const executePopup = async (payload: FlowRunExecuteStepPayload): Promise<FlowRunExecuteResultPayload> => {
+  const message = asString(payload.message ?? '');
+  window.alert(message);
+  return buildBaseResult(payload, {
+    ok: true,
+    details: {
+      popupMessage: message,
+    },
+  });
+};
+
 const evaluateConditionFromElement = (
   payload: FlowRunExecuteStepPayload,
   element: Element,
@@ -374,6 +385,7 @@ const executeByType: Record<
 > = {
   click: executeClick,
   input: executeInput,
+  popup: executePopup,
   wait: executeWait,
   assert: executeAssert,
   condition: executeCondition,

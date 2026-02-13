@@ -413,6 +413,9 @@
   "sidepanel_field_value": {
     "message": "Value"
   },
+  "sidepanel_field_message": {
+    "message": "Message"
+  },
   "sidepanel_field_wait_for": {
     "message": "Wait for"
   },
@@ -746,6 +749,12 @@
   "sidepanel_step_navigate_label": {
     "message": "Navigate"
   },
+  "sidepanel_step_popup_description": {
+    "message": "Show a popup dialog message."
+  },
+  "sidepanel_step_popup_label": {
+    "message": "Popup"
+  },
   "sidepanel_step_summary_conditional": {
     "message": "Conditional check"
   },
@@ -775,6 +784,9 @@
   },
   "sidepanel_step_summary_value": {
     "message": "Value: {value}"
+  },
+  "sidepanel_step_summary_message": {
+    "message": "Message: {value}"
   },
   "sidepanel_step_summary_wait_until": {
     "message": "Wait until {selector} {operator} \\\"{value}\\\""
@@ -982,5 +994,17 @@
   },
   "sidepanel_flow_runner_error_unknown": {
     "message": "Flow run failed."
+  },
+  "sidepanel_flow_runner_error_data_source_required": {
+    "message": "Please select a data source CSV before running this flow."
+  },
+  "sidepanel_flow_runner_error_data_source_mismatch": {
+    "message": "Selected CSV does not match the recorded data source."
+  },
+  "sidepanel_flow_runner_data_source_pick_confirm": {
+    "message": "Select CSV/TSV for step: {step}"
+  },
+  "sidepanel_flow_runner_data_source_selection_cancelled": {
+    "message": "Run cancelled because data source selection was cancelled."
   }
 }

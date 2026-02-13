@@ -8,12 +8,21 @@ export type DataSourceParseResult = {
   rowStepWeight: number;
 };
 
-export const parseDataSourceRows = (step: FlowStepData, rowStepWeight: number): DataSourceParseResult => {
-  const rawText = step.dataSource?.rawText || '';
+type DataSourceSource = {
+  rawText: string;
+  fileType: 'csv' | 'tsv';
+};
+
+export const parseDataSourceRows = (
+  step: FlowStepData,
+  rowStepWeight: number,
+  source?: DataSourceSource,
+): DataSourceParseResult => {
+  const rawText = source?.rawText ?? step.dataSource?.rawText ?? '';
   if (!rawText.trim()) {
     throw new Error('Data source has no content.');
   }
-  const sourceType = step.dataSource?.fileType === 'tsv' ? 'tsv' : 'csv';
+  const sourceType = source?.fileType ?? (step.dataSource?.fileType === 'tsv' ? 'tsv' : 'csv');
   const delimiter = delimiterFromFileType(sourceType);
   const table = parseDelimitedRows(rawText, delimiter);
   if (table.length === 0) {

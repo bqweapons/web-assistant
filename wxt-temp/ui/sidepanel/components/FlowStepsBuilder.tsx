@@ -109,6 +109,7 @@ const CONDITION_OPERATORS: StepFieldOption[] = [
 const FIELD_LABEL_KEYS: Record<string, string> = {
   Selector: 'sidepanel_field_selector',
   Value: 'sidepanel_field_value',
+  Message: 'sidepanel_field_message',
   Iterations: 'sidepanel_field_iterations',
   'Wait for': 'sidepanel_field_wait_for',
   'Duration (ms)': 'sidepanel_field_duration_ms',
@@ -563,6 +564,7 @@ const DEFAULT_STEPS: StepData[] = [
 const STEP_TYPE_LABELS: Record<string, string> = {
   click: t('sidepanel_step_click_label', 'Click'),
   input: t('sidepanel_step_input_label', 'Input'),
+  popup: t('sidepanel_step_popup_label', 'Popup'),
   loop: t('sidepanel_step_loop_label', 'Loop'),
   'data-source': t('sidepanel_step_data_source_label', 'Data Source'),
   'if-else': t('sidepanel_step_if_else_label', 'If / Else'),
@@ -602,6 +604,7 @@ export default function FlowStepsBuilder({
   >(null);
   const syncingFromPropsRef = useRef(false);
   const initializedRef = useRef(false);
+  const onChangeRef = useRef(onChange);
   const appliedResetKeyRef = useRef<string | number | symbol>(Symbol('initial-reset'));
   const setFieldInputRef =
     (_stepId: string, _fieldId: string) => (_node: HTMLInputElement | HTMLTextAreaElement | null) => undefined;
@@ -612,6 +615,10 @@ export default function FlowStepsBuilder({
     const key = FIELD_LABEL_KEYS[label];
     return key ? t(key, label) : label;
   };
+
+  useEffect(() => {
+    onChangeRef.current = onChange;
+  }, [onChange]);
 
   useEffect(() => {
     if (typeof resetKey !== 'undefined') {
@@ -640,8 +647,8 @@ export default function FlowStepsBuilder({
       syncingFromPropsRef.current = false;
       return;
     }
-    onChange?.(draftSteps);
-  }, [draftSteps, onChange]);
+    onChangeRef.current?.(draftSteps);
+  }, [draftSteps]);
 
   const updateField = (stepId: string, fieldId: string, value: string) => {
     setDraftSteps((prev) =>

@@ -46,6 +46,22 @@ export const createStepTemplate = (type: string, options: TemplateOptions): Step
           { id: 'value', label: 'Value', placeholder: 'Example text', type: 'text', value: '' },
         ],
       };
+    case 'popup':
+      return {
+        id: createStepId('popup'),
+        type: 'popup',
+        title: 'Show popup',
+        summary: 'Message: Hello',
+        fields: [
+          {
+            id: 'message',
+            label: 'Message',
+            placeholder: 'Hello',
+            type: 'text',
+            value: 'Hello',
+          },
+        ],
+      };
     case 'loop':
       return {
         id: createStepId('loop'),

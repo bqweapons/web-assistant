@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type MutableRefObject } from 'react';
 import {
   MessageType,
+  type FlowRunDataSourceInput,
   type FlowRunStartSource,
   type FlowRunStatusPayload,
   type RuntimeMessage,
@@ -8,6 +9,7 @@ import {
 import { sendRuntimeMessage } from '../../utils/runtimeMessaging';
 import { t } from '../../utils/i18n';
 import { toFlowSnapshot, type FlowRecord } from './normalize';
+import type { FlowStepData } from '../../../../shared/flowStepMigration';
 
 export const getRunnerStateLabel = (state?: FlowRunStatusPayload['state']) => {
   if (state === 'running') {
@@ -41,7 +43,126 @@ export const formatRunnerError = (code?: string, message?: string) => {
   if (code === 'unsupported-step-type') {
     return t('sidepanel_flow_runner_error_unsupported_step', 'Flow has an unsupported step type.');
   }
+  if (code === 'data-source-input-required' || code === 'data-source-input-missing') {
+    return t(
+      'sidepanel_flow_runner_error_data_source_required',
+      'Please select a data source CSV before running this flow.',
+    );
+  }
+  if (code === 'data-source-mismatch') {
+    return t(
+      'sidepanel_flow_runner_error_data_source_mismatch',
+      'Selected CSV does not match the recorded data source.',
+    );
+  }
   return message || code || t('sidepanel_flow_runner_error_unknown', 'Flow run failed.');
+};
+
+type DataSourceStepDescriptor = {
+  id: string;
+  title: string;
+  fileType: 'csv' | 'tsv';
+};
+
+const inferFileType = (fileName: string, fallback: 'csv' | 'tsv') => {
+  const lower = fileName.toLowerCase();
+  if (lower.endsWith('.tsv')) {
+    return 'tsv';
+  }
+  if (lower.endsWith('.csv')) {
+    return 'csv';
+  }
+  return fallback;
+};
+
+const collectDataSourceSteps = (steps: FlowStepData[], sink: DataSourceStepDescriptor[] = []) => {
+  for (const step of steps) {
+    if (step.type === 'data-source') {
+      sink.push({
+        id: step.id,
+        title: step.title || step.id,
+        fileType: step.dataSource?.fileType === 'tsv' ? 'tsv' : 'csv',
+      });
+    }
+    if (Array.isArray(step.children) && step.children.length > 0) {
+      collectDataSourceSteps(step.children, sink);
+    }
+    if (Array.isArray(step.branches) && step.branches.length > 0) {
+      for (const branch of step.branches) {
+        collectDataSourceSteps(branch.steps ?? [], sink);
+      }
+    }
+  }
+  return sink;
+};
+
+const requestFileForDataSourceStep = (step: DataSourceStepDescriptor): Promise<File | null> => {
+  return new Promise((resolve) => {
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = step.fileType === 'tsv' ? '.tsv,text/tab-separated-values,text/plain' : '.csv,text/csv,text/plain';
+    input.style.position = 'fixed';
+    input.style.left = '-9999px';
+    input.style.top = '-9999px';
+    let settled = false;
+
+    const finish = (file: File | null) => {
+      if (settled) {
+        return;
+      }
+      settled = true;
+      input.removeEventListener('change', handleChange);
+      input.removeEventListener('cancel', handleCancel as EventListener);
+      input.remove();
+      resolve(file);
+    };
+
+    const handleChange = () => {
+      finish(input.files?.[0] ?? null);
+    };
+
+    const handleCancel = () => {
+      finish(null);
+    };
+
+    input.addEventListener('change', handleChange);
+    input.addEventListener('cancel', handleCancel as EventListener);
+    document.body.appendChild(input);
+
+    const proceed = window.confirm(
+      t('sidepanel_flow_runner_data_source_pick_confirm', 'Select CSV/TSV for step: {step}').replace(
+        '{step}',
+        step.title,
+      ),
+    );
+    if (!proceed) {
+      finish(null);
+      return;
+    }
+
+    input.click();
+  });
+};
+
+const collectDataSourceInputsForRun = async (flow: FlowRecord) => {
+  const steps = collectDataSourceSteps(flow.steps);
+  if (steps.length === 0) {
+    return {} as Record<string, FlowRunDataSourceInput>;
+  }
+  const selected: Record<string, FlowRunDataSourceInput> = {};
+  for (const step of steps) {
+    const file = await requestFileForDataSourceStep(step);
+    if (!file) {
+      throw new Error('data-source-selection-cancelled');
+    }
+    const rawText = await file.text();
+    selected[step.id] = {
+      fileName: file.name,
+      fileType: inferFileType(file.name, step.fileType),
+      rawText,
+    };
+  }
+  return selected;
 };
 
 type UseFlowRunnerResult = {
@@ -108,11 +229,13 @@ export const useFlowRunner = (flows: FlowRecord[]): UseFlowRunnerResult => {
     setRunRequestError('');
     const startedAt = Date.now();
     try {
+      const dataSourceInputs = await collectDataSourceInputsForRun(flow);
       const response = await sendRuntimeMessage({
         type: MessageType.START_FLOW_RUN,
         data: {
           flow: toFlowSnapshot(flow),
           source,
+          dataSourceInputs,
         },
       });
       const runId =
@@ -135,6 +258,15 @@ export const useFlowRunner = (flows: FlowRecord[]): UseFlowRunnerResult => {
       }));
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
+      if (message === 'data-source-selection-cancelled') {
+        setRunRequestError(
+          t(
+            'sidepanel_flow_runner_data_source_selection_cancelled',
+            'Run cancelled because data source selection was cancelled.',
+          ),
+        );
+        return;
+      }
       setRunRequestError(formatRunnerError(message, message));
     }
   }, []);

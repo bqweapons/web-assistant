@@ -22,6 +22,13 @@ export const STEP_LIBRARY: StepLibraryItem[] = [
     description: 'Type text into a field.',
   },
   {
+    type: 'popup',
+    labelKey: 'sidepanel_step_popup_label',
+    label: 'Popup',
+    descriptionKey: 'sidepanel_step_popup_description',
+    description: 'Show a popup dialog message.',
+  },
+  {
     type: 'loop',
     labelKey: 'sidepanel_step_loop_label',
     label: 'Loop',

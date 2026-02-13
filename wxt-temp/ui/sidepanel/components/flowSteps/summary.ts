@@ -24,6 +24,7 @@ const getOperatorLabel = (operators: StepFieldOption[], value: string) =>
 export const buildStepSummary = (step: StepData, operators: StepFieldOption[]) => {
   const selector = getFieldValue(step, 'selector');
   const value = getFieldValue(step, 'value');
+  const message = getFieldValue(step, 'message');
   const operator = getFieldValue(step, 'operator');
   const expected = getFieldValue(step, 'expected');
   const mode = getFieldValue(step, 'mode');
@@ -45,6 +46,11 @@ export const buildStepSummary = (step: StepData, operators: StepFieldOption[]) =
       return selector
         ? t('sidepanel_step_summary_selector', 'Selector: {value}').replace('{value}', selector)
         : t('sidepanel_step_summary_input', 'Input');
+    case 'popup':
+      return t('sidepanel_step_summary_message', 'Message: {value}').replace(
+        '{value}',
+        message || t('sidepanel_field_not_set', 'Not set'),
+      );
     case 'loop':
       return iterations
         ? t('sidepanel_step_summary_repeat_times', 'Repeat {count} times').replace('{count}', iterations)

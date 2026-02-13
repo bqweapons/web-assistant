@@ -86,7 +86,9 @@ export const isInjectableUrl = (url?: string) => {
 
 const isReceivingEndMissing = (value?: string) => /receiving end does not exist/i.test(value || '');
 const isMessageChannelClosed = (value?: string) =>
-  /message channel is closed|message port closed|back\/forward cache/i.test(value || '');
+  /message channel(?:\s+is)?\s+closed|message port closed|back\/forward cache|asynchronous response|before a response was received/i.test(
+    value || '',
+  );
 
 export const isRecoverableTabMessageError = (value?: string) =>
   isReceivingEndMissing(value) ||

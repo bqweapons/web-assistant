@@ -1,6 +1,7 @@
 import {
   MessageType,
   type FlowRunAtomicStepType,
+  type FlowRunDataSourceInput,
   type FlowRunExecuteResultPayload,
   type FlowRunExecuteStepPayload,
   type FlowRunFlowSnapshot,
@@ -48,6 +49,7 @@ type FlowRunInternal = {
   runId: string;
   flow: FlowRunFlowSnapshot;
   source: FlowRunStartPayload['source'];
+  dataSourceInputs: Record<string, FlowRunDataSourceInput>;
   tabId: number;
   siteKey: string;
   state: FlowRunState;
@@ -84,6 +86,7 @@ const estimateFlowStep = (step: FlowStepData): number => {
     step.type === 'input' ||
     step.type === 'wait' ||
     step.type === 'assert' ||
+    step.type === 'popup' ||
     step.type === 'navigate'
   ) {
     return 1;
@@ -108,6 +111,25 @@ const estimateFlowStep = (step: FlowStepData): number => {
 
 const estimateFlowSteps = (steps: FlowStepData[]) =>
   steps.reduce((total, step) => total + estimateFlowStep(step), 0);
+
+const normalizeDelimitedText = (value: string) => value.replace(/\r\n?/g, '\n').replace(/\n+$/, '');
+
+const collectDataSourceStepIds = (steps: FlowStepData[], sink: string[] = []) => {
+  for (const step of steps) {
+    if (step.type === 'data-source') {
+      sink.push(step.id);
+    }
+    if (Array.isArray(step.children) && step.children.length > 0) {
+      collectDataSourceStepIds(step.children, sink);
+    }
+    if (Array.isArray(step.branches) && step.branches.length > 0) {
+      for (const branch of step.branches) {
+        collectDataSourceStepIds(branch.steps ?? [], sink);
+      }
+    }
+  }
+  return sink;
+};
 
 const selectIfElseBranches = (step: FlowStepData) => {
   const branches = Array.isArray(step.branches) ? step.branches : [];
@@ -176,6 +198,40 @@ export class FlowRunnerManager {
         `Active site (${activeSiteKey || 'unknown'}) does not match flow site (${flowSiteKey}).`,
       );
     }
+    const runDataSourceInputs: Record<string, FlowRunDataSourceInput> = {};
+    const rawInputs =
+      payload.dataSourceInputs && typeof payload.dataSourceInputs === 'object'
+        ? payload.dataSourceInputs
+        : {};
+    for (const [stepId, sourceInput] of Object.entries(rawInputs)) {
+      if (!sourceInput || typeof sourceInput !== 'object') {
+        continue;
+      }
+      const typedInput = sourceInput as Partial<FlowRunDataSourceInput>;
+      if (
+        typeof typedInput.fileName !== 'string' ||
+        (typedInput.fileType !== 'csv' && typedInput.fileType !== 'tsv') ||
+        typeof typedInput.rawText !== 'string'
+      ) {
+        continue;
+      }
+      runDataSourceInputs[stepId] = {
+        fileName: typedInput.fileName,
+        fileType: typedInput.fileType,
+        rawText: typedInput.rawText,
+      };
+    }
+    const requiredDataSourceStepIds = collectDataSourceStepIds(flow.steps);
+    if (requiredDataSourceStepIds.length > 0) {
+      for (const stepId of requiredDataSourceStepIds) {
+        if (!(stepId in runDataSourceInputs)) {
+          throw new RunnerError(
+            'data-source-input-required',
+            'data-source-input-required',
+          );
+        }
+      }
+    }
 
     const now = Date.now();
     const runId = `run-${now}-${Math.random().toString(36).slice(2, 8)}`;
@@ -183,6 +239,7 @@ export class FlowRunnerManager {
       runId,
       flow,
       source: payload.source,
+      dataSourceInputs: runDataSourceInputs,
       tabId,
       siteKey: flowSiteKey,
       state: 'queued',
@@ -293,6 +350,9 @@ export class FlowRunnerManager {
     if (stepType === 'assert') {
       return `Assert "${truncateForLog(payload.selector || '')}" ${payload.operator || 'contains'} "${truncateForLog(payload.expected || '')}".`;
     }
+    if (stepType === 'popup') {
+      return `Show popup "${truncateForLog(payload.message || '')}".`;
+    }
     if (stepType === 'condition') {
       return `Check condition on "${truncateForLog(payload.selector || '')}".`;
     }
@@ -328,6 +388,9 @@ export class FlowRunnerManager {
     }
     if (stepType === 'assert') {
       return `Assertion passed on ${truncateForLog(payload.selector || '')}.`;
+    }
+    if (stepType === 'popup') {
+      return `Popup shown: "${truncateForLog(payload.message || details?.popupMessage || '')}".`;
     }
     if (stepType === 'condition') {
       return result.conditionMatched ? 'Condition matched.' : 'Condition not matched.';
@@ -523,6 +586,10 @@ export class FlowRunnerManager {
       await this.executeAtomicStep(run, step, 'assert', row);
       return;
     }
+    if (step.type === 'popup') {
+      await this.executeAtomicStep(run, step, 'popup', row);
+      return;
+    }
     if (step.type === 'navigate') {
       await this.executeNavigateStep(run, step, row);
       this.markStepCompleted(run);
@@ -666,6 +733,8 @@ export class FlowRunnerManager {
     } else if (stepType === 'input') {
       payload.selector = await this.resolveStepFieldValue(step, 'selector', row);
       payload.value = await this.resolveStepFieldValue(step, 'value', row);
+    } else if (stepType === 'popup') {
+      payload.message = await this.resolveStepFieldValue(step, 'message', row);
     } else if (stepType === 'wait') {
       const modeValue = await this.resolveStepFieldValue(step, 'mode', row);
       const mode =
@@ -803,7 +872,32 @@ export class FlowRunnerManager {
 
   private async executeDataSourceStep(run: FlowRunInternal, step: FlowStepData, row?: FlowRowContext) {
     const children = Array.isArray(step.children) ? step.children : [];
-    const parsed = parseDataSourceRows(step, estimateFlowSteps(children));
+    const selectedInput = run.dataSourceInputs[step.id];
+    if (!selectedInput || !selectedInput.rawText.trim()) {
+      throw new RunnerError(
+        'data-source-input-missing',
+        `Missing data source input for step ${step.id}.`,
+      );
+    }
+    const expectedFileType = step.dataSource?.fileType === 'tsv' ? 'tsv' : 'csv';
+    if (selectedInput.fileType !== expectedFileType) {
+      throw new RunnerError(
+        'data-source-mismatch',
+        `Selected file type does not match recorded file type for step ${step.id}.`,
+      );
+    }
+    const expectedRaw = normalizeDelimitedText(step.dataSource?.rawText || '');
+    const actualRaw = normalizeDelimitedText(selectedInput.rawText);
+    if (expectedRaw && expectedRaw !== actualRaw) {
+      throw new RunnerError(
+        'data-source-mismatch',
+        `Selected CSV content does not match recorded content for step ${step.id}.`,
+      );
+    }
+    const parsed = parseDataSourceRows(step, estimateFlowSteps(children), {
+      rawText: selectedInput.rawText,
+      fileType: selectedInput.fileType,
+    });
     this.appendLog(run, 'info', `Data source rows: ${parsed.rows.length}.`, {
       stepId: step.id,
       stepType: 'data-source',

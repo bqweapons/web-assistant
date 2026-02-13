@@ -85,7 +85,7 @@ export type MessageElementPayload = StructuredElementRecord;
 export type FlowRunState = 'queued' | 'running' | 'succeeded' | 'failed' | 'cancelled';
 export type FlowRunStartSource = 'flows-list' | 'flow-drawer-save-run';
 export type FlowConditionOperator = 'contains' | 'equals' | 'greater' | 'less';
-export type FlowRunAtomicStepType = 'click' | 'input' | 'wait' | 'assert' | 'condition';
+export type FlowRunAtomicStepType = 'click' | 'input' | 'wait' | 'assert' | 'condition' | 'popup';
 export type FlowRunLogLevel = 'info' | 'success' | 'error';
 
 export type FlowRunLogEntry = {
@@ -102,11 +102,18 @@ export type FlowRunExecutionDetails = {
   elementText?: string;
   fieldName?: string;
   inputValue?: string;
+  popupMessage?: string;
   mode?: 'time' | 'condition' | 'appear' | 'disappear';
   durationMs?: number;
   operator?: FlowConditionOperator;
   expected?: string;
   actual?: string;
+};
+
+export type FlowRunDataSourceInput = {
+  fileName: string;
+  fileType: 'csv' | 'tsv';
+  rawText: string;
 };
 
 export type FlowRunFlowSnapshot = {
@@ -123,6 +130,7 @@ export type FlowRunFlowSnapshot = {
 export type FlowRunStartPayload = {
   flow: FlowRunFlowSnapshot;
   source: FlowRunStartSource;
+  dataSourceInputs?: Record<string, FlowRunDataSourceInput>;
 };
 
 export type FlowRunStopPayload = {
@@ -156,6 +164,7 @@ export type FlowRunExecuteStepPayload = {
   stepType: FlowRunAtomicStepType;
   selector?: string;
   value?: string;
+  message?: string;
   mode?: 'time' | 'condition' | 'appear' | 'disappear';
   durationMs?: number;
   operator?: FlowConditionOperator;

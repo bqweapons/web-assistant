@@ -18,6 +18,29 @@ export const bootstrapBackground = () => {
   const runtime = chrome?.runtime;
   const tabsApi = chrome?.tabs;
   const scriptingApi = chrome?.scripting;
+  const isNoReceiverError = (error: unknown) =>
+    /receiving end does not exist|asynchronous response|message channel(?:\s+is)?\s+closed|before a response was received/i.test(
+      error instanceof Error ? error.message : String(error ?? ''),
+    );
+  const safeBroadcast = (message: RuntimeMessage) => {
+    if (!runtime?.sendMessage) {
+      return;
+    }
+    try {
+      const result = runtime.sendMessage(message);
+      if (result && typeof (result as Promise<unknown>).catch === 'function') {
+        void (result as Promise<unknown>).catch((error) => {
+          if (!isNoReceiverError(error)) {
+            console.warn('Runtime broadcast failed', error);
+          }
+        });
+      }
+    } catch (error) {
+      if (!isNoReceiverError(error)) {
+        console.warn('Runtime broadcast failed', error);
+      }
+    }
+  };
 
   const tabBridge = new TabBridge({
     runtime,
@@ -27,7 +50,7 @@ export const bootstrapBackground = () => {
   });
 
   const broadcastPageContext = (context: PageContextPayload) => {
-    runtime?.sendMessage?.({
+    safeBroadcast({
       type: MessageType.ACTIVE_PAGE_CONTEXT,
       data: context,
       forwarded: true,
@@ -75,7 +98,7 @@ export const bootstrapBackground = () => {
       case MessageType.PICKER_CANCELLED:
       case MessageType.PICKER_INVALID:
       case MessageType.ELEMENT_DRAFT_UPDATED: {
-        runtime.sendMessage({ ...message, forwarded: true });
+        safeBroadcast({ ...message, forwarded: true });
         sendResponse?.({ ok: true });
         return true;
       }
