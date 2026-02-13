@@ -9,6 +9,12 @@ export type FlowStepField = {
   withPicker?: boolean;
   options?: Array<{ value: string; label: string }>;
   showWhen?: { fieldId: string; value?: string; values?: string[] };
+  transform?: {
+    mode: 'js';
+    code: string;
+    enabled?: boolean;
+    timeoutMs?: number;
+  };
 };
 
 export type FlowDataSourceMeta = {
@@ -122,6 +128,23 @@ const normalizeFlowStepField = (raw: unknown, idFactory: (prefix: string) => str
       showWhen.values = raw.showWhen.values.filter((item): item is string => typeof item === 'string');
     }
     normalized.showWhen = showWhen;
+  }
+  if (
+    isRecord(raw.transform) &&
+    raw.transform.mode === 'js' &&
+    typeof raw.transform.code === 'string'
+  ) {
+    const transform: NonNullable<FlowStepField['transform']> = {
+      mode: 'js',
+      code: raw.transform.code,
+    };
+    if (typeof raw.transform.enabled === 'boolean') {
+      transform.enabled = raw.transform.enabled;
+    }
+    if (typeof raw.transform.timeoutMs === 'number' && Number.isFinite(raw.transform.timeoutMs)) {
+      transform.timeoutMs = raw.transform.timeoutMs;
+    }
+    normalized.transform = transform;
   }
   return normalized;
 };

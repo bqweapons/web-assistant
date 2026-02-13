@@ -11,7 +11,8 @@ import {
   type PageContextPayload,
   type RuntimeMessage,
 } from '../shared/messages';
-import type { FlowStepData } from '../shared/flowStepMigration';
+import type { FlowStepData, FlowStepField } from '../shared/flowStepMigration';
+import { runSafeTransformCode } from './background/transformRuntime';
 
 const CONTENT_SCRIPT_FILE = 'content-scripts/content.js';
 const STEP_ACTION_TIMEOUT_MS = 10_000;
@@ -21,6 +22,9 @@ const STATUS_THROTTLE_MS = 200;
 const STEP_MESSAGE_RETRY_TIMEOUT_MS = 60_000;
 const STEP_MESSAGE_RETRY_INTERVAL_MS = 250;
 const MAX_RUN_LOG_ENTRIES = 500;
+const JS_TRANSFORM_DEFAULT_TIMEOUT_MS = 300;
+const JS_TRANSFORM_MIN_TIMEOUT_MS = 50;
+const JS_TRANSFORM_MAX_TIMEOUT_MS = 5_000;
 
 type TabMessageResponse = {
   ok: boolean;
@@ -45,6 +49,26 @@ type BrowserTabChangeInfo = {
   url?: string;
   status?: string;
 };
+
+type JsTransformRequest = {
+  id: string;
+  code: string;
+  input: string;
+  row: Record<string, string>;
+  nowTimestamp: number;
+};
+
+type JsTransformResponse =
+  | {
+      id: string;
+      ok: true;
+      output: string;
+    }
+  | {
+      id: string;
+      ok: false;
+      error: string;
+    };
 
 type FlowRunInternal = {
   runId: string;
@@ -167,6 +191,137 @@ const normalizeForwardError = (value?: string) => {
   return value || 'unknown-error';
 };
 
+let transformWorker: Worker | null = null;
+let transformRequestSequence = 0;
+const pendingTransformRequests = new Map<
+  string,
+  {
+    resolve: (output: string) => void;
+    reject: (error: Error) => void;
+    timer: ReturnType<typeof setTimeout>;
+  }
+>();
+
+const clearTransformRequest = (requestId: string) => {
+  const pending = pendingTransformRequests.get(requestId);
+  if (!pending) {
+    return;
+  }
+  clearTimeout(pending.timer);
+  pendingTransformRequests.delete(requestId);
+};
+
+const terminateTransformWorker = (reason: string) => {
+  if (transformWorker) {
+    transformWorker.terminate();
+    transformWorker = null;
+  }
+  const error = new Error(reason);
+  for (const [requestId, pending] of pendingTransformRequests) {
+    clearTimeout(pending.timer);
+    pending.reject(error);
+    pendingTransformRequests.delete(requestId);
+  }
+};
+
+const ensureTransformWorker = () => {
+  if (transformWorker) {
+    return transformWorker;
+  }
+  if (typeof Worker === 'undefined') {
+    throw new Error('Worker API unavailable for JS transform sandbox.');
+  }
+  const worker = new Worker(new URL('./background/transformSandbox.worker.ts', import.meta.url), {
+    type: 'module',
+  });
+  worker.addEventListener('message', (event: MessageEvent<JsTransformResponse>) => {
+    const response = event.data;
+    if (!response || typeof response.id !== 'string') {
+      return;
+    }
+    const pending = pendingTransformRequests.get(response.id);
+    if (!pending) {
+      return;
+    }
+    clearTransformRequest(response.id);
+    if (response.ok) {
+      pending.resolve(response.output);
+      return;
+    }
+    pending.reject(new Error(response.error || 'JS transform failed.'));
+  });
+  worker.addEventListener('error', (event: ErrorEvent) => {
+    const message = event.message || 'JS transform sandbox worker crashed.';
+    terminateTransformWorker(message);
+  });
+  transformWorker = worker;
+  return worker;
+};
+
+const normalizeTransformTimeout = (value?: number) => {
+  if (typeof value !== 'number' || !Number.isFinite(value)) {
+    return JS_TRANSFORM_DEFAULT_TIMEOUT_MS;
+  }
+  return Math.min(JS_TRANSFORM_MAX_TIMEOUT_MS, Math.max(JS_TRANSFORM_MIN_TIMEOUT_MS, Math.trunc(value)));
+};
+
+const runJsTransformInlineFallback = async (input: {
+  code: string;
+  value: string;
+  row?: FlowRowContext;
+  timeoutMs: number;
+}) => {
+  const execution = Promise.resolve(
+    runSafeTransformCode({
+      code: input.code,
+      input: input.value,
+      row: input.row,
+      nowTimestamp: Date.now(),
+    }),
+  );
+  const timeout = new Promise<never>((_resolve, reject) => {
+    setTimeout(() => {
+      reject(new Error(`JS transform timed out after ${input.timeoutMs}ms.`));
+    }, input.timeoutMs);
+  });
+  return Promise.race([execution, timeout]);
+};
+
+const runJsTransformInSandbox = async (input: {
+  code: string;
+  value: string;
+  row?: FlowRowContext;
+  timeoutMs?: number;
+}) => {
+  const timeoutMs = normalizeTransformTimeout(input.timeoutMs);
+  if (typeof Worker === 'undefined') {
+    return runJsTransformInlineFallback({
+      code: input.code,
+      value: input.value,
+      row: input.row,
+      timeoutMs,
+    });
+  }
+  const worker = ensureTransformWorker();
+  const requestId = `t-${Date.now()}-${(transformRequestSequence += 1)}`;
+  return new Promise<string>((resolve, reject) => {
+    const timer = setTimeout(() => {
+      clearTransformRequest(requestId);
+      terminateTransformWorker(`JS transform timed out after ${timeoutMs}ms.`);
+      reject(new Error(`JS transform timed out after ${timeoutMs}ms.`));
+    }, timeoutMs);
+    pendingTransformRequests.set(requestId, { resolve, reject, timer });
+    const request: JsTransformRequest = {
+      id: requestId,
+      code: input.code,
+      input: input.value,
+      row: input.row ?? {},
+      nowTimestamp: Date.now(),
+    };
+    worker.postMessage(request);
+  });
+};
+
 const microYield = () =>
   new Promise<void>((resolve) => {
     setTimeout(resolve, 0);
@@ -175,13 +330,48 @@ const microYield = () =>
 const getStepFieldRawValue = (step: FlowStepData, fieldId: string) =>
   step.fields.find((field) => field.id === fieldId)?.value ?? '';
 
+const getStepField = (step: FlowStepData, fieldId: string): FlowStepField | undefined =>
+  step.fields.find((field) => field.id === fieldId);
+
 const ROW_TOKEN_PATTERN = /{{\s*row(?:\.([A-Za-z0-9_$]+)|\[\s*["']([^"']+)["']\s*\])\s*}}/g;
+const NOW_TOKEN_PATTERN = /{{\s*now\.(date|time|datetime|timestamp)\s*}}/g;
+
+const toTwoDigits = (value: number) => String(value).padStart(2, '0');
+
+const formatNowToken = (tokenType: string, now: Date) => {
+  const year = now.getFullYear();
+  const month = toTwoDigits(now.getMonth() + 1);
+  const day = toTwoDigits(now.getDate());
+  const hours = toTwoDigits(now.getHours());
+  const minutes = toTwoDigits(now.getMinutes());
+  const seconds = toTwoDigits(now.getSeconds());
+  if (tokenType === 'date') {
+    return `${year}-${month}-${day}`;
+  }
+  if (tokenType === 'time') {
+    return `${hours}:${minutes}:${seconds}`;
+  }
+  if (tokenType === 'datetime') {
+    return `${year}-${month}-${day} ${hours}:${minutes}:${seconds}`;
+  }
+  if (tokenType === 'timestamp') {
+    return String(now.getTime());
+  }
+  return '';
+};
 
 const renderWithRowContext = (input: string, row?: FlowRowContext) => {
-  if (!row || !input) {
+  if (!input) {
     return input;
   }
-  return input.replace(ROW_TOKEN_PATTERN, (_full, dotKey: string | undefined, bracketKey: string | undefined) => {
+  const now = new Date();
+  const withNow = input.replace(NOW_TOKEN_PATTERN, (_full, tokenType: string) =>
+    formatNowToken(tokenType, now),
+  );
+  if (!row) {
+    return withNow;
+  }
+  return withNow.replace(ROW_TOKEN_PATTERN, (_full, dotKey: string | undefined, bracketKey: string | undefined) => {
     const key = dotKey || bracketKey || '';
     return key in row ? row[key] : '';
   });
@@ -872,7 +1062,7 @@ export default defineBackground(() => {
       stepType: Exclude<FlowRunAtomicStepType, 'condition'>,
       row?: FlowRowContext,
     ) {
-      const payload = this.buildAtomicPayload(run, step, stepType, row);
+      const payload = await this.buildAtomicPayload(run, step, stepType, row);
       this.appendLog(run, 'info', this.formatAtomicStartMessage(stepType, payload), {
         stepId: step.id,
         stepType,
@@ -895,7 +1085,7 @@ export default defineBackground(() => {
     }
 
     private async executeConditionStep(run: FlowRunInternal, step: FlowStepData, row?: FlowRowContext) {
-      const payload = this.buildAtomicPayload(run, step, 'condition', row);
+      const payload = await this.buildAtomicPayload(run, step, 'condition', row);
       this.appendLog(run, 'info', this.formatAtomicStartMessage('condition', payload), {
         stepId: step.id,
         stepType: 'condition',
@@ -918,12 +1108,46 @@ export default defineBackground(() => {
       return Boolean(result.conditionMatched);
     }
 
-    private buildAtomicPayload(
+    private async resolveStepFieldValue(
+      run: FlowRunInternal,
+      step: FlowStepData,
+      fieldId: string,
+      row?: FlowRowContext,
+    ) {
+      const renderedValue = getRenderedStepFieldValue(step, fieldId, row);
+      const field = getStepField(step, fieldId);
+      if (!field?.transform || field.transform.mode !== 'js') {
+        return renderedValue;
+      }
+      if (field.transform.enabled === false) {
+        return renderedValue;
+      }
+      const code = field.transform.code.trim();
+      if (!code) {
+        return renderedValue;
+      }
+      try {
+        return await runJsTransformInSandbox({
+          code,
+          value: renderedValue,
+          row,
+          timeoutMs: field.transform.timeoutMs,
+        });
+      } catch (error) {
+        const errorMessage = error instanceof Error ? error.message : String(error);
+        throw new RunnerError(
+          'input-transform-error',
+          `JS transform failed for ${fieldId}: ${errorMessage}`,
+        );
+      }
+    }
+
+    private async buildAtomicPayload(
       run: FlowRunInternal,
       step: FlowStepData,
       stepType: FlowRunAtomicStepType,
       row?: FlowRowContext,
-    ): FlowRunExecuteStepPayload {
+    ): Promise<FlowRunExecuteStepPayload> {
       const payload: FlowRunExecuteStepPayload = {
         runId: run.runId,
         stepId: step.id,
@@ -933,12 +1157,12 @@ export default defineBackground(() => {
       };
 
       if (stepType === 'click') {
-        payload.selector = getRenderedStepFieldValue(step, 'selector', row);
+        payload.selector = await this.resolveStepFieldValue(run, step, 'selector', row);
       } else if (stepType === 'input') {
-        payload.selector = getRenderedStepFieldValue(step, 'selector', row);
-        payload.value = getRenderedStepFieldValue(step, 'value', row);
+        payload.selector = await this.resolveStepFieldValue(run, step, 'selector', row);
+        payload.value = await this.resolveStepFieldValue(run, step, 'value', row);
       } else if (stepType === 'wait') {
-        const modeValue = getRenderedStepFieldValue(step, 'mode', row);
+        const modeValue = await this.resolveStepFieldValue(run, step, 'mode', row);
         const mode =
           modeValue === 'condition' ||
           modeValue === 'appear' ||
@@ -954,23 +1178,23 @@ export default defineBackground(() => {
         }
         payload.mode = mode;
         if (mode === 'time') {
-          const durationValue = getRenderedStepFieldValue(step, 'duration', row);
+          const durationValue = await this.resolveStepFieldValue(run, step, 'duration', row);
           payload.durationMs = toNonNegativeInteger(durationValue, 0);
         } else if (mode === 'condition') {
-          payload.selector = getRenderedStepFieldValue(step, 'selector', row);
-          const operator = getRenderedStepFieldValue(step, 'operator', row);
+          payload.selector = await this.resolveStepFieldValue(run, step, 'selector', row);
+          const operator = await this.resolveStepFieldValue(run, step, 'operator', row);
           payload.operator =
             operator === 'equals' || operator === 'greater' || operator === 'less' ? operator : 'contains';
-          payload.expected = getRenderedStepFieldValue(step, 'expected', row);
+          payload.expected = await this.resolveStepFieldValue(run, step, 'expected', row);
         } else {
-          payload.selector = getRenderedStepFieldValue(step, 'selector', row);
+          payload.selector = await this.resolveStepFieldValue(run, step, 'selector', row);
         }
       } else if (stepType === 'assert' || stepType === 'condition') {
-        payload.selector = getRenderedStepFieldValue(step, 'selector', row);
-        const operator = getRenderedStepFieldValue(step, 'operator', row);
+        payload.selector = await this.resolveStepFieldValue(run, step, 'selector', row);
+        const operator = await this.resolveStepFieldValue(run, step, 'operator', row);
         payload.operator =
           operator === 'equals' || operator === 'greater' || operator === 'less' ? operator : 'contains';
-        payload.expected = getRenderedStepFieldValue(step, 'expected', row);
+        payload.expected = await this.resolveStepFieldValue(run, step, 'expected', row);
       }
 
       return payload;

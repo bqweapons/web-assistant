@@ -1,5 +1,18 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react';
-import { ChevronRight, GripVertical, Trash2 } from 'lucide-react';
+import {
+  AlignLeft,
+  AlignRight,
+  Calendar,
+  ChevronRight,
+  Clock3,
+  Code2,
+  GripVertical,
+  Hash,
+  Replace,
+  Scissors,
+  Timer,
+  Trash2,
+} from 'lucide-react';
 import SelectMenu from './SelectMenu';
 import SelectorInput from './SelectorInput';
 import StepPicker from './StepPicker';
@@ -20,6 +33,12 @@ type StepField = {
   withPicker?: boolean;
   options?: StepFieldOption[];
   showWhen?: { fieldId: string; value?: string; values?: string[] };
+  transform?: {
+    mode: 'js';
+    code: string;
+    enabled?: boolean;
+    timeoutMs?: number;
+  };
 };
 
 type DataSourceMeta = {
@@ -125,6 +144,64 @@ const FIELD_LABEL_KEYS: Record<string, string> = {
   URL: 'sidepanel_field_url',
   'Header row': 'sidepanel_steps_header_row',
 };
+
+const INPUT_VALUE_SHORTCUTS = [
+  {
+    id: 'date',
+    token: '{{now.date}}',
+    label: t('sidepanel_step_input_shortcut_date', 'Insert current date'),
+    icon: Calendar,
+  },
+  {
+    id: 'time',
+    token: '{{now.time}}',
+    label: t('sidepanel_step_input_shortcut_time', 'Insert current time'),
+    icon: Clock3,
+  },
+  {
+    id: 'datetime',
+    token: '{{now.datetime}}',
+    label: t('sidepanel_step_input_shortcut_datetime', 'Insert current date and time'),
+    icon: Timer,
+  },
+  {
+    id: 'timestamp',
+    token: '{{now.timestamp}}',
+    label: t('sidepanel_step_input_shortcut_timestamp', 'Insert current timestamp'),
+    icon: Hash,
+  },
+];
+
+const TRANSFORM_CODE_SHORTCUTS = [
+  {
+    id: 'replace',
+    label: t('sidepanel_step_input_transform_replace', 'Replace'),
+    icon: Replace,
+    code: `const value = String(input ?? '');
+return helpers.replace(value, '-', '');`,
+  },
+  {
+    id: 'left-pad',
+    label: t('sidepanel_step_input_transform_leftpad', 'Left pad'),
+    icon: AlignLeft,
+    code: `const value = String(input ?? '');
+return helpers.leftPad(value, 8, '0');`,
+  },
+  {
+    id: 'right-pad',
+    label: t('sidepanel_step_input_transform_rightpad', 'Right pad'),
+    icon: AlignRight,
+    code: `const value = String(input ?? '');
+return helpers.rightPad(value, 8, ' ');`,
+  },
+  {
+    id: 'substr',
+    label: t('sidepanel_step_input_transform_substr', 'Substring'),
+    icon: Scissors,
+    code: `const value = String(input ?? '');
+return helpers.substr(value, 0, 4);`,
+  },
+];
 
 const DEFAULT_STEPS: StepData[] = [
   {
@@ -538,6 +615,10 @@ export default function FlowStepsBuilder({
   const [draftSteps, setDraftSteps] = useState<StepData[]>(steps);
   const [activeStepId, setActiveStepId] = useState('');
   const [activeFieldTarget, setActiveFieldTarget] = useState<{ stepId: string; fieldId: string } | null>(null);
+  const [transformEditorTarget, setTransformEditorTarget] = useState<{
+    stepId: string;
+    fieldId: string;
+  } | null>(null);
   const [collapsedSteps, setCollapsedSteps] = useState<Record<string, boolean>>({});
   const [collapsedBranches, setCollapsedBranches] = useState<Record<string, boolean>>({});
   const [dragState, setDragState] = useState<
@@ -599,6 +680,7 @@ export default function FlowStepsBuilder({
       }
       return '';
     });
+    setTransformEditorTarget(null);
   }, [resetKey, steps]);
 
   useEffect(() => {
@@ -1133,6 +1215,7 @@ export default function FlowStepsBuilder({
       });
       return next;
     });
+    setTransformEditorTarget((prev) => (prev?.stepId === stepId ? null : prev));
   };
 
   const normalizeColumnToken = (column: string) => {
@@ -1164,8 +1247,12 @@ export default function FlowStepsBuilder({
           return { ...step, children: nextChildren };
         });
       });
-      setActiveStepId(newStep.id);
-      setActiveFieldTarget({ stepId: newStep.id, fieldId: 'value' });
+      setCollapsedSteps((prev) => ({
+        ...prev,
+        [fallbackStepId]: false,
+      }));
+      setActiveStepId(fallbackStepId);
+      setActiveFieldTarget(null);
       return;
     }
     setDraftSteps((prev) => {
@@ -1187,6 +1274,79 @@ export default function FlowStepsBuilder({
         return { ...nextStep, summary: buildStepSummary(nextStep) };
       });
     });
+  };
+
+  const insertInputValueShortcut = (stepId: string, fieldId: string, token: string) => {
+    setDraftSteps((prev) =>
+      updateSteps(prev, stepId, (step) => {
+        const nextFields = step.fields.map((field) => {
+          if (field.id !== fieldId) {
+            return field;
+          }
+          const nextValue = field.value ? `${field.value} ${token}` : token;
+          return { ...field, value: nextValue };
+        });
+        const nextStep = { ...step, fields: nextFields };
+        return { ...nextStep, summary: buildStepSummary(nextStep) };
+      }),
+    );
+    setActiveStepId(stepId);
+    setActiveFieldTarget({ stepId, fieldId });
+  };
+
+  const updateFieldTransform = (
+    stepId: string,
+    fieldId: string,
+    updater: (
+      current: NonNullable<StepField['transform']> | undefined,
+    ) => StepField['transform'] | undefined,
+  ) => {
+    setDraftSteps((prev) =>
+      updateSteps(prev, stepId, (step) => {
+        const nextFields = step.fields.map((field) => {
+          if (field.id !== fieldId) {
+            return field;
+          }
+          return {
+            ...field,
+            transform: updater(field.transform),
+          };
+        });
+        const nextStep = { ...step, fields: nextFields };
+        return { ...nextStep, summary: buildStepSummary(nextStep) };
+      }),
+    );
+  };
+
+  const ensureJsTransform = (current: StepField['transform']): NonNullable<StepField['transform']> => {
+    if (current?.mode === 'js') {
+      return current;
+    }
+    return {
+      mode: 'js',
+      code: 'return input;',
+      enabled: true,
+      timeoutMs: 300,
+    };
+  };
+
+  const toggleTransformEditor = (stepId: string, fieldId: string) => {
+    setTransformEditorTarget((prev) =>
+      prev?.stepId === stepId && prev.fieldId === fieldId ? null : { stepId, fieldId },
+    );
+    updateFieldTransform(stepId, fieldId, (current) => ensureJsTransform(current));
+    setActiveStepId(stepId);
+    setActiveFieldTarget({ stepId, fieldId });
+  };
+
+  const applyTransformSnippet = (stepId: string, fieldId: string, code: string) => {
+    updateFieldTransform(stepId, fieldId, (current) => ({
+      ...ensureJsTransform(current),
+      code,
+      enabled: true,
+    }));
+    setActiveStepId(stepId);
+    setActiveFieldTarget({ stepId, fieldId });
   };
 
   const parseDelimitedRows = (text: string, delimiter: string) => {
@@ -1481,6 +1641,148 @@ export default function FlowStepsBuilder({
                                 />
                               );
                             }
+                              if (step.type === 'input' && field.id === 'value') {
+                                const hasTransform = Boolean(
+                                  field.transform?.mode === 'js' && field.transform.code.trim(),
+                                );
+                                const transformEditorOpen =
+                                  transformEditorTarget?.stepId === step.id &&
+                                  transformEditorTarget.fieldId === field.id;
+                                const transformConfig = ensureJsTransform(field.transform);
+                                return (
+                                  <div className="grid w-full gap-1.5">
+                                    <input
+                                      ref={setFieldInputRef(step.id, field.id)}
+                                      data-flow-step-id={step.id}
+                                      data-flow-field-id={field.id}
+                                      className="input min-w-0"
+                                      type={field.type === 'number' ? 'number' : 'text'}
+                                      value={field.value}
+                                      onChange={(event) => updateField(step.id, field.id, event.target.value)}
+                                      placeholder={field.placeholder}
+                                      onFocus={() =>
+                                        setActiveFieldTarget({ stepId: step.id, fieldId: field.id })
+                                      }
+                                    />
+                                    <div className="flex flex-wrap items-center gap-1">
+                                      {INPUT_VALUE_SHORTCUTS.map((shortcut) => {
+                                        const Icon = shortcut.icon;
+                                        return (
+                                          <button
+                                            key={shortcut.id}
+                                            type="button"
+                                            className="btn-icon h-7 w-7"
+                                            title={shortcut.label}
+                                            aria-label={shortcut.label}
+                                            onClick={(event) => {
+                                              event.preventDefault();
+                                              event.stopPropagation();
+                                              insertInputValueShortcut(step.id, field.id, shortcut.token);
+                                            }}
+                                          >
+                                            <Icon className="h-3.5 w-3.5" />
+                                          </button>
+                                        );
+                                      })}
+                                      <button
+                                        type="button"
+                                        className={`btn-icon h-7 w-7 ${hasTransform || transformEditorOpen ? 'bg-primary/15 text-primary' : ''}`}
+                                        title={t('sidepanel_step_input_transform_edit', 'Edit JS transform')}
+                                        aria-label={t('sidepanel_step_input_transform_edit', 'Edit JS transform')}
+                                        onClick={(event) => {
+                                          event.preventDefault();
+                                          event.stopPropagation();
+                                          toggleTransformEditor(step.id, field.id);
+                                        }}
+                                      >
+                                        <Code2 className="h-3.5 w-3.5" />
+                                      </button>
+                                    </div>
+                                    {transformEditorOpen ? (
+                                      <div className="grid gap-2 rounded-md border border-border bg-muted/30 p-2">
+                                        <label className="flex items-center gap-2 text-[11px] text-muted-foreground">
+                                          <input
+                                            type="checkbox"
+                                            className="h-3.5 w-3.5"
+                                            checked={transformConfig.enabled !== false}
+                                            onChange={(event) =>
+                                              updateFieldTransform(step.id, field.id, (current) => ({
+                                                ...ensureJsTransform(current),
+                                                enabled: event.target.checked,
+                                              }))
+                                            }
+                                          />
+                                          <span>
+                                            {t(
+                                              'sidepanel_step_input_transform_enabled',
+                                              'Enable JS transform at runtime',
+                                            )}
+                                          </span>
+                                        </label>
+                                        <div className="flex flex-wrap items-center gap-1">
+                                          {TRANSFORM_CODE_SHORTCUTS.map((shortcut) => {
+                                            const Icon = shortcut.icon;
+                                            return (
+                                              <button
+                                                key={shortcut.id}
+                                                type="button"
+                                                className="btn-icon h-7 w-7"
+                                                title={shortcut.label}
+                                                aria-label={shortcut.label}
+                                                onClick={(event) => {
+                                                  event.preventDefault();
+                                                  event.stopPropagation();
+                                                  applyTransformSnippet(step.id, field.id, shortcut.code);
+                                                }}
+                                              >
+                                                <Icon className="h-3.5 w-3.5" />
+                                              </button>
+                                            );
+                                          })}
+                                        </div>
+                                        <textarea
+                                          className="input h-24 min-w-0 font-mono text-[11px]"
+                                          value={transformConfig.code}
+                                          onChange={(event) =>
+                                            updateFieldTransform(step.id, field.id, (current) => ({
+                                              ...ensureJsTransform(current),
+                                              code: event.target.value,
+                                            }))
+                                          }
+                                          placeholder="return input;"
+                                        />
+                                        <label className="grid grid-cols-[auto,minmax(0,1fr)] items-center gap-2 text-[11px] text-muted-foreground">
+                                          <span>{t('sidepanel_step_input_transform_timeout', 'Timeout (ms)')}</span>
+                                          <input
+                                            className="input h-8 min-w-0"
+                                            type="number"
+                                            min={50}
+                                            max={5000}
+                                            value={String(transformConfig.timeoutMs ?? 300)}
+                                            onChange={(event) =>
+                                              updateFieldTransform(step.id, field.id, (current) => {
+                                                const parsed = Number.parseInt(event.target.value, 10);
+                                                const timeoutMs =
+                                                  Number.isFinite(parsed) && parsed > 0 ? parsed : 300;
+                                                return {
+                                                  ...ensureJsTransform(current),
+                                                  timeoutMs,
+                                                };
+                                              })
+                                            }
+                                          />
+                                        </label>
+                                        <p className="text-[10px] text-muted-foreground">
+                                          {t(
+                                            'sidepanel_step_input_transform_hint',
+                                            'Use input, row, now, helpers and return the final string.',
+                                          )}
+                                        </p>
+                                      </div>
+                                    ) : null}
+                                  </div>
+                                );
+                              }
                               return (
                                 <input
                                   ref={setFieldInputRef(step.id, field.id)}
