@@ -1,15 +1,43 @@
 import {
   MessageType,
-  type FlowRunFlowSnapshot,
   type RuntimeMessage,
 } from '../../shared/messages';
-import { normalizeFlowSteps } from '../../shared/flowStepMigration';
 import { getSiteData } from '../../shared/storage';
 import {
   deriveSiteKey,
-  isStructuredElementRecord,
   type StructuredElementRecord,
 } from '../../shared/siteDataSchema';
+import { generateSelector, selectorForSibling } from './injection/selector';
+import {
+  applyInlineStyles,
+  formatCustomCss,
+  mergeStyleRules,
+  normalizeStyleRules,
+  parseCustomCss,
+  POSITIONING_KEYS,
+} from './injection/style';
+import {
+  getElementActionFlowId,
+  getElementActionSelector,
+  getElementAfterSelector,
+  getElementBeforeSelector,
+  getElementContainerId,
+  getElementHref,
+  getElementLayout,
+  getElementLinkTarget,
+  getElementMode,
+  getElementPosition,
+  getElementSelector,
+  getElementTooltipPosition,
+  getElementType,
+  isElementFloating,
+  isRecord,
+  normalizeSiteKey,
+  toFlowSnapshot,
+  toRuntimeElementPayload,
+  toStructuredElementPayload,
+  type RuntimeElement,
+} from './injection/shared';
 
 type RegistryEntry = {
   element: StructuredElementRecord;
@@ -18,8 +46,6 @@ type RegistryEntry = {
   content?: HTMLElement;
   cleanup?: () => void;
 };
-
-type RuntimeElement = StructuredElementRecord;
 
 type RuntimeMessenger = { sendMessage?: (message: unknown) => void };
 
@@ -55,7 +81,6 @@ const HIGHLIGHT_COLOR = 'rgba(27, 132, 255, 0.55)';
 const FLOATING_Z_INDEX = '2147482000';
 const DRAG_Z_INDEX = '2147483200';
 const MIN_SIZE = 24;
-const POSITIONING_KEYS = new Set(['position', 'left', 'top', 'right', 'bottom', 'zIndex']);
 
 let editingElementId: string | null = null;
 let highlightedAreaId: string | null = null;
@@ -70,151 +95,7 @@ const pendingReattachIds = new Set<string>();
 let pendingPlacementTimer: number | null = null;
 const pendingPlacementById = new Map<string, StructuredElementRecord>();
 
-const cssEscape =
-  typeof CSS !== 'undefined' && typeof CSS.escape === 'function'
-    ? CSS.escape.bind(CSS)
-    : (value: string) => String(value).replace(/[^a-zA-Z0-9_\-]/g, (char) => `\\${char}`);
-
-const normalizeSiteKey = (value: string) =>
-  value.replace(/^https?:\/\//, '').replace(/^file:\/\//, '').replace(/\/$/, '');
-const isRecord = (value: unknown): value is Record<string, unknown> =>
-  Boolean(value) && typeof value === 'object' && !Array.isArray(value);
-
-const toStructuredElementPayload = (value: unknown): StructuredElementRecord | null => {
-  return isStructuredElementRecord(value) ? value : null;
-};
-
-const toRuntimeElementPayload = (value: StructuredElementRecord): RuntimeElement => value;
-
 const getEntryRuntime = (entry: RegistryEntry): RuntimeElement => toRuntimeElementPayload(entry.element);
-
-const getElementType = (element: RuntimeElement): RuntimeElement['behavior']['type'] => element.behavior.type;
-const getElementSelector = (element: RuntimeElement) => element.placement.selector || '';
-const getElementPosition = (element: RuntimeElement) => element.placement.position || 'append';
-const getElementBeforeSelector = (element: RuntimeElement) => element.placement.relativeTo.before;
-const getElementAfterSelector = (element: RuntimeElement) => element.placement.relativeTo.after;
-const getElementContainerId = (element: RuntimeElement) => element.placement.containerId;
-const getElementMode = (element: RuntimeElement) =>
-  element.placement.mode === 'floating' || element.placement.mode === 'container'
-    ? element.placement.mode
-    : 'dom';
-const isElementFloating = (element: RuntimeElement) => getElementMode(element) === 'floating';
-const getElementLayout = (element: RuntimeElement) => element.behavior.layout;
-const getElementHref = (element: RuntimeElement) => element.behavior.href;
-const getElementLinkTarget = (element: RuntimeElement) => element.behavior.target;
-const getElementActionSelector = (element: RuntimeElement) => element.behavior.actionSelector || '';
-const getElementActionFlowId = (element: RuntimeElement) => element.behavior.actionFlowId || '';
-const getElementTooltipPosition = (element: RuntimeElement) => element.behavior.tooltipPosition;
-
-const toFlowTimestamp = (value: unknown) => {
-  if (typeof value === 'number' && Number.isFinite(value)) {
-    return value;
-  }
-  if (typeof value === 'string') {
-    const numeric = Number(value);
-    if (Number.isFinite(numeric) && numeric > 0) {
-      return numeric;
-    }
-    const parsed = Date.parse(value);
-    if (Number.isFinite(parsed)) {
-      return parsed;
-    }
-  }
-  return Date.now();
-};
-
-const toFlowSnapshot = (value: unknown, fallbackSiteKey: string): FlowRunFlowSnapshot | null => {
-  if (!isRecord(value) || typeof value.id !== 'string' || !value.id.trim()) {
-    return null;
-  }
-  const flowSiteKey = normalizeSiteKey(
-    deriveSiteKey(typeof value.siteKey === 'string' ? value.siteKey : '') || fallbackSiteKey,
-  );
-  if (!flowSiteKey) {
-    return null;
-  }
-  const normalizedSteps = normalizeFlowSteps(value.steps, {
-    flowId: value.id,
-    keepNumber: false,
-    sanitizeExisting: true,
-  });
-  if (!Array.isArray(normalizedSteps)) {
-    return null;
-  }
-  const scope =
-    value.scope === 'page' || value.scope === 'site' || value.scope === 'global'
-      ? value.scope
-      : 'site';
-  return {
-    id: value.id,
-    name:
-      typeof value.name === 'string' && value.name.trim()
-        ? value.name.trim()
-        : 'Untitled flow',
-    description: typeof value.description === 'string' ? value.description : '',
-    scope,
-    siteKey: flowSiteKey,
-    pageKey: typeof value.pageKey === 'string' ? value.pageKey : null,
-    steps: normalizedSteps,
-    updatedAt: toFlowTimestamp(value.updatedAt),
-  };
-};
-
-const parseCustomCss = (raw?: string) => {
-  if (!raw) {
-    return {} as Record<string, string>;
-  }
-  const rules: Record<string, string> = {};
-  raw
-    .split(';')
-    .map((segment) => segment.trim())
-    .filter(Boolean)
-    .forEach((segment) => {
-      const [property, ...rest] = segment.split(':');
-      if (!property || rest.length === 0) {
-        return;
-      }
-      const value = rest.join(':').trim();
-      if (!value) {
-        return;
-      }
-      const key = property
-        .trim()
-        .toLowerCase()
-        .replace(/-([a-z])/g, (_, char: string) => char.toUpperCase());
-      if (!key) {
-        return;
-      }
-      rules[key] = value;
-    });
-  return rules;
-};
-
-const toKebabCase = (value: string) => value.replace(/[A-Z]/g, (match) => `-${match.toLowerCase()}`);
-
-const formatCustomCss = (rules: Record<string, string>) =>
-  Object.entries(rules)
-    .map(([key, value]) => [key.trim(), value.trim()] as const)
-    .filter(([key, value]) => Boolean(key) && Boolean(value))
-    .map(([key, value]) => `${toKebabCase(key)}: ${value};`)
-    .join('\n');
-
-const mergeStyleRules = (element: RuntimeElement) => ({
-  ...(element.style?.inline || {}),
-  ...parseCustomCss(element.style?.customCss || ''),
-});
-
-const normalizeStyleRules = (rules: Record<string, string>) => {
-  const next: Record<string, string> = {};
-  Object.entries(rules).forEach(([key, value]) => {
-    const trimmed = typeof value === 'string' ? value.trim() : '';
-    if (!trimmed) {
-      return;
-    }
-    next[key] = trimmed;
-  });
-  return next;
-};
 
 const setRenderOrderFromElements = (elements: StructuredElementRecord[]) => {
   renderOrderById.clear();
@@ -235,89 +116,6 @@ const ensureRenderOrder = (id: string) => {
   return next;
 };
 
-const isIdUnique = (id: string, contextDocument: Document) => {
-  try {
-    return contextDocument.querySelectorAll(`#${cssEscape(id)}`).length === 1;
-  } catch {
-    return false;
-  }
-};
-
-const nthOfType = (element: Element) => {
-  const parent = element.parentElement;
-  if (!parent) {
-    return 1;
-  }
-  const siblings = Array.from(parent.children).filter((node) => node.localName === element.localName);
-  return siblings.indexOf(element) + 1;
-};
-
-const generateSelector = (element: Element) => {
-  const contextDocument = element.ownerDocument || document;
-  if (element.id && isIdUnique(element.id, contextDocument)) {
-    return `#${cssEscape(element.id)}`;
-  }
-  const segments: string[] = [];
-  let current: Element | null = element;
-  while (current && current.nodeType === Node.ELEMENT_NODE && current !== contextDocument.documentElement) {
-    let segment = current.localName;
-    if (!segment) {
-      break;
-    }
-    if (current.id && isIdUnique(current.id, current.ownerDocument || contextDocument)) {
-      segment = `${segment}#${cssEscape(current.id)}`;
-      segments.unshift(segment);
-      break;
-    }
-    const nth = nthOfType(current);
-    if (nth > 1) {
-      segment += `:nth-of-type(${nth})`;
-    }
-    segments.unshift(segment);
-    current = current.parentElement;
-  }
-  return segments.join(' > ');
-};
-
-const selectorForSibling = (node: Element | null) => {
-  if (!node) {
-    return undefined;
-  }
-  try {
-    const selector = generateSelector(node);
-    return selector || undefined;
-  } catch {
-    return undefined;
-  }
-};
-
-const applyInlineStyles = (
-  node: HTMLElement,
-  element: RuntimeElement,
-  options?: { omitPositioning?: boolean },
-) => {
-  const omitPositioning = options?.omitPositioning === true;
-  const inline = element.style?.inline || {};
-  const custom = parseCustomCss(element.style?.customCss || '');
-  const merged: Record<string, string> = { ...inline, ...custom };
-  Object.entries(merged).forEach(([key, value]) => {
-    if (!value) {
-      return;
-    }
-    if (
-      omitPositioning &&
-      POSITIONING_KEYS.has(key)
-    ) {
-      return;
-    }
-    // eslint-disable-next-line @typescript-eslint/ban-ts-comment
-    // @ts-ignore style indexing
-    node.style[key] = value;
-  });
-  if (isElementFloating(element) && !omitPositioning) {
-    node.style.position = node.style.position || 'absolute';
-  }
-};
 
 const applyHostPlacementStyles = (host: HTMLElement, element: RuntimeElement) => {
   const merged = mergeStyleRules(element);

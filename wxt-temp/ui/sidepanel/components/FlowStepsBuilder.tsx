@@ -18,48 +18,20 @@ import SelectorInput from './SelectorInput';
 import StepPicker from './StepPicker';
 import { t } from '../utils/i18n';
 import type { SelectorPickerAccept } from '../../../shared/messages';
+import { buildDataSourceSummary, parseDataSourceMeta } from './flowSteps/dataSourceParser';
+import { buildStepSummary, getFieldValue, shouldShowField } from './flowSteps/summary';
+import { createInputStepWithValue, createStepTemplate } from './flowSteps/templates';
+import {
+  findStepById,
+  isSameContext,
+  removeStepById,
+  reorderWithinContext,
+  updateSteps,
+  type StepTreeContext,
+} from './flowSteps/treeOps';
+import type { StepData, StepField, StepFieldOption } from './flowSteps/types';
 
-type StepFieldOption = {
-  value: string;
-  label: string;
-};
-
-type StepField = {
-  id: string;
-  label: string;
-  placeholder?: string;
-  type?: 'text' | 'number' | 'textarea' | 'select' | 'checkbox';
-  value: string;
-  withPicker?: boolean;
-  options?: StepFieldOption[];
-  showWhen?: { fieldId: string; value?: string; values?: string[] };
-  transform?: {
-    mode: 'js';
-    code: string;
-    enabled?: boolean;
-    timeoutMs?: number;
-  };
-};
-
-type DataSourceMeta = {
-  fileName?: string;
-  fileType?: 'csv' | 'tsv';
-  columns?: string[];
-  rowCount?: number;
-  error?: string;
-  rawText?: string;
-};
-
-export type StepData = {
-  id: string;
-  type: string;
-  title: string;
-  summary: string;
-  fields: StepField[];
-  children?: StepData[];
-  branches?: Array<{ id: string; label: string; steps: StepData[] }>;
-  dataSource?: DataSourceMeta;
-};
+export type { StepData };
 
 type AddStepPlaceholderProps = {
   label: string;
@@ -625,10 +597,7 @@ export default function FlowStepsBuilder({
     | null
     | {
         stepId: string;
-        context:
-          | { scope: 'root' }
-          | { scope: 'children'; parentId: string }
-          | { scope: 'branch'; parentId: string; branchId: string };
+        context: StepTreeContext;
       }
   >(null);
   const syncingFromPropsRef = useRef(false);
@@ -636,33 +605,12 @@ export default function FlowStepsBuilder({
   const appliedResetKeyRef = useRef<string | number | symbol>(Symbol('initial-reset'));
   const setFieldInputRef =
     (_stepId: string, _fieldId: string) => (_node: HTMLInputElement | HTMLTextAreaElement | null) => undefined;
+  const templateOptions = { waitModes: WAIT_MODES, conditionOperators: CONDITION_OPERATORS };
+  const summarizeStep = (step: StepData) => buildStepSummary(step, CONDITION_OPERATORS);
 
   const getFieldLabel = (label: string) => {
     const key = FIELD_LABEL_KEYS[label];
     return key ? t(key, label) : label;
-  };
-
-  const findStepById = (items: StepData[], stepId: string): StepData | undefined => {
-    for (const step of items) {
-      if (step.id === stepId) {
-        return step;
-      }
-      if (step.children?.length) {
-        const match = findStepById(step.children, stepId);
-        if (match) {
-          return match;
-        }
-      }
-      if (step.branches?.length) {
-        for (const branch of step.branches) {
-          const match = findStepById(branch.steps, stepId);
-          if (match) {
-            return match;
-          }
-        }
-      }
-    }
-    return undefined;
   };
 
   useEffect(() => {
@@ -695,214 +643,6 @@ export default function FlowStepsBuilder({
     onChange?.(draftSteps);
   }, [draftSteps, onChange]);
 
-  const isSameContext = (
-    left:
-      | { scope: 'root' }
-      | { scope: 'children'; parentId: string }
-      | { scope: 'branch'; parentId: string; branchId: string },
-    right:
-      | { scope: 'root' }
-      | { scope: 'children'; parentId: string }
-      | { scope: 'branch'; parentId: string; branchId: string },
-  ) => {
-    if (left.scope !== right.scope) {
-      return false;
-    }
-    if (left.scope === 'root' && right.scope === 'root') {
-      return true;
-    }
-    if (left.scope === 'children' && right.scope === 'children') {
-      return left.parentId === right.parentId;
-    }
-    if (left.scope === 'branch' && right.scope === 'branch') {
-      return left.parentId === right.parentId && left.branchId === right.branchId;
-    }
-    return false;
-  };
-
-  const reorderList = (items: StepData[], fromId: string, toId?: string) => {
-    const fromIndex = items.findIndex((item) => item.id === fromId);
-    if (fromIndex === -1) {
-      return items;
-    }
-    const next = [...items];
-    const [moved] = next.splice(fromIndex, 1);
-    if (!toId) {
-      next.push(moved);
-      return next;
-    }
-    const targetIndex = next.findIndex((item) => item.id === toId);
-    if (targetIndex === -1) {
-      next.push(moved);
-      return next;
-    }
-    next.splice(targetIndex, 0, moved);
-    return next;
-  };
-
-  const reorderWithinContext = (
-    items: StepData[],
-    context:
-      | { scope: 'root' }
-      | { scope: 'children'; parentId: string }
-      | { scope: 'branch'; parentId: string; branchId: string },
-    fromId: string,
-    toId?: string,
-  ) => {
-    if (context.scope === 'root') {
-      return reorderList(items, fromId, toId);
-    }
-    return updateSteps(items, context.parentId, (step) => {
-      if (context.scope === 'children') {
-        const nextChildren = reorderList(step.children ?? [], fromId, toId);
-        return { ...step, children: nextChildren };
-      }
-      if (context.scope === 'branch') {
-        const nextBranches =
-          step.branches?.map((branch) => {
-            if (branch.id !== context.branchId) {
-              return branch;
-            }
-            return { ...branch, steps: reorderList(branch.steps, fromId, toId) };
-          }) ?? [];
-        return { ...step, branches: nextBranches };
-      }
-      return step;
-    });
-  };
-
-  const updateSteps = (items: StepData[], stepId: string, updater: (step: StepData) => StepData) =>
-    items.map((step) => {
-      if (step.id === stepId) {
-        return updater(step);
-      }
-      let nextStep = step;
-      if (step.children?.length) {
-        const nextChildren = updateSteps(step.children, stepId, updater);
-        if (nextChildren !== step.children) {
-          nextStep = { ...nextStep, children: nextChildren };
-        }
-      }
-      if (step.branches?.length) {
-        let branchesChanged = false;
-        const nextBranches = step.branches.map((branch) => {
-          const nextBranchSteps = updateSteps(branch.steps, stepId, updater);
-          if (nextBranchSteps !== branch.steps) {
-            branchesChanged = true;
-            return { ...branch, steps: nextBranchSteps };
-          }
-          return branch;
-        });
-        if (branchesChanged) {
-          nextStep = { ...nextStep, branches: nextBranches };
-        }
-      }
-      return nextStep;
-    });
-
-  const getFieldValue = (step: StepData, fieldId: string) =>
-    step.fields.find((field) => field.id === fieldId)?.value ?? '';
-
-  const shouldShowField = (step: StepData, field: StepField) => {
-    if (!field.showWhen) {
-      return true;
-    }
-    const currentValue = getFieldValue(step, field.showWhen.fieldId);
-    if (field.showWhen.values) {
-      return field.showWhen.values.includes(currentValue);
-    }
-    if (field.showWhen.value !== undefined) {
-      return currentValue === field.showWhen.value;
-    }
-    return true;
-  };
-
-  const getOperatorLabel = (value: string) =>
-    CONDITION_OPERATORS.find((option) => option.value === value)?.label || value;
-
-  const buildStepSummary = (step: StepData) => {
-    const selector = getFieldValue(step, 'selector');
-    const value = getFieldValue(step, 'value');
-    const operator = getFieldValue(step, 'operator');
-    const expected = getFieldValue(step, 'expected');
-    const mode = getFieldValue(step, 'mode');
-    const duration = getFieldValue(step, 'duration');
-    const url = getFieldValue(step, 'url');
-    const iterations = getFieldValue(step, 'iterations');
-    const operatorLabel = operator ? getOperatorLabel(operator) : '';
-
-    switch (step.type) {
-      case 'click':
-        return t('sidepanel_step_summary_selector', 'Selector: {value}').replace(
-          '{value}',
-          selector || t('sidepanel_field_not_set', 'Not set'),
-        );
-      case 'input':
-        if (value) {
-          return t('sidepanel_step_summary_value', 'Value: {value}').replace('{value}', value);
-        }
-        return selector
-          ? t('sidepanel_step_summary_selector', 'Selector: {value}').replace('{value}', selector)
-          : t('sidepanel_step_summary_input', 'Input');
-      case 'loop':
-        return iterations
-          ? t('sidepanel_step_summary_repeat_times', 'Repeat {count} times').replace('{count}', iterations)
-          : t('sidepanel_step_summary_repeat_steps', 'Repeat steps');
-      case 'data-source': {
-        if (step.dataSource?.error) {
-          return t('sidepanel_steps_file_parse_error', 'Failed to parse file');
-        }
-        if (step.dataSource?.columns?.length) {
-          return t('sidepanel_steps_columns_rows', '{columns} columns | {rows} rows')
-            .replace('{columns}', String(step.dataSource.columns.length))
-            .replace('{rows}', String(step.dataSource.rowCount ?? 0));
-        }
-        return step.dataSource?.fileName
-          ? t('sidepanel_steps_columns_missing', 'No columns detected')
-          : t('sidepanel_steps_file_waiting', 'Awaiting file selection');
-      }
-      case 'if-else':
-        if (selector || expected || operatorLabel) {
-          return t('sidepanel_step_summary_if', 'If {selector} {operator} \"{value}\"')
-            .replace('{selector}', selector || t('sidepanel_field_selector', 'Selector'))
-            .replace('{operator}', operatorLabel || t('sidepanel_step_condition_is', 'is'))
-            .replace('{value}', expected || '');
-        }
-        return t('sidepanel_step_summary_conditional', 'Conditional check');
-      case 'wait':
-        if (mode === 'condition') {
-          return t('sidepanel_step_summary_wait_until', 'Wait until {selector} {operator} \"{value}\"')
-            .replace('{selector}', selector || t('sidepanel_field_selector', 'Selector'))
-            .replace('{operator}', operatorLabel || t('sidepanel_step_condition_is', 'is'))
-            .replace('{value}', expected || '');
-        }
-        if (mode === 'appear') {
-          return t('sidepanel_step_summary_wait_appear', 'Wait until {selector} appears')
-            .replace('{selector}', selector || t('sidepanel_field_selector', 'Selector'));
-        }
-        if (mode === 'disappear') {
-          return t('sidepanel_step_summary_wait_disappear', 'Wait until {selector} disappears')
-            .replace('{selector}', selector || t('sidepanel_field_selector', 'Selector'));
-        }
-        return t('sidepanel_step_summary_duration', 'Duration: {value} ms').replace(
-          '{value}',
-          duration || '0',
-        );
-      case 'navigate':
-        return t('sidepanel_step_summary_url', 'URL: {value}').replace(
-          '{value}',
-          url || t('sidepanel_field_not_set', 'Not set'),
-        );
-      case 'assert':
-        return t('sidepanel_step_summary_expect', 'Expect {selector} {operator} \"{value}\"')
-          .replace('{selector}', selector || t('sidepanel_field_selector', 'Selector'))
-          .replace('{operator}', operatorLabel || t('sidepanel_step_condition_is', 'is'))
-          .replace('{value}', expected || '');
-      default:
-        return step.summary || step.title;
-    }
-  };
-
   const updateField = (stepId: string, fieldId: string, value: string) => {
     setDraftSteps((prev) =>
       updateSteps(prev, stepId, (step) => {
@@ -934,216 +674,24 @@ export default function FlowStepsBuilder({
           const sourceType = step.dataSource?.fileType || 'csv';
           const headerRow = nextFields.find((field) => field.id === 'headerRow')?.value;
           const hasHeader = headerRow ? headerRow === 'true' : true;
-          try {
-            const delimiter = sourceType === 'tsv' ? '\t' : ',';
-            const meta = extractDelimitedMeta(step.dataSource.rawText, delimiter, hasHeader);
-            return {
-              ...nextStep,
-              summary:
-                meta.columns.length > 0
-                  ? t('sidepanel_steps_columns_rows', '{columns} columns | {rows} rows')
-                      .replace('{columns}', String(meta.columns.length))
-                      .replace('{rows}', String(meta.rowCount))
-                  : t('sidepanel_steps_columns_missing', 'No columns detected'),
-              dataSource: {
-                ...step.dataSource,
-                columns: meta.columns,
-                rowCount: meta.rowCount,
-                error: '',
-              },
-            };
-          } catch {
-            return {
-              ...nextStep,
-              summary: t('sidepanel_steps_file_parse_error', 'Failed to parse file'),
-              dataSource: {
-                ...step.dataSource,
-                columns: [],
-                rowCount: 0,
-                error: t('sidepanel_steps_file_parse_error', 'Failed to parse file'),
-              },
-            };
-          }
+          const meta = parseDataSourceMeta(step.dataSource.rawText, sourceType, hasHeader);
+          return {
+            ...nextStep,
+            summary: buildDataSourceSummary(meta.columns, meta.rowCount, meta.error),
+            dataSource: {
+              ...step.dataSource,
+              columns: meta.columns,
+              rowCount: meta.rowCount,
+              error: meta.error,
+            },
+          };
         }
         return {
           ...nextStep,
-          summary: buildStepSummary(nextStep),
+          summary: summarizeStep(nextStep),
         };
       }),
     );
-  };
-
-  const createStepId = (prefix: string) =>
-    `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
-
-  const createStepTemplate = (type: string): StepData => {
-    switch (type) {
-      case 'click':
-        return {
-          id: createStepId('click'),
-          type: 'click',
-          title: 'Click element',
-          summary: 'Selector: .btn-primary',
-          fields: [
-            {
-              id: 'selector',
-              label: 'Selector',
-              placeholder: '.btn-primary',
-              type: 'text',
-              value: '',
-              withPicker: true,
-            },
-          ],
-        };
-      case 'input':
-        return {
-          id: createStepId('input'),
-          type: 'input',
-          title: 'Fill input',
-          summary: 'Value: Example text',
-          fields: [
-            {
-              id: 'selector',
-              label: 'Selector',
-              placeholder: 'input[name="title"]',
-              type: 'text',
-              value: '',
-              withPicker: true,
-            },
-            { id: 'value', label: 'Value', placeholder: 'Example text', type: 'text', value: '' },
-          ],
-        };
-      case 'loop':
-        return {
-          id: createStepId('loop'),
-          type: 'loop',
-          title: 'Repeat steps',
-          summary: 'Repeat 3 times',
-          fields: [{ id: 'iterations', label: 'Iterations', placeholder: '3', type: 'number', value: '3' }],
-          children: [],
-        };
-      case 'data-source':
-        return {
-          id: createStepId('data-source'),
-          type: 'data-source',
-          title: 'Load data source',
-          summary: 'Awaiting file selection',
-          fields: [
-            {
-              id: 'headerRow',
-              label: 'Header row',
-              type: 'checkbox',
-              value: 'true',
-            },
-          ],
-          dataSource: {
-            fileName: '',
-            fileType: 'csv',
-            columns: [],
-            rowCount: 0,
-            rawText: '',
-          },
-          children: [],
-        };
-      case 'if-else':
-        return {
-          id: createStepId('if-else'),
-          type: 'if-else',
-          title: 'Conditional check',
-          summary: 'If .status contains "Ready"',
-          fields: [
-            { id: 'selector', label: 'Selector', placeholder: '.status', type: 'text', value: '.status' },
-            { id: 'operator', label: 'Operator', type: 'select', value: 'contains', options: CONDITION_OPERATORS },
-            { id: 'expected', label: 'Value', placeholder: 'Ready', type: 'text', value: 'Ready' },
-          ],
-          branches: [
-            { id: 'branch-then', label: 'Then', steps: [] },
-            { id: 'branch-else', label: 'Else', steps: [] },
-          ],
-        };
-      case 'wait':
-        return {
-          id: createStepId('wait'),
-          type: 'wait',
-          title: 'Wait',
-          summary: 'Duration: 1200 ms',
-          fields: [
-            { id: 'mode', label: 'Wait for', type: 'select', value: 'time', options: WAIT_MODES },
-            {
-              id: 'duration',
-              label: 'Duration (ms)',
-              placeholder: '1200',
-              type: 'number',
-              value: '1200',
-              showWhen: { fieldId: 'mode', value: 'time' },
-            },
-            {
-              id: 'selector',
-              label: 'Selector',
-              placeholder: '.status',
-              type: 'text',
-              value: '.status',
-              withPicker: true,
-              showWhen: { fieldId: 'mode', values: ['condition', 'appear', 'disappear'] },
-            },
-            {
-              id: 'operator',
-              label: 'Operator',
-              type: 'select',
-              value: 'contains',
-              options: CONDITION_OPERATORS,
-              showWhen: { fieldId: 'mode', value: 'condition' },
-            },
-            {
-              id: 'expected',
-              label: 'Value',
-              placeholder: 'Ready',
-              type: 'text',
-              value: 'Ready',
-              showWhen: { fieldId: 'mode', value: 'condition' },
-            },
-          ],
-        };
-      case 'navigate':
-        return {
-          id: createStepId('navigate'),
-          type: 'navigate',
-          title: 'Navigate',
-          summary: 'URL: https://example.com',
-          fields: [
-            { id: 'url', label: 'URL', placeholder: 'https://example.com', type: 'text', value: '' },
-          ],
-        };
-      case 'assert':
-        return {
-          id: createStepId('assert'),
-          type: 'assert',
-          title: 'Assert text',
-          summary: 'Expect .status equals "Ready"',
-          fields: [
-            { id: 'selector', label: 'Selector', placeholder: '.status', type: 'text', value: '.status' },
-            { id: 'operator', label: 'Operator', type: 'select', value: 'equals', options: CONDITION_OPERATORS },
-            { id: 'expected', label: 'Value', placeholder: 'Ready', type: 'text', value: 'Ready' },
-          ],
-        };
-      default:
-        return {
-          id: createStepId('step'),
-          type,
-          title: 'New step',
-          summary: 'Configure step details',
-          fields: [],
-        };
-    }
-  };
-
-  const createInputStepWithValue = (value: string) => {
-    const step = createStepTemplate('input');
-    const nextFields = step.fields.map((field) =>
-      field.id === 'value' ? { ...field, value } : field,
-    );
-    const nextStep = { ...step, fields: nextFields };
-    return { ...nextStep, summary: buildStepSummary(nextStep) };
   };
 
   const addStep = (
@@ -1153,7 +701,7 @@ export default function FlowStepsBuilder({
       | { scope: 'children'; stepId: string }
       | { scope: 'branch'; stepId: string; branchId: string },
   ) => {
-    const newStep = createStepTemplate(type);
+    const newStep = createStepTemplate(type, templateOptions);
     if (target.scope === 'root') {
       setDraftSteps((prev) => [...prev, newStep]);
       setActiveStepId(newStep.id);
@@ -1179,29 +727,6 @@ export default function FlowStepsBuilder({
       }),
     );
     setActiveStepId(newStep.id);
-  };
-
-  const removeStepById = (items: StepData[], stepId: string) => {
-    const next: StepData[] = [];
-    for (const step of items) {
-      if (step.id === stepId) {
-        continue;
-      }
-      let nextStep = step;
-      if (step.children?.length) {
-        const nextChildren = removeStepById(step.children, stepId);
-        nextStep = { ...nextStep, children: nextChildren };
-      }
-      if (step.branches?.length) {
-        const nextBranches = step.branches.map((branch) => ({
-          ...branch,
-          steps: removeStepById(branch.steps, stepId),
-        }));
-        nextStep = { ...nextStep, branches: nextBranches };
-      }
-      next.push(nextStep);
-    }
-    return next;
   };
 
   const handleDeleteStep = (stepId: string) => {
@@ -1237,7 +762,7 @@ export default function FlowStepsBuilder({
       return;
     }
     if (fallbackStepId) {
-      const newStep = createInputStepWithValue(token);
+      const newStep = createInputStepWithValue(token, templateOptions);
       setDraftSteps((prev) => {
         if (!findStepById(prev, fallbackStepId)) {
           return prev;
@@ -1271,7 +796,7 @@ export default function FlowStepsBuilder({
           return { ...field, value: nextValue };
         });
         const nextStep = { ...step, fields: nextFields };
-        return { ...nextStep, summary: buildStepSummary(nextStep) };
+        return { ...nextStep, summary: summarizeStep(nextStep) };
       });
     });
   };
@@ -1287,7 +812,7 @@ export default function FlowStepsBuilder({
           return { ...field, value: nextValue };
         });
         const nextStep = { ...step, fields: nextFields };
-        return { ...nextStep, summary: buildStepSummary(nextStep) };
+        return { ...nextStep, summary: summarizeStep(nextStep) };
       }),
     );
     setActiveStepId(stepId);
@@ -1313,7 +838,7 @@ export default function FlowStepsBuilder({
           };
         });
         const nextStep = { ...step, fields: nextFields };
-        return { ...nextStep, summary: buildStepSummary(nextStep) };
+        return { ...nextStep, summary: summarizeStep(nextStep) };
       }),
     );
   };
@@ -1349,63 +874,6 @@ export default function FlowStepsBuilder({
     setActiveFieldTarget({ stepId, fieldId });
   };
 
-  const parseDelimitedRows = (text: string, delimiter: string) => {
-    const rows: string[][] = [];
-    let row: string[] = [];
-    let current = '';
-    let inQuotes = false;
-
-    for (let i = 0; i < text.length; i += 1) {
-      const char = text[i];
-      if (char === '"') {
-        if (inQuotes && text[i + 1] === '"') {
-          current += '"';
-          i += 1;
-        } else {
-          inQuotes = !inQuotes;
-        }
-        continue;
-      }
-      if (char === '\r' || char === '\n') {
-        if (inQuotes) {
-          current += char;
-          continue;
-        }
-        if (char === '\r' && text[i + 1] === '\n') {
-          i += 1;
-        }
-        row.push(current);
-        current = '';
-        rows.push(row);
-        row = [];
-        continue;
-      }
-      if (char === delimiter && !inQuotes) {
-        row.push(current);
-        current = '';
-        continue;
-      }
-      current += char;
-    }
-
-    row.push(current);
-    rows.push(row);
-    return rows.filter((nextRow) => nextRow.some((cell) => cell.trim() !== ''));
-  };
-
-  const extractDelimitedMeta = (text: string, delimiter: string, hasHeader: boolean) => {
-    const rows = parseDelimitedRows(text, delimiter);
-    if (rows.length === 0) {
-      return { columns: [] as string[], rowCount: 0 };
-    }
-    const headerParts = rows[0];
-    const columns = hasHeader
-      ? headerParts.map((value) => value.trim()).filter(Boolean)
-      : headerParts.map((_, index) => `column${index + 1}`);
-    const rowCount = Math.max(0, rows.length - (hasHeader ? 1 : 0));
-    return { columns, rowCount };
-  };
-
   const handleDataSourceFileChange = (stepId: string, file: File | null) => {
     if (!file) {
       return;
@@ -1423,30 +891,16 @@ export default function FlowStepsBuilder({
         const sourceType = inferredType || step.dataSource?.fileType || 'csv';
         const headerRow = getFieldValue(step, 'headerRow');
         const hasHeader = headerRow ? headerRow === 'true' : true;
-        let columns: string[] = [];
-        let rowCount = 0;
-        let error = '';
-        try {
-          const delimiter = sourceType === 'tsv' ? '\t' : ',';
-          const meta = extractDelimitedMeta(text, delimiter, hasHeader);
-          columns = meta.columns;
-          rowCount = meta.rowCount;
-        } catch {
-          error = 'Failed to parse file.';
-        }
+        const meta = parseDataSourceMeta(text, sourceType, hasHeader);
         return updateSteps(prev, stepId, (item) => ({
           ...item,
-          summary: error
-            ? 'Failed to parse file'
-            : columns.length > 0
-              ? `${columns.length} columns | ${rowCount} rows`
-              : 'No columns detected',
+          summary: buildDataSourceSummary(meta.columns, meta.rowCount, meta.error),
           dataSource: {
             fileName: file.name,
             fileType: sourceType as 'csv' | 'tsv',
-            columns,
-            rowCount,
-            error,
+            columns: meta.columns,
+            rowCount: meta.rowCount,
+            error: meta.error,
             rawText: text,
           },
         }));
@@ -1459,10 +913,7 @@ export default function FlowStepsBuilder({
     items: StepData[],
     depth = 0,
     options?: {
-      context?:
-        | { scope: 'root' }
-        | { scope: 'children'; parentId: string }
-        | { scope: 'branch'; parentId: string; branchId: string };
+      context?: StepTreeContext;
       addPlaceholder?: { label: string; ariaLabel: string; onPick: (type: string) => void };
     },
   ) => {

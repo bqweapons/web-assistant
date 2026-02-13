@@ -1,28 +1,16 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Check, CheckCircle2, Copy, Play, Search, Square, Trash2 } from 'lucide-react';
 import Card from '../components/Card';
 import FlowDrawer from '../components/FlowDrawer';
 import FlowStepsBuilder, { type StepData as FlowStepData } from '../components/FlowStepsBuilder';
 import { t } from '../utils/i18n';
 import {
-  MessageType,
-  type FlowRunFlowSnapshot,
-  type FlowRunStartSource,
-  type FlowRunStatusPayload,
-  type RuntimeMessage,
   type SelectorPickerAccept,
 } from '../../../shared/messages';
 import { getSiteData, setSiteData, STORAGE_KEY } from '../../../shared/storage';
-import { deriveSiteKey, type StructuredFlowRecord } from '../../../shared/siteDataSchema';
-import { normalizeFlowSteps } from '../../../shared/flowStepMigration';
-
-type FlowRecord = StructuredFlowRecord & {
-  scope: 'page' | 'site' | 'global';
-  siteKey: string;
-  pageKey: string | null;
-  steps: FlowStepData[];
-  updatedAt: number;
-};
+import { deriveSiteKey } from '../../../shared/siteDataSchema';
+import { formatTimestamp, getStepCount, normalizeFlow, type FlowRecord } from './flows/normalize';
+import { getRunnerStateLabel, useFlowRunner } from './flows/useFlowRunner';
 
 type FlowsSectionProps = {
   siteKey?: string;
@@ -39,119 +27,6 @@ type FlowSummaryActions = {
   disableSave?: boolean;
   disableSaveRun?: boolean;
   disableRun?: boolean;
-};
-
-const formatTimestamp = (value: number) => {
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) {
-    return '';
-  }
-  const pad = (segment: number) => String(segment).padStart(2, '0');
-  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())} ${pad(
-    date.getHours(),
-  )}:${pad(date.getMinutes())}`;
-};
-
-const getStepCount = (value: FlowStepData[]) => value.length;
-
-const isRecord = (value: unknown): value is Record<string, unknown> =>
-  Boolean(value) && typeof value === 'object' && !Array.isArray(value);
-
-const toTimestamp = (value: unknown) => {
-  if (typeof value === 'number' && Number.isFinite(value)) {
-    return value;
-  }
-  if (typeof value === 'string') {
-    const numeric = Number(value);
-    if (Number.isFinite(numeric) && numeric > 0) {
-      return numeric;
-    }
-    const normalized = value.includes(' ') ? value.replace(' ', 'T') : value;
-    const parsed = Date.parse(normalized);
-    if (Number.isFinite(parsed)) {
-      return parsed;
-    }
-  }
-  return Date.now();
-};
-
-const normalizeFlow = (value: unknown, fallbackSiteKey: string): FlowRecord | null => {
-  if (!isRecord(value)) {
-    return null;
-  }
-  const id = typeof value.id === 'string' && value.id.trim() ? value.id.trim() : '';
-  if (!id) {
-    return null;
-  }
-  const resolvedSiteKey =
-    deriveSiteKey(typeof value.siteKey === 'string' ? value.siteKey : '') || fallbackSiteKey;
-  if (!resolvedSiteKey) {
-    return null;
-  }
-  const normalizedSteps = normalizeFlowSteps(value.steps, {
-    flowId: id,
-    keepNumber: false,
-    sanitizeExisting: true,
-  });
-  return {
-    id,
-    name:
-      typeof value.name === 'string' && value.name.trim()
-        ? value.name.trim()
-        : t('sidepanel_flows_new_default', 'New flow'),
-    description: typeof value.description === 'string' ? value.description : '',
-    scope: value.scope === 'page' || value.scope === 'global' ? value.scope : 'site',
-    siteKey: resolvedSiteKey,
-    pageKey: typeof value.pageKey === 'string' ? value.pageKey : null,
-    steps: Array.isArray(normalizedSteps) ? (normalizedSteps as FlowStepData[]) : [],
-    updatedAt: toTimestamp(value.updatedAt),
-  };
-};
-
-const toFlowSnapshot = (flow: FlowRecord): FlowRunFlowSnapshot => ({
-  id: flow.id,
-  name: flow.name,
-  description: flow.description,
-  scope: flow.scope,
-  siteKey: flow.siteKey,
-  pageKey: flow.pageKey,
-  steps: flow.steps,
-  updatedAt: flow.updatedAt,
-});
-
-const getRunnerStateLabel = (state?: FlowRunStatusPayload['state']) => {
-  if (state === 'running') {
-    return t('sidepanel_flow_runner_state_running', 'Running');
-  }
-  if (state === 'queued') {
-    return t('sidepanel_flow_runner_state_queued', 'Queued');
-  }
-  if (state === 'succeeded') {
-    return t('sidepanel_flow_runner_state_succeeded', 'Succeeded');
-  }
-  if (state === 'failed') {
-    return t('sidepanel_flow_runner_state_failed', 'Failed');
-  }
-  if (state === 'cancelled') {
-    return t('sidepanel_flow_runner_state_cancelled', 'Cancelled');
-  }
-  return t('sidepanel_label_unknown', 'Unknown');
-};
-
-const formatRunnerError = (code?: string, message?: string) => {
-  if (!code && !message) {
-    return '';
-  }
-  if (code === 'site-mismatch' || code === 'cross-site-navigation') {
-    return t('sidepanel_flow_runner_error_site_mismatch', 'Flow can only run on the same site.');
-  }
-  if (code === 'runner-busy') {
-    return t('sidepanel_flow_runner_error_busy', 'Another flow is already running.');
-  }
-  if (code === 'unsupported-step-type') {
-    return t('sidepanel_flow_runner_error_unsupported_step', 'Flow has an unsupported step type.');
-  }
-  return message || code || t('sidepanel_flow_runner_error_unknown', 'Flow run failed.');
 };
 
 export default function FlowsSection({
@@ -176,32 +51,19 @@ export default function FlowsSection({
     steps: [] as FlowStepData[],
   });
   const [createResetKey, setCreateResetKey] = useState(0);
-  const [runStatus, setRunStatus] = useState<FlowRunStatusPayload | null>(null);
-  const [runRequestError, setRunRequestError] = useState('');
-  const [runLogCopyFeedback, setRunLogCopyFeedback] = useState('');
-  const runLogScrollRef = useRef<HTMLDivElement | null>(null);
-
-  const sendRuntimeMessage = useCallback((message: RuntimeMessage) => {
-    return new Promise<unknown>((resolve, reject) => {
-      const runtime = chrome?.runtime;
-      if (!runtime?.sendMessage) {
-        reject(new Error('Messaging API unavailable.'));
-        return;
-      }
-      runtime.sendMessage(message, (response) => {
-        const lastError = runtime.lastError?.message;
-        if (lastError) {
-          reject(new Error(lastError));
-          return;
-        }
-        if (response?.ok === false) {
-          reject(new Error(response.error || 'Messaging failed.'));
-          return;
-        }
-        resolve(response?.data);
-      });
-    });
-  }, []);
+  const {
+    runStatus,
+    runErrorMessage,
+    runLogCopyFeedback,
+    runLogScrollRef,
+    runLogs,
+    isRunActive,
+    currentRunFlow,
+    startFlowRun,
+    stopFlowRun,
+    copyRunLogs,
+    formatLogTime,
+  } = useFlowRunner(flows);
 
   const normalizedQuery = searchQuery.trim().toLowerCase();
 
@@ -234,24 +96,6 @@ export default function FlowsSection({
 
   const showClear = Boolean(normalizedQuery) || sortMode !== 'recent';
 
-  const isRunActive = runStatus?.state === 'queued' || runStatus?.state === 'running';
-  const runErrorMessage = useMemo(() => {
-    if (runRequestError) {
-      return runRequestError;
-    }
-    if (!runStatus?.error) {
-      return '';
-    }
-    return formatRunnerError(runStatus.error.code, runStatus.error.message);
-  }, [runRequestError, runStatus?.error]);
-
-  const currentRunFlow = useMemo(
-    () => (runStatus?.flowId ? flows.find((flow) => flow.id === runStatus.flowId) ?? null : null),
-    [flows, runStatus?.flowId],
-  );
-  const runLogs = runStatus?.logs ?? [];
-  const lastRunLogId = runLogs.length ? runLogs[runLogs.length - 1]?.id : '';
-
   useEffect(() => {
     if (createFlowOpen) {
       setActiveFlowId(null);
@@ -270,24 +114,6 @@ export default function FlowsSection({
     setCreateResetKey((prev) => prev + 1);
   }, [normalizedSiteKey]);
 
-  useEffect(() => {
-    const runtime = chrome?.runtime;
-    if (!runtime?.onMessage) {
-      return;
-    }
-    const handleRuntimeMessage = (rawMessage: RuntimeMessage) => {
-      if (!rawMessage?.forwarded || rawMessage.type !== MessageType.FLOW_RUN_STATUS) {
-        return;
-      }
-      setRunStatus(rawMessage.data);
-      if (rawMessage.data.state !== 'failed') {
-        setRunRequestError('');
-      }
-    };
-    runtime.onMessage.addListener(handleRuntimeMessage);
-    return () => runtime.onMessage.removeListener(handleRuntimeMessage);
-  }, []);
-
   const loadFlows = useCallback(() => {
     if (!normalizedSiteKey) {
       setFlows([]);
@@ -296,7 +122,9 @@ export default function FlowsSection({
     getSiteData(normalizedSiteKey)
       .then((data) => {
         const next = (Array.isArray(data.flows) ? data.flows : [])
-          .map((item) => normalizeFlow(item, normalizedSiteKey))
+          .map((item) =>
+            normalizeFlow(item, normalizedSiteKey, t('sidepanel_flows_new_default', 'New flow')),
+          )
           .filter((item): item is FlowRecord => Boolean(item));
         setFlows(next);
       })
@@ -356,100 +184,6 @@ export default function FlowsSection({
   const closeCreateDrawer = useCallback(() => {
     onCreateFlowClose?.();
   }, [onCreateFlowClose]);
-
-  const startFlowRun = useCallback(
-    async (flow: FlowRecord, source: FlowRunStartSource) => {
-      setRunRequestError('');
-      const startedAt = Date.now();
-      try {
-        const response = await sendRuntimeMessage({
-          type: MessageType.START_FLOW_RUN,
-          data: {
-            flow: toFlowSnapshot(flow),
-            source,
-          },
-        });
-        const runId = isRecord(response) && typeof response.runId === 'string' ? response.runId : `run-${startedAt}`;
-        setRunStatus((prev) => ({
-          runId,
-          flowId: flow.id,
-          siteKey: flow.siteKey,
-          tabId: prev?.tabId ?? 0,
-          state: 'queued',
-          progress: { completedSteps: 0, totalSteps: Math.max(1, flow.steps.length) },
-          startedAt,
-          activeUrl: prev?.activeUrl || '',
-          currentStepId: prev?.currentStepId,
-          endedAt: undefined,
-          error: undefined,
-          logs: [],
-        }));
-      } catch (error) {
-        const message = error instanceof Error ? error.message : String(error);
-        setRunRequestError(formatRunnerError(message, message));
-      }
-    },
-    [sendRuntimeMessage],
-  );
-
-  const formatLogTime = useCallback((timestamp: number) => {
-    const date = new Date(timestamp);
-    if (Number.isNaN(date.getTime())) {
-      return '--:--:--';
-    }
-    return date.toLocaleTimeString([], {
-      hour: '2-digit',
-      minute: '2-digit',
-      second: '2-digit',
-      hour12: false,
-    });
-  }, []);
-
-  const copyRunLogs = useCallback(async () => {
-    if (!runLogs.length) {
-      setRunLogCopyFeedback(t('sidepanel_flow_runner_logs_empty', 'No logs to copy.'));
-      return;
-    }
-    const output = runLogs
-      .map((entry) => `[${formatLogTime(entry.timestamp)}] ${entry.level.toUpperCase()} ${entry.message}`)
-      .join('\n');
-    try {
-      await navigator.clipboard.writeText(output);
-      setRunLogCopyFeedback(t('sidepanel_flow_runner_logs_copied', 'Logs copied.'));
-    } catch {
-      setRunLogCopyFeedback(t('sidepanel_flow_runner_logs_copy_failed', 'Failed to copy logs.'));
-    }
-  }, [formatLogTime, runLogs]);
-
-  useEffect(() => {
-    if (!lastRunLogId) {
-      return;
-    }
-    const container = runLogScrollRef.current;
-    if (!container) {
-      return;
-    }
-    const rafId = window.requestAnimationFrame(() => {
-      container.scrollTop = container.scrollHeight;
-    });
-    return () => window.cancelAnimationFrame(rafId);
-  }, [lastRunLogId]);
-
-  const stopFlowRun = useCallback(async () => {
-    if (!runStatus?.runId) {
-      return;
-    }
-    setRunRequestError('');
-    try {
-      await sendRuntimeMessage({
-        type: MessageType.STOP_FLOW_RUN,
-        data: { runId: runStatus.runId },
-      });
-    } catch (error) {
-      const message = error instanceof Error ? error.message : String(error);
-      setRunRequestError(formatRunnerError(message, message));
-    }
-  }, [runStatus?.runId, sendRuntimeMessage]);
 
   const saveEditedFlow = useCallback(
     (closeDrawer = true): FlowRecord | null => {
