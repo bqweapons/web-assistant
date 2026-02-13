@@ -100,7 +100,7 @@ export default function StepPicker({ onPick, ariaLabel, buttonRef }: StepPickerP
     <div
       ref={menuRef}
       data-step-picker-menu
-      className={`fixed z-50 w-64 rounded border border-border bg-card p-2 shadow-md ${
+      className={`fixed z-[120] w-64 rounded border border-border bg-card p-2 shadow-md ${
         menuPosition ? '' : 'pointer-events-none opacity-0'
       }`}
       style={{ top: menuPosition?.top ?? 0, left: menuPosition?.left ?? 0 }}

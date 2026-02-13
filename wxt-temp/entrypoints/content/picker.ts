@@ -2,7 +2,21 @@ import type { PickerAccept, PickerRect, PickerResultPayload } from '../../shared
 
 const HIGHLIGHT_BORDER_COLOR = '#1b84ff';
 const HIGHLIGHT_FILL_COLOR = 'rgba(27, 132, 255, 0.2)';
-const INPUT_TYPES = new Set(['text', 'password', 'email', 'number', 'search']);
+const INPUT_TYPES = new Set([
+  'text',
+  'password',
+  'email',
+  'number',
+  'search',
+  'url',
+  'tel',
+  'date',
+  'datetime-local',
+  'time',
+  'month',
+  'week',
+  'color',
+]);
 const HOST_ATTR = 'data-ladybird-element';
 const INSERTION_MARKER_SIZE = 10;
 
@@ -189,7 +203,7 @@ const resolveTarget = (target: EventTarget | null) => {
 };
 
 const isInputTarget = (element: Element) => {
-  if (element.getAttribute('contenteditable') === 'true') {
+  if (element instanceof HTMLElement && element.isContentEditable) {
     return true;
   }
   const tag = element.tagName.toLowerCase();
@@ -278,6 +292,7 @@ const createOverlay = () => {
 export const startPicker = (options: {
   accept?: PickerAccept;
   disallowInput?: boolean;
+  showInsertionMarker?: boolean;
   onResult: (payload: PickerResultPayload) => void;
   onCancel: () => void;
   onInvalid?: (reason?: string) => void;
@@ -285,7 +300,14 @@ export const startPicker = (options: {
   if (currentSession) {
     currentSession.stop();
   }
-  const { accept = 'selector', disallowInput = false, onResult, onCancel, onInvalid } = options;
+  const {
+    accept = 'selector',
+    disallowInput = false,
+    showInsertionMarker = true,
+    onResult,
+    onCancel,
+    onInvalid,
+  } = options;
   const overlay = createOverlay();
   const root = document.body || document.documentElement;
   root.appendChild(overlay.container);
@@ -317,6 +339,10 @@ export const startPicker = (options: {
     }
     overlay.show(hovered);
     if (accept === 'selector') {
+      if (!showInsertionMarker) {
+        overlay.hideInsertion();
+        return;
+      }
       const containerId = resolveAreaContainerId(hovered, event);
       if (containerId) {
         overlay.hideInsertion();
@@ -361,7 +387,7 @@ export const startPicker = (options: {
     let beforeSelector = resolveSiblingSelector(target.previousElementSibling);
     let afterSelector = resolveSiblingSelector(target.nextElementSibling);
     if (accept === 'selector') {
-      if (!containerId) {
+      if (!containerId && showInsertionMarker) {
         const placement = resolveInsertionSelectors(target, event.clientX, event.clientY);
         beforeSelector = placement.beforeSelector;
         afterSelector = placement.afterSelector;

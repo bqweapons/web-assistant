@@ -779,6 +779,12 @@
   "sidepanel_step_summary_wait_until": {
     "message": "Wait until {selector} {operator} \\\"{value}\\\""
   },
+  "sidepanel_step_summary_wait_appear": {
+    "message": "Wait until {selector} appears"
+  },
+  "sidepanel_step_summary_wait_disappear": {
+    "message": "Wait until {selector} disappears"
+  },
   "sidepanel_step_wait_description": {
     "message": "Pause or wait for element condition."
   },
@@ -787,6 +793,12 @@
   },
   "sidepanel_step_wait_mode_condition": {
     "message": "Element condition"
+  },
+  "sidepanel_step_wait_mode_appear": {
+    "message": "Element appears"
+  },
+  "sidepanel_step_wait_mode_disappear": {
+    "message": "Element disappears"
   },
   "sidepanel_step_wait_mode_time": {
     "message": "Time delay"
@@ -931,5 +943,44 @@
   },
   "sidepanel_elements_selector_placeholder": {
     "message": "CSS selector for target"
+  },
+  "sidepanel_flow_runner_status_title": {
+    "message": "Runner status"
+  },
+  "sidepanel_flow_runner_state_queued": {
+    "message": "Queued"
+  },
+  "sidepanel_flow_runner_state_running": {
+    "message": "Running"
+  },
+  "sidepanel_flow_runner_state_succeeded": {
+    "message": "Succeeded"
+  },
+  "sidepanel_flow_runner_state_failed": {
+    "message": "Failed"
+  },
+  "sidepanel_flow_runner_state_cancelled": {
+    "message": "Cancelled"
+  },
+  "sidepanel_flow_runner_progress": {
+    "message": "{done}/{total} steps"
+  },
+  "sidepanel_flow_runner_current_step": {
+    "message": "Current step: {step}"
+  },
+  "sidepanel_flow_runner_stop": {
+    "message": "Stop"
+  },
+  "sidepanel_flow_runner_error_site_mismatch": {
+    "message": "Flow can only run on the same site."
+  },
+  "sidepanel_flow_runner_error_busy": {
+    "message": "Another flow is already running."
+  },
+  "sidepanel_flow_runner_error_unsupported_step": {
+    "message": "Flow has an unsupported step type."
+  },
+  "sidepanel_flow_runner_error_unknown": {
+    "message": "Flow run failed."
   }
 }

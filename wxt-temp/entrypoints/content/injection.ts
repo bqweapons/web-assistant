@@ -1,4 +1,10 @@
-import { MessageType, type RuntimeMessage } from '../../shared/messages';
+import {
+  MessageType,
+  type FlowRunFlowSnapshot,
+  type RuntimeMessage,
+} from '../../shared/messages';
+import { normalizeFlowSteps } from '../../shared/flowStepMigration';
+import { getSiteData } from '../../shared/storage';
 import {
   deriveSiteKey,
   isStructuredElementRecord,
@@ -61,6 +67,8 @@ const renderOrderById = new Map<string, number>();
 let reconcileTimer: number | null = null;
 let reconcileObserver: MutationObserver | null = null;
 const pendingReattachIds = new Set<string>();
+let pendingPlacementTimer: number | null = null;
+const pendingPlacementById = new Map<string, StructuredElementRecord>();
 
 const cssEscape =
   typeof CSS !== 'undefined' && typeof CSS.escape === 'function'
@@ -69,6 +77,8 @@ const cssEscape =
 
 const normalizeSiteKey = (value: string) =>
   value.replace(/^https?:\/\//, '').replace(/^file:\/\//, '').replace(/\/$/, '');
+const isRecord = (value: unknown): value is Record<string, unknown> =>
+  Boolean(value) && typeof value === 'object' && !Array.isArray(value);
 
 const toStructuredElementPayload = (value: unknown): StructuredElementRecord | null => {
   return isStructuredElementRecord(value) ? value : null;
@@ -92,7 +102,63 @@ const isElementFloating = (element: RuntimeElement) => getElementMode(element) =
 const getElementLayout = (element: RuntimeElement) => element.behavior.layout;
 const getElementHref = (element: RuntimeElement) => element.behavior.href;
 const getElementLinkTarget = (element: RuntimeElement) => element.behavior.target;
+const getElementActionSelector = (element: RuntimeElement) => element.behavior.actionSelector || '';
+const getElementActionFlowId = (element: RuntimeElement) => element.behavior.actionFlowId || '';
 const getElementTooltipPosition = (element: RuntimeElement) => element.behavior.tooltipPosition;
+
+const toFlowTimestamp = (value: unknown) => {
+  if (typeof value === 'number' && Number.isFinite(value)) {
+    return value;
+  }
+  if (typeof value === 'string') {
+    const numeric = Number(value);
+    if (Number.isFinite(numeric) && numeric > 0) {
+      return numeric;
+    }
+    const parsed = Date.parse(value);
+    if (Number.isFinite(parsed)) {
+      return parsed;
+    }
+  }
+  return Date.now();
+};
+
+const toFlowSnapshot = (value: unknown, fallbackSiteKey: string): FlowRunFlowSnapshot | null => {
+  if (!isRecord(value) || typeof value.id !== 'string' || !value.id.trim()) {
+    return null;
+  }
+  const flowSiteKey = normalizeSiteKey(
+    deriveSiteKey(typeof value.siteKey === 'string' ? value.siteKey : '') || fallbackSiteKey,
+  );
+  if (!flowSiteKey) {
+    return null;
+  }
+  const normalizedSteps = normalizeFlowSteps(value.steps, {
+    flowId: value.id,
+    keepNumber: false,
+    sanitizeExisting: true,
+  });
+  if (!Array.isArray(normalizedSteps)) {
+    return null;
+  }
+  const scope =
+    value.scope === 'page' || value.scope === 'site' || value.scope === 'global'
+      ? value.scope
+      : 'site';
+  return {
+    id: value.id,
+    name:
+      typeof value.name === 'string' && value.name.trim()
+        ? value.name.trim()
+        : 'Untitled flow',
+    description: typeof value.description === 'string' ? value.description : '',
+    scope,
+    siteKey: flowSiteKey,
+    pageKey: typeof value.pageKey === 'string' ? value.pageKey : null,
+    steps: normalizedSteps,
+    updatedAt: toFlowTimestamp(value.updatedAt),
+  };
+};
 
 const parseCustomCss = (raw?: string) => {
   if (!raw) {
@@ -520,6 +586,42 @@ const collectRemovedHostIds = (node: Node, sink: Set<string>) => {
   });
 };
 
+const schedulePendingPlacementRetry = (delayMs = 220) => {
+  if (pendingPlacementTimer != null) {
+    return;
+  }
+  pendingPlacementTimer = window.setTimeout(() => {
+    pendingPlacementTimer = null;
+    const pendingElements = Array.from(pendingPlacementById.values());
+    if (pendingElements.length === 0) {
+      if (registry.size === 0) {
+        stopDetachedEntryObserver();
+      }
+      return;
+    }
+    pendingPlacementById.clear();
+    pendingElements.forEach((pendingElement) => {
+      injectElement(pendingElement);
+    });
+    if (pendingPlacementById.size > 0) {
+      schedulePendingPlacementRetry(320);
+      return;
+    }
+    if (registry.size === 0) {
+      stopDetachedEntryObserver();
+    }
+  }, delayMs);
+};
+
+const queuePendingPlacementRetry = (element: StructuredElementRecord, delayMs = 220) => {
+  if (!element?.id) {
+    return;
+  }
+  pendingPlacementById.set(element.id, element);
+  ensureDetachedEntryObserver();
+  schedulePendingPlacementRetry(delayMs);
+};
+
 const ensureDetachedEntryObserver = () => {
   if (reconcileObserver || typeof MutationObserver === 'undefined') {
     return;
@@ -529,7 +631,7 @@ const ensureDetachedEntryObserver = () => {
     return;
   }
   reconcileObserver = new MutationObserver((mutations) => {
-    if (registry.size === 0) {
+    if (registry.size === 0 && pendingPlacementById.size === 0) {
       return;
     }
     const removedHostIds = new Set<string>();
@@ -545,6 +647,9 @@ const ensureDetachedEntryObserver = () => {
       }
       queueDetachedEntryReconcile(id);
     });
+    if (pendingPlacementById.size > 0) {
+      schedulePendingPlacementRetry(80);
+    }
   });
   reconcileObserver.observe(root, { childList: true, subtree: true });
 };
@@ -555,6 +660,11 @@ const stopDetachedEntryObserver = () => {
     reconcileTimer = null;
   }
   pendingReattachIds.clear();
+  if (pendingPlacementTimer != null) {
+    window.clearTimeout(pendingPlacementTimer);
+    pendingPlacementTimer = null;
+  }
+  pendingPlacementById.clear();
   if (reconcileObserver) {
     reconcileObserver.disconnect();
     reconcileObserver = null;
@@ -826,6 +936,100 @@ const postDraftUpdate = (element: StructuredElementRecord) => {
     type: MessageType.ELEMENT_DRAFT_UPDATED,
     data: { element },
   });
+};
+
+const sendRuntimeMessage = async (message: RuntimeMessage) => {
+  const runtime = chrome?.runtime;
+  if (!runtime?.sendMessage) {
+    return { ok: false, error: 'runtime-unavailable' } as const;
+  }
+  return new Promise<{ ok: boolean; data?: unknown; error?: string }>((resolve) => {
+    runtime.sendMessage(message, (response) => {
+      const lastError = chrome?.runtime?.lastError?.message;
+      if (lastError) {
+        resolve({ ok: false, error: lastError });
+        return;
+      }
+      if (isRecord(response) && 'ok' in response) {
+        const typed = response as { ok?: boolean; data?: unknown; error?: string };
+        resolve({
+          ok: typed.ok !== false,
+          data: typed.data,
+          error: typed.error,
+        });
+        return;
+      }
+      resolve({ ok: true, data: response });
+    });
+  });
+};
+
+const triggerSelectorAction = (selector: string) => {
+  if (!selector.trim()) {
+    return false;
+  }
+  let target: Element | null = null;
+  try {
+    target = document.querySelector(selector);
+  } catch {
+    return false;
+  }
+  if (!target) {
+    return false;
+  }
+  if (target instanceof HTMLElement) {
+    target.click();
+    return true;
+  }
+  target.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }));
+  return true;
+};
+
+const startBoundFlowRun = async (element: RuntimeElement) => {
+  const flowId = getElementActionFlowId(element).trim();
+  if (!flowId) {
+    return { ok: false, error: 'action-flow-missing' } as const;
+  }
+  const fallbackSiteKey = normalizeSiteKey(window.location.host || '');
+  const siteKey = normalizeSiteKey(deriveSiteKey(element.context.siteKey || '') || fallbackSiteKey);
+  if (!siteKey) {
+    return { ok: false, error: 'site-key-missing' } as const;
+  }
+  const siteData = await getSiteData(siteKey);
+  const matchedFlow = siteData.flows.find((flow) => flow?.id === flowId);
+  const snapshot = toFlowSnapshot(matchedFlow, siteKey);
+  if (!snapshot) {
+    return { ok: false, error: `flow-not-found:${flowId}` } as const;
+  }
+  return sendRuntimeMessage({
+    type: MessageType.START_FLOW_RUN,
+    data: {
+      flow: snapshot,
+      source: 'flows-list',
+    },
+  });
+};
+
+const executeBoundButtonAction = async (element: RuntimeElement) => {
+  const flowId = getElementActionFlowId(element).trim();
+  if (flowId) {
+    const response = await startBoundFlowRun(element);
+    if (!response.ok) {
+      console.warn('Failed to start bound flow run', {
+        flowId,
+        error: response.error || 'unknown-error',
+      });
+    }
+    return;
+  }
+
+  const actionSelector = getElementActionSelector(element).trim();
+  if (!actionSelector) {
+    return;
+  }
+  if (!triggerSelectorAction(actionSelector)) {
+    console.warn('Failed to trigger bound action selector', { selector: actionSelector });
+  }
 };
 
 const buildStructuredElementWithStyleRules = (
@@ -1639,6 +1843,23 @@ const attachInteractions = (entry: RegistryEntry) => {
 
   const handleClickCapture = (event: MouseEvent) => {
     if (!isEditing()) {
+      const liveEntry = registry.get(entryId);
+      if (!liveEntry) {
+        return;
+      }
+      const liveRuntime = getEntryRuntime(liveEntry);
+      if (getElementType(liveRuntime) !== 'button') {
+        return;
+      }
+      const hasBoundAction = Boolean(
+        getElementActionFlowId(liveRuntime).trim() || getElementActionSelector(liveRuntime).trim(),
+      );
+      if (!hasBoundAction) {
+        return;
+      }
+      event.preventDefault();
+      event.stopPropagation();
+      void executeBoundButtonAction(liveRuntime);
       return;
     }
     event.preventDefault();
@@ -1666,6 +1887,7 @@ const injectElement = (element: StructuredElementRecord) => {
   const siteKey = normalizeSiteKey(deriveSiteKey(element.context.siteKey || ''));
   const currentSite = normalizeSiteKey(window.location.host || '');
   if (siteKey && currentSite && siteKey !== currentSite && !currentSite.endsWith(siteKey)) {
+    pendingPlacementById.delete(element.id);
     return { ok: false, error: 'site-mismatch' };
   }
 
@@ -1678,8 +1900,14 @@ const injectElement = (element: StructuredElementRecord) => {
   const inserted = insertNode(host, runtimeElement);
   if (!inserted.ok) {
     host.remove();
+    if (inserted.error === 'target-not-found' || inserted.error === 'container-not-found') {
+      queuePendingPlacementRetry(element);
+    } else {
+      pendingPlacementById.delete(element.id);
+    }
     return { ok: false, error: inserted.error || 'insert-failed' };
   }
+  pendingPlacementById.delete(element.id);
 
   const existing = registry.get(element.id);
   if (existing) {
@@ -1745,10 +1973,11 @@ const removeElement = (id: string) => {
   entry.node.remove();
   registry.delete(id);
   renderOrderById.delete(id);
+  pendingPlacementById.delete(id);
   if (editingElementId === id) {
     editingElementId = null;
   }
-  if (registry.size === 0) {
+  if (registry.size === 0 && pendingPlacementById.size === 0) {
     stopDetachedEntryObserver();
   }
   return true;
@@ -1758,6 +1987,11 @@ const rehydrateElements = (elements: StructuredElementRecord[]) => {
   const previousEditingId = editingElementId;
   setRenderOrderFromElements(elements);
   const incomingIds = new Set(elements.map((element) => element.id));
+  Array.from(pendingPlacementById.keys()).forEach((id) => {
+    if (!incomingIds.has(id)) {
+      pendingPlacementById.delete(id);
+    }
+  });
   Array.from(registry.keys()).forEach((id) => {
     if (!incomingIds.has(id)) {
       removeElement(id);

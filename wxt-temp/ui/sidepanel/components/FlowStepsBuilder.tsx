@@ -104,6 +104,8 @@ function AddStepPlaceholder({ label, ariaLabel, onPick, onDropReorder, canDrop }
 const WAIT_MODES: StepFieldOption[] = [
   { value: 'time', label: t('sidepanel_step_wait_mode_time', 'Time delay') },
   { value: 'condition', label: t('sidepanel_step_wait_mode_condition', 'Element condition') },
+  { value: 'appear', label: t('sidepanel_step_wait_mode_appear', 'Element appears') },
+  { value: 'disappear', label: t('sidepanel_step_wait_mode_disappear', 'Element disappears') },
 ];
 
 const CONDITION_OPERATORS: StepFieldOption[] = [
@@ -292,7 +294,7 @@ const DEFAULT_STEPS: StepData[] = [
                 placeholder: '.status',
                 type: 'text',
                 value: '.status',
-                showWhen: { fieldId: 'mode', value: 'condition' },
+                showWhen: { fieldId: 'mode', values: ['condition', 'appear', 'disappear'] },
               },
               {
                 id: 'operator',
@@ -337,7 +339,7 @@ const DEFAULT_STEPS: StepData[] = [
         placeholder: '.status',
         type: 'text',
         value: '.status',
-        showWhen: { fieldId: 'mode', value: 'condition' },
+        showWhen: { fieldId: 'mode', values: ['condition', 'appear', 'disappear'] },
       },
       {
         id: 'operator',
@@ -522,11 +524,17 @@ const STEP_TYPE_LABELS: Record<string, string> = {
 
 type FlowStepsBuilderProps = {
   steps?: StepData[];
+  resetKey?: string | number;
   onChange?: (steps: StepData[]) => void;
   onStartPicker?: (accept: SelectorPickerAccept) => Promise<string | null>;
 };
 
-export default function FlowStepsBuilder({ steps = DEFAULT_STEPS, onChange, onStartPicker }: FlowStepsBuilderProps) {
+export default function FlowStepsBuilder({
+  steps = DEFAULT_STEPS,
+  resetKey,
+  onChange,
+  onStartPicker,
+}: FlowStepsBuilderProps) {
   const [draftSteps, setDraftSteps] = useState<StepData[]>(steps);
   const [activeStepId, setActiveStepId] = useState('');
   const [activeFieldTarget, setActiveFieldTarget] = useState<{ stepId: string; fieldId: string } | null>(null);
@@ -544,6 +552,9 @@ export default function FlowStepsBuilder({ steps = DEFAULT_STEPS, onChange, onSt
   >(null);
   const syncingFromPropsRef = useRef(false);
   const initializedRef = useRef(false);
+  const appliedResetKeyRef = useRef<string | number | symbol>(Symbol('initial-reset'));
+  const setFieldInputRef =
+    (_stepId: string, _fieldId: string) => (_node: HTMLInputElement | HTMLTextAreaElement | null) => undefined;
 
   const getFieldLabel = (label: string) => {
     const key = FIELD_LABEL_KEYS[label];
@@ -574,6 +585,12 @@ export default function FlowStepsBuilder({ steps = DEFAULT_STEPS, onChange, onSt
   };
 
   useEffect(() => {
+    if (typeof resetKey !== 'undefined') {
+      if (appliedResetKeyRef.current === resetKey) {
+        return;
+      }
+      appliedResetKeyRef.current = resetKey;
+    }
     syncingFromPropsRef.current = true;
     setDraftSteps(steps);
     setActiveStepId((prev) => {
@@ -582,7 +599,7 @@ export default function FlowStepsBuilder({ steps = DEFAULT_STEPS, onChange, onSt
       }
       return '';
     });
-  }, [steps]);
+  }, [resetKey, steps]);
 
   useEffect(() => {
     if (!initializedRef.current) {
@@ -776,6 +793,14 @@ export default function FlowStepsBuilder({ steps = DEFAULT_STEPS, onChange, onSt
             .replace('{selector}', selector || t('sidepanel_field_selector', 'Selector'))
             .replace('{operator}', operatorLabel || t('sidepanel_step_condition_is', 'is'))
             .replace('{value}', expected || '');
+        }
+        if (mode === 'appear') {
+          return t('sidepanel_step_summary_wait_appear', 'Wait until {selector} appears')
+            .replace('{selector}', selector || t('sidepanel_field_selector', 'Selector'));
+        }
+        if (mode === 'disappear') {
+          return t('sidepanel_step_summary_wait_disappear', 'Wait until {selector} disappears')
+            .replace('{selector}', selector || t('sidepanel_field_selector', 'Selector'));
         }
         return t('sidepanel_step_summary_duration', 'Duration: {value} ms').replace(
           '{value}',
@@ -977,7 +1002,7 @@ export default function FlowStepsBuilder({ steps = DEFAULT_STEPS, onChange, onSt
               type: 'text',
               value: '.status',
               withPicker: true,
-              showWhen: { fieldId: 'mode', value: 'condition' },
+              showWhen: { fieldId: 'mode', values: ['condition', 'appear', 'disappear'] },
             },
             {
               id: 'operator',
@@ -1349,14 +1374,16 @@ export default function FlowStepsBuilder({ steps = DEFAULT_STEPS, onChange, onSt
             >
               <GripVertical className="h-3.5 w-3.5 text-muted-foreground" />
               <div className="min-w-0 flex-1">
-                <div className="flex items-center gap-2">
+                <div className="flex min-w-0 items-center gap-2">
                   <span className="inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-full border border-border bg-muted text-[10px] font-semibold text-foreground">
                     {index + 1}
                   </span>
-                  <p className="text-xs font-semibold text-foreground">{step.title}</p>
-                  <span className="badge-pill text-[9px] uppercase tracking-wide">{typeLabel}</span>
+                  <p className="min-w-0 truncate text-xs font-semibold text-foreground">{step.title}</p>
+                  <span className="badge-pill shrink-0 text-[9px] uppercase tracking-wide">{typeLabel}</span>
                 </div>
-                <p className="mt-1 truncate text-[11px] text-muted-foreground">{step.summary}</p>
+                <p className="mt-1 min-w-0 max-w-full break-all text-[11px] text-muted-foreground">
+                  {step.summary}
+                </p>
               </div>
               <button
                 type="button"
@@ -1383,7 +1410,7 @@ export default function FlowStepsBuilder({ steps = DEFAULT_STEPS, onChange, onSt
                           <span className="text-xs font-semibold text-muted-foreground">
                             {getFieldLabel(field.label)}
                           </span>
-                          <div className="flex items-center gap-2">
+                          <div className="flex min-w-0 items-center gap-2">
                             {(() => {
                               const showPicker = field.withPicker || field.id === 'selector';
                               if (field.type === 'select') {
@@ -1392,7 +1419,7 @@ export default function FlowStepsBuilder({ steps = DEFAULT_STEPS, onChange, onSt
                                     value={field.value}
                                     options={field.options ?? []}
                                     useInputStyle={false}
-                                    buttonClassName="btn-ghost h-9 w-full justify-between px-2 text-xs"
+                                    buttonClassName="btn-ghost h-9 w-full min-w-0 justify-between px-2 text-xs"
                                     onChange={(value) => updateField(step.id, field.id, value)}
                                   />
                                 );
@@ -1401,6 +1428,8 @@ export default function FlowStepsBuilder({ steps = DEFAULT_STEPS, onChange, onSt
                                 return (
                                   <label className="flex items-center gap-2 text-xs text-foreground">
                                     <input
+                                      data-flow-step-id={step.id}
+                                      data-flow-field-id={field.id}
                                       type="checkbox"
                                       className="h-4 w-4"
                                       checked={field.value === 'true'}
@@ -1414,7 +1443,10 @@ export default function FlowStepsBuilder({ steps = DEFAULT_STEPS, onChange, onSt
                               if (field.type === 'textarea') {
                                 return (
                                   <textarea
-                                    className="input h-20"
+                                    ref={setFieldInputRef(step.id, field.id)}
+                                    data-flow-step-id={step.id}
+                                    data-flow-field-id={field.id}
+                                    className="input min-w-0 h-20"
                                     value={field.value}
                                     onChange={(event) => updateField(step.id, field.id, event.target.value)}
                                     placeholder={field.placeholder}
@@ -1425,6 +1457,9 @@ export default function FlowStepsBuilder({ steps = DEFAULT_STEPS, onChange, onSt
                             if (showPicker) {
                               return (
                                 <SelectorInput
+                                  inputRef={setFieldInputRef(step.id, field.id)}
+                                  dataStepId={step.id}
+                                  dataFieldId={field.id}
                                   value={field.value}
                                   placeholder={field.placeholder}
                                   type={field.type === 'number' ? 'number' : 'text'}
@@ -1448,7 +1483,10 @@ export default function FlowStepsBuilder({ steps = DEFAULT_STEPS, onChange, onSt
                             }
                               return (
                                 <input
-                                  className="input"
+                                  ref={setFieldInputRef(step.id, field.id)}
+                                  data-flow-step-id={step.id}
+                                  data-flow-field-id={field.id}
+                                  className="input min-w-0"
                                   type={field.type === 'number' ? 'number' : 'text'}
                                   value={field.value}
                                   onChange={(event) => updateField(step.id, field.id, event.target.value)}
@@ -1475,23 +1513,26 @@ export default function FlowStepsBuilder({ steps = DEFAULT_STEPS, onChange, onSt
                         rendered.push(
                           <div
                             key="mode-duration"
-                            className="grid grid-cols-[auto,minmax(0,1fr),auto,minmax(0,1fr)] items-center gap-2"
+                            className="grid gap-2 sm:grid-cols-[auto,minmax(0,1fr),auto,minmax(0,1fr)] sm:items-center"
                           >
-                            <span className="text-xs font-semibold text-muted-foreground">
+                            <span className="text-xs font-semibold text-muted-foreground sm:whitespace-nowrap">
                               {getFieldLabel(field.label)}
                             </span>
                             <SelectMenu
                               value={field.value}
                               options={field.options ?? []}
                               useInputStyle={false}
-                              buttonClassName="btn-ghost h-9 w-full justify-between px-2 text-xs"
+                              buttonClassName="btn-ghost h-9 w-full min-w-0 justify-between px-2 text-xs"
                               onChange={(value) => updateField(step.id, field.id, value)}
                             />
-                            <span className="text-xs font-semibold text-muted-foreground">
+                            <span className="text-xs font-semibold text-muted-foreground sm:whitespace-nowrap">
                               {durationField.label}
                             </span>
                             <input
-                              className="input w-full"
+                              ref={setFieldInputRef(step.id, durationField.id)}
+                              data-flow-step-id={step.id}
+                              data-flow-field-id={durationField.id}
+                              className="input w-full min-w-0"
                               type="number"
                               value={durationField.value}
                               onChange={(event) => updateField(step.id, durationField.id, event.target.value)}
@@ -1508,16 +1549,19 @@ export default function FlowStepsBuilder({ steps = DEFAULT_STEPS, onChange, onSt
                           <span className="text-xs font-semibold text-muted-foreground">
                             {t('sidepanel_step_condition_label', 'Condition')}
                           </span>
-                            <div className="grid grid-cols-2 gap-2">
+                            <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
                               <SelectMenu
                                 value={field.value}
                                 options={field.options ?? []}
                                 useInputStyle={false}
-                                buttonClassName="btn-ghost h-9 w-full justify-between px-2 text-xs"
+                                buttonClassName="btn-ghost h-9 w-full min-w-0 justify-between px-2 text-xs"
                                 onChange={(value) => updateField(step.id, field.id, value)}
                               />
                               <input
-                                className="input"
+                                ref={setFieldInputRef(step.id, expectedField.id)}
+                                data-flow-step-id={step.id}
+                                data-flow-field-id={expectedField.id}
+                                className="input min-w-0"
                                 type="text"
                                 value={expectedField.value}
                                 onChange={(event) => updateField(step.id, expectedField.id, event.target.value)}
@@ -1534,7 +1578,7 @@ export default function FlowStepsBuilder({ steps = DEFAULT_STEPS, onChange, onSt
                           <span className="text-xs font-semibold text-muted-foreground">
                             {getFieldLabel(field.label)}
                           </span>
-                          <div className="flex items-center gap-2">
+                          <div className="flex min-w-0 items-center gap-2">
                             {(() => {
                               const showPicker = field.withPicker || field.id === 'selector';
                               if (field.type === 'select') {
@@ -1543,7 +1587,7 @@ export default function FlowStepsBuilder({ steps = DEFAULT_STEPS, onChange, onSt
                                     value={field.value}
                                     options={field.options ?? []}
                                     useInputStyle={false}
-                                    buttonClassName="btn-ghost h-9 w-full justify-between px-2 text-xs"
+                                    buttonClassName="btn-ghost h-9 w-full min-w-0 justify-between px-2 text-xs"
                                     onChange={(value) => updateField(step.id, field.id, value)}
                                   />
                                 );
@@ -1552,6 +1596,8 @@ export default function FlowStepsBuilder({ steps = DEFAULT_STEPS, onChange, onSt
                                 return (
                                   <label className="flex items-center gap-2 text-xs text-foreground">
                                     <input
+                                      data-flow-step-id={step.id}
+                                      data-flow-field-id={field.id}
                                       type="checkbox"
                                       className="h-4 w-4"
                                       checked={field.value === 'true'}
@@ -1565,6 +1611,9 @@ export default function FlowStepsBuilder({ steps = DEFAULT_STEPS, onChange, onSt
                               if (field.type === 'textarea') {
                                 return (
                                   <textarea
+                                    ref={setFieldInputRef(step.id, field.id)}
+                                    data-flow-step-id={step.id}
+                                    data-flow-field-id={field.id}
                                     className="input h-20"
                                     value={field.value}
                                     onChange={(event) => updateField(step.id, field.id, event.target.value)}
@@ -1576,6 +1625,9 @@ export default function FlowStepsBuilder({ steps = DEFAULT_STEPS, onChange, onSt
                               if (showPicker) {
                               return (
                                 <SelectorInput
+                                  inputRef={setFieldInputRef(step.id, field.id)}
+                                  dataStepId={step.id}
+                                  dataFieldId={field.id}
                                   value={field.value}
                                   placeholder={field.placeholder}
                                   type={field.type === 'number' ? 'number' : 'text'}
@@ -1599,7 +1651,10 @@ export default function FlowStepsBuilder({ steps = DEFAULT_STEPS, onChange, onSt
                             }
                               return (
                                 <input
-                                  className="input"
+                                  ref={setFieldInputRef(step.id, field.id)}
+                                  data-flow-step-id={step.id}
+                                  data-flow-field-id={field.id}
+                                  className="input min-w-0"
                                   type={field.type === 'number' ? 'number' : 'text'}
                                   value={field.value}
                                   onChange={(event) => updateField(step.id, field.id, event.target.value)}
@@ -1829,7 +1884,7 @@ export default function FlowStepsBuilder({ steps = DEFAULT_STEPS, onChange, onSt
           {t('sidepanel_steps_title', 'Steps')}
         </span>
       </div>
-      <div className="max-h-[35.5vh] overflow-y-auto pr-1" data-step-scroll>
+      <div className="max-h-[35.5vh] overflow-x-hidden overflow-y-auto pr-1" data-step-scroll>
         {renderStepList(draftSteps, 0, {
           context: { scope: 'root' },
           addPlaceholder: {

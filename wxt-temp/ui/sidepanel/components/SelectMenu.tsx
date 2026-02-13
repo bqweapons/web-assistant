@@ -135,19 +135,19 @@ export default function SelectMenu({
   const iconClassName = cx('h-4 w-4 transition', open && 'rotate-180');
   const triggerClassName = cx(
     useInputStyle && 'input',
-    'flex items-center gap-2',
+    'flex w-full min-w-0 items-center gap-2',
     disabled ? 'cursor-not-allowed opacity-50' : 'cursor-pointer',
     centerLabel ? 'justify-center text-center' : 'text-left',
     buttonClassName,
   );
   const menuClasses = cx(
-    'absolute left-0 right-auto z-10 max-h-[30vh] min-w-full w-max overflow-y-auto rounded border border-border bg-card p-2 shadow-md',
+    'absolute left-0 right-auto z-10 max-h-[30vh] min-w-full max-w-[calc(100vw-1rem)] overflow-x-hidden overflow-y-auto rounded border border-border bg-card p-2 shadow-md',
     openUpward ? 'bottom-full mb-2' : 'mt-2',
     menuClassName,
   );
 
   return (
-    <div ref={containerRef} className="relative">
+    <div ref={containerRef} className="relative min-w-0">
       <button
         type="button"
         className={triggerClassName}
@@ -189,9 +189,9 @@ export default function SelectMenu({
                     closeMenu();
                   }}
                 >
-                  <span className="truncate">{option.label}</span>
+                  <span className="min-w-0 truncate">{option.label}</span>
                   {option.rightLabel ? (
-                    <span className="text-xs text-muted-foreground">{option.rightLabel}</span>
+                    <span className="shrink-0 text-xs text-muted-foreground">{option.rightLabel}</span>
                   ) : null}
                 </button>
               );

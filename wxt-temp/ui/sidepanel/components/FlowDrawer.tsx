@@ -26,6 +26,11 @@ export default function FlowDrawer({
   const titleId = useId();
   const descriptionId = useId();
   const panelRef = useRef<HTMLDivElement | null>(null);
+  const onCloseRef = useRef(onClose);
+
+  useEffect(() => {
+    onCloseRef.current = onClose;
+  }, [onClose]);
 
   useEffect(() => {
     if (!open || typeof document === 'undefined') {
@@ -36,7 +41,7 @@ export default function FlowDrawer({
     panelRef.current?.focus();
     const handleKey = (event: KeyboardEvent) => {
       if (event.key === 'Escape') {
-        onClose();
+        onCloseRef.current();
       }
     };
     document.addEventListener('keydown', handleKey);
@@ -44,7 +49,7 @@ export default function FlowDrawer({
       document.body.style.overflow = previousOverflow;
       document.removeEventListener('keydown', handleKey);
     };
-  }, [open, onClose]);
+  }, [open]);
 
   if (!open) {
     return null;
@@ -89,7 +94,7 @@ export default function FlowDrawer({
             </button>
           </header>
           <div className="grid grid-cols-1 gap-4 px-5 py-4 lg:grid-cols-[2fr,1fr]">
-            <div className="order-1 max-h-[70vh] overflow-y-auto pr-1">{children}</div>
+            <div className="order-1 max-h-[70vh] overflow-x-hidden overflow-y-auto pr-1">{children}</div>
             <aside className="order-2 flex flex-col gap-3 rounded-2xl border border-border bg-muted p-4 lg:order-none lg:sticky lg:top-4">
               {summary}
             </aside>

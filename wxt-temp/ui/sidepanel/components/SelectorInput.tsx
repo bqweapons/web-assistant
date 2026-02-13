@@ -8,6 +8,9 @@ type SelectorInputProps = {
   type?: 'text' | 'number';
   onPick?: () => void;
   onFocus?: () => void;
+  inputRef?: (node: HTMLInputElement | null) => void;
+  dataStepId?: string;
+  dataFieldId?: string;
 };
 
 export default function SelectorInput({
@@ -17,10 +20,16 @@ export default function SelectorInput({
   type = 'text',
   onPick,
   onFocus,
+  inputRef,
+  dataStepId,
+  dataFieldId,
 }: SelectorInputProps) {
   return (
     <div className="flex w-full min-w-0 items-center gap-2">
       <input
+        ref={inputRef}
+        data-flow-step-id={dataStepId}
+        data-flow-field-id={dataFieldId}
         className="input min-w-0 flex-1"
         type={type}
         value={value}

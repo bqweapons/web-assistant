@@ -1,3 +1,4 @@
+import type { FlowStepData } from './flowStepMigration';
 import type { StructuredElementRecord } from './siteDataSchema';
 
 export const MessageType = {
@@ -17,6 +18,11 @@ export const MessageType = {
   SET_EDITING_ELEMENT: 'SET_EDITING_ELEMENT',
   ELEMENT_DRAFT_UPDATED: 'ELEMENT_DRAFT_UPDATED',
   REHYDRATE_ELEMENTS: 'REHYDRATE_ELEMENTS',
+  START_FLOW_RUN: 'START_FLOW_RUN',
+  STOP_FLOW_RUN: 'STOP_FLOW_RUN',
+  FLOW_RUN_STATUS: 'FLOW_RUN_STATUS',
+  FLOW_RUN_EXECUTE_STEP: 'FLOW_RUN_EXECUTE_STEP',
+  FLOW_RUN_EXECUTE_RESULT: 'FLOW_RUN_EXECUTE_RESULT',
 } as const;
 
 export type MessageType = (typeof MessageType)[keyof typeof MessageType];
@@ -34,6 +40,7 @@ export type PickerRect = {
 export type PickerStartPayload = {
   accept?: PickerAccept;
   disallowInput?: boolean;
+  showInsertionMarker?: boolean;
 };
 
 export type PickerResultPayload = {
@@ -75,6 +82,100 @@ export type ElementStylePayload = {
 
 export type MessageElementPayload = StructuredElementRecord;
 
+export type FlowRunState = 'queued' | 'running' | 'succeeded' | 'failed' | 'cancelled';
+export type FlowRunStartSource = 'flows-list' | 'flow-drawer-save-run';
+export type FlowConditionOperator = 'contains' | 'equals' | 'greater' | 'less';
+export type FlowRunAtomicStepType = 'click' | 'input' | 'wait' | 'assert' | 'condition';
+export type FlowRunLogLevel = 'info' | 'success' | 'error';
+
+export type FlowRunLogEntry = {
+  id: string;
+  timestamp: number;
+  level: FlowRunLogLevel;
+  message: string;
+  stepId?: string;
+  stepType?: FlowRunAtomicStepType | 'navigate' | 'loop' | 'if-else' | 'data-source';
+};
+
+export type FlowRunExecutionDetails = {
+  selector?: string;
+  elementText?: string;
+  fieldName?: string;
+  inputValue?: string;
+  mode?: 'time' | 'condition' | 'appear' | 'disappear';
+  durationMs?: number;
+  operator?: FlowConditionOperator;
+  expected?: string;
+  actual?: string;
+};
+
+export type FlowRunFlowSnapshot = {
+  id: string;
+  name: string;
+  description: string;
+  scope?: 'page' | 'site' | 'global';
+  siteKey: string;
+  pageKey?: string | null;
+  steps: FlowStepData[];
+  updatedAt: number;
+};
+
+export type FlowRunStartPayload = {
+  flow: FlowRunFlowSnapshot;
+  source: FlowRunStartSource;
+};
+
+export type FlowRunStopPayload = {
+  runId: string;
+};
+
+export type FlowRunStatusPayload = {
+  runId: string;
+  flowId: string;
+  siteKey: string;
+  tabId: number;
+  state: FlowRunState;
+  currentStepId?: string;
+  progress: {
+    completedSteps: number;
+    totalSteps: number;
+  };
+  error?: {
+    code: string;
+    message: string;
+  };
+  startedAt: number;
+  endedAt?: number;
+  activeUrl: string;
+  logs: FlowRunLogEntry[];
+};
+
+export type FlowRunExecuteStepPayload = {
+  runId: string;
+  stepId: string;
+  stepType: FlowRunAtomicStepType;
+  selector?: string;
+  value?: string;
+  mode?: 'time' | 'condition' | 'appear' | 'disappear';
+  durationMs?: number;
+  operator?: FlowConditionOperator;
+  expected?: string;
+  timeoutMs?: number;
+  pollIntervalMs?: number;
+};
+
+export type FlowRunExecuteResultPayload = {
+  ok: boolean;
+  runId: string;
+  stepId: string;
+  stepType: FlowRunAtomicStepType;
+  conditionMatched?: boolean;
+  actual?: string;
+  details?: FlowRunExecutionDetails;
+  error?: string;
+  errorCode?: string;
+};
+
 export type RuntimeMessage =
   | { type: typeof MessageType.START_PICKER; data?: PickerStartPayload; forwarded?: boolean }
   | { type: typeof MessageType.CANCEL_PICKER; data?: undefined; forwarded?: boolean }
@@ -91,4 +192,9 @@ export type RuntimeMessage =
   | { type: typeof MessageType.FOCUS_ELEMENT; data: { id: string }; forwarded?: boolean }
   | { type: typeof MessageType.SET_EDITING_ELEMENT; data: { id?: string }; forwarded?: boolean }
   | { type: typeof MessageType.ELEMENT_DRAFT_UPDATED; data: { element: MessageElementPayload }; forwarded?: boolean }
-  | { type: typeof MessageType.REHYDRATE_ELEMENTS; data: { elements: MessageElementPayload[] }; forwarded?: boolean };
+  | { type: typeof MessageType.REHYDRATE_ELEMENTS; data: { elements: MessageElementPayload[] }; forwarded?: boolean }
+  | { type: typeof MessageType.START_FLOW_RUN; data: FlowRunStartPayload; forwarded?: boolean }
+  | { type: typeof MessageType.STOP_FLOW_RUN; data: FlowRunStopPayload; forwarded?: boolean }
+  | { type: typeof MessageType.FLOW_RUN_STATUS; data: FlowRunStatusPayload; forwarded?: boolean }
+  | { type: typeof MessageType.FLOW_RUN_EXECUTE_STEP; data: FlowRunExecuteStepPayload; forwarded?: boolean }
+  | { type: typeof MessageType.FLOW_RUN_EXECUTE_RESULT; data: FlowRunExecuteResultPayload; forwarded?: boolean };

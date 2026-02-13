@@ -6,6 +6,7 @@ import {
 } from '../shared/siteDataSchema';
 import { startPicker, stopPicker } from './content/picker';
 import { handleInjectionMessage, registerPageContextIfNeeded, resetInjectionRegistry } from './content/injection';
+import { executeFlowRunStep } from './content/flowRunner';
 
 const CONTENT_RUNTIME_READY_KEY = '__ladybirdContentRuntimeReady__';
 type RuntimeMessenger = { sendMessage?: (message: unknown) => void };
@@ -211,9 +212,11 @@ export default defineContentScript({
         case MessageType.START_PICKER: {
           const accept = message.data?.accept;
           const disallowInput = message.data?.disallowInput ?? false;
+          const showInsertionMarker = message.data?.showInsertionMarker ?? true;
           startPicker({
             accept,
             disallowInput,
+            showInsertionMarker,
             onResult(payload) {
               runtime.sendMessage({
                 type: MessageType.PICKER_RESULT,
@@ -250,6 +253,35 @@ export default defineContentScript({
         case MessageType.REHYDRATE_ELEMENTS: {
           const result = handleInjectionMessage(message);
           sendResponse?.(result ?? { ok: false, error: 'unsupported-message' });
+          return true;
+        }
+        case MessageType.FLOW_RUN_EXECUTE_STEP: {
+          void executeFlowRunStep(message.data)
+            .then((result) => {
+              sendResponse?.({
+                ok: true,
+                data: {
+                  type: MessageType.FLOW_RUN_EXECUTE_RESULT,
+                  data: result,
+                },
+              });
+            })
+            .catch((error) => {
+              sendResponse?.({
+                ok: true,
+                data: {
+                  type: MessageType.FLOW_RUN_EXECUTE_RESULT,
+                  data: {
+                    ok: false,
+                    runId: message.data.runId,
+                    stepId: message.data.stepId,
+                    stepType: message.data.stepType,
+                    errorCode: 'step-execution-exception',
+                    error: error instanceof Error ? error.message : String(error),
+                  },
+                },
+              });
+            });
           return true;
         }
         default:

@@ -1,0 +1,176 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Data Source Flow Test - Screen B</title>
+    <style>
+      :root {
+        --bg-1: #f6f6ff;
+        --bg-2: #ecf0ff;
+        --card: #ffffff;
+        --ink: #1e2540;
+        --muted: #616d95;
+        --accent: #314dc6;
+        --accent-2: #1f2f86;
+        --line: #d7ddf6;
+        --radius: 14px;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        min-height: 100vh;
+        font-family: "IBM Plex Sans", "Segoe UI", sans-serif;
+        color: var(--ink);
+        background:
+          radial-gradient(circle at 85% 10%, #dfe6ff 0%, transparent 38%),
+          radial-gradient(circle at 15% 80%, #e5e9ff 0%, transparent 40%),
+          linear-gradient(155deg, var(--bg-1), var(--bg-2));
+        padding: 24px;
+      }
+
+      .page {
+        width: min(860px, 100%);
+        margin: 0 auto;
+        display: grid;
+        gap: 16px;
+      }
+
+      .card {
+        background: var(--card);
+        border: 1px solid var(--line);
+        border-radius: var(--radius);
+        box-shadow: 0 16px 36px rgba(49, 77, 198, 0.09);
+        padding: 18px;
+      }
+
+      h1 {
+        margin: 0 0 6px;
+        font-size: 25px;
+      }
+
+      p {
+        margin: 0;
+        color: var(--muted);
+      }
+
+      table {
+        width: 100%;
+        border-collapse: collapse;
+        margin-top: 12px;
+      }
+
+      th,
+      td {
+        border: 1px solid var(--line);
+        padding: 9px 10px;
+        text-align: left;
+        vertical-align: top;
+        font-size: 14px;
+      }
+
+      th {
+        width: 180px;
+        background: #f6f8ff;
+      }
+
+      .actions {
+        display: flex;
+        gap: 10px;
+        flex-wrap: wrap;
+        margin-top: 14px;
+      }
+
+      button,
+      a {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        text-decoration: none;
+        border: 0;
+        border-radius: 10px;
+        padding: 10px 14px;
+        font: inherit;
+        font-weight: 700;
+        cursor: pointer;
+      }
+
+      #back-button {
+        background: linear-gradient(135deg, var(--accent), var(--accent-2));
+        color: #fff;
+      }
+
+      #back-link {
+        background: #eef1ff;
+        color: var(--ink);
+        border: 1px solid var(--line);
+      }
+    </style>
+  </head>
+  <body>
+    <main class="page">
+      <section class="card">
+        <h1>Screen B: Submitted</h1>
+        <p>This page is the post-submit destination from Screen A.</p>
+      </section>
+
+      <section class="card">
+        <p>Received query values:</p>
+        <table id="received-table">
+          <tbody></tbody>
+        </table>
+
+        <div class="actions">
+          <button id="back-button" type="button">Back to Screen A</button>
+          <a id="back-link" href="./datasource-form-a.html">Open Screen A</a>
+        </div>
+      </section>
+    </main>
+
+    <script>
+      (function () {
+        const fields = [
+          ["customerId", "Customer ID"],
+          ["fullName", "Full Name"],
+          ["email", "Email"],
+          ["phone", "Phone"],
+          ["company", "Company"],
+          ["plan", "Plan"],
+          ["startDate", "Start Date"],
+          ["budget", "Budget (USD)"],
+          ["note", "Note"],
+        ];
+        const params = new URLSearchParams(window.location.search);
+        const tbody = document.querySelector("#received-table tbody");
+        if (!tbody) return;
+
+        fields.forEach(([key, label]) => {
+          const row = document.createElement("tr");
+          const th = document.createElement("th");
+          th.textContent = label;
+          const td = document.createElement("td");
+          td.id = "result-" + key;
+          td.textContent = params.get(key) || "(empty)";
+          row.appendChild(th);
+          row.appendChild(td);
+          tbody.appendChild(row);
+        });
+
+        const backButton = document.getElementById("back-button");
+        if (backButton) {
+          backButton.addEventListener("click", function () {
+            if (history.length > 1) {
+              history.back();
+              return;
+            }
+            window.location.href = "./datasource-form-a.html";
+          });
+        }
+      })();
+    </script>
+  </body>
+</html>

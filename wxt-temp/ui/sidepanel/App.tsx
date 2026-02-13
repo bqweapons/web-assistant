@@ -128,7 +128,10 @@ export default function App() {
   }, []);
 
   const startPicker = useCallback(
-    async (accept: PickerAccept, options?: { disallowInput?: boolean }) => {
+    async (
+      accept: PickerAccept,
+      options?: { disallowInput?: boolean; showInsertionMarker?: boolean },
+    ) => {
       if (pickerResolveRef.current) {
         pickerResolveRef.current(null);
         pickerResolveRef.current = null;
@@ -138,7 +141,14 @@ export default function App() {
       setPickerActive(true);
       return new Promise<PickerResultPayload | null>((resolve) => {
         pickerResolveRef.current = resolve;
-        sendRuntimeMessage({ type: MessageType.START_PICKER, data: { accept, disallowInput: options?.disallowInput } })
+        sendRuntimeMessage({
+          type: MessageType.START_PICKER,
+          data: {
+            accept,
+            disallowInput: options?.disallowInput,
+            showInsertionMarker: options?.showInsertionMarker,
+          },
+        })
           .then(() => undefined)
           .catch(() => {
             setPickerError(t('sidepanel_picker_start_error', 'Unable to start picker.'));
@@ -152,6 +162,12 @@ export default function App() {
   const startSelectorPicker = useCallback(
     (accept: SelectorPickerAccept) =>
       startPicker(accept).then((result) => result?.selector ?? null),
+    [startPicker],
+  );
+
+  const startSelectorPickerWithoutInsertionMarker = useCallback(
+    (accept: SelectorPickerAccept) =>
+      startPicker(accept, { showInsertionMarker: false }).then((result) => result?.selector ?? null),
     [startPicker],
   );
 
@@ -315,7 +331,7 @@ export default function App() {
               hasActivePage={hasActivePage}
               createFlowOpen={createFlowOpen}
               onCreateFlowClose={() => setCreateFlowOpen(false)}
-              onStartPicker={startSelectorPicker}
+              onStartPicker={startSelectorPickerWithoutInsertionMarker}
             />
           )}
           {activeTab === TAB_IDS.hiddenRules && (
