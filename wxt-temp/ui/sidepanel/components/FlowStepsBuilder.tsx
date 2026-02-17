@@ -1,26 +1,25 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import {
-  AlignLeft,
-  AlignRight,
-  Calendar,
   ChevronRight,
-  Clock3,
   Code2,
   GripVertical,
-  Hash,
-  Replace,
-  Scissors,
-  Timer,
   Trash2,
 } from 'lucide-react';
 import SelectMenu from './SelectMenu';
-import SelectorInput from './SelectorInput';
 import StepPicker from './StepPicker';
 import { t } from '../utils/i18n';
 import type { SelectorPickerAccept } from '../../../shared/messages';
 import { buildDataSourceSummary, parseDataSourceMeta } from './flowSteps/dataSourceParser';
 import { buildStepSummary, getFieldValue, shouldShowField } from './flowSteps/summary';
 import { createInputStepWithValue, createStepTemplate } from './flowSteps/templates';
+import { StepFieldControl } from './flowSteps/fieldRenderer';
+import {
+  CONDITION_OPERATORS,
+  FIELD_LABEL_KEYS,
+  INPUT_VALUE_SHORTCUTS,
+  TRANSFORM_CODE_SHORTCUTS,
+  WAIT_MODES,
+} from './flowSteps/shortcutConfig';
 import {
   findStepById,
   isSameContext,
@@ -29,7 +28,7 @@ import {
   updateSteps,
   type StepTreeContext,
 } from './flowSteps/treeOps';
-import type { StepData, StepField, StepFieldOption } from './flowSteps/types';
+import type { StepData, StepField } from './flowSteps/types';
 
 export type { StepData };
 
@@ -91,90 +90,6 @@ function AddStepPlaceholder({ label, ariaLabel, onPick, onDropReorder, canDrop }
     </div>
   );
 }
-
-const WAIT_MODES: StepFieldOption[] = [
-  { value: 'time', label: t('sidepanel_step_wait_mode_time', 'Time delay') },
-  { value: 'condition', label: t('sidepanel_step_wait_mode_condition', 'Element condition') },
-  { value: 'appear', label: t('sidepanel_step_wait_mode_appear', 'Element appears') },
-  { value: 'disappear', label: t('sidepanel_step_wait_mode_disappear', 'Element disappears') },
-];
-
-const CONDITION_OPERATORS: StepFieldOption[] = [
-  { value: 'contains', label: t('sidepanel_step_condition_contains', 'Contains') },
-  { value: 'equals', label: t('sidepanel_step_condition_equals', 'Equals') },
-  { value: 'greater', label: t('sidepanel_step_condition_greater', 'Greater than') },
-  { value: 'less', label: t('sidepanel_step_condition_less', 'Less than') },
-];
-
-const FIELD_LABEL_KEYS: Record<string, string> = {
-  Selector: 'sidepanel_field_selector',
-  Value: 'sidepanel_field_value',
-  Message: 'sidepanel_field_message',
-  Iterations: 'sidepanel_field_iterations',
-  'Wait for': 'sidepanel_field_wait_for',
-  'Duration (ms)': 'sidepanel_field_duration_ms',
-  Operator: 'sidepanel_field_operator',
-  URL: 'sidepanel_field_url',
-  'Header row': 'sidepanel_steps_header_row',
-};
-
-const INPUT_VALUE_SHORTCUTS = [
-  {
-    id: 'date',
-    token: '{{now.date}}',
-    label: t('sidepanel_step_input_shortcut_date', 'Insert current date'),
-    icon: Calendar,
-  },
-  {
-    id: 'time',
-    token: '{{now.time}}',
-    label: t('sidepanel_step_input_shortcut_time', 'Insert current time'),
-    icon: Clock3,
-  },
-  {
-    id: 'datetime',
-    token: '{{now.datetime}}',
-    label: t('sidepanel_step_input_shortcut_datetime', 'Insert current date and time'),
-    icon: Timer,
-  },
-  {
-    id: 'timestamp',
-    token: '{{now.timestamp}}',
-    label: t('sidepanel_step_input_shortcut_timestamp', 'Insert current timestamp'),
-    icon: Hash,
-  },
-];
-
-const TRANSFORM_CODE_SHORTCUTS = [
-  {
-    id: 'replace',
-    label: t('sidepanel_step_input_transform_replace', 'Replace'),
-    icon: Replace,
-    code: `const value = String(input ?? '');
-return helpers.replace(value, '-', '');`,
-  },
-  {
-    id: 'left-pad',
-    label: t('sidepanel_step_input_transform_leftpad', 'Left pad'),
-    icon: AlignLeft,
-    code: `const value = String(input ?? '');
-return helpers.leftPad(value, 8, '0');`,
-  },
-  {
-    id: 'right-pad',
-    label: t('sidepanel_step_input_transform_rightpad', 'Right pad'),
-    icon: AlignRight,
-    code: `const value = String(input ?? '');
-return helpers.rightPad(value, 8, ' ');`,
-  },
-  {
-    id: 'substr',
-    label: t('sidepanel_step_input_transform_substr', 'Substring'),
-    icon: Scissors,
-    code: `const value = String(input ?? '');
-return helpers.substr(value, 0, 4);`,
-  },
-];
 
 const DEFAULT_STEPS: StepData[] = [
   {
@@ -1030,75 +945,6 @@ export default function FlowStepsBuilder({
                           </span>
                           <div className="flex min-w-0 items-center gap-2">
                             {(() => {
-                              const showPicker = field.withPicker || field.id === 'selector';
-                              if (field.type === 'select') {
-                                return (
-                                  <SelectMenu
-                                    value={field.value}
-                                    options={field.options ?? []}
-                                    useInputStyle={false}
-                                    buttonClassName="btn-ghost h-9 w-full min-w-0 justify-between px-2 text-xs"
-                                    onChange={(value) => updateField(step.id, field.id, value)}
-                                  />
-                                );
-                              }
-                              if (field.type === 'checkbox') {
-                                return (
-                                  <label className="flex items-center gap-2 text-xs text-foreground">
-                                    <input
-                                      data-flow-step-id={step.id}
-                                      data-flow-field-id={field.id}
-                                      type="checkbox"
-                                      className="h-4 w-4"
-                                      checked={field.value === 'true'}
-                                      onChange={(event) =>
-                                        updateField(step.id, field.id, event.target.checked ? 'true' : 'false')
-                                      }
-                                    />
-                                  </label>
-                                );
-                              }
-                              if (field.type === 'textarea') {
-                                return (
-                                  <textarea
-                                    ref={setFieldInputRef(step.id, field.id)}
-                                    data-flow-step-id={step.id}
-                                    data-flow-field-id={field.id}
-                                    className="input min-w-0 h-20"
-                                    value={field.value}
-                                    onChange={(event) => updateField(step.id, field.id, event.target.value)}
-                                    placeholder={field.placeholder}
-                                    onFocus={() => setActiveFieldTarget({ stepId: step.id, fieldId: field.id })}
-                                  />
-                                );
-                              }
-                            if (showPicker) {
-                              return (
-                                <SelectorInput
-                                  inputRef={setFieldInputRef(step.id, field.id)}
-                                  dataStepId={step.id}
-                                  dataFieldId={field.id}
-                                  value={field.value}
-                                  placeholder={field.placeholder}
-                                  type={field.type === 'number' ? 'number' : 'text'}
-                                  onChange={(value) => updateField(step.id, field.id, value)}
-                                  onFocus={() => setActiveFieldTarget({ stepId: step.id, fieldId: field.id })}
-                                  onPick={() => {
-                                    setActiveFieldTarget({ stepId: step.id, fieldId: field.id });
-                                    if (!onStartPicker) {
-                                      return;
-                                    }
-                                    const accept: SelectorPickerAccept =
-                                      step.type === 'input' ? 'input' : 'selector';
-                                    void onStartPicker(accept).then((selector) => {
-                                      if (selector) {
-                                        updateField(step.id, field.id, selector);
-                                      }
-                                    });
-                                  }}
-                                />
-                              );
-                            }
                               if (step.type === 'input' && field.id === 'value') {
                                 const hasTransform = Boolean(
                                   field.transform?.mode === 'js' && field.transform.code.trim(),
@@ -1242,16 +1088,13 @@ export default function FlowStepsBuilder({
                                 );
                               }
                               return (
-                                <input
-                                  ref={setFieldInputRef(step.id, field.id)}
-                                  data-flow-step-id={step.id}
-                                  data-flow-field-id={field.id}
-                                  className="input min-w-0"
-                                  type={field.type === 'number' ? 'number' : 'text'}
-                                  value={field.value}
-                                  onChange={(event) => updateField(step.id, field.id, event.target.value)}
-                                  placeholder={field.placeholder}
-                                  onFocus={() => setActiveFieldTarget({ stepId: step.id, fieldId: field.id })}
+                                <StepFieldControl
+                                  step={step}
+                                  field={field}
+                                  onUpdateField={updateField}
+                                  setFieldInputRef={setFieldInputRef}
+                                  onFocusField={(stepId, fieldId) => setActiveFieldTarget({ stepId, fieldId })}
+                                  onStartPicker={onStartPicker}
                                 />
                               );
                             })()}
@@ -1339,90 +1182,14 @@ export default function FlowStepsBuilder({
                             {getFieldLabel(field.label)}
                           </span>
                           <div className="flex min-w-0 items-center gap-2">
-                            {(() => {
-                              const showPicker = field.withPicker || field.id === 'selector';
-                              if (field.type === 'select') {
-                                return (
-                                  <SelectMenu
-                                    value={field.value}
-                                    options={field.options ?? []}
-                                    useInputStyle={false}
-                                    buttonClassName="btn-ghost h-9 w-full min-w-0 justify-between px-2 text-xs"
-                                    onChange={(value) => updateField(step.id, field.id, value)}
-                                  />
-                                );
-                              }
-                              if (field.type === 'checkbox') {
-                                return (
-                                  <label className="flex items-center gap-2 text-xs text-foreground">
-                                    <input
-                                      data-flow-step-id={step.id}
-                                      data-flow-field-id={field.id}
-                                      type="checkbox"
-                                      className="h-4 w-4"
-                                      checked={field.value === 'true'}
-                                      onChange={(event) =>
-                                        updateField(step.id, field.id, event.target.checked ? 'true' : 'false')
-                                      }
-                                    />
-                                  </label>
-                                );
-                              }
-                              if (field.type === 'textarea') {
-                                return (
-                                  <textarea
-                                    ref={setFieldInputRef(step.id, field.id)}
-                                    data-flow-step-id={step.id}
-                                    data-flow-field-id={field.id}
-                                    className="input h-20"
-                                    value={field.value}
-                                    onChange={(event) => updateField(step.id, field.id, event.target.value)}
-                                    placeholder={field.placeholder}
-                                    onFocus={() => setActiveFieldTarget({ stepId: step.id, fieldId: field.id })}
-                                  />
-                                );
-                              }
-                              if (showPicker) {
-                              return (
-                                <SelectorInput
-                                  inputRef={setFieldInputRef(step.id, field.id)}
-                                  dataStepId={step.id}
-                                  dataFieldId={field.id}
-                                  value={field.value}
-                                  placeholder={field.placeholder}
-                                  type={field.type === 'number' ? 'number' : 'text'}
-                                  onChange={(value) => updateField(step.id, field.id, value)}
-                                  onFocus={() => setActiveFieldTarget({ stepId: step.id, fieldId: field.id })}
-                                  onPick={() => {
-                                    setActiveFieldTarget({ stepId: step.id, fieldId: field.id });
-                                    if (!onStartPicker) {
-                                      return;
-                                    }
-                                    const accept: SelectorPickerAccept =
-                                      step.type === 'input' ? 'input' : 'selector';
-                                    void onStartPicker(accept).then((selector) => {
-                                      if (selector) {
-                                        updateField(step.id, field.id, selector);
-                                      }
-                                    });
-                                  }}
-                                />
-                              );
-                            }
-                              return (
-                                <input
-                                  ref={setFieldInputRef(step.id, field.id)}
-                                  data-flow-step-id={step.id}
-                                  data-flow-field-id={field.id}
-                                  className="input min-w-0"
-                                  type={field.type === 'number' ? 'number' : 'text'}
-                                  value={field.value}
-                                  onChange={(event) => updateField(step.id, field.id, event.target.value)}
-                                  placeholder={field.placeholder}
-                                  onFocus={() => setActiveFieldTarget({ stepId: step.id, fieldId: field.id })}
-                                />
-                              );
-                            })()}
+                            <StepFieldControl
+                              step={step}
+                              field={field}
+                              onUpdateField={updateField}
+                              setFieldInputRef={setFieldInputRef}
+                              onFocusField={(stepId, fieldId) => setActiveFieldTarget({ stepId, fieldId })}
+                              onStartPicker={onStartPicker}
+                            />
                           </div>
                         </label>,
                       );

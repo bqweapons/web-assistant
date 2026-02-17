@@ -17,6 +17,7 @@ import {
   type RuntimeMessage,
   type SelectorPickerAccept,
 } from '../../shared/messages';
+import { sendRuntimeMessage } from '../../shared/runtimeMessaging';
 
 const TAB_IDS = {
   elements: 'elements',
@@ -72,28 +73,6 @@ export default function App() {
     document.documentElement.classList.toggle('dark', isDark);
   }, [isDark]);
 
-  const sendRuntimeMessage = useCallback((message: RuntimeMessage) => {
-    return new Promise<unknown>((resolve, reject) => {
-      const runtime = chrome?.runtime;
-      if (!runtime?.sendMessage) {
-        reject(new Error('Messaging API unavailable.'));
-        return;
-      }
-      runtime.sendMessage(message, (response) => {
-        const lastError = runtime.lastError?.message;
-        if (lastError) {
-          reject(new Error(lastError));
-          return;
-        }
-        if (response?.ok === false) {
-          reject(new Error(response.error || 'Messaging failed.'));
-          return;
-        }
-        resolve(response?.data);
-      });
-    });
-  }, []);
-
   const refreshPageContext = useCallback(async () => {
     setContextLoading(true);
     setContextError('');
@@ -112,7 +91,7 @@ export default function App() {
     } finally {
       setContextLoading(false);
     }
-  }, [sendRuntimeMessage]);
+  }, []);
 
   useEffect(() => {
     refreshPageContext();
@@ -156,7 +135,7 @@ export default function App() {
           });
       });
     },
-    [finalizePicker, sendRuntimeMessage],
+    [finalizePicker],
   );
 
   const startSelectorPicker = useCallback(
@@ -199,7 +178,7 @@ export default function App() {
       .then(() => undefined)
       .catch(() => undefined);
     finalizePicker(null);
-  }, [finalizePicker, pickerActive, sendRuntimeMessage]);
+  }, [finalizePicker, pickerActive]);
 
   useEffect(() => {
     if (!pickerActive) {

@@ -6,6 +6,7 @@ import {
   type FlowRunStatusPayload,
   type RuntimeMessage,
 } from '../../../../shared/messages';
+import { inferDataSourceFileType, requestDataSourceFile } from '../../../../shared/filePicker';
 import { sendRuntimeMessage } from '../../utils/runtimeMessaging';
 import { t } from '../../utils/i18n';
 import { toFlowSnapshot, type FlowRecord } from './normalize';
@@ -64,17 +65,6 @@ type DataSourceStepDescriptor = {
   fileType: 'csv' | 'tsv';
 };
 
-const inferFileType = (fileName: string, fallback: 'csv' | 'tsv') => {
-  const lower = fileName.toLowerCase();
-  if (lower.endsWith('.tsv')) {
-    return 'tsv';
-  }
-  if (lower.endsWith('.csv')) {
-    return 'csv';
-  }
-  return fallback;
-};
-
 const collectDataSourceSteps = (steps: FlowStepData[], sink: DataSourceStepDescriptor[] = []) => {
   for (const step of steps) {
     if (step.type === 'data-source') {
@@ -97,51 +87,16 @@ const collectDataSourceSteps = (steps: FlowStepData[], sink: DataSourceStepDescr
 };
 
 const requestFileForDataSourceStep = (step: DataSourceStepDescriptor): Promise<File | null> => {
-  return new Promise((resolve) => {
-    const input = document.createElement('input');
-    input.type = 'file';
-    input.accept = step.fileType === 'tsv' ? '.tsv,text/tab-separated-values,text/plain' : '.csv,text/csv,text/plain';
-    input.style.position = 'fixed';
-    input.style.left = '-9999px';
-    input.style.top = '-9999px';
-    let settled = false;
-
-    const finish = (file: File | null) => {
-      if (settled) {
-        return;
-      }
-      settled = true;
-      input.removeEventListener('change', handleChange);
-      input.removeEventListener('cancel', handleCancel as EventListener);
-      input.remove();
-      resolve(file);
-    };
-
-    const handleChange = () => {
-      finish(input.files?.[0] ?? null);
-    };
-
-    const handleCancel = () => {
-      finish(null);
-    };
-
-    input.addEventListener('change', handleChange);
-    input.addEventListener('cancel', handleCancel as EventListener);
-    document.body.appendChild(input);
-
-    const proceed = window.confirm(
-      t('sidepanel_flow_runner_data_source_pick_confirm', 'Select CSV/TSV for step: {step}').replace(
+  return requestDataSourceFile(
+    { title: step.title, fileType: step.fileType },
+    {
+      requireConfirm: true,
+      confirmMessage: t('sidepanel_flow_runner_data_source_pick_confirm', 'Select CSV/TSV for step: {step}').replace(
         '{step}',
         step.title,
       ),
-    );
-    if (!proceed) {
-      finish(null);
-      return;
-    }
-
-    input.click();
-  });
+    },
+  );
 };
 
 const collectDataSourceInputsForRun = async (flow: FlowRecord) => {
@@ -158,7 +113,7 @@ const collectDataSourceInputsForRun = async (flow: FlowRecord) => {
     const rawText = await file.text();
     selected[step.id] = {
       fileName: file.name,
-      fileType: inferFileType(file.name, step.fileType),
+      fileType: inferDataSourceFileType(file.name, step.fileType),
       rawText,
     };
   }

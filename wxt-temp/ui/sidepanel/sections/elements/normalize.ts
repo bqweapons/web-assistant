@@ -8,6 +8,10 @@ import {
   type StructuredFlowRecord,
 } from '../../../../shared/siteDataSchema';
 import { normalizeFlowSteps, type FlowStepData } from '../../../../shared/flowStepMigration';
+import {
+  derivePageKeyFromUrl,
+  normalizeSiteKey as normalizeSharedSiteKey,
+} from '../../../../shared/urlKeys';
 
 export type ElementInlineStyle = Record<string, string>;
 export type ElementRecord = StructuredElementRecord;
@@ -199,8 +203,7 @@ export type ElementResolvedContext = {
   frameSelectors: string[];
 };
 
-export const normalizeSiteKey = (value: string) =>
-  value.replace(/^https?:\/\//, '').replace(/^file:\/\//, '').replace(/\/$/, '');
+export const normalizeSiteKey = normalizeSharedSiteKey;
 
 const toFlowTimestamp = (value: unknown) => {
   if (typeof value === 'number' && Number.isFinite(value)) {
@@ -336,13 +339,7 @@ export const normalizePageKey = (value?: string, fallbackSiteKey?: string) => {
     return '';
   }
   try {
-    const parsed = new URL(trimmed);
-    if (parsed.protocol === 'file:') {
-      return `${normalizeSiteKey(trimmed.split(/[?#]/)[0] || trimmed)}`;
-    }
-    const siteKey = normalizeSiteKey(parsed.host || parsed.hostname || trimmed);
-    const path = parsed.pathname || '/';
-    return `${siteKey}${path.startsWith('/') ? path : `/${path}`}`;
+    return derivePageKeyFromUrl(trimmed);
   } catch {
     if (trimmed.startsWith('/')) {
       const baseSiteKey = normalizeSiteKey(fallbackSiteKey || '');

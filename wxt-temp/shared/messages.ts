@@ -22,7 +22,7 @@ export const MessageType = {
   STOP_FLOW_RUN: 'STOP_FLOW_RUN',
   FLOW_RUN_STATUS: 'FLOW_RUN_STATUS',
   FLOW_RUN_EXECUTE_STEP: 'FLOW_RUN_EXECUTE_STEP',
-  FLOW_RUN_EXECUTE_RESULT: 'FLOW_RUN_EXECUTE_RESULT',
+  FLOW_RUN_STEP_RESULT: 'FLOW_RUN_STEP_RESULT',
 } as const;
 
 export type MessageType = (typeof MessageType)[keyof typeof MessageType];
@@ -116,6 +116,8 @@ export type FlowRunDataSourceInput = {
   rawText: string;
 };
 
+export type FlowRunStepRequestId = string;
+
 export type FlowRunFlowSnapshot = {
   id: string;
   name: string;
@@ -151,6 +153,8 @@ export type FlowRunStatusPayload = {
   error?: {
     code: string;
     message: string;
+    phase?: 'dispatch' | 'execute' | 'result-wait' | 'navigate';
+    recoverable?: boolean;
   };
   startedAt: number;
   endedAt?: number;
@@ -160,6 +164,8 @@ export type FlowRunStatusPayload = {
 
 export type FlowRunExecuteStepPayload = {
   runId: string;
+  requestId: FlowRunStepRequestId;
+  attempt: number;
   stepId: string;
   stepType: FlowRunAtomicStepType;
   selector?: string;
@@ -176,6 +182,7 @@ export type FlowRunExecuteStepPayload = {
 export type FlowRunExecuteResultPayload = {
   ok: boolean;
   runId: string;
+  requestId: FlowRunStepRequestId;
   stepId: string;
   stepType: FlowRunAtomicStepType;
   conditionMatched?: boolean;
@@ -206,4 +213,4 @@ export type RuntimeMessage =
   | { type: typeof MessageType.STOP_FLOW_RUN; data: FlowRunStopPayload; forwarded?: boolean }
   | { type: typeof MessageType.FLOW_RUN_STATUS; data: FlowRunStatusPayload; forwarded?: boolean }
   | { type: typeof MessageType.FLOW_RUN_EXECUTE_STEP; data: FlowRunExecuteStepPayload; forwarded?: boolean }
-  | { type: typeof MessageType.FLOW_RUN_EXECUTE_RESULT; data: FlowRunExecuteResultPayload; forwarded?: boolean };
+  | { type: typeof MessageType.FLOW_RUN_STEP_RESULT; data: FlowRunExecuteResultPayload; forwarded?: boolean };

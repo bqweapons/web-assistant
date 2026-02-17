@@ -1,11 +1,11 @@
 import type { FlowRunFlowSnapshot } from '../../../shared/messages';
 import { normalizeFlowSteps } from '../../../shared/flowStepMigration';
 import { deriveSiteKey, isStructuredElementRecord, type StructuredElementRecord } from '../../../shared/siteDataSchema';
+import { normalizeSiteKey as normalizeSharedSiteKey } from '../../../shared/urlKeys';
 
 export type RuntimeElement = StructuredElementRecord;
 
-export const normalizeSiteKey = (value: string) =>
-  value.replace(/^https?:\/\//, '').replace(/^file:\/\//, '').replace(/\/$/, '');
+export const normalizeSiteKey = normalizeSharedSiteKey;
 
 export const isRecord = (value: unknown): value is Record<string, unknown> =>
   Boolean(value) && typeof value === 'object' && !Array.isArray(value);

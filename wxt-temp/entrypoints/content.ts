@@ -1,5 +1,6 @@
 import { MessageType, type RuntimeMessage } from '../shared/messages';
 import { getSiteData, STORAGE_KEY } from '../shared/storage';
+import { derivePageKeyFromUrl, deriveSiteKeyFromUrl, normalizeStoredPageKey } from '../shared/urlKeys';
 import {
   isStructuredElementRecord,
   type StructuredElementRecord,
@@ -10,78 +11,6 @@ import { executeFlowRunStep } from './content/flowRunner';
 
 const CONTENT_RUNTIME_READY_KEY = '__ladybirdContentRuntimeReady__';
 type RuntimeMessenger = { sendMessage?: (message: unknown) => void };
-const normalizeSiteKey = (value: string) =>
-  value.replace(/^https?:\/\//, '').replace(/^file:\/\//, '').replace(/\/$/, '');
-
-const resolveSiteKeyFromLocation = (href: string) => {
-  if (!href) {
-    return '';
-  }
-  try {
-    const parsed = new URL(href);
-    if (parsed.protocol === 'file:') {
-      return normalizeSiteKey(href);
-    }
-    const host = parsed.host || parsed.hostname || '';
-    return normalizeSiteKey(host || href);
-  } catch {
-    return '';
-  }
-};
-
-const resolvePageKeyFromLocation = (href: string) => {
-  if (!href) {
-    return '';
-  }
-  try {
-    const parsed = new URL(href);
-    if (parsed.protocol === 'file:') {
-      return normalizeSiteKey(href.split(/[?#]/)[0] || href);
-    }
-    const host = parsed.host || parsed.hostname || '';
-    const siteKey = normalizeSiteKey(host || href);
-    const path = parsed.pathname || '/';
-    const cleanPath = path.startsWith('/') ? path : `/${path}`;
-    return `${siteKey}${cleanPath}`;
-  } catch {
-    return '';
-  }
-};
-
-const normalizeStoredPageKey = (value?: string | null) => {
-  if (!value || typeof value !== 'string') {
-    return '';
-  }
-  const trimmed = value.trim();
-  if (!trimmed) {
-    return '';
-  }
-  if (trimmed.startsWith('/')) {
-    const site = resolveSiteKeyFromLocation(window.location.href);
-    return `${site}${trimmed}`;
-  }
-  if (!/^https?:\/\//.test(trimmed) && !trimmed.startsWith('file://')) {
-    const withoutScheme = trimmed.replace(/^https?:\/\//, '').replace(/^file:\/\//, '');
-    const withoutQuery = (withoutScheme.split(/[?#]/)[0] || withoutScheme).trim();
-    if (!withoutQuery) {
-      return '';
-    }
-    const slashIndex = withoutQuery.indexOf('/');
-    if (slashIndex === -1) {
-      const siteOnly = normalizeSiteKey(withoutQuery);
-      return siteOnly ? `${siteOnly}/` : '';
-    }
-    const siteKey = normalizeSiteKey(withoutQuery.slice(0, slashIndex));
-    const pathRaw = withoutQuery.slice(slashIndex);
-    const path = pathRaw ? `/${pathRaw.replace(/^\/+/, '')}` : '/';
-    return siteKey ? `${siteKey}${path}` : path;
-  }
-  try {
-    return resolvePageKeyFromLocation(new URL(trimmed, window.location.href).toString());
-  } catch {
-    return '';
-  }
-};
 
 const toStructuredElementPayload = (value: unknown): StructuredElementRecord | null => {
   if (!value || typeof value !== 'object') {
@@ -94,8 +23,8 @@ const rehydratePersistedElements = async () => {
   if (window.top !== window) {
     return;
   }
-  const siteKey = resolveSiteKeyFromLocation(window.location.href);
-  const pageKey = resolvePageKeyFromLocation(window.location.href);
+  const siteKey = deriveSiteKeyFromUrl(window.location.href);
+  const pageKey = derivePageKeyFromUrl(window.location.href);
   if (!siteKey) {
     return;
   }
@@ -112,7 +41,7 @@ const rehydratePersistedElements = async () => {
             if (!item.context.pageKey) {
               return true;
             }
-            return normalizeStoredPageKey(item.context.pageKey) === pageKey;
+            return normalizeStoredPageKey(item.context.pageKey, window.location.href) === pageKey;
           })
       : [];
     handleInjectionMessage({
@@ -256,29 +185,25 @@ export default defineContentScript({
           return true;
         }
         case MessageType.FLOW_RUN_EXECUTE_STEP: {
+          sendResponse?.({ ok: true, data: { accepted: true } });
           void executeFlowRunStep(message.data)
             .then((result) => {
-              sendResponse?.({
-                ok: true,
-                data: {
-                  type: MessageType.FLOW_RUN_EXECUTE_RESULT,
-                  data: result,
-                },
+              runtime.sendMessage({
+                type: MessageType.FLOW_RUN_STEP_RESULT,
+                data: result,
               });
             })
             .catch((error) => {
-              sendResponse?.({
-                ok: true,
+              runtime.sendMessage({
+                type: MessageType.FLOW_RUN_STEP_RESULT,
                 data: {
-                  type: MessageType.FLOW_RUN_EXECUTE_RESULT,
-                  data: {
-                    ok: false,
-                    runId: message.data.runId,
-                    stepId: message.data.stepId,
-                    stepType: message.data.stepType,
-                    errorCode: 'step-execution-exception',
-                    error: error instanceof Error ? error.message : String(error),
-                  },
+                  ok: false,
+                  runId: message.data.runId,
+                  requestId: message.data.requestId,
+                  stepId: message.data.stepId,
+                  stepType: message.data.stepType,
+                  errorCode: 'step-execution-exception',
+                  error: error instanceof Error ? error.message : String(error),
                 },
               });
             });

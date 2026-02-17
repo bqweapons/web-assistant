@@ -133,6 +133,7 @@ const buildBaseResult = (
 ): FlowRunExecuteResultPayload => ({
   ok: false,
   runId: payload.runId,
+  requestId: payload.requestId,
   stepId: payload.stepId,
   stepType: payload.stepType,
   ...overrides,
@@ -399,6 +400,7 @@ export const executeFlowRunStep = async (
     return {
       ok: false,
       runId: payload.runId,
+      requestId: payload.requestId,
       stepId: payload.stepId,
       stepType: payload.stepType,
       errorCode: 'unsupported-step-type',
@@ -411,6 +413,7 @@ export const executeFlowRunStep = async (
     return {
       ok: false,
       runId: payload.runId,
+      requestId: payload.requestId,
       stepId: payload.stepId,
       stepType: payload.stepType,
       errorCode: 'step-execution-exception',

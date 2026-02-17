@@ -7,16 +7,15 @@ import {
   type FlowRunFlowSnapshot,
   type FlowRunLogEntry,
   type FlowRunStartPayload,
+  type FlowRunStepRequestId,
   type FlowRunState,
   type FlowRunStatusPayload,
   type RuntimeMessage,
 } from '../../../shared/messages';
 import type { FlowStepData } from '../../../shared/flowStepMigration';
+import { deriveSiteKeyFromUrl, normalizeSiteKey } from '../../../shared/urlKeys';
 import {
-  deriveSiteKeyFromUrl,
   isRecoverableTabMessageError,
-  isRecord,
-  normalizeSiteKey,
   type BrowserTabChangeInfo,
 } from '../runtime/pageContext';
 import { TabBridge } from '../runtime/tabBridge';
@@ -43,6 +42,8 @@ const MAX_RUN_LOG_ENTRIES = 500;
 type FlowRunError = {
   code: string;
   message: string;
+  phase?: 'dispatch' | 'execute' | 'result-wait' | 'navigate';
+  recoverable?: boolean;
 };
 
 type FlowRunInternal = {
@@ -73,10 +74,14 @@ type FlowRunInternal = {
 
 export class RunnerError extends Error {
   readonly code: string;
+  readonly phase?: FlowRunError['phase'];
+  readonly recoverable?: boolean;
 
-  constructor(code: string, message: string) {
+  constructor(code: string, message: string, options?: { phase?: FlowRunError['phase']; recoverable?: boolean }) {
     super(message);
     this.code = code;
+    this.phase = options?.phase;
+    this.recoverable = options?.recoverable;
   }
 }
 
@@ -152,10 +157,21 @@ type FlowRunnerManagerOptions = {
   statusThrottleMs?: number;
 };
 
+type PendingStepRequest = {
+  runId: string;
+  stepId: string;
+  stepType: FlowRunAtomicStepType;
+  resolve: (value: FlowRunExecuteResultPayload) => void;
+  reject: (reason?: unknown) => void;
+  timeoutHandle?: ReturnType<typeof setTimeout>;
+};
+
 export class FlowRunnerManager {
   private readonly runs = new Map<string, FlowRunInternal>();
 
   private readonly activeRunByTab = new Map<number, string>();
+
+  private readonly pendingStepRequests = new Map<FlowRunStepRequestId, PendingStepRequest>();
 
   private readonly runtime?: FlowRunnerManagerOptions['runtime'];
 
@@ -164,6 +180,8 @@ export class FlowRunnerManager {
   private readonly statusThrottleMs: number;
 
   private readonly jsTransformExecutor = new JsTransformExecutor();
+
+  private stepRequestSequence = 0;
 
   constructor(options: FlowRunnerManagerOptions) {
     this.runtime = options.runtime;
@@ -273,6 +291,7 @@ export class FlowRunnerManager {
     run.cancelRequested = true;
     run.state = 'cancelled';
     run.endedAt = Date.now();
+    this.cancelPendingRequests(run.runId, new RunnerError('cancelled', 'Run cancelled.'));
     this.appendLog(run, 'info', 'Stop requested.');
     this.emitStatus(run, true);
     return { runId };
@@ -298,12 +317,48 @@ export class FlowRunnerManager {
     }
   }
 
+  onStepResult(payload: FlowRunExecuteResultPayload) {
+    if (!payload?.requestId) {
+      return;
+    }
+    const pending = this.pendingStepRequests.get(payload.requestId);
+    if (!pending) {
+      return;
+    }
+    if (pending.runId !== payload.runId || pending.stepId !== payload.stepId || pending.stepType !== payload.stepType) {
+      return;
+    }
+    if (pending.timeoutHandle) {
+      clearTimeout(pending.timeoutHandle);
+    }
+    this.pendingStepRequests.delete(payload.requestId);
+    pending.resolve(payload);
+  }
+
   private getRunByTab(tabId: number) {
     const runId = this.activeRunByTab.get(tabId);
     if (!runId) {
       return null;
     }
     return this.runs.get(runId) ?? null;
+  }
+
+  private nextStepRequestId(run: FlowRunInternal, stepId: string) {
+    this.stepRequestSequence += 1;
+    return `${run.runId}-${stepId}-${this.stepRequestSequence}`;
+  }
+
+  private cancelPendingRequests(runId: string, reason: RunnerError) {
+    for (const [requestId, pending] of this.pendingStepRequests.entries()) {
+      if (pending.runId !== runId) {
+        continue;
+      }
+      if (pending.timeoutHandle) {
+        clearTimeout(pending.timeoutHandle);
+      }
+      this.pendingStepRequests.delete(requestId);
+      pending.reject(reason);
+    }
   }
 
   private appendLog(
@@ -422,7 +477,14 @@ export class FlowRunnerManager {
       state: run.state,
       currentStepId: run.currentStepId,
       progress: { ...run.progress },
-      error: run.error ? { ...run.error } : undefined,
+      error: run.error
+        ? {
+            code: run.error.code,
+            message: run.error.message,
+            phase: run.error.phase,
+            recoverable: run.error.recoverable,
+          }
+        : undefined,
       startedAt: run.startedAt,
       endedAt: run.endedAt,
       activeUrl: run.activeUrl,
@@ -509,6 +571,7 @@ export class FlowRunnerManager {
     run.state = state;
     run.error = error;
     run.endedAt = Date.now();
+    this.cancelPendingRequests(run.runId, new RunnerError('run-finalized', `Run finalized as ${state}.`));
     if (state === 'succeeded') {
       this.appendLog(run, 'success', 'Run succeeded.');
     } else if (state === 'cancelled') {
@@ -552,7 +615,12 @@ export class FlowRunnerManager {
       }
       const code = error instanceof RunnerError ? error.code : 'run-exception';
       const message = error instanceof Error ? error.message : String(error);
-      this.finalizeRun(run, 'failed', { code, message });
+      this.finalizeRun(run, 'failed', {
+        code,
+        message,
+        phase: error instanceof RunnerError ? error.phase : undefined,
+        recoverable: error instanceof RunnerError ? error.recoverable : undefined,
+      });
     }
   }
 
@@ -656,7 +724,10 @@ export class FlowRunnerManager {
         `Step failed: ${result.error || result.errorCode || 'execution failed'}.`,
         { stepId: step.id, stepType },
       );
-      throw new RunnerError(result.errorCode || 'step-execution-failed', result.error || 'Step execution failed.');
+      throw new RunnerError(result.errorCode || 'step-execution-failed', result.error || 'Step execution failed.', {
+        phase: 'execute',
+        recoverable: false,
+      });
     }
     this.appendLog(run, 'success', this.formatAtomicSuccessMessage(stepType, payload, result), {
       stepId: step.id,
@@ -679,7 +750,10 @@ export class FlowRunnerManager {
         `Condition check failed: ${result.error || result.errorCode || 'execution failed'}.`,
         { stepId: step.id, stepType: 'condition' },
       );
-      throw new RunnerError(result.errorCode || 'condition-check-failed', result.error || 'Condition check failed.');
+      throw new RunnerError(result.errorCode || 'condition-check-failed', result.error || 'Condition check failed.', {
+        phase: 'execute',
+        recoverable: false,
+      });
     }
     this.appendLog(run, 'success', this.formatAtomicSuccessMessage('condition', payload, result), {
       stepId: step.id,
@@ -722,6 +796,8 @@ export class FlowRunnerManager {
   ): Promise<FlowRunExecuteStepPayload> {
     const payload: FlowRunExecuteStepPayload = {
       runId: '',
+      requestId: '',
+      attempt: 0,
       stepId: step.id,
       stepType,
       timeoutMs: STEP_ACTION_TIMEOUT_MS,
@@ -780,44 +856,124 @@ export class FlowRunnerManager {
   ): Promise<FlowRunExecuteResultPayload> {
     const deadline = Date.now() + STEP_MESSAGE_RETRY_TIMEOUT_MS;
     let lastTransportError = '';
+    let attempt = 0;
+    const stepStartUrl = run.activeUrl;
 
-    while (true) {
+    while (Date.now() < deadline) {
       this.ensureRunHealthy(run);
+      attempt += 1;
+      const requestId = this.nextStepRequestId(run, payload.stepId);
       const response = await this.tabBridge.sendMessageToTabWithRetry(run.tabId, {
         type: MessageType.FLOW_RUN_EXECUTE_STEP,
-        data: { ...payload, runId: run.runId },
+        data: { ...payload, runId: run.runId, requestId, attempt },
       });
-      if (response.ok) {
-        if (!isRecord(response.data) || response.data.type !== MessageType.FLOW_RUN_EXECUTE_RESULT) {
-          throw new RunnerError('invalid-content-response', 'Unexpected content response payload.');
+      if (!response.ok) {
+        lastTransportError = response.error || 'Failed to dispatch step to content script.';
+        if (!isRecoverableTabMessageError(lastTransportError)) {
+          throw new RunnerError('content-message-failed', lastTransportError, {
+            phase: 'dispatch',
+            recoverable: false,
+          });
         }
-        const result = response.data.data;
-        if (!isRecord(result) || typeof result.ok !== 'boolean') {
-          throw new RunnerError('invalid-content-result', 'Malformed content execution result.');
+        if (Date.now() >= deadline) {
+          break;
         }
-        return result as FlowRunExecuteResultPayload;
+        await new Promise<void>((resolve) => {
+          setTimeout(resolve, STEP_MESSAGE_RETRY_INTERVAL_MS);
+        });
+        continue;
       }
 
-      lastTransportError = response.error || 'Failed to message content script.';
-      if (!isRecoverableTabMessageError(lastTransportError)) {
-        throw new RunnerError('content-message-failed', lastTransportError);
+      const remaining = Math.max(0, deadline - Date.now());
+      if (remaining <= 0) {
+        break;
       }
-      if (Date.now() >= deadline) {
-        throw new RunnerError(
-          'content-message-timeout',
-          `Timed out after ${STEP_MESSAGE_RETRY_TIMEOUT_MS}ms while waiting for page readiness: ${lastTransportError}`,
-        );
+      try {
+        return await this.waitForStepResult({
+          requestId,
+          runId: run.runId,
+          stepId: payload.stepId,
+          stepType: payload.stepType,
+          timeoutMs: remaining,
+        });
+      } catch (error) {
+        if (!(error instanceof RunnerError) || error.code !== 'step-result-timeout') {
+          throw error;
+        }
+        if (
+          payload.stepType === 'click' &&
+          run.activeUrl &&
+          run.activeUrl !== stepStartUrl &&
+          deriveSiteKeyFromUrl(run.activeUrl) === run.siteKey
+        ) {
+          this.appendLog(
+            run,
+            'info',
+            `No step result callback received, but same-site navigation detected; treating click as success.`,
+            {
+              stepId: payload.stepId,
+              stepType: payload.stepType,
+            },
+          );
+          return {
+            ok: true,
+            runId: run.runId,
+            requestId,
+            stepId: payload.stepId,
+            stepType: payload.stepType,
+            details: {
+              selector: payload.selector,
+              elementText: 'navigation-likely',
+            },
+          };
+        }
+        throw error;
       }
-      await new Promise<void>((resolve) => {
-        setTimeout(resolve, STEP_MESSAGE_RETRY_INTERVAL_MS);
-      });
     }
+
+    throw new RunnerError(
+      'content-message-timeout',
+      `Timed out after ${STEP_MESSAGE_RETRY_TIMEOUT_MS}ms while dispatching step: ${lastTransportError || 'unknown transport error'}`,
+      { phase: 'dispatch', recoverable: true },
+    );
+  }
+
+  private waitForStepResult(params: {
+    requestId: FlowRunStepRequestId;
+    runId: string;
+    stepId: string;
+    stepType: FlowRunAtomicStepType;
+    timeoutMs: number;
+  }): Promise<FlowRunExecuteResultPayload> {
+    return new Promise<FlowRunExecuteResultPayload>((resolve, reject) => {
+      const timeoutHandle = setTimeout(() => {
+        this.pendingStepRequests.delete(params.requestId);
+        reject(
+          new RunnerError(
+            'step-result-timeout',
+            `Timed out waiting for step result: ${params.stepType} (${params.stepId})`,
+            { phase: 'result-wait', recoverable: false },
+          ),
+        );
+      }, params.timeoutMs);
+      this.pendingStepRequests.set(params.requestId, {
+        runId: params.runId,
+        stepId: params.stepId,
+        stepType: params.stepType,
+        timeoutHandle,
+        resolve,
+        reject,
+      });
+    });
   }
 
   private async executeNavigateStep(run: FlowRunInternal, step: FlowStepData, row?: FlowRowContext) {
     const targetValue = getRenderedStepFieldValue(step, 'url', row).trim();
     if (!targetValue) {
-      throw new RunnerError('navigate-url-missing', 'Navigate step URL is required.');
+      throw new RunnerError('navigate-url-missing', 'Navigate step URL is required.', {
+        phase: 'navigate',
+        recoverable: false,
+      });
     }
     const tab = await this.tabBridge.getTabById(run.tabId);
     const baseUrl = run.activeUrl || tab?.url || '';
@@ -825,7 +981,10 @@ export class FlowRunnerManager {
     try {
       absoluteUrl = new URL(targetValue, baseUrl || `https://${run.siteKey}`).toString();
     } catch {
-      throw new RunnerError('navigate-url-invalid', `Invalid navigate URL: ${targetValue}`);
+      throw new RunnerError('navigate-url-invalid', `Invalid navigate URL: ${targetValue}`, {
+        phase: 'navigate',
+        recoverable: false,
+      });
     }
     this.appendLog(run, 'info', `Navigate to ${truncateForLog(absoluteUrl)}.`, {
       stepId: step.id,
@@ -833,7 +992,10 @@ export class FlowRunnerManager {
     });
     const targetSite = deriveSiteKeyFromUrl(absoluteUrl);
     if (!targetSite || targetSite !== run.siteKey) {
-      throw new RunnerError('cross-site-navigation', `Navigate target is outside site: ${absoluteUrl}`);
+      throw new RunnerError('cross-site-navigation', `Navigate target is outside site: ${absoluteUrl}`, {
+        phase: 'navigate',
+        recoverable: false,
+      });
     }
 
     try {
@@ -842,6 +1004,7 @@ export class FlowRunnerManager {
       throw new RunnerError(
         'navigate-update-failed',
         error instanceof Error ? error.message : String(error),
+        { phase: 'navigate', recoverable: false },
       );
     }
 
@@ -854,14 +1017,17 @@ export class FlowRunnerManager {
       });
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
-      throw new RunnerError('navigate-timeout', message);
+      throw new RunnerError('navigate-timeout', message, { phase: 'navigate', recoverable: true });
     }
 
     const landedUrl = completedTab.url || absoluteUrl;
     run.activeUrl = landedUrl;
     const landedSite = deriveSiteKeyFromUrl(landedUrl);
     if (!landedSite || landedSite !== run.siteKey) {
-      throw new RunnerError('cross-site-navigation', `Navigation landed on another site: ${landedUrl}`);
+      throw new RunnerError('cross-site-navigation', `Navigation landed on another site: ${landedUrl}`, {
+        phase: 'navigate',
+        recoverable: false,
+      });
     }
     this.appendLog(run, 'success', `Navigation completed at ${truncateForLog(landedUrl)}.`, {
       stepId: step.id,

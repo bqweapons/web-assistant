@@ -31,7 +31,7 @@ import {
   type RuntimeMessage,
   type SelectorPickerAccept,
 } from '../../../shared/messages';
-import { getSiteData, setSiteData } from '../../../shared/storage';
+import { setSiteData } from '../../../shared/storage';
 import {
   buildDefaultSiteUrl,
   deriveSiteKey,
@@ -51,7 +51,6 @@ import {
   isElementType,
   normalizeElementPosition,
   normalizeElementScope,
-  normalizeFlowRecord,
   normalizePageKey,
   normalizeSiteKey,
   normalizeStoredElement,
@@ -60,9 +59,10 @@ import {
   toMessageElementPayload,
   type ElementInlineStyle,
   type ElementRecord,
-  type FlowRecord,
   type StoredElementRecord,
 } from './elements/normalize';
+import { getInjectionErrorMessage, sendElementMessage as sendElementMessageShared } from './elements/useElementsMessaging';
+import { useElementsStore } from './elements/useElementsStore';
 
 let lastElementsRehydrateSignature = '';
 let pendingElementsRehydrateSignature: string | null = null;
@@ -98,9 +98,8 @@ export default function ElementsSection({
   onStartElementPicker,
 }: ElementsSectionProps) {
   const locale = useLocale();
-  const [elements, setElements] = useState<StoredElementRecord[]>([]);
-  const [flows, setFlows] = useState<FlowRecord[]>([]);
-  const [siteDataReady, setSiteDataReady] = useState(false);
+  const normalizedSiteKey = useMemo(() => normalizeSiteKey(siteKey || ''), [siteKey]);
+  const { elements, setElements, flows, setFlows, siteDataReady } = useElementsStore(normalizedSiteKey);
   const actionClass = 'btn-icon h-8 w-8';
   const selectButtonClass = 'btn-ghost h-9 w-full justify-between px-2 text-xs';
   const [activeElementId, setActiveElementId] = useState<string | null>(null);
@@ -108,7 +107,6 @@ export default function ElementsSection({
   const [addElementType, setAddElementType] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
   const [typeFilter, setTypeFilter] = useState('all');
-  const normalizedSiteKey = useMemo(() => normalizeSiteKey(siteKey || ''), [siteKey]);
   const siteElements = useMemo(() => {
     if (!normalizedSiteKey) {
       return [];
@@ -142,33 +140,6 @@ export default function ElementsSection({
     setTypeFilter('all');
   }, [normalizedSiteKey]);
 
-  useEffect(() => {
-    if (!normalizedSiteKey) {
-      setElements([]);
-      setFlows([]);
-      setSiteDataReady(false);
-      return;
-    }
-    setSiteDataReady(false);
-    getSiteData(normalizedSiteKey)
-      .then((data) => {
-        const normalized =
-          (data.elements as unknown[] | undefined)
-            ?.map((item) => normalizeStoredElement(item))
-            .filter((item): item is StoredElementRecord => Boolean(item)) || [];
-        setElements(normalized);
-        const normalizedFlows = (Array.isArray(data.flows) ? data.flows : [])
-          .map((item) => normalizeFlowRecord(item, normalizedSiteKey))
-          .filter((item): item is FlowRecord => Boolean(item));
-        setFlows(normalizedFlows);
-        setSiteDataReady(true);
-      })
-      .catch(() => {
-        setElements([]);
-        setFlows([]);
-        setSiteDataReady(true);
-      });
-  }, [normalizedSiteKey]);
   const typeOptions = useMemo(() => {
     const types = new Set(siteElements.map((element) => getElementType(element)));
     return ['all', ...Array.from(types).sort()];
@@ -207,63 +178,16 @@ export default function ElementsSection({
   const [injectionError, setInjectionError] = useState('');
   const previewTimerRef = useRef<number | null>(null);
   const suppressPreviewElementIdRef = useRef<string | null>(null);
-  const getInjectionErrorMessage = (code: string) => {
-    const normalized = code.trim().toLowerCase();
-    if (
-      normalized === 'content-unavailable' ||
-      normalized.includes('receiving end does not exist') ||
-      normalized.includes('could not establish connection')
-    ) {
-      return t(
-        'sidepanel_elements_injection_error_content',
-        'Cannot connect to the page script. Reload the page and try again.',
-      );
-    }
-    if (normalized === 'site-mismatch') {
-      return t('sidepanel_elements_injection_error_site', 'Current page does not match element site.');
-    }
-    if (normalized === 'container-not-found') {
-      return t('sidepanel_elements_injection_error_container', 'Container not found on page.');
-    }
-    if (normalized === 'target-not-found') {
-      return t('sidepanel_elements_injection_error_target', 'Target element not found.');
-    }
-    return t('sidepanel_elements_injection_error', 'Failed to inject element: {error}').replace(
-      '{error}',
-      code,
-    );
-  };
-  const sendRuntimeMessage = useCallback((message: unknown) => {
-    return new Promise<unknown>((resolve, reject) => {
-      const runtime = chrome?.runtime;
-      if (!runtime?.sendMessage) {
-        reject(new Error('Messaging API unavailable.'));
-        return;
-      }
-      runtime.sendMessage(message, (response) => {
-        const lastError = runtime.lastError?.message;
-        if (lastError) {
-          reject(new Error(lastError));
-          return;
-        }
-        resolve(response);
-      });
-    });
-  }, []);
-
   const sendElementMessage = useCallback(
     async (type: MessageType, payload?: Record<string, unknown>) => {
       try {
-        const response = (await sendRuntimeMessage({ type, data: payload })) as { ok?: boolean; error?: string };
-        if (response?.ok === false && response.error) {
-          throw new Error(response.error);
-        }
+        await sendElementMessageShared(type, payload);
       } catch (error) {
         console.warn('Failed to send element message', type, error);
         throw error;
       }
     },
-    [sendRuntimeMessage],
+    [],
   );
 
   const syncElementsToContent = useCallback(() => {

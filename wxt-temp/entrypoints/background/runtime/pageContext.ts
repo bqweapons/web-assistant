@@ -1,4 +1,5 @@
 import type { PageContextPayload } from '../../../shared/messages';
+import { derivePageKeyFromUrl, deriveSiteKeyFromUrl } from '../../../shared/urlKeys';
 
 export type BrowserTab = {
   id?: number;
@@ -16,25 +17,6 @@ export type BrowserTabChangeInfo = {
 export const isRecord = (value: unknown): value is Record<string, unknown> =>
   Boolean(value) && typeof value === 'object' && !Array.isArray(value);
 
-export const normalizeSiteKey = (value: string) =>
-  value.replace(/^https?:\/\//, '').replace(/^file:\/\//, '').replace(/\/$/, '');
-
-export const deriveSiteKeyFromUrl = (url: string) => {
-  if (!url) {
-    return '';
-  }
-  try {
-    const parsed = new URL(url);
-    if (parsed.protocol === 'file:') {
-      return normalizeSiteKey((url.split(/[?#]/)[0] || url).trim());
-    }
-    const host = parsed.host || parsed.hostname || '';
-    return normalizeSiteKey(host || url);
-  } catch {
-    return '';
-  }
-};
-
 export const derivePageContext = (url: string, tabId?: number, title?: string): PageContextPayload => {
   const timestamp = Date.now();
   const hasAccess = /^https?:\/\//.test(url) || url.startsWith('file://');
@@ -50,15 +32,12 @@ export const derivePageContext = (url: string, tabId?: number, title?: string): 
     };
   }
   try {
-    const parsed = new URL(url);
-    const host = parsed.host || parsed.hostname || '';
-    const siteKey = normalizeSiteKey(host || url);
-    const pathname = parsed.pathname || '/';
-    const cleanPath = pathname.startsWith('/') ? pathname : `/${pathname}`;
+    const siteKey = deriveSiteKeyFromUrl(url);
+    const pageKey = derivePageKeyFromUrl(url);
     return {
       url,
       siteKey,
-      pageKey: `${siteKey}${cleanPath}`,
+      pageKey,
       tabId,
       title,
       timestamp,

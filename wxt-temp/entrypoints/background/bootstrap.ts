@@ -102,6 +102,11 @@ export const bootstrapBackground = () => {
         sendResponse?.({ ok: true });
         return true;
       }
+      case MessageType.FLOW_RUN_STEP_RESULT: {
+        flowRunnerManager.onStepResult(message.data);
+        sendResponse?.({ ok: true });
+        return true;
+      }
       case MessageType.GET_ACTIVE_PAGE_CONTEXT: {
         void respondPromise(async () => {
           const tab = await tabBridge.queryActiveTab();
