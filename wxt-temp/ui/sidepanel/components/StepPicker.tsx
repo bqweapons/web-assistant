@@ -47,7 +47,9 @@ export default function StepPicker({ onPick, ariaLabel, buttonRef }: StepPickerP
   const normalizedQuery = query.trim().toLowerCase();
   const filteredLibrary = normalizedQuery
     ? STEP_LIBRARY.filter((item) => {
-        const haystack = `${item.label} ${item.description}`.toLowerCase();
+        const localizedLabel = t(item.labelKey, item.label);
+        const localizedDescription = t(item.descriptionKey, item.description);
+        const haystack = `${localizedLabel} ${localizedDescription}`.toLowerCase();
         return haystack.includes(normalizedQuery);
       })
     : STEP_LIBRARY;

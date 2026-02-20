@@ -32,11 +32,15 @@ import {
 } from './tokenRenderer';
 
 const STEP_ACTION_TIMEOUT_MS = 10_000;
+const WAIT_SELECTOR_TIMEOUT_MS = 6_000;
 const NAVIGATION_TIMEOUT_MS = 20_000;
 const CONDITION_POLL_INTERVAL_MS = 120;
 const STATUS_THROTTLE_MS = 200;
 const STEP_MESSAGE_RETRY_TIMEOUT_MS = 60_000;
 const STEP_MESSAGE_RETRY_INTERVAL_MS = 250;
+const STEP_RESULT_WAIT_GRACE_MS = 1_200;
+const STEP_RESULT_WAIT_MIN_MS = 1_000;
+const ENABLE_EVENT_DRIVEN_RECOVERY = true;
 const MAX_RUN_LOG_ENTRIES = 500;
 
 type FlowRunError = {
@@ -44,6 +48,23 @@ type FlowRunError = {
   message: string;
   phase?: 'dispatch' | 'execute' | 'result-wait' | 'navigate';
   recoverable?: boolean;
+};
+
+type InFlightRecoverSource = 'timeout' | 'tab-updated' | 'page-ping';
+type InFlightStepStatus = 'dispatched' | 'awaiting_result' | 'superseded';
+
+type InFlightAtomicStep = {
+  stepId: string;
+  stepType: FlowRunAtomicStepType;
+  payload: FlowRunExecuteStepPayload;
+  attempt: number;
+  currentRequestId: FlowRunStepRequestId;
+  stepStartUrl: string;
+  lastKnownUrl: string;
+  deadlineAt: number;
+  startedAt: number;
+  status: InFlightStepStatus;
+  recoverSource?: InFlightRecoverSource;
 };
 
 type FlowRunInternal = {
@@ -70,6 +91,7 @@ type FlowRunInternal = {
   logSequence: number;
   statusTimer?: ReturnType<typeof setTimeout>;
   cleanupTimer?: ReturnType<typeof setTimeout>;
+  inFlightAtomic?: InFlightAtomicStep;
 };
 
 export class RunnerError extends Error {
@@ -291,6 +313,7 @@ export class FlowRunnerManager {
     run.cancelRequested = true;
     run.state = 'cancelled';
     run.endedAt = Date.now();
+    this.clearInFlightAtomic(run);
     this.cancelPendingRequests(run.runId, new RunnerError('cancelled', 'Run cancelled.'));
     this.appendLog(run, 'info', 'Stop requested.');
     this.emitStatus(run, true);
@@ -303,6 +326,7 @@ export class FlowRunnerManager {
       return;
     }
     this.updateRunActiveUrl(run, url);
+    this.tryRecoverInFlightStep(run, 'page-ping');
   }
 
   onTabUpdated(tabId: number, changeInfo: BrowserTabChangeInfo, tab: { url?: string }) {
@@ -315,17 +339,42 @@ export class FlowRunnerManager {
     } else if (tab.url) {
       this.updateRunActiveUrl(run, tab.url);
     }
+    this.tryRecoverInFlightStep(run, 'tab-updated');
   }
 
   onStepResult(payload: FlowRunExecuteResultPayload) {
     if (!payload?.requestId) {
       return;
     }
+    const run = this.runs.get(payload.runId);
+    if (!run || this.isRunFinalized(run)) {
+      return;
+    }
     const pending = this.pendingStepRequests.get(payload.requestId);
     if (!pending) {
+      this.appendLog(run, 'info', `stale-result ignored: ${payload.requestId}`, {
+        stepId: payload.stepId,
+        stepType: payload.stepType,
+      });
       return;
     }
     if (pending.runId !== payload.runId || pending.stepId !== payload.stepId || pending.stepType !== payload.stepType) {
+      this.appendLog(run, 'info', `stale-result ignored: ${payload.requestId}`, {
+        stepId: payload.stepId,
+        stepType: payload.stepType,
+      });
+      return;
+    }
+    const inFlight = run.inFlightAtomic;
+    if (!inFlight || inFlight.currentRequestId !== payload.requestId) {
+      this.pendingStepRequests.delete(payload.requestId);
+      if (pending.timeoutHandle) {
+        clearTimeout(pending.timeoutHandle);
+      }
+      this.appendLog(run, 'info', `stale-result ignored: ${payload.requestId}`, {
+        stepId: payload.stepId,
+        stepType: payload.stepType,
+      });
       return;
     }
     if (pending.timeoutHandle) {
@@ -359,6 +408,128 @@ export class FlowRunnerManager {
       this.pendingStepRequests.delete(requestId);
       pending.reject(reason);
     }
+  }
+
+  private isRunFinalized(run: FlowRunInternal) {
+    return run.state === 'succeeded' || run.state === 'failed' || run.state === 'cancelled';
+  }
+
+  private clearInFlightAtomic(run: FlowRunInternal, stepId?: string) {
+    if (!run.inFlightAtomic) {
+      return;
+    }
+    if (stepId && run.inFlightAtomic.stepId !== stepId) {
+      return;
+    }
+    run.inFlightAtomic = undefined;
+  }
+
+  private supersedeInFlightRequest(
+    run: FlowRunInternal,
+    source: InFlightRecoverSource,
+    reason: string,
+  ) {
+    const inFlight = run.inFlightAtomic;
+    if (!inFlight || inFlight.status === 'superseded') {
+      return false;
+    }
+    inFlight.status = 'superseded';
+    inFlight.recoverSource = source;
+    inFlight.lastKnownUrl = run.activeUrl || inFlight.lastKnownUrl;
+    const pending = this.pendingStepRequests.get(inFlight.currentRequestId);
+    if (!pending) {
+      return false;
+    }
+    if (pending.timeoutHandle) {
+      clearTimeout(pending.timeoutHandle);
+    }
+    this.pendingStepRequests.delete(inFlight.currentRequestId);
+    pending.reject(
+      new RunnerError('step-request-superseded', reason, {
+        phase: 'result-wait',
+        recoverable: true,
+      }),
+    );
+    this.appendLog(run, 'info', `recover: supersede request ${inFlight.currentRequestId}`, {
+      stepId: inFlight.stepId,
+      stepType: inFlight.stepType,
+    });
+    return true;
+  }
+
+  private settleInFlightClickAsNavigationSuccess(
+    run: FlowRunInternal,
+    source: InFlightRecoverSource,
+  ) {
+    const inFlight = run.inFlightAtomic;
+    if (!inFlight || inFlight.stepType !== 'click' || inFlight.status === 'superseded') {
+      return false;
+    }
+    const pending = this.pendingStepRequests.get(inFlight.currentRequestId);
+    if (!pending) {
+      return false;
+    }
+    if (pending.timeoutHandle) {
+      clearTimeout(pending.timeoutHandle);
+    }
+    this.pendingStepRequests.delete(inFlight.currentRequestId);
+    inFlight.status = 'superseded';
+    inFlight.recoverSource = source;
+    const requestId = inFlight.currentRequestId;
+    this.appendLog(run, 'info', 'recover: click treated success due navigation', {
+      stepId: inFlight.stepId,
+      stepType: inFlight.stepType,
+    });
+    pending.resolve({
+      ok: true,
+      runId: run.runId,
+      requestId,
+      stepId: inFlight.stepId,
+      stepType: 'click',
+      details: {
+        selector: inFlight.payload.selector,
+        elementText: 'navigation-likely',
+      },
+    });
+    return true;
+  }
+
+  private tryRecoverInFlightStep(run: FlowRunInternal, source: InFlightRecoverSource) {
+    if (!ENABLE_EVENT_DRIVEN_RECOVERY || this.isRunFinalized(run)) {
+      return;
+    }
+    const inFlight = run.inFlightAtomic;
+    if (!inFlight || inFlight.status === 'superseded') {
+      return;
+    }
+    const currentUrl = run.activeUrl || inFlight.lastKnownUrl || inFlight.stepStartUrl;
+    if (!currentUrl) {
+      return;
+    }
+    const currentSiteKey = deriveSiteKeyFromUrl(currentUrl);
+    if (!currentSiteKey || currentSiteKey !== run.siteKey) {
+      return;
+    }
+    const hasNavigation = Boolean(inFlight.stepStartUrl && currentUrl !== inFlight.stepStartUrl);
+    if (inFlight.stepType === 'click') {
+      if (hasNavigation) {
+        this.settleInFlightClickAsNavigationSuccess(run, source);
+      }
+      return;
+    }
+    const isRetryableStep =
+      inFlight.stepType === 'input' ||
+      inFlight.stepType === 'wait' ||
+      inFlight.stepType === 'assert' ||
+      inFlight.stepType === 'condition' ||
+      inFlight.stepType === 'popup';
+    if (!isRetryableStep) {
+      return;
+    }
+    if (inFlight.stepType !== 'wait' && !hasNavigation) {
+      return;
+    }
+    this.supersedeInFlightRequest(run, source, `recover:${source}`);
   }
 
   private appendLog(
@@ -571,6 +742,7 @@ export class FlowRunnerManager {
     run.state = state;
     run.error = error;
     run.endedAt = Date.now();
+    this.clearInFlightAtomic(run);
     this.cancelPendingRequests(run.runId, new RunnerError('run-finalized', `Run finalized as ${state}.`));
     if (state === 'succeeded') {
       this.appendLog(run, 'success', 'Run succeeded.');
@@ -584,6 +756,7 @@ export class FlowRunnerManager {
         { stepId: run.currentStepId },
       );
     }
+    this.appendLog(run, 'info', `finalize: run ${state}`);
     this.releaseActiveRun(run);
     this.emitStatus(run, true);
     this.scheduleCleanup(run);
@@ -831,12 +1004,14 @@ export class FlowRunnerManager {
         const durationValue = await this.resolveStepFieldValue(step, 'duration', row);
         payload.durationMs = toNonNegativeInteger(durationValue, 0);
       } else if (mode === 'condition') {
+        payload.timeoutMs = WAIT_SELECTOR_TIMEOUT_MS;
         payload.selector = await this.resolveStepFieldValue(step, 'selector', row);
         const operator = await this.resolveStepFieldValue(step, 'operator', row);
         payload.operator =
           operator === 'equals' || operator === 'greater' || operator === 'less' ? operator : 'contains';
         payload.expected = await this.resolveStepFieldValue(step, 'expected', row);
       } else {
+        payload.timeoutMs = WAIT_SELECTOR_TIMEOUT_MS;
         payload.selector = await this.resolveStepFieldValue(step, 'selector', row);
       }
     } else if (stepType === 'assert' || stepType === 'condition') {
@@ -858,84 +1033,180 @@ export class FlowRunnerManager {
     let lastTransportError = '';
     let attempt = 0;
     const stepStartUrl = run.activeUrl;
-
-    while (Date.now() < deadline) {
-      this.ensureRunHealthy(run);
-      attempt += 1;
-      const requestId = this.nextStepRequestId(run, payload.stepId);
-      const response = await this.tabBridge.sendMessageToTabWithRetry(run.tabId, {
-        type: MessageType.FLOW_RUN_EXECUTE_STEP,
-        data: { ...payload, runId: run.runId, requestId, attempt },
-      });
-      if (!response.ok) {
-        lastTransportError = response.error || 'Failed to dispatch step to content script.';
-        if (!isRecoverableTabMessageError(lastTransportError)) {
-          throw new RunnerError('content-message-failed', lastTransportError, {
-            phase: 'dispatch',
-            recoverable: false,
-          });
-        }
-        if (Date.now() >= deadline) {
-          break;
-        }
-        await new Promise<void>((resolve) => {
-          setTimeout(resolve, STEP_MESSAGE_RETRY_INTERVAL_MS);
-        });
-        continue;
-      }
-
-      const remaining = Math.max(0, deadline - Date.now());
-      if (remaining <= 0) {
-        break;
-      }
-      try {
-        return await this.waitForStepResult({
-          requestId,
+    try {
+      while (Date.now() < deadline) {
+        this.ensureRunHealthy(run);
+        attempt += 1;
+        const requestId = this.nextStepRequestId(run, payload.stepId);
+        const requestPayload: FlowRunExecuteStepPayload = {
+          ...payload,
           runId: run.runId,
+          requestId,
+          attempt,
+        };
+        run.inFlightAtomic = {
           stepId: payload.stepId,
           stepType: payload.stepType,
-          timeoutMs: remaining,
+          payload: requestPayload,
+          attempt,
+          currentRequestId: requestId,
+          stepStartUrl,
+          lastKnownUrl: run.activeUrl || stepStartUrl,
+          deadlineAt: deadline,
+          startedAt: Date.now(),
+          status: 'dispatched',
+        };
+        const response = await this.tabBridge.sendMessageToTabWithRetry(run.tabId, {
+          type: MessageType.FLOW_RUN_EXECUTE_STEP,
+          data: requestPayload,
         });
-      } catch (error) {
-        if (!(error instanceof RunnerError) || error.code !== 'step-result-timeout') {
-          throw error;
+        if (!response.ok) {
+          lastTransportError = response.error || 'Failed to dispatch step to content script.';
+          if (!isRecoverableTabMessageError(lastTransportError)) {
+            throw new RunnerError('content-message-failed', lastTransportError, {
+              phase: 'dispatch',
+              recoverable: false,
+            });
+          }
+          if (Date.now() >= deadline) {
+            break;
+          }
+          await new Promise<void>((resolve) => {
+            setTimeout(resolve, STEP_MESSAGE_RETRY_INTERVAL_MS);
+          });
+          continue;
         }
-        if (
-          payload.stepType === 'click' &&
-          run.activeUrl &&
-          run.activeUrl !== stepStartUrl &&
-          deriveSiteKeyFromUrl(run.activeUrl) === run.siteKey
-        ) {
-          this.appendLog(
-            run,
-            'info',
-            `No step result callback received, but same-site navigation detected; treating click as success.`,
-            {
-              stepId: payload.stepId,
-              stepType: payload.stepType,
-            },
-          );
-          return {
-            ok: true,
-            runId: run.runId,
+
+        if (run.inFlightAtomic?.status === 'superseded') {
+          continue;
+        }
+
+        const remaining = Math.max(0, deadline - Date.now());
+        if (remaining <= 0) {
+          break;
+        }
+        const perAttemptTimeoutMs = this.getStepResultWaitTimeoutMs(payload, remaining);
+        if (perAttemptTimeoutMs <= 0) {
+          break;
+        }
+        if (run.inFlightAtomic) {
+          run.inFlightAtomic.status = 'awaiting_result';
+          run.inFlightAtomic.lastKnownUrl = run.activeUrl || run.inFlightAtomic.lastKnownUrl;
+        }
+        try {
+          return await this.waitForStepResult({
             requestId,
+            runId: run.runId,
             stepId: payload.stepId,
             stepType: payload.stepType,
-            details: {
-              selector: payload.selector,
-              elementText: 'navigation-likely',
-            },
-          };
+            timeoutMs: perAttemptTimeoutMs,
+          });
+        } catch (error) {
+          if (error instanceof RunnerError && error.code === 'step-request-superseded') {
+            const recoverUrl = run.activeUrl || run.inFlightAtomic?.lastKnownUrl || stepStartUrl;
+            this.appendLog(
+              run,
+              'info',
+              `recover: retry attempt ${attempt + 1} on ${truncateForLog(recoverUrl || 'current page')}`,
+              {
+                stepId: payload.stepId,
+                stepType: payload.stepType,
+              },
+            );
+            continue;
+          }
+          if (!(error instanceof RunnerError) || error.code !== 'step-result-timeout') {
+            throw error;
+          }
+          const liveTab = await this.tabBridge.getTabById(run.tabId);
+          const liveUrl = liveTab?.url || run.activeUrl;
+          if (liveUrl && liveUrl !== run.activeUrl) {
+            this.updateRunActiveUrl(run, liveUrl);
+          }
+          const currentUrl = liveUrl || run.activeUrl;
+          const isSameSiteAfterTimeout = Boolean(currentUrl) && deriveSiteKeyFromUrl(currentUrl) === run.siteKey;
+          const hasNavigationAfterTimeout = Boolean(currentUrl && stepStartUrl && currentUrl !== stepStartUrl);
+
+          if (payload.stepType === 'click' && isSameSiteAfterTimeout && hasNavigationAfterTimeout) {
+            this.appendLog(run, 'info', 'recover: click treated success due navigation', {
+              stepId: payload.stepId,
+              stepType: payload.stepType,
+            });
+            return {
+              ok: true,
+              runId: run.runId,
+              requestId,
+              stepId: payload.stepId,
+              stepType: payload.stepType,
+              details: {
+                selector: payload.selector,
+                elementText: 'navigation-likely',
+              },
+            };
+          }
+
+          const isRetryableAtomicStep =
+            payload.stepType === 'input' ||
+            payload.stepType === 'wait' ||
+            payload.stepType === 'assert' ||
+            payload.stepType === 'condition' ||
+            payload.stepType === 'popup';
+          const canRetryAfterTimeout =
+            isRetryableAtomicStep &&
+            isSameSiteAfterTimeout &&
+            (payload.stepType === 'wait' || hasNavigationAfterTimeout);
+          if (canRetryAfterTimeout) {
+            this.appendLog(
+              run,
+              'info',
+              `recover: retry attempt ${attempt + 1} on ${truncateForLog(currentUrl || 'current page')}`,
+              {
+                stepId: payload.stepId,
+                stepType: payload.stepType,
+              },
+            );
+            continue;
+          }
+          throw error;
         }
-        throw error;
       }
+
+      throw new RunnerError(
+        'content-message-timeout',
+        `Timed out after ${STEP_MESSAGE_RETRY_TIMEOUT_MS}ms while dispatching step: ${lastTransportError || 'unknown transport error'}`,
+        { phase: 'dispatch', recoverable: true },
+      );
+    } finally {
+      this.clearInFlightAtomic(run, payload.stepId);
+    }
+  }
+
+  private getStepResultWaitTimeoutMs(payload: FlowRunExecuteStepPayload, remainingMs: number) {
+    if (!Number.isFinite(remainingMs) || remainingMs <= 0) {
+      return 0;
+    }
+    const normalizedRemaining = Math.max(0, Math.floor(remainingMs));
+    const normalizePositive = (value: number) =>
+      Number.isFinite(value) ? Math.max(STEP_RESULT_WAIT_MIN_MS, Math.floor(value)) : STEP_RESULT_WAIT_MIN_MS;
+    const clampToRemaining = (value: number) => {
+      if (normalizedRemaining < STEP_RESULT_WAIT_MIN_MS) {
+        return normalizedRemaining;
+      }
+      return Math.min(normalizedRemaining, normalizePositive(value));
+    };
+
+    if (payload.stepType === 'popup') {
+      return normalizedRemaining;
     }
 
-    throw new RunnerError(
-      'content-message-timeout',
-      `Timed out after ${STEP_MESSAGE_RETRY_TIMEOUT_MS}ms while dispatching step: ${lastTransportError || 'unknown transport error'}`,
-      { phase: 'dispatch', recoverable: true },
-    );
+    const defaultTimeoutMs = toNonNegativeInteger(String(payload.timeoutMs ?? STEP_ACTION_TIMEOUT_MS), STEP_ACTION_TIMEOUT_MS);
+    const baseTimeoutMs = defaultTimeoutMs + STEP_RESULT_WAIT_GRACE_MS;
+    if (payload.stepType === 'wait' && payload.mode === 'time') {
+      const durationMs = toNonNegativeInteger(String(payload.durationMs ?? 0), 0);
+      const waitTimeoutMs = Math.max(defaultTimeoutMs, durationMs) + STEP_RESULT_WAIT_GRACE_MS;
+      return clampToRemaining(waitTimeoutMs);
+    }
+    return clampToRemaining(baseTimeoutMs);
   }
 
   private waitForStepResult(params: {

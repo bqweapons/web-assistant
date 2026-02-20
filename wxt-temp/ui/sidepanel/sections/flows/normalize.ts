@@ -37,13 +37,37 @@ export const formatTimestamp = (value: number) => {
   if (Number.isNaN(date.getTime())) {
     return '';
   }
+  try {
+    const formatted = date.toLocaleString(undefined, {
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+      hour: '2-digit',
+      minute: '2-digit',
+      hour12: false,
+    });
+    if (formatted) {
+      return formatted;
+    }
+  } catch {
+    // Fallback to a stable formatter below.
+  }
   const pad = (segment: number) => String(segment).padStart(2, '0');
   return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())} ${pad(
     date.getHours(),
   )}:${pad(date.getMinutes())}`;
 };
 
-export const getStepCount = (value: FlowStepData[]) => value.length;
+const countNestedSteps = (steps: FlowStepData[]): number =>
+  steps.reduce((total, step) => {
+    const childCount = Array.isArray(step.children) ? countNestedSteps(step.children) : 0;
+    const branchCount = Array.isArray(step.branches)
+      ? step.branches.reduce((sum, branch) => sum + countNestedSteps(branch.steps ?? []), 0)
+      : 0;
+    return total + 1 + childCount + branchCount;
+  }, 0);
+
+export const getStepCount = (value: FlowStepData[]) => countNestedSteps(value);
 
 export const normalizeFlow = (
   value: unknown,

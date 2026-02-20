@@ -11,14 +11,14 @@ import {
 import { t } from '../../utils/i18n';
 import type { StepFieldOption } from './types';
 
-export const WAIT_MODES: StepFieldOption[] = [
+export const getWaitModes = (): StepFieldOption[] => [
   { value: 'time', label: t('sidepanel_step_wait_mode_time', 'Time delay') },
   { value: 'condition', label: t('sidepanel_step_wait_mode_condition', 'Element condition') },
   { value: 'appear', label: t('sidepanel_step_wait_mode_appear', 'Element appears') },
   { value: 'disappear', label: t('sidepanel_step_wait_mode_disappear', 'Element disappears') },
 ];
 
-export const CONDITION_OPERATORS: StepFieldOption[] = [
+export const getConditionOperators = (): StepFieldOption[] => [
   { value: 'contains', label: t('sidepanel_step_condition_contains', 'Contains') },
   { value: 'equals', label: t('sidepanel_step_condition_equals', 'Equals') },
   { value: 'greater', label: t('sidepanel_step_condition_greater', 'Greater than') },
@@ -37,7 +37,7 @@ export const FIELD_LABEL_KEYS: Record<string, string> = {
   'Header row': 'sidepanel_steps_header_row',
 };
 
-export const INPUT_VALUE_SHORTCUTS = [
+export const getInputValueShortcuts = () => [
   {
     id: 'date',
     token: '{{now.date}}',
@@ -64,7 +64,7 @@ export const INPUT_VALUE_SHORTCUTS = [
   },
 ];
 
-export const TRANSFORM_CODE_SHORTCUTS = [
+export const getTransformCodeShortcuts = () => [
   {
     id: 'replace',
     label: t('sidepanel_step_input_transform_replace', 'Replace'),

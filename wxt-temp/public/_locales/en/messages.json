@@ -431,6 +431,21 @@
   "sidepanel_flows_delete": {
     "message": "Delete flow"
   },
+  "sidepanel_flows_delete_confirm": {
+    "message": "Delete flow \"{name}\"? This action cannot be undone."
+  },
+  "sidepanel_flows_dirty_close_confirm": {
+    "message": "You have unsaved changes. Discard them and close?"
+  },
+  "sidepanel_flows_disabled_no_active_page": {
+    "message": "No active page. Running is disabled."
+  },
+  "sidepanel_flows_disabled_read_only": {
+    "message": "Read-only mode without an active page."
+  },
+  "sidepanel_flows_disabled_runner_busy": {
+    "message": "Another flow is running."
+  },
   "sidepanel_flows_description_placeholder": {
     "message": "Describe what the flow does"
   },
@@ -467,6 +482,18 @@
   "sidepanel_flows_no_description": {
     "message": "No description"
   },
+  "sidepanel_flows_no_active_page_readonly": {
+    "message": "No active page detected. You can browse flows in read-only mode. Running is disabled."
+  },
+  "sidepanel_flows_persist_error_create": {
+    "message": "Failed to create flow. Please try again."
+  },
+  "sidepanel_flows_persist_error_delete": {
+    "message": "Failed to delete flow. Please try again."
+  },
+  "sidepanel_flows_persist_error_save": {
+    "message": "Failed to save flow. Please try again."
+  },
   "sidepanel_flows_run": {
     "message": "Run flow"
   },
@@ -490,6 +517,9 @@
   },
   "sidepanel_flows_title": {
     "message": "Action flows"
+  },
+  "sidepanel_header_no_active_site": {
+    "message": "No active site"
   },
   "sidepanel_hidden_delete": {
     "message": "Delete rule"
@@ -688,6 +718,33 @@
   },
   "sidepanel_settings_title": {
     "message": "Settings"
+  },
+  "sidepanel_settings_feedback_export_success": {
+    "message": "Exported {count} site(s)."
+  },
+  "sidepanel_settings_feedback_export_failed": {
+    "message": "Export failed: {error}"
+  },
+  "sidepanel_settings_feedback_import_success": {
+    "message": "Imported {sites} site(s), {elements} element(s), {flows} flow(s)."
+  },
+  "sidepanel_settings_feedback_import_warning_suffix": {
+    "message": " ({count} warning(s))"
+  },
+  "sidepanel_settings_feedback_import_failed": {
+    "message": "Import failed: {error}"
+  },
+  "sidepanel_settings_feedback_copy_success": {
+    "message": "Store link copied."
+  },
+  "sidepanel_settings_feedback_copy_failed": {
+    "message": "Copy failed: {error}"
+  },
+  "sidepanel_settings_feedback_open_failed": {
+    "message": "Unable to open store link."
+  },
+  "sidepanel_settings_feedback_open_success": {
+    "message": "Opened store link in a new tab."
   },
   "sidepanel_step_assert_description": {
     "message": "Check a value or state."
@@ -892,6 +949,18 @@
   },
   "sidepanel_steps_search_placeholder": {
     "message": "Search steps"
+  },
+  "sidepanel_steps_branch_then": {
+    "message": "Then"
+  },
+  "sidepanel_steps_branch_else": {
+    "message": "Else"
+  },
+  "sidepanel_steps_template_new_title": {
+    "message": "New step"
+  },
+  "sidepanel_steps_template_new_summary": {
+    "message": "Configure step details"
   },
   "sidepanel_steps_title": {
     "message": "Steps"

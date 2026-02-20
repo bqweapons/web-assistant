@@ -7,18 +7,18 @@ import {
 } from 'lucide-react';
 import SelectMenu from './SelectMenu';
 import StepPicker from './StepPicker';
-import { t } from '../utils/i18n';
+import { t, useLocale } from '../utils/i18n';
 import type { SelectorPickerAccept } from '../../../shared/messages';
 import { buildDataSourceSummary, parseDataSourceMeta } from './flowSteps/dataSourceParser';
 import { buildStepSummary, getFieldValue, shouldShowField } from './flowSteps/summary';
 import { createInputStepWithValue, createStepTemplate } from './flowSteps/templates';
 import { StepFieldControl } from './flowSteps/fieldRenderer';
 import {
-  CONDITION_OPERATORS,
   FIELD_LABEL_KEYS,
-  INPUT_VALUE_SHORTCUTS,
-  TRANSFORM_CODE_SHORTCUTS,
-  WAIT_MODES,
+  getConditionOperators,
+  getInputValueShortcuts,
+  getTransformCodeShortcuts,
+  getWaitModes,
 } from './flowSteps/shortcutConfig';
 import {
   findStepById,
@@ -208,7 +208,7 @@ const DEFAULT_STEPS: StepData[] = [
     summary: 'If .status contains "Ready"',
     fields: [
       { id: 'selector', label: 'Selector', placeholder: '.status', type: 'text', value: '.status' },
-      { id: 'operator', label: 'Operator', type: 'select', value: 'contains', options: CONDITION_OPERATORS },
+      { id: 'operator', label: 'Operator', type: 'select', value: 'contains', options: getConditionOperators() },
       { id: 'expected', label: 'Value', placeholder: 'Ready', type: 'text', value: 'Ready' },
     ],
     branches: [
@@ -244,7 +244,7 @@ const DEFAULT_STEPS: StepData[] = [
             title: 'Wait for ready state',
             summary: 'Wait until .status contains "Ready"',
             fields: [
-              { id: 'mode', label: 'Wait for', type: 'select', value: 'condition', options: WAIT_MODES },
+              { id: 'mode', label: 'Wait for', type: 'select', value: 'condition', options: getWaitModes() },
               {
                 id: 'duration',
                 label: 'Duration (ms)',
@@ -266,7 +266,7 @@ const DEFAULT_STEPS: StepData[] = [
                 label: 'Operator',
                 type: 'select',
                 value: 'contains',
-                options: CONDITION_OPERATORS,
+                options: getConditionOperators(),
                 showWhen: { fieldId: 'mode', value: 'condition' },
               },
               {
@@ -289,7 +289,7 @@ const DEFAULT_STEPS: StepData[] = [
     title: 'Wait for response',
     summary: 'Duration: 1200 ms',
     fields: [
-      { id: 'mode', label: 'Wait for', type: 'select', value: 'time', options: WAIT_MODES },
+      { id: 'mode', label: 'Wait for', type: 'select', value: 'time', options: getWaitModes() },
       {
         id: 'duration',
         label: 'Duration (ms)',
@@ -311,7 +311,7 @@ const DEFAULT_STEPS: StepData[] = [
         label: 'Operator',
         type: 'select',
         value: 'contains',
-        options: CONDITION_OPERATORS,
+        options: getConditionOperators(),
         showWhen: { fieldId: 'mode', value: 'condition' },
       },
       {
@@ -476,18 +476,6 @@ const DEFAULT_STEPS: StepData[] = [
   },
 ];
 
-const STEP_TYPE_LABELS: Record<string, string> = {
-  click: t('sidepanel_step_click_label', 'Click'),
-  input: t('sidepanel_step_input_label', 'Input'),
-  popup: t('sidepanel_step_popup_label', 'Popup'),
-  loop: t('sidepanel_step_loop_label', 'Loop'),
-  'data-source': t('sidepanel_step_data_source_label', 'Data Source'),
-  'if-else': t('sidepanel_step_if_else_label', 'If / Else'),
-  wait: t('sidepanel_step_wait_label', 'Wait'),
-  navigate: t('sidepanel_step_navigate_label', 'Navigate'),
-  assert: t('sidepanel_step_assert_label', 'Assert'),
-};
-
 type FlowStepsBuilderProps = {
   steps?: StepData[];
   resetKey?: string | number;
@@ -501,6 +489,22 @@ export default function FlowStepsBuilder({
   onChange,
   onStartPicker,
 }: FlowStepsBuilderProps) {
+  useLocale();
+  const waitModes = getWaitModes();
+  const conditionOperators = getConditionOperators();
+  const inputValueShortcuts = getInputValueShortcuts();
+  const transformCodeShortcuts = getTransformCodeShortcuts();
+  const stepTypeLabels: Record<string, string> = {
+    click: t('sidepanel_step_click_label', 'Click'),
+    input: t('sidepanel_step_input_label', 'Input'),
+    popup: t('sidepanel_step_popup_label', 'Popup'),
+    loop: t('sidepanel_step_loop_label', 'Loop'),
+    'data-source': t('sidepanel_step_data_source_label', 'Data Source'),
+    'if-else': t('sidepanel_step_if_else_label', 'If / Else'),
+    wait: t('sidepanel_step_wait_label', 'Wait'),
+    navigate: t('sidepanel_step_navigate_label', 'Navigate'),
+    assert: t('sidepanel_step_assert_label', 'Assert'),
+  };
   const [draftSteps, setDraftSteps] = useState<StepData[]>(steps);
   const [activeStepId, setActiveStepId] = useState('');
   const [activeFieldTarget, setActiveFieldTarget] = useState<{ stepId: string; fieldId: string } | null>(null);
@@ -523,12 +527,35 @@ export default function FlowStepsBuilder({
   const appliedResetKeyRef = useRef<string | number | symbol>(Symbol('initial-reset'));
   const setFieldInputRef =
     (_stepId: string, _fieldId: string) => (_node: HTMLInputElement | HTMLTextAreaElement | null) => undefined;
-  const templateOptions = { waitModes: WAIT_MODES, conditionOperators: CONDITION_OPERATORS };
-  const summarizeStep = (step: StepData) => buildStepSummary(step, CONDITION_OPERATORS);
+  const templateOptions = { waitModes, conditionOperators };
+  const summarizeStep = (step: StepData) => buildStepSummary(step, conditionOperators);
 
   const getFieldLabel = (label: string) => {
     const key = FIELD_LABEL_KEYS[label];
     return key ? t(key, label) : label;
+  };
+
+  const resolveFieldOptions = (step: StepData, field: StepField) => {
+    if (field.type !== 'select') {
+      return field.options;
+    }
+    if (step.type === 'wait' && field.id === 'mode') {
+      return waitModes;
+    }
+    if ((step.type === 'wait' || step.type === 'if-else' || step.type === 'assert') && field.id === 'operator') {
+      return conditionOperators;
+    }
+    return field.options;
+  };
+
+  const getBranchLabel = (branchId: string, fallback: string) => {
+    if (branchId === 'branch-then') {
+      return t('sidepanel_steps_branch_then', 'Then');
+    }
+    if (branchId === 'branch-else') {
+      return t('sidepanel_steps_branch_else', 'Else');
+    }
+    return fallback;
   };
 
   useEffect(() => {
@@ -556,6 +583,7 @@ export default function FlowStepsBuilder({
   useEffect(() => {
     if (!initializedRef.current) {
       initializedRef.current = true;
+      syncingFromPropsRef.current = false;
       return;
     }
     if (syncingFromPropsRef.current) {
@@ -850,7 +878,7 @@ export default function FlowStepsBuilder({
         const isCollapsed = collapsedSteps[step.id] ?? (isDataSource ? true : false);
         const dataSourceCount = isDataSource ? step.children?.length ?? 0 : 0;
         const dataSourceMeta = step.dataSource;
-        const typeLabel = STEP_TYPE_LABELS[step.type] ?? step.type;
+        const typeLabel = stepTypeLabels[step.type] ?? step.type;
         const isDragging = dragState?.stepId === step.id;
         const canDropHere = dragState && listContext ? isSameContext(dragState.context, listContext) : false;
         const handleDrop = () => {
@@ -969,7 +997,7 @@ export default function FlowStepsBuilder({
                                       }
                                     />
                                     <div className="flex flex-wrap items-center gap-1">
-                                      {INPUT_VALUE_SHORTCUTS.map((shortcut) => {
+                                      {inputValueShortcuts.map((shortcut) => {
                                         const Icon = shortcut.icon;
                                         return (
                                           <button
@@ -1024,7 +1052,7 @@ export default function FlowStepsBuilder({
                                           </span>
                                         </label>
                                         <div className="flex flex-wrap items-center gap-1">
-                                          {TRANSFORM_CODE_SHORTCUTS.map((shortcut) => {
+                                          {transformCodeShortcuts.map((shortcut) => {
                                             const Icon = shortcut.icon;
                                             return (
                                               <button
@@ -1090,7 +1118,7 @@ export default function FlowStepsBuilder({
                               return (
                                 <StepFieldControl
                                   step={step}
-                                  field={field}
+                                  field={{ ...field, options: resolveFieldOptions(step, field) }}
                                   onUpdateField={updateField}
                                   setFieldInputRef={setFieldInputRef}
                                   onFocusField={(stepId, fieldId) => setActiveFieldTarget({ stepId, fieldId })}
@@ -1123,13 +1151,13 @@ export default function FlowStepsBuilder({
                             </span>
                             <SelectMenu
                               value={field.value}
-                              options={field.options ?? []}
+                              options={resolveFieldOptions(step, field) ?? []}
                               useInputStyle={false}
                               buttonClassName="btn-ghost h-9 w-full min-w-0 justify-between px-2 text-xs"
                               onChange={(value) => updateField(step.id, field.id, value)}
                             />
                             <span className="text-xs font-semibold text-muted-foreground sm:whitespace-nowrap">
-                              {durationField.label}
+                              {getFieldLabel(durationField.label)}
                             </span>
                             <input
                               ref={setFieldInputRef(step.id, durationField.id)}
@@ -1155,7 +1183,7 @@ export default function FlowStepsBuilder({
                             <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
                               <SelectMenu
                                 value={field.value}
-                                options={field.options ?? []}
+                                options={resolveFieldOptions(step, field) ?? []}
                                 useInputStyle={false}
                                 buttonClassName="btn-ghost h-9 w-full min-w-0 justify-between px-2 text-xs"
                                 onChange={(value) => updateField(step.id, field.id, value)}
@@ -1184,7 +1212,7 @@ export default function FlowStepsBuilder({
                           <div className="flex min-w-0 items-center gap-2">
                             <StepFieldControl
                               step={step}
-                              field={field}
+                              field={{ ...field, options: resolveFieldOptions(step, field) }}
                               onUpdateField={updateField}
                               setFieldInputRef={setFieldInputRef}
                               onFocusField={(stepId, fieldId) => setActiveFieldTarget({ stepId, fieldId })}
@@ -1332,53 +1360,56 @@ export default function FlowStepsBuilder({
             ) : null}
             {isIfElse && step.branches?.length ? (
               <div className="px-3 pb-3">
-                {step.branches.map((branch) => (
-                  <div key={branch.id} className="mt-2">
-                    <div className="flex items-center justify-between text-[11px] font-semibold text-muted-foreground">
-                      <button
-                        type="button"
-                        className="flex items-center gap-1 text-[11px] font-semibold text-muted-foreground"
-                        onClick={() =>
-                          setCollapsedBranches((prev) => ({
-                            ...prev,
-                            [`${step.id}:${branch.id}`]:
-                              !(prev[`${step.id}:${branch.id}`] ?? false),
-                          }))
-                        }
-                      >
-                        <ChevronRight
-                          className={`h-3 w-3 transition ${
-                            collapsedBranches[`${step.id}:${branch.id}`] ? '' : 'rotate-90'
-                          }`}
-                        />
-                        <span>{branch.label}</span>
-                      </button>
-                      <span className="text-[10px] font-semibold text-muted-foreground">
-                        {t('sidepanel_steps_count', '{count} steps')
-                          .replace('{count}', String(branch.steps.length))}
-                      </span>
-                    </div>
-                    {!collapsedBranches[`${step.id}:${branch.id}`] ? (
-                      <div className="mt-2">
-                        {renderStepList(branch.steps ?? [], depth + 1, {
-                          context: { scope: 'branch', parentId: step.id, branchId: branch.id },
-                          addPlaceholder: {
-                            label: t('sidepanel_steps_add_to_branch', 'Add step to {label}').replace(
-                              '{label}',
-                              branch.label,
-                            ),
-                            ariaLabel: t('sidepanel_steps_add_to_branch', 'Add step to {label}').replace(
-                              '{label}',
-                              branch.label,
-                            ),
-                            onPick: (type) =>
-                              addStep(type, { scope: 'branch', stepId: step.id, branchId: branch.id }),
-                          },
-                        })}
+                {step.branches.map((branch) => {
+                  const branchLabel = getBranchLabel(branch.id, branch.label);
+                  return (
+                    <div key={branch.id} className="mt-2">
+                      <div className="flex items-center justify-between text-[11px] font-semibold text-muted-foreground">
+                        <button
+                          type="button"
+                          className="flex items-center gap-1 text-[11px] font-semibold text-muted-foreground"
+                          onClick={() =>
+                            setCollapsedBranches((prev) => ({
+                              ...prev,
+                              [`${step.id}:${branch.id}`]:
+                                !(prev[`${step.id}:${branch.id}`] ?? false),
+                            }))
+                          }
+                        >
+                          <ChevronRight
+                            className={`h-3 w-3 transition ${
+                              collapsedBranches[`${step.id}:${branch.id}`] ? '' : 'rotate-90'
+                            }`}
+                          />
+                          <span>{branchLabel}</span>
+                        </button>
+                        <span className="text-[10px] font-semibold text-muted-foreground">
+                          {t('sidepanel_steps_count', '{count} steps')
+                            .replace('{count}', String(branch.steps.length))}
+                        </span>
                       </div>
-                    ) : null}
-                  </div>
-                ))}
+                      {!collapsedBranches[`${step.id}:${branch.id}`] ? (
+                        <div className="mt-2">
+                          {renderStepList(branch.steps ?? [], depth + 1, {
+                            context: { scope: 'branch', parentId: step.id, branchId: branch.id },
+                            addPlaceholder: {
+                              label: t('sidepanel_steps_add_to_branch', 'Add step to {label}').replace(
+                                '{label}',
+                                branchLabel,
+                              ),
+                              ariaLabel: t('sidepanel_steps_add_to_branch', 'Add step to {label}').replace(
+                                '{label}',
+                                branchLabel,
+                              ),
+                              onPick: (type) =>
+                                addStep(type, { scope: 'branch', stepId: step.id, branchId: branch.id }),
+                            },
+                          })}
+                        </div>
+                      ) : null}
+                    </div>
+                  );
+                })}
               </div>
             ) : null}
           </div>

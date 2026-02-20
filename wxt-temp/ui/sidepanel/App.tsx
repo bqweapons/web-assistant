@@ -7,7 +7,7 @@ import OverviewSection from './sections/OverviewSection';
 import SettingsSection from './sections/SettingsSection';
 import SettingsPopover from './components/SettingsPopover';
 import PickerOverlay from './components/PickerOverlay';
-import { EyeOff, Layers, LayoutDashboard, Moon, RefreshCw, Settings, Sun, Workflow } from 'lucide-react';
+import { EyeOff, Layers, LayoutDashboard, Moon, Settings, Sun, Workflow } from 'lucide-react';
 import { t, useLocale } from './utils/i18n';
 import {
   MessageType,
@@ -233,21 +233,12 @@ export default function App() {
   }, [finalizePicker, locale, pickerAccept]);
 
   const hasActivePage = Boolean(pageContext?.hasAccess && pageContext.siteKey);
-  const headerContext = '';
+  const headerContext = pageContext?.siteKey
+    ? pageContext.siteKey
+    : t('sidepanel_header_no_active_site', 'No active site');
 
   const headerActions = useMemo(
     () => [
-      {
-        label: contextLoading
-          ? `${t('sidepanel_action_refresh', 'Refresh')}...`
-          : t('sidepanel_action_refresh', 'Refresh'),
-        onClick: () => {
-          if (!contextLoading) {
-            refreshPageContext();
-          }
-        },
-        icon: <RefreshCw className={`h-4 w-4 ${contextLoading ? 'animate-spin' : ''}`} />,
-      },
       {
         label: isDark
           ? t('sidepanel_action_light_mode', 'Light mode')
@@ -261,7 +252,7 @@ export default function App() {
         icon: <Settings className="h-4 w-4" />,
       },
     ],
-    [contextLoading, isDark, locale, refreshPageContext],
+    [isDark, locale],
   );
 
   return (
@@ -283,6 +274,11 @@ export default function App() {
               className="btn-primary w-full disabled:cursor-not-allowed disabled:opacity-60"
               onClick={() => setCreateFlowOpen(true)}
               disabled={!hasActivePage}
+              title={
+                hasActivePage
+                  ? t('sidepanel_flows_create', 'Create flow')
+                  : t('sidepanel_flows_disabled_read_only', 'Read-only mode without an active page.')
+              }
             >
               {t('sidepanel_flows_create', 'Create flow')}
             </button>

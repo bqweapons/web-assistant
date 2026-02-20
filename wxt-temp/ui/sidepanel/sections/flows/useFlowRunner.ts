@@ -9,7 +9,7 @@ import {
 import { inferDataSourceFileType, requestDataSourceFile } from '../../../../shared/filePicker';
 import { sendRuntimeMessage } from '../../utils/runtimeMessaging';
 import { t } from '../../utils/i18n';
-import { toFlowSnapshot, type FlowRecord } from './normalize';
+import { getStepCount, toFlowSnapshot, type FlowRecord } from './normalize';
 import type { FlowStepData } from '../../../../shared/flowStepMigration';
 
 export const getRunnerStateLabel = (state?: FlowRunStatusPayload['state']) => {
@@ -203,7 +203,7 @@ export const useFlowRunner = (flows: FlowRecord[]): UseFlowRunnerResult => {
         siteKey: flow.siteKey,
         tabId: prev?.tabId ?? 0,
         state: 'queued',
-        progress: { completedSteps: 0, totalSteps: Math.max(1, flow.steps.length) },
+        progress: { completedSteps: 0, totalSteps: Math.max(1, getStepCount(flow.steps)) },
         startedAt,
         activeUrl: prev?.activeUrl || '',
         currentStepId: prev?.currentStepId,

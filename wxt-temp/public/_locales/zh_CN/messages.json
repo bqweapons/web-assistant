@@ -659,6 +659,33 @@
   "sidepanel_settings_title": {
     "message": "设置"
   },
+  "sidepanel_settings_feedback_export_success": {
+    "message": "已导出 {count} 个站点。"
+  },
+  "sidepanel_settings_feedback_export_failed": {
+    "message": "导出失败：{error}"
+  },
+  "sidepanel_settings_feedback_import_success": {
+    "message": "已导入 {sites} 个站点、{elements} 个元素、{flows} 个流程。"
+  },
+  "sidepanel_settings_feedback_import_warning_suffix": {
+    "message": "（{count} 条警告）"
+  },
+  "sidepanel_settings_feedback_import_failed": {
+    "message": "导入失败：{error}"
+  },
+  "sidepanel_settings_feedback_copy_success": {
+    "message": "已复制商店链接。"
+  },
+  "sidepanel_settings_feedback_copy_failed": {
+    "message": "复制失败：{error}"
+  },
+  "sidepanel_settings_feedback_open_failed": {
+    "message": "无法打开商店链接。"
+  },
+  "sidepanel_settings_feedback_open_success": {
+    "message": "已在新标签页中打开商店链接。"
+  },
   "sidepanel_step_assert_description": {
     "message": "检查值或状态。"
   },
@@ -842,6 +869,18 @@
   "sidepanel_steps_search_placeholder": {
     "message": "搜索步骤"
   },
+  "sidepanel_steps_branch_then": {
+    "message": "满足条件"
+  },
+  "sidepanel_steps_branch_else": {
+    "message": "不满足条件"
+  },
+  "sidepanel_steps_template_new_title": {
+    "message": "新步骤"
+  },
+  "sidepanel_steps_template_new_summary": {
+    "message": "配置步骤详情"
+  },
   "sidepanel_steps_title": {
     "message": "步骤"
   },
@@ -933,66 +972,96 @@
     "message": "目标的 CSS 选择器"
   },
   "sidepanel_flow_runner_status_title": {
-    "message": "Runner status"
+    "message": "运行状态"
   },
   "sidepanel_flow_runner_state_queued": {
-    "message": "Queued"
+    "message": "排队中"
   },
   "sidepanel_flow_runner_state_running": {
-    "message": "Running"
+    "message": "运行中"
   },
   "sidepanel_flow_runner_state_succeeded": {
-    "message": "Succeeded"
+    "message": "已成功"
   },
   "sidepanel_flow_runner_state_failed": {
-    "message": "Failed"
+    "message": "失败"
   },
   "sidepanel_flow_runner_state_cancelled": {
-    "message": "Cancelled"
+    "message": "已取消"
   },
   "sidepanel_flow_runner_progress": {
-    "message": "{done}/{total} steps"
+    "message": "{done}/{total} 步"
   },
   "sidepanel_flow_runner_current_step": {
-    "message": "Current step: {step}"
+    "message": "当前步骤：{step}"
   },
   "sidepanel_flow_runner_stop": {
-    "message": "Stop"
+    "message": "停止"
   },
   "sidepanel_flow_runner_error_site_mismatch": {
-    "message": "Flow can only run on the same site."
+    "message": "流程只能在同一站点运行。"
   },
   "sidepanel_flow_runner_error_busy": {
-    "message": "Another flow is already running."
+    "message": "另一个流程已在运行。"
   },
   "sidepanel_flow_runner_error_unsupported_step": {
-    "message": "Flow has an unsupported step type."
+    "message": "流程包含不受支持的步骤类型。"
   },
   "sidepanel_flow_runner_error_unknown": {
-    "message": "Flow run failed."
+    "message": "流程运行失败。"
   },
   "sidepanel_field_message": {
-    "message": "Message"
+    "message": "消息"
   },
   "sidepanel_step_popup_description": {
-    "message": "Show a popup dialog message."
+    "message": "显示弹窗消息。"
   },
   "sidepanel_step_popup_label": {
-    "message": "Popup"
+    "message": "弹窗"
   },
   "sidepanel_step_summary_message": {
-    "message": "Message: {value}"
+    "message": "消息：{value}"
   },
   "sidepanel_flow_runner_error_data_source_required": {
-    "message": "Please select a data source CSV before running this flow."
+    "message": "运行此流程前，请先选择数据源 CSV。"
   },
   "sidepanel_flow_runner_error_data_source_mismatch": {
-    "message": "Selected CSV does not match the recorded data source."
+    "message": "所选 CSV 与记录的数据源不匹配。"
   },
   "sidepanel_flow_runner_data_source_pick_confirm": {
-    "message": "Select CSV/TSV for step: {step}"
+    "message": "为步骤选择 CSV/TSV：{step}"
   },
   "sidepanel_flow_runner_data_source_selection_cancelled": {
-    "message": "Run cancelled because data source selection was cancelled."
+    "message": "因数据源选择被取消，运行已取消。"
+  },
+  "sidepanel_flows_delete_confirm": {
+    "message": "删除流程“{name}”？此操作无法撤销。"
+  },
+  "sidepanel_flows_dirty_close_confirm": {
+    "message": "你有未保存的更改。要放弃并关闭吗？"
+  },
+  "sidepanel_flows_disabled_no_active_page": {
+    "message": "当前无活动页面，已禁用运行。"
+  },
+  "sidepanel_flows_disabled_read_only": {
+    "message": "当前无活动页面，处于只读模式。"
+  },
+  "sidepanel_flows_disabled_runner_busy": {
+    "message": "另一个流程正在运行。"
+  },
+  "sidepanel_flows_no_active_page_readonly": {
+    "message": "未检测到活动页面。你仍可只读浏览流程，运行已禁用。"
+  },
+  "sidepanel_flows_persist_error_create": {
+    "message": "创建流程失败，请重试。"
+  },
+  "sidepanel_flows_persist_error_delete": {
+    "message": "删除流程失败，请重试。"
+  },
+  "sidepanel_flows_persist_error_save": {
+    "message": "保存流程失败，请重试。"
+  },
+  "sidepanel_header_no_active_site": {
+    "message": "无活动站点"
   }
 }

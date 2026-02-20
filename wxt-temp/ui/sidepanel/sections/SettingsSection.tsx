@@ -39,12 +39,18 @@ export default function SettingsSection() {
       window.setTimeout(() => URL.revokeObjectURL(url), 1000);
       setFeedback({
         type: 'success',
-        message: `Exported ${Object.keys(sites).length} site(s).`,
+        message: t('sidepanel_settings_feedback_export_success', 'Exported {count} site(s).').replace(
+          '{count}',
+          String(Object.keys(sites).length),
+        ),
       });
     } catch (error) {
       setFeedback({
         type: 'error',
-        message: `Export failed: ${error instanceof Error ? error.message : String(error)}`,
+        message: t('sidepanel_settings_feedback_export_failed', 'Export failed: {error}').replace(
+          '{error}',
+          error instanceof Error ? error.message : String(error),
+        ),
       });
     } finally {
       setIsExporting(false);
@@ -74,19 +80,30 @@ export default function SettingsSection() {
       await setAllSitesData(mergedSites);
       const warningSuffix =
         parsed.summary.warnings.length > 0
-          ? ` (${parsed.summary.warnings.length} warning(s))`
+          ? t('sidepanel_settings_feedback_import_warning_suffix', ' ({count} warning(s))').replace(
+              '{count}',
+              String(parsed.summary.warnings.length),
+            )
           : '';
       setFeedback({
         type: 'success',
         message:
-          `Imported ${parsed.summary.siteCount} site(s), ` +
-          `${parsed.summary.elementCount} element(s), ${parsed.summary.flowCount} flow(s).` +
+          t(
+            'sidepanel_settings_feedback_import_success',
+            'Imported {sites} site(s), {elements} element(s), {flows} flow(s).',
+          )
+            .replace('{sites}', String(parsed.summary.siteCount))
+            .replace('{elements}', String(parsed.summary.elementCount))
+            .replace('{flows}', String(parsed.summary.flowCount)) +
           warningSuffix,
       });
     } catch (error) {
       setFeedback({
         type: 'error',
-        message: `Import failed: ${error instanceof Error ? error.message : String(error)}`,
+        message: t('sidepanel_settings_feedback_import_failed', 'Import failed: {error}').replace(
+          '{error}',
+          error instanceof Error ? error.message : String(error),
+        ),
       });
     } finally {
       event.target.value = '';
@@ -115,12 +132,15 @@ export default function SettingsSection() {
       await copyToClipboard(storeUrl);
       setFeedback({
         type: 'success',
-        message: 'Store link copied.',
+        message: t('sidepanel_settings_feedback_copy_success', 'Store link copied.'),
       });
     } catch (error) {
       setFeedback({
         type: 'error',
-        message: `Copy failed: ${error instanceof Error ? error.message : String(error)}`,
+        message: t('sidepanel_settings_feedback_copy_failed', 'Copy failed: {error}').replace(
+          '{error}',
+          error instanceof Error ? error.message : String(error),
+        ),
       });
     }
   };
@@ -130,13 +150,13 @@ export default function SettingsSection() {
     if (!nextWindow) {
       setFeedback({
         type: 'error',
-        message: 'Unable to open store link.',
+        message: t('sidepanel_settings_feedback_open_failed', 'Unable to open store link.'),
       });
       return;
     }
     setFeedback({
       type: 'success',
-      message: 'Opened store link in a new tab.',
+      message: t('sidepanel_settings_feedback_open_success', 'Opened store link in a new tab.'),
     });
   };
 

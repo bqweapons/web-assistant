@@ -659,6 +659,33 @@
   "sidepanel_settings_title": {
     "message": "設定"
   },
+  "sidepanel_settings_feedback_export_success": {
+    "message": "{count} 件のサイトをエクスポートしました。"
+  },
+  "sidepanel_settings_feedback_export_failed": {
+    "message": "エクスポートに失敗しました: {error}"
+  },
+  "sidepanel_settings_feedback_import_success": {
+    "message": "{sites} 件のサイト、{elements} 件の要素、{flows} 件のフローをインポートしました。"
+  },
+  "sidepanel_settings_feedback_import_warning_suffix": {
+    "message": "（警告 {count} 件）"
+  },
+  "sidepanel_settings_feedback_import_failed": {
+    "message": "インポートに失敗しました: {error}"
+  },
+  "sidepanel_settings_feedback_copy_success": {
+    "message": "ストアリンクをコピーしました。"
+  },
+  "sidepanel_settings_feedback_copy_failed": {
+    "message": "コピーに失敗しました: {error}"
+  },
+  "sidepanel_settings_feedback_open_failed": {
+    "message": "ストアリンクを開けませんでした。"
+  },
+  "sidepanel_settings_feedback_open_success": {
+    "message": "ストアリンクを新しいタブで開きました。"
+  },
   "sidepanel_step_assert_description": {
     "message": "値や状態を確認します。"
   },
@@ -842,6 +869,18 @@
   "sidepanel_steps_search_placeholder": {
     "message": "ステップを検索"
   },
+  "sidepanel_steps_branch_then": {
+    "message": "条件一致"
+  },
+  "sidepanel_steps_branch_else": {
+    "message": "それ以外"
+  },
+  "sidepanel_steps_template_new_title": {
+    "message": "新しいステップ"
+  },
+  "sidepanel_steps_template_new_summary": {
+    "message": "ステップの詳細を設定"
+  },
   "sidepanel_steps_title": {
     "message": "ステップ"
   },
@@ -933,66 +972,96 @@
     "message": "ターゲットのCSSセレクター"
   },
   "sidepanel_flow_runner_status_title": {
-    "message": "Runner status"
+    "message": "実行ステータス"
   },
   "sidepanel_flow_runner_state_queued": {
-    "message": "Queued"
+    "message": "待機中"
   },
   "sidepanel_flow_runner_state_running": {
-    "message": "Running"
+    "message": "実行中"
   },
   "sidepanel_flow_runner_state_succeeded": {
-    "message": "Succeeded"
+    "message": "成功"
   },
   "sidepanel_flow_runner_state_failed": {
-    "message": "Failed"
+    "message": "失敗"
   },
   "sidepanel_flow_runner_state_cancelled": {
-    "message": "Cancelled"
+    "message": "キャンセル済み"
   },
   "sidepanel_flow_runner_progress": {
-    "message": "{done}/{total} steps"
+    "message": "{done}/{total} ステップ"
   },
   "sidepanel_flow_runner_current_step": {
-    "message": "Current step: {step}"
+    "message": "現在のステップ: {step}"
   },
   "sidepanel_flow_runner_stop": {
-    "message": "Stop"
+    "message": "停止"
   },
   "sidepanel_flow_runner_error_site_mismatch": {
-    "message": "Flow can only run on the same site."
+    "message": "フローは同一サイトでのみ実行できます。"
   },
   "sidepanel_flow_runner_error_busy": {
-    "message": "Another flow is already running."
+    "message": "別のフローがすでに実行中です。"
   },
   "sidepanel_flow_runner_error_unsupported_step": {
-    "message": "Flow has an unsupported step type."
+    "message": "フローに未対応のステップ種別があります。"
   },
   "sidepanel_flow_runner_error_unknown": {
-    "message": "Flow run failed."
+    "message": "フロー実行に失敗しました。"
   },
   "sidepanel_field_message": {
-    "message": "Message"
+    "message": "メッセージ"
   },
   "sidepanel_step_popup_description": {
-    "message": "Show a popup dialog message."
+    "message": "ポップアップダイアログを表示します。"
   },
   "sidepanel_step_popup_label": {
-    "message": "Popup"
+    "message": "ポップアップ"
   },
   "sidepanel_step_summary_message": {
-    "message": "Message: {value}"
+    "message": "メッセージ: {value}"
   },
   "sidepanel_flow_runner_error_data_source_required": {
-    "message": "Please select a data source CSV before running this flow."
+    "message": "このフローを実行する前にデータソースCSVを選択してください。"
   },
   "sidepanel_flow_runner_error_data_source_mismatch": {
-    "message": "Selected CSV does not match the recorded data source."
+    "message": "選択したCSVが記録済みデータソースと一致しません。"
   },
   "sidepanel_flow_runner_data_source_pick_confirm": {
-    "message": "Select CSV/TSV for step: {step}"
+    "message": "ステップ用の CSV/TSV を選択: {step}"
   },
   "sidepanel_flow_runner_data_source_selection_cancelled": {
-    "message": "Run cancelled because data source selection was cancelled."
+    "message": "データソース選択がキャンセルされたため、実行を中止しました。"
+  },
+  "sidepanel_flows_delete_confirm": {
+    "message": "フロー「{name}」を削除しますか？この操作は元に戻せません。"
+  },
+  "sidepanel_flows_dirty_close_confirm": {
+    "message": "未保存の変更があります。破棄して閉じますか？"
+  },
+  "sidepanel_flows_disabled_no_active_page": {
+    "message": "アクティブなページがありません。実行は無効です。"
+  },
+  "sidepanel_flows_disabled_read_only": {
+    "message": "アクティブページがないため読み取り専用モードです。"
+  },
+  "sidepanel_flows_disabled_runner_busy": {
+    "message": "別のフローが実行中です。"
+  },
+  "sidepanel_flows_no_active_page_readonly": {
+    "message": "アクティブなページが見つかりません。フローは閲覧できますが、実行は無効です。"
+  },
+  "sidepanel_flows_persist_error_create": {
+    "message": "フローの作成に失敗しました。もう一度お試しください。"
+  },
+  "sidepanel_flows_persist_error_delete": {
+    "message": "フローの削除に失敗しました。もう一度お試しください。"
+  },
+  "sidepanel_flows_persist_error_save": {
+    "message": "フローの保存に失敗しました。もう一度お試しください。"
+  },
+  "sidepanel_header_no_active_site": {
+    "message": "アクティブなサイトなし"
   }
 }

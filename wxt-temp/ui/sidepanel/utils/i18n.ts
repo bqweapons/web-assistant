@@ -15,6 +15,7 @@ const LOCALE_STORAGE_KEY = 'sidepanel.locale';
 const listeners = new Set<() => void>();
 const messageCache: Partial<Record<SupportedLocale, LocaleMessages>> = {};
 const messagePromises = new Map<SupportedLocale, Promise<LocaleMessages>>();
+let storeRevision = 0;
 
 const isSupportedLocale = (value: string | null | undefined): value is SupportedLocale =>
   LOCALE_OPTIONS.some((option) => option.value === value);
@@ -60,8 +61,10 @@ const getBrowserLocale = () => {
 };
 
 let currentLocale: SupportedLocale = normalizeLocale(readStoredLocale() ?? getBrowserLocale());
+const browserLocale = normalizeLocale(getBrowserLocale());
 
 const notify = () => {
+  storeRevision += 1;
   listeners.forEach((listener) => listener());
 };
 
@@ -126,7 +129,13 @@ const getMessage = (key: string) => {
   if (cached) {
     return cached;
   }
-  if (typeof chrome !== 'undefined' && chrome?.i18n?.getMessage) {
+  // Only use chrome.i18n as a fallback when the selected locale matches browser UI locale.
+  // Otherwise, chrome.i18n can leak old-language strings after manual locale switching.
+  if (
+    currentLocale === browserLocale &&
+    typeof chrome !== 'undefined' &&
+    chrome?.i18n?.getMessage
+  ) {
     return chrome.i18n.getMessage(key as Parameters<typeof chrome.i18n.getMessage>[0]);
   }
   return '';
@@ -157,7 +166,12 @@ export const setLocale = async (locale: SupportedLocale) => {
   notify();
 };
 
-export const useLocale = () => useSyncExternalStore(subscribe, () => currentLocale);
+const getStoreSnapshot = () => storeRevision;
+
+export const useLocale = () => {
+  useSyncExternalStore(subscribe, getStoreSnapshot);
+  return currentLocale;
+};
 
 export const getLocaleLabel = (locale: SupportedLocale) => {
   switch (locale) {

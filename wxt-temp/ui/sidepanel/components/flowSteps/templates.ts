@@ -1,4 +1,5 @@
 import { buildStepSummary } from './summary';
+import { t } from '../../utils/i18n';
 import type { StepData, StepFieldOption } from './types';
 
 type TemplateOptions = {
@@ -9,14 +10,19 @@ type TemplateOptions = {
 export const createStepId = (prefix: string) =>
   `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
 
+const getOperatorLabel = (options: StepFieldOption[], value: string) =>
+  options.find((option) => option.value === value)?.label || value;
+
 export const createStepTemplate = (type: string, options: TemplateOptions): StepData => {
+  const containsLabel = getOperatorLabel(options.conditionOperators, 'contains');
+  const equalsLabel = getOperatorLabel(options.conditionOperators, 'equals');
   switch (type) {
     case 'click':
       return {
         id: createStepId('click'),
         type: 'click',
-        title: 'Click element',
-        summary: 'Selector: .btn-primary',
+        title: t('sidepanel_step_click_label', 'Click'),
+        summary: t('sidepanel_step_summary_selector', 'Selector: {value}').replace('{value}', '.btn-primary'),
         fields: [
           {
             id: 'selector',
@@ -32,8 +38,8 @@ export const createStepTemplate = (type: string, options: TemplateOptions): Step
       return {
         id: createStepId('input'),
         type: 'input',
-        title: 'Fill input',
-        summary: 'Value: Example text',
+        title: t('sidepanel_step_input_label', 'Input'),
+        summary: t('sidepanel_step_summary_value', 'Value: {value}').replace('{value}', 'Example text'),
         fields: [
           {
             id: 'selector',
@@ -50,8 +56,8 @@ export const createStepTemplate = (type: string, options: TemplateOptions): Step
       return {
         id: createStepId('popup'),
         type: 'popup',
-        title: 'Show popup',
-        summary: 'Message: Hello',
+        title: t('sidepanel_step_popup_label', 'Popup'),
+        summary: t('sidepanel_step_summary_message', 'Message: {value}').replace('{value}', 'Hello'),
         fields: [
           {
             id: 'message',
@@ -66,8 +72,8 @@ export const createStepTemplate = (type: string, options: TemplateOptions): Step
       return {
         id: createStepId('loop'),
         type: 'loop',
-        title: 'Repeat steps',
-        summary: 'Repeat 3 times',
+        title: t('sidepanel_step_loop_label', 'Loop'),
+        summary: t('sidepanel_step_summary_repeat_times', 'Repeat {count} times').replace('{count}', '3'),
         fields: [{ id: 'iterations', label: 'Iterations', placeholder: '3', type: 'number', value: '3' }],
         children: [],
       };
@@ -75,8 +81,8 @@ export const createStepTemplate = (type: string, options: TemplateOptions): Step
       return {
         id: createStepId('data-source'),
         type: 'data-source',
-        title: 'Load data source',
-        summary: 'Awaiting file selection',
+        title: t('sidepanel_step_data_source_label', 'Data Source'),
+        summary: t('sidepanel_steps_file_waiting', 'Awaiting file selection'),
         fields: [
           {
             id: 'headerRow',
@@ -98,8 +104,11 @@ export const createStepTemplate = (type: string, options: TemplateOptions): Step
       return {
         id: createStepId('if-else'),
         type: 'if-else',
-        title: 'Conditional check',
-        summary: 'If .status contains "Ready"',
+        title: t('sidepanel_step_if_else_label', 'If / Else'),
+        summary: t('sidepanel_step_summary_if', 'If {selector} {operator} "{value}"')
+          .replace('{selector}', '.status')
+          .replace('{operator}', containsLabel)
+          .replace('{value}', 'Ready'),
         fields: [
           { id: 'selector', label: 'Selector', placeholder: '.status', type: 'text', value: '.status' },
           {
@@ -112,16 +121,16 @@ export const createStepTemplate = (type: string, options: TemplateOptions): Step
           { id: 'expected', label: 'Value', placeholder: 'Ready', type: 'text', value: 'Ready' },
         ],
         branches: [
-          { id: 'branch-then', label: 'Then', steps: [] },
-          { id: 'branch-else', label: 'Else', steps: [] },
+          { id: 'branch-then', label: t('sidepanel_steps_branch_then', 'Then'), steps: [] },
+          { id: 'branch-else', label: t('sidepanel_steps_branch_else', 'Else'), steps: [] },
         ],
       };
     case 'wait':
       return {
         id: createStepId('wait'),
         type: 'wait',
-        title: 'Wait',
-        summary: 'Duration: 1200 ms',
+        title: t('sidepanel_step_wait_label', 'Wait'),
+        summary: t('sidepanel_step_summary_duration', 'Duration: {value} ms').replace('{value}', '1200'),
         fields: [
           { id: 'mode', label: 'Wait for', type: 'select', value: 'time', options: options.waitModes },
           {
@@ -163,8 +172,8 @@ export const createStepTemplate = (type: string, options: TemplateOptions): Step
       return {
         id: createStepId('navigate'),
         type: 'navigate',
-        title: 'Navigate',
-        summary: 'URL: https://example.com',
+        title: t('sidepanel_step_navigate_label', 'Navigate'),
+        summary: t('sidepanel_step_summary_url', 'URL: {value}').replace('{value}', 'https://example.com'),
         fields: [
           { id: 'url', label: 'URL', placeholder: 'https://example.com', type: 'text', value: '' },
         ],
@@ -173,8 +182,11 @@ export const createStepTemplate = (type: string, options: TemplateOptions): Step
       return {
         id: createStepId('assert'),
         type: 'assert',
-        title: 'Assert text',
-        summary: 'Expect .status equals "Ready"',
+        title: t('sidepanel_step_assert_label', 'Assert'),
+        summary: t('sidepanel_step_summary_expect', 'Expect {selector} {operator} "{value}"')
+          .replace('{selector}', '.status')
+          .replace('{operator}', equalsLabel)
+          .replace('{value}', 'Ready'),
         fields: [
           { id: 'selector', label: 'Selector', placeholder: '.status', type: 'text', value: '.status' },
           {
@@ -191,8 +203,8 @@ export const createStepTemplate = (type: string, options: TemplateOptions): Step
       return {
         id: createStepId('step'),
         type,
-        title: 'New step',
-        summary: 'Configure step details',
+        title: t('sidepanel_steps_template_new_title', 'New step'),
+        summary: t('sidepanel_steps_template_new_summary', 'Configure step details'),
         fields: [],
       };
   }

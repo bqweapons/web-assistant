@@ -27,7 +27,16 @@ type FlowSummaryActions = {
   disableSave?: boolean;
   disableSaveRun?: boolean;
   disableRun?: boolean;
+  saveRunDisabledReason?: string;
+  runDisabledReason?: string;
 };
+
+const getEditableSnapshot = (flow: Pick<FlowRecord, 'name' | 'description' | 'steps'>) =>
+  JSON.stringify({
+    name: flow.name,
+    description: flow.description,
+    steps: flow.steps,
+  });
 
 export default function FlowsSection({
   siteKey = '',
@@ -44,7 +53,9 @@ export default function FlowsSection({
   const actionClass = 'btn-icon h-8 w-8';
   const [activeFlowId, setActiveFlowId] = useState<string | null>(null);
   const [editFlow, setEditFlow] = useState<FlowRecord | null>(null);
+  const [editFlowSnapshot, setEditFlowSnapshot] = useState('');
   const [editResetKey, setEditResetKey] = useState(0);
+  const [flowActionError, setFlowActionError] = useState('');
   const [draftFlow, setDraftFlow] = useState({
     name: '',
     description: '',
@@ -66,6 +77,12 @@ export default function FlowsSection({
   } = useFlowRunner(flows);
 
   const normalizedQuery = searchQuery.trim().toLowerCase();
+  const runDisabledReason = !hasActivePage
+    ? t('sidepanel_flows_disabled_no_active_page', 'No active page. Running is disabled.')
+    : isRunActive
+      ? t('sidepanel_flows_disabled_runner_busy', 'Another flow is running.')
+      : '';
+  const isEditDirty = editFlow ? getEditableSnapshot(editFlow) !== editFlowSnapshot : false;
 
   const filteredFlows = useMemo(() => {
     return flows.filter((flow) => {
@@ -100,6 +117,7 @@ export default function FlowsSection({
     if (createFlowOpen) {
       setActiveFlowId(null);
       setEditFlow(null);
+      setEditFlowSnapshot('');
       setEditResetKey((prev) => prev + 1);
       setCreateResetKey((prev) => prev + 1);
       setDraftFlow({ name: '', description: '', steps: [] });
@@ -109,6 +127,7 @@ export default function FlowsSection({
   useEffect(() => {
     setActiveFlowId(null);
     setEditFlow(null);
+    setEditFlowSnapshot('');
     setEditResetKey((prev) => prev + 1);
     setDraftFlow({ name: '', description: '', steps: [] });
     setCreateResetKey((prev) => prev + 1);
@@ -116,7 +135,6 @@ export default function FlowsSection({
 
   const loadFlows = useCallback(() => {
     if (!normalizedSiteKey) {
-      setFlows([]);
       return;
     }
     getSiteData(normalizedSiteKey)
@@ -151,11 +169,11 @@ export default function FlowsSection({
   }, [loadFlows, normalizedSiteKey]);
 
   const persistFlows = useCallback(
-    (nextFlows: FlowRecord[]) => {
+    async (nextFlows: FlowRecord[]) => {
       if (!normalizedSiteKey) {
-        return;
+        throw new Error('site-key-missing');
       }
-      setSiteData(normalizedSiteKey, { flows: nextFlows }).catch(() => undefined);
+      await setSiteData(normalizedSiteKey, { flows: nextFlows });
     },
     [normalizedSiteKey],
   );
@@ -166,28 +184,50 @@ export default function FlowsSection({
       if (!selected) {
         return;
       }
+      setFlowActionError('');
       setActiveFlowId(flowId);
-      setEditFlow({
+      const nextEditFlow = {
         ...selected,
         description: selected.description || '',
-      });
+      };
+      setEditFlow(nextEditFlow);
+      setEditFlowSnapshot(getEditableSnapshot(nextEditFlow));
       setEditResetKey((prev) => prev + 1);
     },
     [flows],
   );
 
-  const closeEditDrawer = useCallback(() => {
+  const forceCloseEditDrawer = useCallback(() => {
     setActiveFlowId(null);
     setEditFlow(null);
+    setEditFlowSnapshot('');
   }, []);
+
+  const closeEditDrawer = useCallback(() => {
+    if (isEditDirty) {
+      const confirmed = window.confirm(
+        t('sidepanel_flows_dirty_close_confirm', 'You have unsaved changes. Discard them and close?'),
+      );
+      if (!confirmed) {
+        return;
+      }
+    }
+    forceCloseEditDrawer();
+  }, [forceCloseEditDrawer, isEditDirty]);
 
   const closeCreateDrawer = useCallback(() => {
     onCreateFlowClose?.();
   }, [onCreateFlowClose]);
 
   const saveEditedFlow = useCallback(
-    (closeDrawer = true): FlowRecord | null => {
+    async (closeDrawer = true): Promise<FlowRecord | null> => {
       if (!editFlow) {
+        return null;
+      }
+      if (!normalizedSiteKey) {
+        setFlowActionError(
+          t('sidepanel_flows_persist_error_save', 'Failed to save flow. Please try again.'),
+        );
         return null;
       }
       const updatedAt = Date.now();
@@ -197,25 +237,35 @@ export default function FlowsSection({
         description: editFlow.description.trim(),
         updatedAt,
       };
-      setFlows((prev) => {
-        const exists = prev.some((item) => item.id === nextFlow.id);
-        const next = exists
-          ? prev.map((item) => (item.id === nextFlow.id ? nextFlow : item))
-          : [...prev, nextFlow];
-        persistFlows(next);
-        return next;
-      });
+      const exists = flows.some((item) => item.id === nextFlow.id);
+      const next = exists
+        ? flows.map((item) => (item.id === nextFlow.id ? nextFlow : item))
+        : [...flows, nextFlow];
+      try {
+        await persistFlows(next);
+      } catch {
+        setFlowActionError(
+          t('sidepanel_flows_persist_error_save', 'Failed to save flow. Please try again.'),
+        );
+        return null;
+      }
+      setFlowActionError('');
+      setFlows(next);
       setEditFlow(nextFlow);
+      setEditFlowSnapshot(getEditableSnapshot(nextFlow));
       if (closeDrawer) {
-        closeEditDrawer();
+        forceCloseEditDrawer();
       }
       return nextFlow;
     },
-    [closeEditDrawer, editFlow, persistFlows],
+    [editFlow, forceCloseEditDrawer, flows, normalizedSiteKey, persistFlows],
   );
 
-  const createDraftFlow = useCallback((): FlowRecord | null => {
+  const createDraftFlow = useCallback(async (): Promise<FlowRecord | null> => {
     if (!normalizedSiteKey) {
+      setFlowActionError(
+        t('sidepanel_flows_persist_error_create', 'Failed to create flow. Please try again.'),
+      );
       return null;
     }
     const name = draftFlow.name.trim() || t('sidepanel_flows_new_default', 'New flow');
@@ -230,37 +280,55 @@ export default function FlowsSection({
       steps: draftFlow.steps,
       updatedAt: Date.now(),
     };
-    setFlows((prev) => {
-      const next = [...prev, nextFlow];
-      persistFlows(next);
-      return next;
-    });
+    const next = [...flows, nextFlow];
+    try {
+      await persistFlows(next);
+    } catch {
+      setFlowActionError(
+        t('sidepanel_flows_persist_error_create', 'Failed to create flow. Please try again.'),
+      );
+      return null;
+    }
+    setFlowActionError('');
+    setFlows(next);
     closeCreateDrawer();
     return nextFlow;
-  }, [closeCreateDrawer, draftFlow.description, draftFlow.name, draftFlow.steps, normalizedSiteKey, persistFlows]);
+  }, [
+    closeCreateDrawer,
+    draftFlow.description,
+    draftFlow.name,
+    draftFlow.steps,
+    flows,
+    normalizedSiteKey,
+    persistFlows,
+  ]);
 
   const handleFlowSave = () => {
-    saveEditedFlow(true);
+    void saveEditedFlow(true);
   };
 
   const handleFlowSaveRun = () => {
-    const saved = saveEditedFlow(false);
-    if (!saved) {
-      return;
-    }
-    void startFlowRun(saved, 'flow-drawer-save-run');
+    void (async () => {
+      const saved = await saveEditedFlow(false);
+      if (!saved) {
+        return;
+      }
+      await startFlowRun(saved, 'flow-drawer-save-run');
+    })();
   };
 
   const handleCreateFlow = () => {
-    createDraftFlow();
+    void createDraftFlow();
   };
 
   const handleCreateFlowSaveRun = () => {
-    const created = createDraftFlow();
-    if (!created) {
-      return;
-    }
-    void startFlowRun(created, 'flow-drawer-save-run');
+    void (async () => {
+      const created = await createDraftFlow();
+      if (!created) {
+        return;
+      }
+      await startFlowRun(created, 'flow-drawer-save-run');
+    })();
   };
 
   const renderSummary = (steps: number, actions: FlowSummaryActions) => (
@@ -288,6 +356,7 @@ export default function FlowsSection({
           className="btn-ghost h-8 px-3 text-xs disabled:cursor-not-allowed disabled:opacity-60"
           onClick={actions.onSaveRun}
           disabled={actions.disableSaveRun || !actions.onSaveRun}
+          title={actions.disableSaveRun ? actions.saveRunDisabledReason : undefined}
         >
           <span className="inline-flex items-center gap-1">
             <CheckCircle2 className="h-3.5 w-3.5" />
@@ -299,6 +368,7 @@ export default function FlowsSection({
           className="btn-ghost h-8 px-3 text-xs disabled:cursor-not-allowed disabled:opacity-60"
           onClick={actions.onRun}
           disabled={actions.disableRun || !actions.onRun}
+          title={actions.disableRun ? actions.runDisabledReason : undefined}
         >
           <span className="inline-flex items-center gap-1">
             <Play className="h-3.5 w-3.5" />
@@ -322,6 +392,21 @@ export default function FlowsSection({
         </div>
         <span className="text-xs text-muted-foreground">{visibleFlows.length}</span>
       </div>
+
+      {flowActionError ? (
+        <Card className="border-destructive/60 bg-destructive/10 text-destructive">
+          <p className="text-xs">{flowActionError}</p>
+        </Card>
+      ) : null}
+
+      {!hasActivePage ? (
+        <Card className="border-border/70 bg-muted/50 text-sm text-muted-foreground">
+          {t(
+            'sidepanel_flows_no_active_page_readonly',
+            'No active page detected. You can browse flows in read-only mode. Running is disabled.',
+          )}
+        </Card>
+      ) : null}
 
       {(runStatus || runErrorMessage) && (
         <Card className="border border-border/70 bg-muted/50">
@@ -448,14 +533,7 @@ export default function FlowsSection({
         </div>
       </div>
 
-      {!hasActivePage ? (
-        <Card className="bg-muted text-center text-sm text-muted-foreground">
-          {t(
-            'sidepanel_elements_no_active_page',
-            'No active page detected. Open a site tab and refresh to manage elements.',
-          )}
-        </Card>
-      ) : flows.length === 0 ? (
+      {flows.length === 0 ? (
         <Card className="bg-muted text-center text-sm text-muted-foreground">
           {t('sidepanel_flows_empty', 'No flows yet. Create one to define automated actions.')}
         </Card>
@@ -466,10 +544,9 @@ export default function FlowsSection({
       ) : (
         <div className="grid gap-2">
           {visibleFlows.map((flow) => (
-            <Card key={flow.id} onClick={() => openFlowEditor(flow.id)}>
+            <Card key={flow.id} onClick={hasActivePage ? () => openFlowEditor(flow.id) : undefined}>
               <div className="flex items-start justify-between gap-2">
                 <div className="flex min-w-0 items-start gap-2">
-                  <span className="badge-pill shrink-0">{t('sidepanel_flows_badge', 'Flow')}</span>
                   <div className="min-w-0">
                     <h3 className="truncate text-sm font-semibold text-card-foreground">{flow.name}</h3>
                     <p className="mt-1 line-clamp-2 text-xs text-muted-foreground">
@@ -482,7 +559,7 @@ export default function FlowsSection({
                     type="button"
                     className={actionClass}
                     aria-label={t('sidepanel_flows_run', 'Run flow')}
-                    title={t('sidepanel_flows_run', 'Run flow')}
+                    title={runDisabledReason || t('sidepanel_flows_run', 'Run flow')}
                     onClick={(event) => {
                       event.stopPropagation();
                       void startFlowRun(flow, 'flows-list');
@@ -495,15 +572,37 @@ export default function FlowsSection({
                     type="button"
                     className={`${actionClass} btn-icon-danger`}
                     aria-label={t('sidepanel_flows_delete', 'Delete flow')}
-                    title={t('sidepanel_flows_delete', 'Delete flow')}
+                    title={
+                      hasActivePage
+                        ? t('sidepanel_flows_delete', 'Delete flow')
+                        : t('sidepanel_flows_disabled_read_only', 'Read-only mode without an active page.')
+                    }
                     onClick={(event) => {
                       event.stopPropagation();
-                      setFlows((prev) => {
-                        const next = prev.filter((item) => item.id !== flow.id);
-                        persistFlows(next);
-                        return next;
-                      });
+                      void (async () => {
+                        const confirmed = window.confirm(
+                          t('sidepanel_flows_delete_confirm', 'Delete flow "{name}"? This action cannot be undone.').replace(
+                            '{name}',
+                            flow.name,
+                          ),
+                        );
+                        if (!confirmed) {
+                          return;
+                        }
+                        const next = flows.filter((item) => item.id !== flow.id);
+                        try {
+                          await persistFlows(next);
+                        } catch {
+                          setFlowActionError(
+                            t('sidepanel_flows_persist_error_delete', 'Failed to delete flow. Please try again.'),
+                          );
+                          return;
+                        }
+                        setFlowActionError('');
+                        setFlows(next);
+                      })();
                     }}
+                    disabled={!hasActivePage}
                   >
                     <Trash2 className="h-4 w-4" />
                   </button>
@@ -533,9 +632,11 @@ export default function FlowsSection({
                 void startFlowRun(editFlow, 'flows-list');
               }
             : undefined,
-          disableSave: false,
+          disableSave: !hasActivePage,
           disableSaveRun: !hasActivePage || isRunActive,
           disableRun: !hasActivePage || isRunActive || !editFlow,
+          saveRunDisabledReason: runDisabledReason,
+          runDisabledReason: runDisabledReason,
         })}
       >
         {editFlow ? (
@@ -579,8 +680,10 @@ export default function FlowsSection({
         summary={renderSummary(getStepCount(draftFlow.steps), {
           onSave: handleCreateFlow,
           onSaveRun: handleCreateFlowSaveRun,
+          disableSave: !hasActivePage,
           disableSaveRun: !hasActivePage || isRunActive,
           disableRun: true,
+          saveRunDisabledReason: runDisabledReason,
         })}
       >
         <div className="space-y-4 text-xs text-muted-foreground">
