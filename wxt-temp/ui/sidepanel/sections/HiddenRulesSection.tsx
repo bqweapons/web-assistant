@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Crosshair, Eye, EyeOff, Search, Sparkles, Trash2 } from 'lucide-react';
 import Card from '../components/Card';
 import Drawer from '../components/Drawer';
@@ -16,16 +16,34 @@ type HiddenRulesSectionProps = {
 };
 
 type HiddenRuleRecord = StructuredHiddenRecord & {
-  scope: 'page' | 'site' | 'global';
+  scope: 'site';
   siteKey: string;
-  pageKey: string | null;
+  pageKey: null;
   note: string;
   enabled: boolean;
   updatedAt: number;
 };
 
+type HiddenFilterMode = 'all' | 'enabled' | 'paused' | 'auto' | 'manual';
+
 const isRecord = (value: unknown): value is Record<string, unknown> =>
   Boolean(value) && typeof value === 'object' && !Array.isArray(value);
+
+const AUTO_ADS_RULE_PREFIX = 'hidden-auto-ads-v1-';
+const AUTO_ADS_PRESETS = [
+  { key: 'doubleclick-iframe', selector: 'iframe[src*="doubleclick.net"]' },
+  { key: 'googlesyndication-iframe', selector: 'iframe[src*="googlesyndication.com"]' },
+  { key: 'google-ads-id', selector: '[id*="google_ads"]' },
+  { key: 'google-ad-class', selector: '[class*="google-ad"]' },
+  { key: 'ad-prefix-id', selector: '[id^="ad-"]' },
+  { key: 'ad-infix-id', selector: '[id*="-ad-"]' },
+  { key: 'ad-prefix-class', selector: '[class^="ad-"]' },
+  { key: 'ad-infix-class', selector: '[class*="-ad-"]' },
+  { key: 'advert-class', selector: '[class*="advert"]' },
+  { key: 'advert-id', selector: '[id*="advert"]' },
+  { key: 'data-ad', selector: '[data-ad]' },
+  { key: 'aria-label-advert', selector: '[aria-label*="advert"]' },
+] as const;
 
 const toTimestamp = (value: unknown) => {
   if (typeof value === 'number' && Number.isFinite(value)) {
@@ -76,45 +94,82 @@ const normalizeHiddenRule = (value: unknown, fallbackSiteKey: string): HiddenRul
         ? value.name.trim()
         : t('sidepanel_hidden_default_name', 'Hidden rule'),
     note: typeof value.note === 'string' ? value.note : '',
-    scope: value.scope === 'page' || value.scope === 'global' ? value.scope : 'site',
+    scope: 'site',
     siteKey: site,
-    pageKey: typeof value.pageKey === 'string' ? value.pageKey : null,
+    pageKey: null,
     selector: typeof value.selector === 'string' ? value.selector : '',
     enabled: value.enabled !== false,
     updatedAt: toTimestamp(value.updatedAt),
   };
 };
 
-const toSiteLabel = (siteKey: string) => buildDefaultSiteUrl(siteKey || '');
+const isAutoAdsRule = (rule: HiddenRuleRecord) => rule.id.startsWith(AUTO_ADS_RULE_PREFIX);
+
+const isSelectorSyntaxValid = (selector: string) => {
+  const normalized = selector.trim();
+  if (!normalized) {
+    return false;
+  }
+  try {
+    document.querySelector(normalized);
+    return true;
+  } catch {
+    return false;
+  }
+};
 
 export default function HiddenRulesSection({
   siteKey = '',
-  pageKey = '',
+  pageKey: _pageKey = '',
   hasActivePage = false,
   onStartPicker,
 }: HiddenRulesSectionProps) {
   const normalizedSiteKey = useMemo(() => deriveSiteKey(siteKey), [siteKey]);
   const [rules, setRules] = useState<HiddenRuleRecord[]>([]);
+  const rulesRef = useRef<HiddenRuleRecord[]>([]);
   const actionClass = 'btn-icon h-8 w-8';
+  const [actionError, setActionError] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
   const [sortMode, setSortMode] = useState('recent');
+  const [filterMode, setFilterMode] = useState<HiddenFilterMode>('all');
   const [activeRuleId, setActiveRuleId] = useState<string | null>(null);
+  const [editRuleSnapshot, setEditRuleSnapshot] = useState('');
   const siteRules = useMemo(
     () => rules.filter((rule) => !normalizedSiteKey || rule.siteKey === normalizedSiteKey),
     [normalizedSiteKey, rules],
   );
   const activeRule = siteRules.find((rule) => rule.id === activeRuleId) ?? null;
   const [editRule, setEditRule] = useState<HiddenRuleRecord | null>(activeRule);
+  const isEditDirty =
+    Boolean(editRule) &&
+    JSON.stringify({
+      name: editRule?.name || '',
+      selector: editRule?.selector || '',
+      note: editRule?.note || '',
+      enabled: Boolean(editRule?.enabled),
+    }) !== editRuleSnapshot;
   const normalizedQuery = searchQuery.trim().toLowerCase();
   const filteredRules = useMemo(() => {
     return siteRules.filter((rule) => {
+      if (filterMode === 'enabled' && !rule.enabled) {
+        return false;
+      }
+      if (filterMode === 'paused' && rule.enabled) {
+        return false;
+      }
+      if (filterMode === 'auto' && !isAutoAdsRule(rule)) {
+        return false;
+      }
+      if (filterMode === 'manual' && isAutoAdsRule(rule)) {
+        return false;
+      }
       if (!normalizedQuery) {
         return true;
       }
       const haystack = `${rule.name} ${rule.note} ${rule.selector} ${rule.siteKey}`.toLowerCase();
       return haystack.includes(normalizedQuery);
     });
-  }, [normalizedQuery, siteRules]);
+  }, [filterMode, normalizedQuery, siteRules]);
   const visibleRules = useMemo(() => {
     const items = [...filteredRules];
     if (sortMode === 'name') {
@@ -124,27 +179,35 @@ export default function HiddenRulesSection({
     items.sort((a, b) => b.updatedAt - a.updatedAt);
     return items;
   }, [filteredRules, sortMode]);
-  const enabledCount = siteRules.filter((rule) => rule.enabled).length;
-  const showClear = Boolean(searchQuery) || sortMode !== 'recent';
-  const currentSite = toSiteLabel(normalizedSiteKey);
+  const showClear = Boolean(searchQuery) || filterMode !== 'all' || sortMode !== 'recent';
+  const allAutoAdsEnabled = AUTO_ADS_PRESETS.every((preset) => {
+    const id = `${AUTO_ADS_RULE_PREFIX}${preset.key}`;
+    const existing = siteRules.find((rule) => rule.id === id);
+    return Boolean(existing && existing.enabled);
+  });
 
-  const loadHiddenRules = useCallback(() => {
+  useEffect(() => {
+    rulesRef.current = rules;
+  }, [rules]);
+
+  const loadHiddenRules = useCallback(async () => {
     if (!normalizedSiteKey) {
       setRules([]);
       return;
     }
-    getSiteData(normalizedSiteKey)
-      .then((data) => {
-        const next = (Array.isArray(data.hidden) ? data.hidden : [])
-          .map((entry) => normalizeHiddenRule(entry, normalizedSiteKey))
-          .filter((entry): entry is HiddenRuleRecord => Boolean(entry));
-        setRules(next);
-      })
-      .catch(() => setRules([]));
+    try {
+      const data = await getSiteData(normalizedSiteKey);
+      const next = (Array.isArray(data.hidden) ? data.hidden : [])
+        .map((entry) => normalizeHiddenRule(entry, normalizedSiteKey))
+        .filter((entry): entry is HiddenRuleRecord => Boolean(entry));
+      setRules(next);
+    } catch {
+      setRules([]);
+    }
   }, [normalizedSiteKey]);
 
   useEffect(() => {
-    loadHiddenRules();
+    void loadHiddenRules();
   }, [loadHiddenRules]);
 
   useEffect(() => {
@@ -156,18 +219,31 @@ export default function HiddenRulesSection({
       if (areaName !== 'local' || !changes[STORAGE_KEY]) {
         return;
       }
-      loadHiddenRules();
+      void loadHiddenRules();
     };
     storage.addListener(handleStorageChange);
     return () => storage.removeListener(handleStorageChange);
   }, [loadHiddenRules, normalizedSiteKey]);
 
+  useEffect(() => {
+    setActiveRuleId(null);
+  }, [normalizedSiteKey]);
+
   const persistHiddenRules = useCallback(
-    (nextRules: HiddenRuleRecord[]) => {
+    async (nextRules: HiddenRuleRecord[], errorMessage: string) => {
       if (!normalizedSiteKey) {
-        return;
+        setActionError(errorMessage);
+        return false;
       }
-      setSiteData(normalizedSiteKey, { hidden: nextRules }).catch(() => undefined);
+      try {
+        await setSiteData(normalizedSiteKey, { hidden: nextRules });
+        setRules(nextRules);
+        setActionError('');
+        return true;
+      } catch {
+        setActionError(errorMessage);
+        return false;
+      }
     },
     [normalizedSiteKey],
   );
@@ -184,41 +260,94 @@ export default function HiddenRulesSection({
       note: activeRule.note || '',
       enabled: activeRule.enabled !== false,
     });
+    setEditRuleSnapshot(
+      JSON.stringify({
+        name: activeRule.name || '',
+        selector: activeRule.selector || '',
+        note: activeRule.note || '',
+        enabled: activeRule.enabled !== false,
+      }),
+    );
   }, [activeRule]);
 
-  const handleRuleSave = () => {
+  const closeRuleDrawer = () => {
+    if (isEditDirty) {
+      const confirmed = window.confirm(
+        t('sidepanel_hidden_dirty_close_confirm', 'You have unsaved changes. Discard them and close?'),
+      );
+      if (!confirmed) {
+        return;
+      }
+    }
+    setActiveRuleId(null);
+    setEditRule(null);
+    setEditRuleSnapshot('');
+  };
+
+  const handleRuleSave = async () => {
     if (!editRule) {
       return;
     }
+    const selector = editRule.selector.trim();
+    if (!isSelectorSyntaxValid(selector)) {
+      setActionError(t('sidepanel_hidden_invalid_selector', 'Selector is invalid.'));
+      return;
+    }
     const updatedAt = Date.now();
-    setRules((prev) => {
-      const next = prev.map((item) =>
-        item.id === editRule.id ? { ...item, ...editRule, updatedAt } : item,
-      );
-      persistHiddenRules(next);
-      return next;
-    });
-    setActiveRuleId(null);
+    const nextRule: HiddenRuleRecord = {
+      ...editRule,
+      name: editRule.name.trim() || t('sidepanel_hidden_default_name', 'Hidden rule'),
+      selector,
+      scope: 'site',
+      siteKey: normalizedSiteKey || editRule.siteKey,
+      pageKey: null,
+      updatedAt,
+    };
+    const next = rulesRef.current.map((item) => (item.id === editRule.id ? nextRule : item));
+    const persisted = await persistHiddenRules(
+      next,
+      t('sidepanel_hidden_persist_error_save', 'Failed to save rule. Please try again.'),
+    );
+    if (!persisted) {
+      return;
+    }
+    closeRuleDrawer();
   };
 
-  const handleRuleToggle = (ruleId: string) => {
-    setRules((prev) => {
-      const next = prev.map((item) =>
-        item.id === ruleId ? { ...item, enabled: !item.enabled, updatedAt: Date.now() } : item,
-      );
-      persistHiddenRules(next);
-      return next;
-    });
+  const handleRuleToggle = async (ruleId: string) => {
+    const next = rulesRef.current.map((item) =>
+      item.id === ruleId ? { ...item, enabled: !item.enabled, updatedAt: Date.now() } : item,
+    );
+    await persistHiddenRules(
+      next,
+      t('sidepanel_hidden_persist_error_save', 'Failed to save rule. Please try again.'),
+    );
   };
 
-  const handleRuleDelete = (ruleId: string) => {
-    setRules((prev) => {
-      const next = prev.filter((item) => item.id !== ruleId);
-      persistHiddenRules(next);
-      return next;
-    });
+  const handleRuleDelete = async (ruleId: string) => {
+    const target = rulesRef.current.find((item) => item.id === ruleId);
+    if (!target) {
+      return;
+    }
+    const confirmed = window.confirm(
+      t('sidepanel_hidden_delete_confirm', 'Delete rule "{name}"? This action cannot be undone.').replace(
+        '{name}',
+        target.name || target.selector || target.id,
+      ),
+    );
+    if (!confirmed) {
+      return;
+    }
+    const next = rulesRef.current.filter((item) => item.id !== ruleId);
+    const persisted = await persistHiddenRules(
+      next,
+      t('sidepanel_hidden_persist_error_delete', 'Failed to delete rule. Please try again.'),
+    );
+    if (!persisted) {
+      return;
+    }
     if (activeRuleId === ruleId) {
-      setActiveRuleId(null);
+      closeRuleDrawer();
     }
   };
 
@@ -230,6 +359,11 @@ export default function HiddenRulesSection({
     if (!selector) {
       return;
     }
+    const normalizedSelector = selector.trim();
+    if (!isSelectorSyntaxValid(normalizedSelector)) {
+      setActionError(t('sidepanel_hidden_invalid_selector', 'Selector is invalid.'));
+      return;
+    }
     const now = Date.now();
     const newRule: HiddenRuleRecord = {
       id: createRuleId(),
@@ -237,17 +371,94 @@ export default function HiddenRulesSection({
       note: '',
       scope: 'site',
       siteKey: normalizedSiteKey,
-      pageKey: pageKey || null,
-      selector,
+      pageKey: null,
+      selector: normalizedSelector,
       enabled: true,
       updatedAt: now,
     };
-    setRules((prev) => {
-      const next = [newRule, ...prev];
-      persistHiddenRules(next);
-      return next;
-    });
+    const next = [newRule, ...rulesRef.current];
+    const persisted = await persistHiddenRules(
+      next,
+      t('sidepanel_hidden_persist_error_save', 'Failed to save rule. Please try again.'),
+    );
+    if (!persisted) {
+      return;
+    }
     setActiveRuleId(newRule.id);
+  };
+
+  const handleBulkEnableAll = async () => {
+    if (!normalizedSiteKey) {
+      return;
+    }
+    const now = Date.now();
+    const next = rulesRef.current.map((rule) =>
+      rule.siteKey === normalizedSiteKey ? { ...rule, enabled: true, updatedAt: now } : rule,
+    );
+    await persistHiddenRules(
+      next,
+      t('sidepanel_hidden_persist_error_save', 'Failed to save rule. Please try again.'),
+    );
+  };
+
+  const handleBulkPauseAll = async () => {
+    if (!normalizedSiteKey) {
+      return;
+    }
+    const now = Date.now();
+    const next = rulesRef.current.map((rule) =>
+      rule.siteKey === normalizedSiteKey ? { ...rule, enabled: false, updatedAt: now } : rule,
+    );
+    await persistHiddenRules(
+      next,
+      t('sidepanel_hidden_persist_error_save', 'Failed to save rule. Please try again.'),
+    );
+  };
+
+  const handleToggleAutoAds = async () => {
+    if (!normalizedSiteKey || !hasActivePage) {
+      return;
+    }
+    const now = Date.now();
+    const next = [...rulesRef.current];
+    if (allAutoAdsEnabled) {
+      for (let index = 0; index < next.length; index += 1) {
+        const rule = next[index];
+        if (rule.siteKey !== normalizedSiteKey || !isAutoAdsRule(rule) || !rule.enabled) {
+          continue;
+        }
+        next[index] = { ...rule, enabled: false, updatedAt: now };
+      }
+    } else {
+      AUTO_ADS_PRESETS.forEach((preset) => {
+        const presetId = `${AUTO_ADS_RULE_PREFIX}${preset.key}`;
+        const existingIndex = next.findIndex((rule) => rule.id === presetId);
+        const nextRule: HiddenRuleRecord = {
+          id: presetId,
+          name: t('sidepanel_hidden_auto_rule_name', 'Auto ad rule'),
+          note: t('sidepanel_hidden_auto_rule_note', 'Generated from Auto hide ads.'),
+          scope: 'site',
+          siteKey: normalizedSiteKey,
+          pageKey: null,
+          selector: preset.selector,
+          enabled: true,
+          updatedAt: now,
+        };
+        if (existingIndex === -1) {
+          next.push(nextRule);
+          return;
+        }
+        next[existingIndex] = {
+          ...next[existingIndex],
+          ...nextRule,
+          id: presetId,
+        };
+      });
+    }
+    await persistHiddenRules(
+      next,
+      t('sidepanel_hidden_persist_error_save', 'Failed to save rule. Please try again.'),
+    );
   };
 
   return (
@@ -262,9 +473,18 @@ export default function HiddenRulesSection({
           <Crosshair className="h-4 w-4" />
           {t('sidepanel_hidden_action_select', 'Hide page element')}
         </button>
-        <button type="button" className="btn-ghost w-full gap-2" disabled>
+        <button
+          type="button"
+          className="btn-ghost w-full gap-2 disabled:cursor-not-allowed disabled:opacity-60"
+          onClick={() => {
+            void handleToggleAutoAds();
+          }}
+          disabled={!hasActivePage || !normalizedSiteKey}
+        >
           <Sparkles className="h-4 w-4" />
-          {t('sidepanel_hidden_action_auto', 'Auto hide ads')}
+          {allAutoAdsEnabled
+            ? t('sidepanel_hidden_auto_ads_off', 'Pause auto hide ads')
+            : t('sidepanel_hidden_auto_ads_on', 'Enable auto hide ads')}
         </button>
       </div>
 
@@ -280,13 +500,11 @@ export default function HiddenRulesSection({
         <span className="text-xs text-muted-foreground">{visibleRules.length}</span>
       </div>
 
-      <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-border bg-muted px-3 py-2 text-xs">
-        <span className="text-muted-foreground">
-          {t('sidepanel_hidden_status', '{count} rules active on {site}')
-            .replace('{count}', String(enabledCount))
-            .replace('{site}', currentSite || 'site')}
-        </span>
-      </div>
+      {actionError ? (
+        <Card className="border-destructive/60 bg-destructive/10 text-destructive">
+          <p className="text-xs">{actionError}</p>
+        </Card>
+      ) : null}
 
       <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
         <div className="relative flex-1">
@@ -299,9 +517,20 @@ export default function HiddenRulesSection({
             placeholder={t('sidepanel_hidden_search_placeholder', 'Search hidden rules')}
           />
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex min-w-0 flex-1 items-center gap-2">
           <select
-            className="input select w-full sm:w-40"
+            className="input select min-w-0 flex-1"
+            value={filterMode}
+            onChange={(event) => setFilterMode(event.target.value as HiddenFilterMode)}
+          >
+            <option value="all">{t('sidepanel_hidden_filter_all', 'All')}</option>
+            <option value="enabled">{t('sidepanel_hidden_filter_enabled', 'Enabled')}</option>
+            <option value="paused">{t('sidepanel_hidden_filter_paused', 'Paused')}</option>
+            <option value="auto">{t('sidepanel_hidden_filter_auto', 'Auto')}</option>
+            <option value="manual">{t('sidepanel_hidden_filter_manual', 'Manual')}</option>
+          </select>
+          <select
+            className="input select min-w-0 flex-1"
             value={sortMode}
             onChange={(event) => setSortMode(event.target.value)}
           >
@@ -311,10 +540,11 @@ export default function HiddenRulesSection({
           {showClear ? (
             <button
               type="button"
-              className="btn-ghost px-3"
+              className="btn-ghost h-9 shrink-0 px-3"
               onClick={() => {
                 setSearchQuery('');
                 setSortMode('recent');
+                setFilterMode('all');
               }}
             >
               {t('sidepanel_action_clear', 'Clear')}
@@ -323,9 +553,37 @@ export default function HiddenRulesSection({
         </div>
       </div>
 
+      {hasActivePage ? (
+        <div className="grid grid-cols-2 gap-2">
+          <button
+            type="button"
+            className="btn-ghost h-8 w-full px-3 text-xs"
+            onClick={() => {
+              void handleBulkEnableAll();
+            }}
+            disabled={!siteRules.length}
+          >
+            {t('sidepanel_hidden_bulk_enable_all', 'Enable all')}
+          </button>
+          <button
+            type="button"
+            className="btn-ghost h-8 w-full px-3 text-xs"
+            onClick={() => {
+              void handleBulkPauseAll();
+            }}
+            disabled={!siteRules.length}
+          >
+            {t('sidepanel_hidden_bulk_pause_all', 'Pause all')}
+          </button>
+        </div>
+      ) : null}
+
       {!hasActivePage ? (
         <Card className="bg-muted text-center text-sm text-muted-foreground">
-          {t('sidepanel_elements_no_active_page', 'No active page detected. Open a site tab and refresh to manage elements.')}
+          {t(
+            'sidepanel_hidden_no_active_page',
+            'No active page detected. Open a site tab to manage hidden rules.',
+          )}
         </Card>
       ) : siteRules.length === 0 ? (
         <Card className="bg-muted text-center text-sm text-muted-foreground">
@@ -343,7 +601,14 @@ export default function HiddenRulesSection({
               <Card key={rule.id} onClick={() => setActiveRuleId(rule.id)}>
                 <div className="flex items-start justify-between gap-2">
                   <div className="min-w-0 flex-1">
-                    <h3 className="truncate text-sm font-semibold text-card-foreground">{title}</h3>
+                    <div className="flex items-center gap-2">
+                      <h3 className="truncate text-sm font-semibold text-card-foreground">{title}</h3>
+                      {isAutoAdsRule(rule) ? (
+                        <span className="badge-pill shrink-0 text-[9px] uppercase tracking-wide">
+                          {t('sidepanel_hidden_filter_auto', 'Auto')}
+                        </span>
+                      ) : null}
+                    </div>
                     <p className="mt-1 truncate text-xs text-muted-foreground">{rule.selector}</p>
                   </div>
                   <div className="flex shrink-0 items-center gap-1">
@@ -374,7 +639,7 @@ export default function HiddenRulesSection({
                       title={t('sidepanel_hidden_delete', 'Delete rule')}
                       onClick={(event) => {
                         event.stopPropagation();
-                        handleRuleDelete(rule.id);
+                        void handleRuleDelete(rule.id);
                       }}
                     >
                       <Trash2 className="h-4 w-4" />
@@ -399,7 +664,7 @@ export default function HiddenRulesSection({
         open={Boolean(activeRule)}
         title={activeRule?.name ?? t('sidepanel_hidden_detail_title', 'Hidden rule details')}
         description={t('sidepanel_hidden_detail_subtitle', 'Edit the hidden rule details below.')}
-        onClose={() => setActiveRuleId(null)}
+        onClose={closeRuleDrawer}
       >
         {editRule ? (
           <div className="grid gap-3 text-xs text-muted-foreground">
@@ -442,7 +707,7 @@ export default function HiddenRulesSection({
             </label>
             <div className="flex items-center justify-between gap-2 rounded-lg border border-border bg-muted px-3 py-2 text-xs">
               <span className="font-semibold text-muted-foreground">{t('sidepanel_field_site', 'Site')}</span>
-              <span className="text-foreground">{toSiteLabel(editRule.siteKey)}</span>
+              <span className="text-foreground">{buildDefaultSiteUrl(editRule.siteKey || '')}</span>
             </div>
             <label className="inline-flex items-center gap-2 text-xs">
               <input
@@ -458,10 +723,16 @@ export default function HiddenRulesSection({
               <p className="text-sm text-foreground">{formatTimestamp(editRule.updatedAt)}</p>
             </div>
             <div className="flex items-center justify-end gap-2 pt-2">
-              <button type="button" className="btn-ghost" onClick={() => setActiveRuleId(null)}>
+              <button type="button" className="btn-ghost" onClick={closeRuleDrawer}>
                 {t('sidepanel_action_cancel', 'Cancel')}
               </button>
-              <button type="button" className="btn-primary" onClick={handleRuleSave}>
+              <button
+                type="button"
+                className="btn-primary"
+                onClick={() => {
+                  void handleRuleSave();
+                }}
+              >
                 {t('sidepanel_action_save_changes', 'Save changes')}
               </button>
             </div>

@@ -524,6 +524,9 @@
   "sidepanel_hidden_delete": {
     "message": "Delete rule"
   },
+  "sidepanel_hidden_delete_confirm": {
+    "message": "Delete rule \"{name}\"? This action cannot be undone."
+  },
   "sidepanel_hidden_default_name": {
     "message": "Hidden rule"
   },
@@ -532,6 +535,9 @@
   },
   "sidepanel_hidden_detail_title": {
     "message": "Hidden rule details"
+  },
+  "sidepanel_hidden_dirty_close_confirm": {
+    "message": "You have unsaved changes. Discard them and close?"
   },
   "sidepanel_hidden_disable": {
     "message": "Disable rule"
@@ -560,11 +566,38 @@
   "sidepanel_hidden_name_placeholder": {
     "message": "Hidden rule name"
   },
+  "sidepanel_hidden_no_active_page": {
+    "message": "No active page detected. Open a site tab to manage hidden rules."
+  },
   "sidepanel_hidden_note_placeholder": {
     "message": "Why this rule exists"
   },
+  "sidepanel_hidden_invalid_selector": {
+    "message": "Selector is invalid."
+  },
+  "sidepanel_hidden_persist_error_save": {
+    "message": "Failed to save rule. Please try again."
+  },
+  "sidepanel_hidden_persist_error_delete": {
+    "message": "Failed to delete rule. Please try again."
+  },
   "sidepanel_hidden_search_placeholder": {
     "message": "Search hidden rules"
+  },
+  "sidepanel_hidden_filter_all": {
+    "message": "All"
+  },
+  "sidepanel_hidden_filter_enabled": {
+    "message": "Enabled"
+  },
+  "sidepanel_hidden_filter_paused": {
+    "message": "Paused"
+  },
+  "sidepanel_hidden_filter_auto": {
+    "message": "Auto"
+  },
+  "sidepanel_hidden_filter_manual": {
+    "message": "Manual"
   },
   "sidepanel_hidden_selector_placeholder": {
     "message": "CSS selector"
@@ -580,6 +613,27 @@
   },
   "sidepanel_hidden_subtitle": {
     "message": "Hide or suppress elements automatically."
+  },
+  "sidepanel_hidden_bulk_enable_all": {
+    "message": "Enable all"
+  },
+  "sidepanel_hidden_bulk_pause_all": {
+    "message": "Pause all"
+  },
+  "sidepanel_hidden_auto_ads_on": {
+    "message": "Enable auto hide ads"
+  },
+  "sidepanel_hidden_auto_ads_off": {
+    "message": "Pause auto hide ads"
+  },
+  "sidepanel_hidden_auto_rule_name": {
+    "message": "Auto ad rule"
+  },
+  "sidepanel_hidden_auto_rule_note": {
+    "message": "Generated from Auto hide ads."
+  },
+  "sidepanel_hidden_auto_ads_enabled_toast": {
+    "message": "Auto hide ads updated."
   },
   "sidepanel_hidden_action_auto": {
     "message": "Auto hide ads"

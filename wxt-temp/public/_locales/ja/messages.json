@@ -464,6 +464,9 @@
   "sidepanel_hidden_delete": {
     "message": "ルールを削除"
   },
+  "sidepanel_hidden_delete_confirm": {
+    "message": "ルール「{name}」を削除しますか？この操作は元に戻せません。"
+  },
   "sidepanel_hidden_default_name": {
     "message": "非表示ルール"
   },
@@ -472,6 +475,9 @@
   },
   "sidepanel_hidden_detail_title": {
     "message": "非表示ルールの詳細"
+  },
+  "sidepanel_hidden_dirty_close_confirm": {
+    "message": "未保存の変更があります。破棄して閉じますか？"
   },
   "sidepanel_hidden_disable": {
     "message": "ルールを無効化"
@@ -500,11 +506,38 @@
   "sidepanel_hidden_name_placeholder": {
     "message": "非表示ルール名"
   },
+  "sidepanel_hidden_no_active_page": {
+    "message": "アクティブなページが見つかりません。サイトタブを開いて非表示ルールを管理してください。"
+  },
   "sidepanel_hidden_note_placeholder": {
     "message": "このルールの理由"
   },
+  "sidepanel_hidden_invalid_selector": {
+    "message": "セレクターの形式が不正です。"
+  },
+  "sidepanel_hidden_persist_error_save": {
+    "message": "ルールの保存に失敗しました。もう一度お試しください。"
+  },
+  "sidepanel_hidden_persist_error_delete": {
+    "message": "ルールの削除に失敗しました。もう一度お試しください。"
+  },
   "sidepanel_hidden_search_placeholder": {
     "message": "非表示ルールを検索"
+  },
+  "sidepanel_hidden_filter_all": {
+    "message": "すべて"
+  },
+  "sidepanel_hidden_filter_enabled": {
+    "message": "有効"
+  },
+  "sidepanel_hidden_filter_paused": {
+    "message": "停止"
+  },
+  "sidepanel_hidden_filter_auto": {
+    "message": "自動"
+  },
+  "sidepanel_hidden_filter_manual": {
+    "message": "手動"
   },
   "sidepanel_hidden_selector_placeholder": {
     "message": "CSS セレクター"
@@ -520,6 +553,27 @@
   },
   "sidepanel_hidden_subtitle": {
     "message": "要素を自動的に非表示または抑制します。"
+  },
+  "sidepanel_hidden_bulk_enable_all": {
+    "message": "すべて有効化"
+  },
+  "sidepanel_hidden_bulk_pause_all": {
+    "message": "すべて停止"
+  },
+  "sidepanel_hidden_auto_ads_on": {
+    "message": "広告自動非表示を有効化"
+  },
+  "sidepanel_hidden_auto_ads_off": {
+    "message": "広告自動非表示を停止"
+  },
+  "sidepanel_hidden_auto_rule_name": {
+    "message": "自動広告ルール"
+  },
+  "sidepanel_hidden_auto_rule_note": {
+    "message": "広告自動非表示から生成されたルールです。"
+  },
+  "sidepanel_hidden_auto_ads_enabled_toast": {
+    "message": "広告自動非表示を更新しました。"
   },
   "sidepanel_hidden_action_auto": {
     "message": "広告を隠す"

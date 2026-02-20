@@ -8,6 +8,7 @@ import {
 import { startPicker, stopPicker } from './content/picker';
 import { handleInjectionMessage, registerPageContextIfNeeded, resetInjectionRegistry } from './content/injection';
 import { executeFlowRunStep } from './content/flowRunner';
+import { clearHiddenRulesStyle, rehydratePersistedHiddenRules } from './content/hiddenRules';
 
 const CONTENT_RUNTIME_READY_KEY = '__ladybirdContentRuntimeReady__';
 type RuntimeMessenger = { sendMessage?: (message: unknown) => void };
@@ -53,7 +54,10 @@ const rehydratePersistedElements = async () => {
   }
 };
 
-const startPageContextWatcher = (runtime?: RuntimeMessenger) => {
+const startPageContextWatcher = (
+  runtime?: RuntimeMessenger,
+  onUrlChanged?: (href: string) => void,
+) => {
   if (!runtime?.sendMessage) {
     return () => undefined;
   }
@@ -67,6 +71,7 @@ const startPageContextWatcher = (runtime?: RuntimeMessenger) => {
       return;
     }
     lastUrl = href;
+    onUrlChanged?.(href);
     runtime.sendMessage?.({
       type: MessageType.PAGE_CONTEXT_PING,
       data: { url: href, title: document.title || undefined },
@@ -121,15 +126,21 @@ export default defineContentScript({
       return;
     }
     markerHost[CONTENT_RUNTIME_READY_KEY] = true;
-    const stopWatcher = startPageContextWatcher(runtime);
+    const rehydrateFromStorage = () => {
+      rehydratePersistedElements().catch(() => undefined);
+      rehydratePersistedHiddenRules().catch(() => undefined);
+    };
+    const stopWatcher = startPageContextWatcher(runtime, () => {
+      rehydrateFromStorage();
+    });
     registerPageContextIfNeeded(runtime);
-    rehydratePersistedElements().catch(() => undefined);
+    rehydrateFromStorage();
     const storageApi = chrome?.storage?.onChanged;
     const handleStorageChange = (changes: Record<string, unknown>, areaName: string) => {
       if (areaName !== 'local' || !changes[STORAGE_KEY]) {
         return;
       }
-      rehydratePersistedElements().catch(() => undefined);
+      rehydrateFromStorage();
     };
     storageApi?.addListener(handleStorageChange);
     runtime.onMessage.addListener((rawMessage, _sender, sendResponse) => {
@@ -215,6 +226,7 @@ export default defineContentScript({
     });
     return () => {
       stopWatcher();
+      clearHiddenRulesStyle();
       resetInjectionRegistry();
       storageApi?.removeListener(handleStorageChange);
       markerHost[CONTENT_RUNTIME_READY_KEY] = false;

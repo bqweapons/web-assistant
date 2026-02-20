@@ -1038,10 +1038,6 @@ export default function ElementsSection({
     setDraftFlow({ name: '', description: '', steps: [] });
   }, [flowDrawerOpen]);
 
-  useEffect(() => {
-    syncElementsToContent();
-  }, [syncElementsToContent]);
-
   const createElementId = () =>
     `element-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
   const defaultSiteKey = normalizedSiteKey || firstSiteElementContext?.siteKey || '';

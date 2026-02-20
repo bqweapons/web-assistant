@@ -314,7 +314,7 @@ export default function App() {
               siteKey={pageContext?.siteKey || ''}
               pageKey={pageContext?.pageKey || ''}
               hasActivePage={hasActivePage}
-              onStartPicker={startSelectorPicker}
+              onStartPicker={startSelectorPickerWithoutInsertionMarker}
             />
           )}
           {activeTab === TAB_IDS.overview && <OverviewSection />}
