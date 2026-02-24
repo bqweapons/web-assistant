@@ -3,9 +3,17 @@ import {
   type StructuredSiteData,
   type StructuredStoragePayload,
 } from './siteDataSchema';
+import { mergeSitesData, parseImportPayload } from './importExport';
 import { normalizeStructuredStoragePayload } from './siteDataMigration';
 
 export const STORAGE_KEY = 'ladybird_sites';
+// Legacy auto-migration (old extension -> new extension).
+// To disable automatic legacy detection + migration in a future version, remove:
+// 1) `LEGACY_STORAGE_KEY` and `LEGACY_MIGRATION_FLAG_KEY`
+// 2) `isRecord` and `tryMigrateLegacyPayload`
+// 3) The legacy migration branches inside `readStructuredPayload` (both chrome.storage and localStorage paths)
+const LEGACY_STORAGE_KEY = 'injectedElements';
+const LEGACY_MIGRATION_FLAG_KEY = 'ladybird_legacy_migrated_v1';
 
 export type SiteData = StructuredSiteData;
 
@@ -30,6 +38,29 @@ const getLocalStorage = () => {
   return null;
 };
 
+const isRecord = (value: unknown): value is Record<string, unknown> =>
+  Boolean(value) && typeof value === 'object' && !Array.isArray(value);
+
+// One-time legacy payload migration helper.
+// Safe removal target when retiring old-data compatibility.
+const tryMigrateLegacyPayload = (
+  currentPayload: StructuredStoragePayload,
+  legacyRaw: unknown,
+): StructuredStoragePayload | null => {
+  if (!isRecord(legacyRaw)) {
+    return null;
+  }
+  try {
+    const parsed = parseImportPayload(legacyRaw);
+    const mergedSites = mergeSitesData(currentPayload.sites || {}, parsed.sites || {});
+    const normalized = normalizeStructuredStoragePayload({ sites: mergedSites });
+    return normalized.payload;
+  } catch (error) {
+    console.warn('legacy-site-migration-failed', error);
+    return null;
+  }
+};
+
 const writeStructuredPayload = async (payload: StructuredStoragePayload) => {
   const storage = getLocalStorage();
   if (storage) {
@@ -46,11 +77,24 @@ const writeStructuredPayload = async (payload: StructuredStoragePayload) => {
 const readStructuredPayload = async (): Promise<StructuredStoragePayload> => {
   const storage = getLocalStorage();
   if (storage) {
-    const result = await storage.get(STORAGE_KEY);
+    const result = await storage.get([STORAGE_KEY, LEGACY_STORAGE_KEY, LEGACY_MIGRATION_FLAG_KEY]);
     const rawPayload = result?.[STORAGE_KEY] as unknown;
     const normalized = normalizeStructuredStoragePayload(rawPayload);
     if (normalized.changed) {
       await writeStructuredPayload(normalized.payload);
+    }
+    // Legacy auto-detect + auto-migrate (chrome.storage path).
+    // Delete this whole block to stop automatic migration from `injectedElements`.
+    const legacyMigrationDone = result?.[LEGACY_MIGRATION_FLAG_KEY] === true;
+    if (!legacyMigrationDone && typeof result?.[LEGACY_STORAGE_KEY] !== 'undefined') {
+      const migrated = tryMigrateLegacyPayload(normalized.payload, result?.[LEGACY_STORAGE_KEY]);
+      if (migrated) {
+        await storage.set({
+          [STORAGE_KEY]: migrated,
+          [LEGACY_MIGRATION_FLAG_KEY]: true,
+        });
+        return migrated;
+      }
     }
     return normalized.payload;
   }
@@ -60,6 +104,24 @@ const readStructuredPayload = async (): Promise<StructuredStoragePayload> => {
     const normalized = normalizeStructuredStoragePayload(parsed);
     if (normalized.changed) {
       await writeStructuredPayload(normalized.payload);
+    }
+    // Legacy auto-detect + auto-migrate (localStorage fallback path).
+    // Delete this whole block to stop automatic migration from legacy localStorage data.
+    const legacyMigrationDone = localStorage.getItem(LEGACY_MIGRATION_FLAG_KEY) === '1';
+    const legacyRawText = localStorage.getItem(LEGACY_STORAGE_KEY);
+    if (!legacyMigrationDone && legacyRawText) {
+      let legacyParsed: unknown = null;
+      try {
+        legacyParsed = JSON.parse(legacyRawText);
+      } catch (error) {
+        console.warn('legacy-site-migration-parse-failed', error);
+      }
+      const migrated = tryMigrateLegacyPayload(normalized.payload, legacyParsed);
+      if (migrated) {
+        await writeStructuredPayload(migrated);
+        localStorage.setItem(LEGACY_MIGRATION_FLAG_KEY, '1');
+        return migrated;
+      }
     }
     return normalized.payload;
   } catch (error) {

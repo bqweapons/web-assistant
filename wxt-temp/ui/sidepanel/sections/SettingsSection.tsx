@@ -1,9 +1,16 @@
-import { useRef, useState, type ChangeEvent } from 'react';
-import { Copy, Download, ExternalLink, Languages, Share2, Upload } from 'lucide-react';
+import { useEffect, useRef, useState, type ChangeEvent } from 'react';
+import { Copy, Download, ExternalLink, KeyRound, Languages, Share2, Upload } from 'lucide-react';
 import Card from '../components/Card';
 import { LOCALE_OPTIONS, SupportedLocale, getLocaleLabel, setLocale, t, useLocale } from '../utils/i18n';
 import { getAllSitesData, setAllSitesData } from '../../../shared/storage';
 import { buildExportPayload, mergeSitesData, parseImportPayload } from '../../../shared/importExport';
+import {
+  deleteSecretValue,
+  getSecretsVaultStatus,
+  lockSecretsVault,
+  unlockSecretsVault,
+  upsertSecretValue,
+} from '../../../shared/secrets';
 
 export default function SettingsSection() {
   const locale = useLocale();
@@ -12,9 +19,36 @@ export default function SettingsSection() {
   const [isImporting, setIsImporting] = useState(false);
   const [isExporting, setIsExporting] = useState(false);
   const [feedback, setFeedback] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
+  const [secretsStatus, setSecretsStatus] = useState({
+    configured: false,
+    unlocked: false,
+    secretCount: 0,
+    names: [] as string[],
+  });
+  const [secretsFeedback, setSecretsFeedback] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
+  const [vaultPassword, setVaultPassword] = useState('');
+  const [secretName, setSecretName] = useState('');
+  const [secretValue, setSecretValue] = useState('');
+  const [isSecretsBusy, setIsSecretsBusy] = useState(false);
   const storeUrl = chrome?.runtime?.id
     ? `https://chromewebstore.google.com/detail/${chrome.runtime.id}`
     : 'https://chromewebstore.google.com/';
+
+  const refreshSecretsStatus = async () => {
+    try {
+      const next = await getSecretsVaultStatus();
+      setSecretsStatus(next);
+    } catch (error) {
+      setSecretsFeedback({
+        type: 'error',
+        message: error instanceof Error ? error.message : String(error),
+      });
+    }
+  };
+
+  useEffect(() => {
+    void refreshSecretsStatus();
+  }, []);
 
   const handleExport = async () => {
     if (isExporting) {
@@ -160,6 +194,100 @@ export default function SettingsSection() {
     });
   };
 
+  const handleUnlockVault = async () => {
+    if (isSecretsBusy) {
+      return;
+    }
+    setIsSecretsBusy(true);
+    setSecretsFeedback(null);
+    try {
+      const next = await unlockSecretsVault(vaultPassword);
+      setSecretsStatus(next);
+      setVaultPassword('');
+      setSecretsFeedback({
+        type: 'success',
+        message: next.configured && next.secretCount > 0 ? 'Secret vault unlocked.' : 'Secret vault ready.',
+      });
+    } catch (error) {
+      setSecretsFeedback({
+        type: 'error',
+        message: error instanceof Error ? error.message : String(error),
+      });
+    } finally {
+      setIsSecretsBusy(false);
+    }
+  };
+
+  const handleLockVault = async () => {
+    if (isSecretsBusy) {
+      return;
+    }
+    setIsSecretsBusy(true);
+    setSecretsFeedback(null);
+    try {
+      await lockSecretsVault();
+      await refreshSecretsStatus();
+      setSecretsFeedback({
+        type: 'success',
+        message: 'Secret vault locked.',
+      });
+    } catch (error) {
+      setSecretsFeedback({
+        type: 'error',
+        message: error instanceof Error ? error.message : String(error),
+      });
+    } finally {
+      setIsSecretsBusy(false);
+    }
+  };
+
+  const handleSaveSecret = async () => {
+    if (isSecretsBusy) {
+      return;
+    }
+    setIsSecretsBusy(true);
+    setSecretsFeedback(null);
+    try {
+      const next = await upsertSecretValue(secretName, secretValue);
+      setSecretsStatus(next);
+      setSecretValue('');
+      setSecretsFeedback({
+        type: 'success',
+        message: `Saved secret "${secretName.trim()}".`,
+      });
+    } catch (error) {
+      setSecretsFeedback({
+        type: 'error',
+        message: error instanceof Error ? error.message : String(error),
+      });
+    } finally {
+      setIsSecretsBusy(false);
+    }
+  };
+
+  const handleDeleteSecret = async (name: string) => {
+    if (isSecretsBusy) {
+      return;
+    }
+    setIsSecretsBusy(true);
+    setSecretsFeedback(null);
+    try {
+      const next = await deleteSecretValue(name);
+      setSecretsStatus(next);
+      setSecretsFeedback({
+        type: 'success',
+        message: `Deleted secret "${name}".`,
+      });
+    } catch (error) {
+      setSecretsFeedback({
+        type: 'error',
+        message: error instanceof Error ? error.message : String(error),
+      });
+    } finally {
+      setIsSecretsBusy(false);
+    }
+  };
+
   return (
     <section className="flex flex-col gap-3">
       <div>
@@ -222,6 +350,113 @@ export default function SettingsSection() {
               {feedback.message}
             </p>
           ) : null}
+        </div>
+      </Card>
+
+      <Card>
+        <div className="flex flex-col gap-3">
+          <div className="flex items-start gap-3">
+            <div className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-border bg-secondary text-secondary-foreground">
+              <KeyRound className="h-4 w-4" />
+            </div>
+            <div>
+              <h3 className="text-sm font-semibold text-card-foreground">Secrets Vault</h3>
+              <p className="mt-1 text-xs text-muted-foreground">
+                Store passwords encrypted and use them in flow input values like <code>{'{{secret.login_password}}'}</code>.
+              </p>
+            </div>
+          </div>
+          <div className="grid gap-2">
+            <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+              <span>{secretsStatus.configured ? 'Vault configured' : 'Vault not configured'}</span>
+              <span>•</span>
+              <span>{secretsStatus.unlocked ? 'Unlocked' : 'Locked'}</span>
+              <span>•</span>
+              <span>{secretsStatus.secretCount} secret(s)</span>
+            </div>
+            <div className="flex flex-nowrap gap-2">
+              <input
+                type="password"
+                autoComplete="new-password"
+                className="input flex-1"
+                placeholder={secretsStatus.configured ? 'Master password to unlock' : 'Set master password'}
+                value={vaultPassword}
+                onChange={(event) => setVaultPassword(event.target.value)}
+              />
+              <button
+                type="button"
+                className="btn-primary whitespace-nowrap disabled:cursor-not-allowed disabled:opacity-60"
+                onClick={() => void handleUnlockVault()}
+                disabled={isSecretsBusy || !vaultPassword.trim()}
+              >
+                {secretsStatus.configured ? 'Unlock' : 'Create Vault'}
+              </button>
+              <button
+                type="button"
+                className="btn-ghost whitespace-nowrap disabled:cursor-not-allowed disabled:opacity-60"
+                onClick={() => void handleLockVault()}
+                disabled={isSecretsBusy || !secretsStatus.unlocked}
+              >
+                Lock
+              </button>
+            </div>
+            <div className="grid gap-2 rounded-xl border border-border bg-secondary/30 p-3">
+              <p className="text-xs font-medium text-card-foreground">Save Secret</p>
+              <input
+                type="text"
+                className="input"
+                placeholder="Secret key (e.g. login_password)"
+                value={secretName}
+                onChange={(event) => setSecretName(event.target.value)}
+                disabled={!secretsStatus.unlocked || isSecretsBusy}
+              />
+              <input
+                type="password"
+                autoComplete="new-password"
+                className="input"
+                placeholder="Secret value"
+                value={secretValue}
+                onChange={(event) => setSecretValue(event.target.value)}
+                disabled={!secretsStatus.unlocked || isSecretsBusy}
+              />
+              <button
+                type="button"
+                className="btn-primary disabled:cursor-not-allowed disabled:opacity-60"
+                onClick={() => void handleSaveSecret()}
+                disabled={!secretsStatus.unlocked || isSecretsBusy || !secretName.trim()}
+              >
+                Save Secret
+              </button>
+              <p className="text-xs text-muted-foreground">
+                Flow input example: <code>{'{{secret.'}{secretName.trim() || 'your_key'}{'}}'}</code>
+              </p>
+            </div>
+            {secretsStatus.names.length > 0 ? (
+              <div className="grid gap-2">
+                <p className="text-xs font-medium text-card-foreground">Saved Secret Keys</p>
+                {secretsStatus.names.map((name) => (
+                  <div key={name} className="flex items-center justify-between gap-2 rounded-lg border border-border px-2 py-1.5">
+                    <code className="truncate text-xs text-foreground">{name}</code>
+                    <button
+                      type="button"
+                      className="btn-ghost h-7 px-2 text-xs disabled:cursor-not-allowed disabled:opacity-60"
+                      onClick={() => void handleDeleteSecret(name)}
+                      disabled={!secretsStatus.unlocked || isSecretsBusy}
+                    >
+                      Delete
+                    </button>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <p className="text-xs text-muted-foreground">No secrets saved yet.</p>
+            )}
+            {secretsFeedback ? (
+              <p className={`text-xs ${secretsFeedback.type === 'error' ? 'text-red-600' : 'text-emerald-600'}`}>
+                {secretsFeedback.message}
+              </p>
+            ) : null}
+          </div>
         </div>
       </Card>
 

@@ -21,6 +21,7 @@ import {
 import { TabBridge } from '../runtime/tabBridge';
 import { parseDataSourceRows } from './dataSource';
 import { JsTransformExecutor } from './jsTransformExecutor';
+import { resolveSecretTokens } from '../../../shared/secrets';
 import {
   getRenderedStepFieldValue,
   getStepField,
@@ -559,7 +560,7 @@ export class FlowRunnerManager {
       return `Click selector "${truncateForLog(payload.selector || '')}".`;
     }
     if (stepType === 'input') {
-      return `Input "${truncateForLog(payload.value || '')}" into "${truncateForLog(payload.selector || '')}".`;
+      return `Input value into "${truncateForLog(payload.selector || '')}".`;
     }
     if (stepType === 'wait') {
       if (payload.mode === 'time') {
@@ -597,8 +598,7 @@ export class FlowRunnerManager {
     }
     if (stepType === 'input') {
       const fieldName = details?.fieldName ? truncateForLog(details.fieldName) : truncateForLog(payload.selector || '');
-      const inputValue = truncateForLog(details?.inputValue ?? payload.value ?? '');
-      return `Input value "${inputValue}" into ${fieldName}.`;
+      return `Input completed into ${fieldName}.`;
     }
     if (stepType === 'wait') {
       if (payload.mode === 'time') {
@@ -938,21 +938,28 @@ export class FlowRunnerManager {
 
   private async resolveStepFieldValue(step: FlowStepData, fieldId: string, row?: FlowRowContext) {
     const renderedValue = getRenderedStepFieldValue(step, fieldId, row);
+    let resolvedValue = renderedValue;
+    try {
+      resolvedValue = await resolveSecretTokens(renderedValue);
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      throw new RunnerError('secret-resolution-error', `Secret resolution failed for ${fieldId}: ${errorMessage}`);
+    }
     const field = getStepField(step, fieldId);
     if (!field?.transform || field.transform.mode !== 'js') {
-      return renderedValue;
+      return resolvedValue;
     }
     if (field.transform.enabled === false) {
-      return renderedValue;
+      return resolvedValue;
     }
     const code = field.transform.code.trim();
     if (!code) {
-      return renderedValue;
+      return resolvedValue;
     }
     try {
       return await this.jsTransformExecutor.run({
         code,
-        value: renderedValue,
+        value: resolvedValue,
         row,
         timeoutMs: field.transform.timeoutMs,
       });
