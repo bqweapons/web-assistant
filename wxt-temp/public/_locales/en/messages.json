@@ -1129,5 +1129,20 @@
   },
   "sidepanel_flow_runner_data_source_selection_cancelled": {
     "message": "Run cancelled because data source selection was cancelled."
+  },
+  "sidepanel_elements_no_active_page_readonly": {
+    "message": "Read-only mode without an active page."
+  },
+  "sidepanel_flows_load_error": {
+    "message": "Failed to load flows. Showing the last known list."
+  },
+  "sidepanel_hidden_load_error": {
+    "message": "Failed to load hidden rules. Showing the last known list."
+  },
+  "sidepanel_action_discard": {
+    "message": "Discard"
+  },
+  "sidepanel_action_delete": {
+    "message": "Delete"
   }
 }

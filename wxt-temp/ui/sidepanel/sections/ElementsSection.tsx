@@ -21,12 +21,13 @@ import {
 import Card from '../components/Card';
 import Drawer from '../components/Drawer';
 import FlowDrawer from '../components/FlowDrawer';
+import ConfirmDialog from '../components/ConfirmDialog';
 import FlowStepsBuilder from '../components/FlowStepsBuilder';
 import SelectMenu from '../components/SelectMenu';
 import { t, useLocale } from '../utils/i18n';
+import { formatLocalDateTime } from '../utils/dateTime';
 import {
   MessageType,
-  type MessageElementPayload,
   type PickerRect,
   type RuntimeMessage,
   type SelectorPickerAccept,
@@ -38,7 +39,6 @@ import {
 } from '../../../shared/siteDataSchema';
 import type { FlowStepData } from '../../../shared/flowStepMigration';
 import {
-  buildElementsRehydrateSignature,
   getElementActionFlowId,
   getElementFloating,
   getElementHref,
@@ -63,14 +63,13 @@ import {
 } from './elements/normalize';
 import { getInjectionErrorMessage, sendElementMessage as sendElementMessageShared } from './elements/useElementsMessaging';
 import { useElementsStore } from './elements/useElementsStore';
-
-let lastElementsRehydrateSignature = '';
-let pendingElementsRehydrateSignature: string | null = null;
+import { getStepCount } from './flows/normalize';
 
 type ElementsSectionProps = {
   siteKey?: string;
   pageKey?: string;
   pageUrl?: string;
+  tabId?: number;
   hasActivePage?: boolean;
   isSyncing?: boolean;
   lastSyncedAt?: number;
@@ -89,6 +88,7 @@ export default function ElementsSection({
   siteKey,
   pageKey,
   pageUrl,
+  tabId,
   hasActivePage = false,
   isSyncing = false,
   lastSyncedAt,
@@ -99,11 +99,19 @@ export default function ElementsSection({
 }: ElementsSectionProps) {
   const locale = useLocale();
   const normalizedSiteKey = useMemo(() => normalizeSiteKey(siteKey || ''), [siteKey]);
-  const { elements, setElements, flows, setFlows, siteDataReady } = useElementsStore(normalizedSiteKey);
+  const {
+    elements,
+    setElements,
+    flows,
+    setFlows,
+    status: siteDataStatus,
+    loadError,
+  } = useElementsStore(normalizedSiteKey);
   const actionClass = 'btn-icon h-8 w-8';
   const selectButtonClass = 'btn-ghost h-9 w-full justify-between px-2 text-xs';
   const [activeElementId, setActiveElementId] = useState<string | null>(null);
   const [draftElementId, setDraftElementId] = useState<string | null>(null);
+  const [pendingDeleteElementId, setPendingDeleteElementId] = useState<string | null>(null);
   const [addElementType, setAddElementType] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
   const [typeFilter, setTypeFilter] = useState('all');
@@ -126,6 +134,9 @@ export default function ElementsSection({
     return firstSiteElementContext?.siteUrl || 'site';
   }, [firstSiteElementContext?.siteUrl, normalizedSiteKey]);
   const activeElement = siteElements.find((element) => element.id === activeElementId) ?? null;
+  const pendingDeleteElement = pendingDeleteElementId
+    ? siteElements.find((item) => item.id === pendingDeleteElementId) ?? null
+    : null;
   const [editElement, setEditElement] = useState<StoredElementRecord | null>(activeElement);
   const [flowDrawerOpen, setFlowDrawerOpen] = useState(false);
   const [draftFlow, setDraftFlow] = useState({
@@ -138,6 +149,8 @@ export default function ElementsSection({
     setDraftElementId(null);
     setSearchQuery('');
     setTypeFilter('all');
+    setPendingDeleteElementId(null);
+    setInjectionError('');
   }, [normalizedSiteKey]);
 
   const typeOptions = useMemo(() => {
@@ -175,66 +188,29 @@ export default function ElementsSection({
   const filteredCount = filteredElements.length;
   const showClear = Boolean(searchQuery) || typeFilter !== 'all';
   const creationDisabled = !hasActivePage || !normalizedSiteKey;
+  const readOnlyReason = t(
+    'sidepanel_elements_no_active_page_readonly',
+    'Read-only mode without an active page.',
+  );
   const [injectionError, setInjectionError] = useState('');
   const previewTimerRef = useRef<number | null>(null);
   const suppressPreviewElementIdRef = useRef<string | null>(null);
+  const elementsWriteQueueRef = useRef<Promise<void>>(Promise.resolve());
+  const latestElementsRef = useRef<StoredElementRecord[]>(elements);
+  const latestFlowsRef = useRef(flows);
+  const latestDraftElementIdRef = useRef<string | null>(draftElementId);
+  const elementTargetTabId = hasActivePage && typeof tabId === 'number' ? tabId : undefined;
   const sendElementMessage = useCallback(
     async (type: MessageType, payload?: Record<string, unknown>) => {
       try {
-        await sendElementMessageShared(type, payload);
+        await sendElementMessageShared(type, payload, { targetTabId: elementTargetTabId });
       } catch (error) {
         console.warn('Failed to send element message', type, error);
         throw error;
       }
     },
-    [],
+    [elementTargetTabId],
   );
-
-  const syncElementsToContent = useCallback(() => {
-    if (!hasActivePage || !normalizedSiteKey) {
-      lastElementsRehydrateSignature = '';
-      pendingElementsRehydrateSignature = null;
-      return;
-    }
-    if (!siteDataReady) {
-      return;
-    }
-    const currentPageKey = normalizePageKey(pageUrl || pageKey, normalizedSiteKey);
-    const payload: MessageElementPayload[] = siteElements
-      .filter((element) => {
-        if (element.scope !== 'page') {
-          return true;
-        }
-        if (!element.context.pageKey) {
-          return true;
-        }
-        return normalizePageKey(element.context.pageKey, normalizedSiteKey) === currentPageKey;
-      })
-      .map((element) => toMessageElementPayload(element));
-    const signature = buildElementsRehydrateSignature(normalizedSiteKey, currentPageKey, payload);
-    if (
-      signature === lastElementsRehydrateSignature ||
-      signature === pendingElementsRehydrateSignature
-    ) {
-      return;
-    }
-    pendingElementsRehydrateSignature = signature;
-    sendElementMessage(MessageType.REHYDRATE_ELEMENTS, { elements: payload })
-      .then(() => {
-        if (pendingElementsRehydrateSignature === signature) {
-          pendingElementsRehydrateSignature = null;
-        }
-        lastElementsRehydrateSignature = signature;
-        setInjectionError('');
-      })
-      .catch((error) => {
-        if (pendingElementsRehydrateSignature === signature) {
-          pendingElementsRehydrateSignature = null;
-        }
-        const message = error instanceof Error ? error.message : String(error);
-        setInjectionError(message);
-      });
-  }, [hasActivePage, normalizedSiteKey, pageUrl, pageKey, sendElementMessage, siteElements, siteDataReady]);
 
   const persistSiteData = useCallback(
     async (nextElements: StoredElementRecord[], nextFlows: typeof flows) => {
@@ -247,6 +223,74 @@ export default function ElementsSection({
       });
     },
     [normalizedSiteKey],
+  );
+
+  const handlePersistFailure = useCallback((error: unknown) => {
+    console.warn('elements-persist-failed', error);
+    const message = error instanceof Error ? error.message : String(error);
+    setInjectionError(message);
+  }, []);
+
+  useEffect(() => {
+    latestElementsRef.current = elements;
+  }, [elements]);
+
+  useEffect(() => {
+    latestFlowsRef.current = flows;
+  }, [flows]);
+
+  useEffect(() => {
+    latestDraftElementIdRef.current = draftElementId;
+  }, [draftElementId]);
+
+  type ElementsWriteContext = {
+    elements: StoredElementRecord[];
+    flows: typeof flows;
+  };
+
+  type ElementsWriteResult<T> = {
+    elements: StoredElementRecord[];
+    flows: typeof flows;
+    result?: T;
+    skipPersist?: boolean;
+  };
+
+  const runElementsWrite = useCallback(
+    async <T,>(
+      opName: string,
+      mutate: (
+        context: ElementsWriteContext,
+      ) => Promise<ElementsWriteResult<T> | null> | ElementsWriteResult<T> | null,
+    ): Promise<T | undefined> => {
+      const task = elementsWriteQueueRef.current.then(async () => {
+        const baseElements = latestElementsRef.current;
+        const baseFlows = latestFlowsRef.current;
+        const next = await mutate({ elements: baseElements, flows: baseFlows });
+        if (!next) {
+          return undefined;
+        }
+        if (!next.skipPersist) {
+          await persistSiteData(next.elements, next.flows);
+        }
+        latestElementsRef.current = next.elements;
+        latestFlowsRef.current = next.flows;
+        setElements(() => next.elements);
+        setFlows(() => next.flows);
+        return next.result;
+      });
+      elementsWriteQueueRef.current = task.then(
+        () => undefined,
+        () => undefined,
+      );
+      try {
+        return await task;
+      } catch (error) {
+        console.warn('elements-write-failed', opName, error);
+        handlePersistFailure(error);
+        throw error;
+      }
+    },
+    [handlePersistFailure, persistSiteData, setElements, setFlows],
   );
 
   useEffect(() => {
@@ -265,28 +309,46 @@ export default function ElementsSection({
       if (resolveElementContext(normalized, normalizedSiteKey).siteKey !== normalizedSiteKey) {
         return;
       }
-      setElements((prev) => {
-        const index = prev.findIndex((item) => item.id === normalized.id);
+      const shouldPersist = normalized.id !== latestDraftElementIdRef.current;
+      if (!shouldPersist) {
+        setElements((prev) => {
+          const index = prev.findIndex((item) => item.id === normalized.id);
+          if (index === -1) {
+            return prev;
+          }
+          const next = prev.slice();
+          next[index] = normalized;
+          latestElementsRef.current = next;
+          return next;
+        });
+        setEditElement((prev) => (prev?.id === normalized.id ? normalized : prev));
+        setInjectionError('');
+        return;
+      }
+      void runElementsWrite('draft-update', ({ elements: baseElements, flows: baseFlows }) => {
+        const index = baseElements.findIndex((item) => item.id === normalized.id);
         if (index === -1) {
-          return prev;
+          return null;
         }
-        const next = prev.slice();
+        const next = baseElements.slice();
         next[index] = normalized;
-        if (normalized.id !== draftElementId) {
-          persistSiteData(next, flows).catch(() => undefined);
-        }
-        return next;
-      });
-      setEditElement((prev) => (prev?.id === normalized.id ? normalized : prev));
-      setInjectionError('');
+        return { elements: next, flows: baseFlows };
+      })
+        .then(() => {
+          setEditElement((prev) => (prev?.id === normalized.id ? normalized : prev));
+          setInjectionError('');
+        })
+        .catch(() => undefined);
     };
     runtime.onMessage.addListener(handleRuntimeMessage);
     return () => runtime.onMessage.removeListener(handleRuntimeMessage);
-  }, [draftElementId, flows, normalizedSiteKey, persistSiteData]);
+  }, [normalizedSiteKey, runElementsWrite, setElements]);
 
   useEffect(() => {
     if (!hasActivePage || !normalizedSiteKey) {
-      sendElementMessage(MessageType.SET_EDITING_ELEMENT, { id: undefined }).catch(() => undefined);
+      sendElementMessage(MessageType.SET_EDITING_ELEMENT, { id: undefined }).catch((error) =>
+        setInjectionError(error instanceof Error ? error.message : String(error)),
+      );
       return;
     }
     sendElementMessage(MessageType.SET_EDITING_ELEMENT, { id: activeElement?.id })
@@ -388,7 +450,7 @@ export default function ElementsSection({
         label: flow.name,
         rightLabel: t('sidepanel_steps_count', '{count} steps').replace(
           '{count}',
-          String(flow.steps.length),
+          String(getStepCount(flow.steps)),
         ),
       })),
     ],
@@ -445,20 +507,14 @@ export default function ElementsSection({
   ];
 
   const formatTimestamp = (value?: number) => {
-    if (!value) {
+    const formatted = formatLocalDateTime(value);
+    if (!formatted) {
       return t('sidepanel_label_unknown', 'Unknown');
     }
-    const date = new Date(value);
-    if (Number.isNaN(date.getTime())) {
-      return t('sidepanel_label_unknown', 'Unknown');
-    }
-    const pad = (segment: number) => String(segment).padStart(2, '0');
-    return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())} ${pad(
-      date.getHours(),
-    )}:${pad(date.getMinutes())}`;
+    return formatted;
   };
 
-  const handleCreateFlow = () => {
+  const handleCreateFlow = async () => {
     const name = draftFlow.name.trim() || t('sidepanel_flows_new_default', 'New flow');
     const description = draftFlow.description.trim();
     const flowSiteKey =
@@ -479,11 +535,14 @@ export default function ElementsSection({
       steps: draftFlow.steps,
       updatedAt: Date.now(),
     };
-    setFlows((prev) => {
-      const next = [...prev, nextFlow];
-      persistSiteData(elements, next).catch(() => undefined);
-      return next;
-    });
+    try {
+      await runElementsWrite('create-flow', ({ elements: baseElements, flows: baseFlows }) => ({
+        elements: baseElements,
+        flows: [...baseFlows, nextFlow],
+      }));
+    } catch (error) {
+      return;
+    }
     setEditElement((prev) =>
       prev
         ? {
@@ -499,7 +558,7 @@ export default function ElementsSection({
     setFlowDrawerOpen(false);
   };
 
-  const getFlowStepCount = (value: FlowStepData[]) => value.length;
+  const getFlowStepCount = (value: FlowStepData[]) => getStepCount(value);
 
   const renderFlowSummary = (steps: number, onSave: () => void) => (
     <>
@@ -510,7 +569,13 @@ export default function ElementsSection({
         {t('sidepanel_steps_count', '{count} steps').replace('{count}', String(steps))}
       </p>
       <div className="flex flex-wrap items-center gap-2">
-        <button type="button" className="btn-primary text-xs" onClick={onSave}>
+        <button
+          type="button"
+          className="btn-primary text-xs"
+          onClick={onSave}
+          disabled={!hasActivePage}
+          title={!hasActivePage ? readOnlyReason : undefined}
+        >
           {t('sidepanel_action_save', 'Save')}
         </button>
         <button type="button" className="btn-primary text-xs" disabled>
@@ -1048,6 +1113,7 @@ export default function ElementsSection({
     pageKey ||
     firstSiteElementContext?.pageKey ||
     (defaultSiteKey ? `${defaultSiteKey}/` : null);
+  const currentPageScopedKey = normalizePageKey(pageUrl || pageKey, defaultSiteKey);
   const defaultPageUrl =
     pageUrl ||
     resolveStructuredPageUrl(defaultSiteKey, defaultPageKey, 'page') ||
@@ -1116,14 +1182,18 @@ export default function ElementsSection({
         createdAt: now,
         updatedAt: now,
       };
-      setElements((prev) => {
-        const next = [newArea, ...prev];
-        return next;
-      });
+      try {
+        await runElementsWrite('create-area', ({ elements: baseElements, flows: baseFlows }) => ({
+          elements: [newArea, ...baseElements],
+          flows: baseFlows,
+        }));
+      } catch (error) {
+        setAddElementType('');
+        return;
+      }
       sendElementMessage(MessageType.CREATE_ELEMENT, { element: toMessageElementPayload(newArea) })
         .then(() => {
           setInjectionError('');
-          syncElementsToContent();
         })
         .catch((error) => {
           const message = error instanceof Error ? error.message : String(error);
@@ -1235,14 +1305,18 @@ export default function ElementsSection({
       createdAt: now,
       updatedAt: now,
     };
-    setElements((prev) => {
-      const next = [newElement, ...prev];
-      return next;
-    });
+    try {
+      await runElementsWrite('create-element', ({ elements: baseElements, flows: baseFlows }) => ({
+        elements: [newElement, ...baseElements],
+        flows: baseFlows,
+      }));
+    } catch (error) {
+      setAddElementType('');
+      return;
+    }
     sendElementMessage(MessageType.CREATE_ELEMENT, { element: toMessageElementPayload(newElement) })
       .then(() => {
         setInjectionError('');
-        syncElementsToContent();
       })
       .catch((error) => {
         const message = error instanceof Error ? error.message : String(error);
@@ -1260,22 +1334,21 @@ export default function ElementsSection({
     );
   };
 
-  const handleElementSave = () => {
+  const handleElementSave = async () => {
     if (!editElement) {
       return;
     }
     const normalizedScope = normalizeElementScope(editElement.scope);
     const normalizedElementSiteKey =
       deriveSiteKey(editElement.context.siteKey || '') || normalizedSiteKey;
-    const fallbackPageKey =
-      normalizePageKey(pageUrl || pageKey, normalizedElementSiteKey) ||
-      (normalizedElementSiteKey ? `${normalizedElementSiteKey}/` : '');
+    const normalizedExistingPageKey = normalizePageKey(
+      editElement.context.pageKey || '',
+      normalizedElementSiteKey,
+    );
+    const normalizedActivePageKey = normalizePageKey(pageUrl || pageKey, normalizedElementSiteKey);
     const normalizedPageKey =
       normalizedScope === 'page'
-        ? normalizePageKey(
-            editElement.context.pageKey || fallbackPageKey,
-            normalizedElementSiteKey,
-          ) || fallbackPageKey
+        ? normalizedExistingPageKey || normalizedActivePageKey || editElement.context.pageKey || null
         : null;
     const savedElement: StoredElementRecord = {
       ...editElement,
@@ -1287,15 +1360,17 @@ export default function ElementsSection({
       },
       updatedAt: Date.now(),
     };
-    setElements((prev) => {
-      const next = prev.map((item) => (item.id === editElement.id ? savedElement : item));
-      persistSiteData(next, flows).catch(() => undefined);
-      return next;
-    });
+    try {
+      await runElementsWrite('save-element', ({ elements: baseElements, flows: baseFlows }) => ({
+        elements: baseElements.map((item) => (item.id === editElement.id ? savedElement : item)),
+        flows: baseFlows,
+      }));
+    } catch (error) {
+      return;
+    }
     sendElementMessage(MessageType.UPDATE_ELEMENT, { element: toMessageElementPayload(savedElement) })
       .then(() => {
         setInjectionError('');
-        syncElementsToContent();
       })
       .catch((error) => {
         const message = error instanceof Error ? error.message : String(error);
@@ -1307,30 +1382,30 @@ export default function ElementsSection({
 
   const handleDeleteElement = (event: React.MouseEvent, id: string) => {
     event.stopPropagation();
-    const targetElement = siteElements.find((item) => item.id === id) || null;
-    const targetLabel = targetElement ? getElementLabel(targetElement) : t('sidepanel_elements_delete', 'Delete element');
-    const confirmMessage = t(
-      'sidepanel_elements_delete_confirm',
-      'Delete "{name}"? This action cannot be undone.',
-    ).replace('{name}', targetLabel);
-    if (!window.confirm(confirmMessage)) {
+    if (!hasActivePage) {
       return;
     }
+    setPendingDeleteElementId(id);
+  };
+
+  const performDeleteElement = async (id: string) => {
     if (activeElementId === id) {
       setActiveElementId(null);
     }
     if (draftElementId === id) {
       setDraftElementId(null);
     }
-    setElements((prev) => {
-      const next = prev.filter((item) => item.id !== id);
-      persistSiteData(next, flows).catch(() => undefined);
-      return next;
-    });
+    try {
+      await runElementsWrite('delete-element', ({ elements: baseElements, flows: baseFlows }) => ({
+        elements: baseElements.filter((item) => item.id !== id),
+        flows: baseFlows,
+      }));
+    } catch (error) {
+      return;
+    }
     sendElementMessage(MessageType.DELETE_ELEMENT, { id })
       .then(() => {
         setInjectionError('');
-        syncElementsToContent();
       })
       .catch((error) => {
         const message = error instanceof Error ? error.message : String(error);
@@ -1393,7 +1468,7 @@ export default function ElementsSection({
     setInjectionError('');
   };
 
-  const closeDetails = useCallback(() => {
+  const closeDetails = useCallback(async () => {
     setInjectionError('');
     const closingId = activeElementId;
     const isDraft = Boolean(closingId && draftElementId && closingId === draftElementId);
@@ -1406,33 +1481,31 @@ export default function ElementsSection({
     }
     setEditElement(null);
     if (closingId && isDraft) {
-      setElements((prev) => {
-        const next = prev.filter((item) => item.id !== closingId);
-        persistSiteData(next, flows).catch(() => undefined);
-        return next;
-      });
+      try {
+        await runElementsWrite('close-draft-delete', ({ elements: baseElements, flows: baseFlows }) => ({
+          elements: baseElements.filter((item) => item.id !== closingId),
+          flows: baseFlows,
+        }));
+      } catch (error) {
+        return;
+      }
       sendElementMessage(MessageType.DELETE_ELEMENT, { id: closingId })
         .then(() => {
           setInjectionError('');
-          syncElementsToContent();
         })
         .catch((error) => {
           const message = error instanceof Error ? error.message : String(error);
           setInjectionError(message);
         });
       setDraftElementId(null);
-    } else {
-      syncElementsToContent();
     }
     setActiveElementId(null);
   }, [
     activeElementId,
     draftElementId,
-    flows,
-    persistSiteData,
     previewTimerRef,
+    runElementsWrite,
     sendElementMessage,
-    syncElementsToContent,
   ]);
 
   useEffect(() => {
@@ -1467,7 +1540,7 @@ export default function ElementsSection({
     <Card
       key={element.id}
       className="p-4"
-      onClick={() => handleSelectElement(element.id)}
+      onClick={hasActivePage ? () => handleSelectElement(element.id) : undefined}
     >
       <div className="flex items-start justify-between gap-2">
         <div className="flex min-w-0 flex-1 items-center gap-2">
@@ -1481,7 +1554,9 @@ export default function ElementsSection({
             type="button"
             className={actionClass}
             aria-label={t('sidepanel_elements_locate', 'Locate element')}
+            title={hasActivePage ? t('sidepanel_elements_locate', 'Locate element') : readOnlyReason}
             onClick={(event) => handleFocusElement(event, element.id)}
+            disabled={!hasActivePage}
           >
             <Crosshair className="h-4 w-4" />
           </button>
@@ -1489,7 +1564,9 @@ export default function ElementsSection({
             type="button"
             className={`${actionClass} btn-icon-danger`}
             aria-label={t('sidepanel_elements_delete', 'Delete element')}
+            title={hasActivePage ? t('sidepanel_elements_delete', 'Delete element') : readOnlyReason}
             onClick={(event) => handleDeleteElement(event, element.id)}
+            disabled={!hasActivePage}
           >
             <Trash2 className="h-4 w-4" />
           </button>
@@ -1509,6 +1586,13 @@ export default function ElementsSection({
       {injectionError ? (
         <div className="rounded border border-destructive/50 bg-destructive/10 px-3 py-2 text-xs text-destructive">
           {getInjectionErrorMessage(injectionError)}
+        </div>
+      ) : null}
+      {siteDataStatus === 'error' ? (
+        <div className="rounded border border-destructive/50 bg-destructive/10 px-3 py-2 text-xs text-destructive">
+          {loadError
+            ? `${t('sidepanel_elements_load_error', 'Failed to load elements. Please try refreshing.')}: ${loadError}`
+            : t('sidepanel_elements_load_error', 'Failed to load elements. Please try refreshing.')}
         </div>
       ) : null}
       <SelectMenu
@@ -1559,7 +1643,6 @@ export default function ElementsSection({
             placeholder={t('sidepanel_elements_search_placeholder', 'Search by name, type, or page')}
             value={searchQuery}
             onChange={(event) => setSearchQuery(event.target.value)}
-            disabled={creationDisabled}
           />
         </div>
         <div className="flex items-center gap-2">
@@ -1567,7 +1650,6 @@ export default function ElementsSection({
             className="input select w-full sm:w-40"
             value={typeFilter}
             onChange={(event) => setTypeFilter(event.target.value)}
-            disabled={creationDisabled}
           >
             {typeOptions.map((type) => (
               <option key={type} value={type}>
@@ -1599,7 +1681,9 @@ export default function ElementsSection({
             'No active page detected. Open a site tab and refresh to manage elements.',
           )}
         </Card>
-      ) : siteElements.length === 0 ? (
+      ) : null}
+
+      {siteElements.length === 0 ? (
         <Card className="bg-muted text-center text-sm text-muted-foreground">
           {t('sidepanel_elements_empty_site', 'No elements for this site yet. Add one to get started.')}
         </Card>
@@ -1707,25 +1791,32 @@ export default function ElementsSection({
             <button
               type="button"
               className="btn-icon h-8 w-8"
-              onClick={closeDetails}
+              onClick={() => {
+                void closeDetails();
+              }}
               aria-label={t('sidepanel_action_cancel', 'Cancel')}
               title={t('sidepanel_action_cancel', 'Cancel')}
             >
               <X className="h-4 w-4" />
             </button>
-            <button
-              type="button"
+      <button
+        type="button"
         className="btn-icon h-8 w-8 border-transparent bg-primary text-primary-foreground hover:brightness-95"
-        onClick={handleElementSave}
+        onClick={() => {
+          void handleElementSave();
+        }}
+        disabled={!hasActivePage}
         aria-label={t('sidepanel_action_save', 'Save')}
-        title={t('sidepanel_action_save', 'Save')}
+        title={hasActivePage ? t('sidepanel_action_save', 'Save') : readOnlyReason}
       >
         <Check className="h-4 w-4" />
       </button>
     </>
   }
   showClose={false}
-  onClose={closeDetails}
+        onClose={() => {
+          void closeDetails();
+        }}
 >
         {editElement ? (
           <div className="grid gap-3 text-xs text-muted-foreground">
@@ -1762,7 +1853,7 @@ export default function ElementsSection({
                         ...editElement.context,
                         pageKey: event.target.checked
                           ? null
-                          : editElement.context.pageKey || defaultPageKey,
+                          : editElement.context.pageKey || currentPageScopedKey || defaultPageKey,
                       },
                       updatedAt: Date.now(),
                     })
@@ -2178,7 +2269,9 @@ export default function ElementsSection({
         title={t('sidepanel_flows_new_title', 'New flow')}
         subtitle={t('sidepanel_flows_new_subtitle', 'Create a new action flow.')}
         onClose={() => setFlowDrawerOpen(false)}
-        summary={renderFlowSummary(getFlowStepCount(draftFlow.steps), handleCreateFlow)}
+        summary={renderFlowSummary(getFlowStepCount(draftFlow.steps), () => {
+          void handleCreateFlow();
+        })}
         overlayClassName="z-[70]"
         panelClassName="z-[80]"
       >
@@ -2209,6 +2302,28 @@ export default function ElementsSection({
           />
         </div>
       </FlowDrawer>
+      <ConfirmDialog
+        open={Boolean(pendingDeleteElementId)}
+        title={t('sidepanel_elements_delete', 'Delete element')}
+        message={t('sidepanel_elements_delete_confirm', 'Delete "{name}"? This action cannot be undone.').replace(
+          '{name}',
+          pendingDeleteElement
+            ? getElementLabel(pendingDeleteElement)
+            : t('sidepanel_elements_delete', 'Delete element'),
+        )}
+        confirmLabel={t('sidepanel_action_delete', 'Delete')}
+        cancelLabel={t('sidepanel_action_cancel', 'Cancel')}
+        danger
+        onCancel={() => setPendingDeleteElementId(null)}
+        onConfirm={() => {
+          const targetId = pendingDeleteElementId;
+          setPendingDeleteElementId(null);
+          if (!targetId) {
+            return;
+          }
+          void performDeleteElement(targetId);
+        }}
+      />
     </div>
   );
 }

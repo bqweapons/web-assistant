@@ -20,12 +20,12 @@ const toStructuredElementPayload = (value: unknown): StructuredElementRecord | n
   return isStructuredElementRecord(value) ? value : null;
 };
 
-const rehydratePersistedElements = async () => {
+const rehydratePersistedElements = async (hrefSnapshot: string) => {
   if (window.top !== window) {
     return;
   }
-  const siteKey = deriveSiteKeyFromUrl(window.location.href);
-  const pageKey = derivePageKeyFromUrl(window.location.href);
+  const siteKey = deriveSiteKeyFromUrl(hrefSnapshot);
+  const pageKey = derivePageKeyFromUrl(hrefSnapshot);
   if (!siteKey) {
     return;
   }
@@ -42,7 +42,7 @@ const rehydratePersistedElements = async () => {
             if (!item.context.pageKey) {
               return true;
             }
-            return normalizeStoredPageKey(item.context.pageKey, window.location.href) === pageKey;
+            return normalizeStoredPageKey(item.context.pageKey, hrefSnapshot) === pageKey;
           })
       : [];
     handleInjectionMessage({
@@ -126,21 +126,64 @@ export default defineContentScript({
       return;
     }
     markerHost[CONTENT_RUNTIME_READY_KEY] = true;
-    const rehydrateFromStorage = () => {
-      rehydratePersistedElements().catch(() => undefined);
-      rehydratePersistedHiddenRules().catch(() => undefined);
+    let rehydrateRequestedToken = 0;
+    let rehydrateAppliedToken = 0;
+    let rehydrateInProgress = false;
+
+    const applyLatestRehydrate = async (reason: string) => {
+      if (rehydrateInProgress) {
+        return;
+      }
+      rehydrateInProgress = true;
+      try {
+        while (rehydrateAppliedToken < rehydrateRequestedToken) {
+          const token = rehydrateRequestedToken;
+          const hrefSnapshot = window.location.href;
+          try {
+            await rehydratePersistedElements(hrefSnapshot);
+            await rehydratePersistedHiddenRules();
+          } catch (error) {
+            console.warn('Failed to rehydrate persisted state', error);
+            rehydrateAppliedToken = token;
+            continue;
+          }
+          const isLatest = token === rehydrateRequestedToken && hrefSnapshot === window.location.href;
+          if (!isLatest) {
+            console.info('elements-rehydrate-stale-discarded', {
+              reason,
+              token,
+              latestToken: rehydrateRequestedToken,
+              hrefSnapshot,
+              currentHref: window.location.href,
+            });
+            continue;
+          }
+          rehydrateAppliedToken = token;
+        }
+      } finally {
+        rehydrateInProgress = false;
+        if (rehydrateAppliedToken < rehydrateRequestedToken) {
+          void applyLatestRehydrate('post-loop');
+        }
+      }
     };
+
+    const requestRehydrate = (reason: string) => {
+      rehydrateRequestedToken += 1;
+      void applyLatestRehydrate(reason);
+    };
+
     const stopWatcher = startPageContextWatcher(runtime, () => {
-      rehydrateFromStorage();
+      requestRehydrate('url-change');
     });
     registerPageContextIfNeeded(runtime);
-    rehydrateFromStorage();
+    requestRehydrate('init');
     const storageApi = chrome?.storage?.onChanged;
     const handleStorageChange = (changes: Record<string, unknown>, areaName: string) => {
       if (areaName !== 'local' || !changes[STORAGE_KEY]) {
         return;
       }
-      rehydrateFromStorage();
+      requestRehydrate('storage-change');
     };
     storageApi?.addListener(handleStorageChange);
     runtime.onMessage.addListener((rawMessage, _sender, sendResponse) => {

@@ -10,16 +10,19 @@ import {
 export const useElementsStore = (normalizedSiteKey: string) => {
   const [elements, setElements] = useState<StoredElementRecord[]>([]);
   const [flows, setFlows] = useState<FlowRecord[]>([]);
-  const [siteDataReady, setSiteDataReady] = useState(false);
+  const [status, setStatus] = useState<'loading' | 'ready' | 'error'>('loading');
+  const [loadError, setLoadError] = useState('');
 
   useEffect(() => {
     if (!normalizedSiteKey) {
       setElements([]);
       setFlows([]);
-      setSiteDataReady(false);
+      setStatus('ready');
+      setLoadError('');
       return;
     }
-    setSiteDataReady(false);
+    setStatus('loading');
+    setLoadError('');
     getSiteData(normalizedSiteKey)
       .then((data) => {
         const normalizedElements =
@@ -31,12 +34,12 @@ export const useElementsStore = (normalizedSiteKey: string) => {
           .filter((item): item is FlowRecord => Boolean(item));
         setElements(normalizedElements);
         setFlows(normalizedFlows);
-        setSiteDataReady(true);
+        setStatus('ready');
       })
-      .catch(() => {
-        setElements([]);
-        setFlows([]);
-        setSiteDataReady(true);
+      .catch((error) => {
+        console.warn('site-load-failed', error);
+        setStatus('error');
+        setLoadError(error instanceof Error ? error.message : String(error));
       });
   }, [normalizedSiteKey]);
 
@@ -45,6 +48,8 @@ export const useElementsStore = (normalizedSiteKey: string) => {
     setElements,
     flows,
     setFlows,
-    siteDataReady,
+    siteDataReady: status === 'ready',
+    status,
+    loadError,
   };
 };

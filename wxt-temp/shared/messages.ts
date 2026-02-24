@@ -193,24 +193,24 @@ export type FlowRunExecuteResultPayload = {
 };
 
 export type RuntimeMessage =
-  | { type: typeof MessageType.START_PICKER; data?: PickerStartPayload; forwarded?: boolean }
-  | { type: typeof MessageType.CANCEL_PICKER; data?: undefined; forwarded?: boolean }
-  | { type: typeof MessageType.PICKER_RESULT; data: PickerResultPayload; forwarded?: boolean }
-  | { type: typeof MessageType.PICKER_CANCELLED; data?: PickerCancelledPayload; forwarded?: boolean }
-  | { type: typeof MessageType.PICKER_INVALID; data?: PickerInvalidPayload; forwarded?: boolean }
-  | { type: typeof MessageType.GET_ACTIVE_PAGE_CONTEXT; data?: undefined; forwarded?: boolean }
-  | { type: typeof MessageType.ACTIVE_PAGE_CONTEXT; data: PageContextPayload; forwarded?: boolean }
-  | { type: typeof MessageType.PAGE_CONTEXT_PING; data?: PageContextPingPayload; forwarded?: boolean }
-  | { type: typeof MessageType.CREATE_ELEMENT; data: { element: MessageElementPayload }; forwarded?: boolean }
-  | { type: typeof MessageType.UPDATE_ELEMENT; data: { element: MessageElementPayload }; forwarded?: boolean }
-  | { type: typeof MessageType.DELETE_ELEMENT; data: { id: string }; forwarded?: boolean }
-  | { type: typeof MessageType.PREVIEW_ELEMENT; data: { element: MessageElementPayload }; forwarded?: boolean }
-  | { type: typeof MessageType.FOCUS_ELEMENT; data: { id: string }; forwarded?: boolean }
-  | { type: typeof MessageType.SET_EDITING_ELEMENT; data: { id?: string }; forwarded?: boolean }
-  | { type: typeof MessageType.ELEMENT_DRAFT_UPDATED; data: { element: MessageElementPayload }; forwarded?: boolean }
-  | { type: typeof MessageType.REHYDRATE_ELEMENTS; data: { elements: MessageElementPayload[] }; forwarded?: boolean }
-  | { type: typeof MessageType.START_FLOW_RUN; data: FlowRunStartPayload; forwarded?: boolean }
-  | { type: typeof MessageType.STOP_FLOW_RUN; data: FlowRunStopPayload; forwarded?: boolean }
-  | { type: typeof MessageType.FLOW_RUN_STATUS; data: FlowRunStatusPayload; forwarded?: boolean }
-  | { type: typeof MessageType.FLOW_RUN_EXECUTE_STEP; data: FlowRunExecuteStepPayload; forwarded?: boolean }
-  | { type: typeof MessageType.FLOW_RUN_STEP_RESULT; data: FlowRunExecuteResultPayload; forwarded?: boolean };
+  | { type: typeof MessageType.START_PICKER; data?: PickerStartPayload; forwarded?: boolean; targetTabId?: number }
+  | { type: typeof MessageType.CANCEL_PICKER; data?: undefined; forwarded?: boolean; targetTabId?: number }
+  | { type: typeof MessageType.PICKER_RESULT; data: PickerResultPayload; forwarded?: boolean; targetTabId?: number }
+  | { type: typeof MessageType.PICKER_CANCELLED; data?: PickerCancelledPayload; forwarded?: boolean; targetTabId?: number }
+  | { type: typeof MessageType.PICKER_INVALID; data?: PickerInvalidPayload; forwarded?: boolean; targetTabId?: number }
+  | { type: typeof MessageType.GET_ACTIVE_PAGE_CONTEXT; data?: undefined; forwarded?: boolean; targetTabId?: number }
+  | { type: typeof MessageType.ACTIVE_PAGE_CONTEXT; data: PageContextPayload; forwarded?: boolean; targetTabId?: number }
+  | { type: typeof MessageType.PAGE_CONTEXT_PING; data?: PageContextPingPayload; forwarded?: boolean; targetTabId?: number }
+  | { type: typeof MessageType.CREATE_ELEMENT; data: { element: MessageElementPayload }; forwarded?: boolean; targetTabId?: number }
+  | { type: typeof MessageType.UPDATE_ELEMENT; data: { element: MessageElementPayload }; forwarded?: boolean; targetTabId?: number }
+  | { type: typeof MessageType.DELETE_ELEMENT; data: { id: string }; forwarded?: boolean; targetTabId?: number }
+  | { type: typeof MessageType.PREVIEW_ELEMENT; data: { element: MessageElementPayload }; forwarded?: boolean; targetTabId?: number }
+  | { type: typeof MessageType.FOCUS_ELEMENT; data: { id: string }; forwarded?: boolean; targetTabId?: number }
+  | { type: typeof MessageType.SET_EDITING_ELEMENT; data: { id?: string }; forwarded?: boolean; targetTabId?: number }
+  | { type: typeof MessageType.ELEMENT_DRAFT_UPDATED; data: { element: MessageElementPayload }; forwarded?: boolean; targetTabId?: number }
+  | { type: typeof MessageType.REHYDRATE_ELEMENTS; data: { elements: MessageElementPayload[] }; forwarded?: boolean; targetTabId?: number }
+  | { type: typeof MessageType.START_FLOW_RUN; data: FlowRunStartPayload; forwarded?: boolean; targetTabId?: number }
+  | { type: typeof MessageType.STOP_FLOW_RUN; data: FlowRunStopPayload; forwarded?: boolean; targetTabId?: number }
+  | { type: typeof MessageType.FLOW_RUN_STATUS; data: FlowRunStatusPayload; forwarded?: boolean; targetTabId?: number }
+  | { type: typeof MessageType.FLOW_RUN_EXECUTE_STEP; data: FlowRunExecuteStepPayload; forwarded?: boolean; targetTabId?: number }
+  | { type: typeof MessageType.FLOW_RUN_STEP_RESULT; data: FlowRunExecuteResultPayload; forwarded?: boolean; targetTabId?: number };

@@ -176,6 +176,17 @@ export class TabBridge {
     return this.sendMessageToTabWithRetry(tabId, message, true);
   }
 
+  async forwardToTab(tabId: number, message: RuntimeMessage): Promise<TabMessageResponse> {
+    if (!tabId) {
+      return { ok: false, error: 'No target tab.' };
+    }
+    const tab = await this.getTabById(tabId);
+    if (!tab) {
+      return { ok: false, error: 'Target tab unavailable.' };
+    }
+    return this.sendMessageToTabWithRetry(tabId, message, true);
+  }
+
   waitForTabComplete(
     tabId: number,
     timeoutMs: number,

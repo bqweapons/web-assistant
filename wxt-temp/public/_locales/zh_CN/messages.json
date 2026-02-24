@@ -1065,57 +1065,84 @@
     "message": "无活动站点"
   },
   "sidepanel_hidden_delete_confirm": {
-    "message": "?????{name}??????????"
+    "message": "要删除规则“{name}”吗？此操作无法撤销。"
   },
   "sidepanel_hidden_dirty_close_confirm": {
-    "message": "?????????????????"
+    "message": "你有未保存的更改，确定放弃并关闭吗？"
   },
   "sidepanel_hidden_no_active_page": {
-    "message": "?????????????????????????"
+    "message": "未检测到活动页面。请打开站点标签页后再管理隐藏规则。"
   },
   "sidepanel_hidden_invalid_selector": {
-    "message": "????????"
+    "message": "选择器格式无效。"
   },
   "sidepanel_hidden_persist_error_save": {
-    "message": "???????????"
+    "message": "保存规则失败，请重试。"
   },
   "sidepanel_hidden_persist_error_delete": {
-    "message": "???????????"
+    "message": "删除规则失败，请重试。"
   },
   "sidepanel_hidden_filter_all": {
-    "message": "??"
+    "message": "全部"
   },
   "sidepanel_hidden_filter_enabled": {
-    "message": "???"
+    "message": "已启用"
   },
   "sidepanel_hidden_filter_paused": {
-    "message": "???"
+    "message": "已暂停"
   },
   "sidepanel_hidden_filter_auto": {
-    "message": "??"
+    "message": "自动"
   },
   "sidepanel_hidden_filter_manual": {
-    "message": "??"
+    "message": "手动"
   },
   "sidepanel_hidden_bulk_enable_all": {
-    "message": "????"
+    "message": "全部启用"
   },
   "sidepanel_hidden_bulk_pause_all": {
-    "message": "????"
+    "message": "全部暂停"
   },
   "sidepanel_hidden_auto_ads_on": {
-    "message": "????????"
+    "message": "启用自动隐藏广告"
   },
   "sidepanel_hidden_auto_ads_off": {
-    "message": "????????"
+    "message": "暂停自动隐藏广告"
   },
   "sidepanel_hidden_auto_rule_name": {
-    "message": "??????"
+    "message": "自动广告规则"
   },
   "sidepanel_hidden_auto_rule_note": {
-    "message": "????????????"
+    "message": "由“自动隐藏广告”生成。"
   },
   "sidepanel_hidden_auto_ads_enabled_toast": {
-    "message": "??????????"
+    "message": "已启用自动隐藏广告"
+  },
+  "sidepanel_step_summary_wait_appear": {
+    "message": "等待 {selector} 出现"
+  },
+  "sidepanel_step_summary_wait_disappear": {
+    "message": "等待 {selector} 消失"
+  },
+  "sidepanel_step_wait_mode_appear": {
+    "message": "元素出现"
+  },
+  "sidepanel_step_wait_mode_disappear": {
+    "message": "元素消失"
+  },
+  "sidepanel_elements_no_active_page_readonly": {
+    "message": "当前无活动页面，处于只读模式。"
+  },
+  "sidepanel_flows_load_error": {
+    "message": "加载流程失败，正在显示上一次列表。"
+  },
+  "sidepanel_hidden_load_error": {
+    "message": "加载隐藏规则失败，正在显示上一次列表。"
+  },
+  "sidepanel_action_discard": {
+    "message": "放弃更改"
+  },
+  "sidepanel_action_delete": {
+    "message": "删除"
   }
 }

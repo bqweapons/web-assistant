@@ -238,6 +238,11 @@ export const normalizeFlowRecord = (value: unknown, fallbackSiteKey: string): Fl
   if (!resolvedSiteKey) {
     return null;
   }
+  const normalizedSteps = normalizeFlowSteps(entry.steps, {
+    flowId: entry.id,
+    keepNumber: false,
+    sanitizeExisting: true,
+  });
   return {
     id: entry.id,
     name:
@@ -248,11 +253,7 @@ export const normalizeFlowRecord = (value: unknown, fallbackSiteKey: string): Fl
     scope: entry.scope === 'page' || entry.scope === 'global' ? entry.scope : 'site',
     siteKey: resolvedSiteKey,
     pageKey: typeof entry.pageKey === 'string' ? entry.pageKey : null,
-    steps: (normalizeFlowSteps(entry.steps, {
-      flowId: entry.id,
-      keepNumber: false,
-      sanitizeExisting: true,
-    }) as FlowStepData[]),
+    steps: Array.isArray(normalizedSteps) ? normalizedSteps : [],
     updatedAt: toFlowTimestamp(entry.updatedAt),
   };
 };

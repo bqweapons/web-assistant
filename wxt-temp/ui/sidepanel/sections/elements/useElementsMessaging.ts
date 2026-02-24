@@ -29,8 +29,16 @@ export const getInjectionErrorMessage = (code: string) => {
   );
 };
 
-export const sendElementMessage = async (type: MessageType, payload?: Record<string, unknown>) => {
-  const response = (await sendRuntimeMessage({ type, data: payload })) as {
+export const sendElementMessage = async (
+  type: MessageType,
+  payload?: Record<string, unknown>,
+  options?: { targetTabId?: number },
+) => {
+  const response = (await sendRuntimeMessage({
+    type,
+    data: payload,
+    targetTabId: options?.targetTabId,
+  })) as {
     ok?: boolean;
     error?: string;
   };

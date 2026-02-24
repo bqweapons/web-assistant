@@ -58,6 +58,29 @@ export const bootstrapBackground = () => {
   };
 
   const flowRunnerManager = new FlowRunnerManager({ runtime, tabBridge });
+  const isElementInjectionMessage = (type: RuntimeMessage['type']) =>
+    type === MessageType.CREATE_ELEMENT ||
+    type === MessageType.UPDATE_ELEMENT ||
+    type === MessageType.DELETE_ELEMENT ||
+    type === MessageType.PREVIEW_ELEMENT ||
+    type === MessageType.FOCUS_ELEMENT ||
+    type === MessageType.SET_EDITING_ELEMENT ||
+    type === MessageType.REHYDRATE_ELEMENTS;
+
+  const forwardElementMessage = async (message: RuntimeMessage) => {
+    const requestedTabId = typeof message.targetTabId === 'number' ? message.targetTabId : undefined;
+    if (requestedTabId) {
+      const targeted = await tabBridge.forwardToTab(requestedTabId, message);
+      if (targeted.ok) {
+        return targeted;
+      }
+      console.warn('elements-forward-tab-fallback', {
+        targetTabId: requestedTabId,
+        error: targeted.error || 'unknown-error',
+      });
+    }
+    return tabBridge.forwardToActiveTab(message);
+  };
 
   if (!runtime?.onMessage) {
     return;
@@ -91,6 +114,10 @@ export const bootstrapBackground = () => {
       case MessageType.FOCUS_ELEMENT:
       case MessageType.SET_EDITING_ELEMENT:
       case MessageType.REHYDRATE_ELEMENTS: {
+        if (isElementInjectionMessage(message.type)) {
+          void respondPromise(() => forwardElementMessage(message));
+          return true;
+        }
         void respondPromise(() => tabBridge.forwardToActiveTab(message));
         return true;
       }

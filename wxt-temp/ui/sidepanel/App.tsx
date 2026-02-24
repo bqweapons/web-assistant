@@ -291,6 +291,7 @@ export default function App() {
               siteKey={pageContext?.siteKey || ''}
               pageKey={pageContext?.pageKey || ''}
               pageUrl={pageContext?.url || ''}
+              tabId={pageContext?.tabId}
               hasActivePage={hasActivePage}
               isSyncing={contextLoading}
               lastSyncedAt={pageContext?.timestamp}

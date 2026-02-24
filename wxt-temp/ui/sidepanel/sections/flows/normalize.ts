@@ -1,7 +1,7 @@
 import type { FlowRunFlowSnapshot } from '../../../../shared/messages';
-import { normalizeFlowSteps } from '../../../../shared/flowStepMigration';
+import { normalizeFlowSteps, type FlowStepData } from '../../../../shared/flowStepMigration';
 import { deriveSiteKey, type StructuredFlowRecord } from '../../../../shared/siteDataSchema';
-import type { StepData as FlowStepData } from '../../components/FlowStepsBuilder';
+import { formatLocalDateTime } from '../../utils/dateTime';
 
 export type FlowRecord = StructuredFlowRecord & {
   scope: 'page' | 'site' | 'global';
@@ -33,29 +33,7 @@ const toTimestamp = (value: unknown) => {
 };
 
 export const formatTimestamp = (value: number) => {
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) {
-    return '';
-  }
-  try {
-    const formatted = date.toLocaleString(undefined, {
-      year: 'numeric',
-      month: '2-digit',
-      day: '2-digit',
-      hour: '2-digit',
-      minute: '2-digit',
-      hour12: false,
-    });
-    if (formatted) {
-      return formatted;
-    }
-  } catch {
-    // Fallback to a stable formatter below.
-  }
-  const pad = (segment: number) => String(segment).padStart(2, '0');
-  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())} ${pad(
-    date.getHours(),
-  )}:${pad(date.getMinutes())}`;
+  return formatLocalDateTime(value);
 };
 
 const countNestedSteps = (steps: FlowStepData[]): number =>
@@ -101,7 +79,7 @@ export const normalizeFlow = (
     scope: value.scope === 'page' || value.scope === 'global' ? value.scope : 'site',
     siteKey: resolvedSiteKey,
     pageKey: typeof value.pageKey === 'string' ? value.pageKey : null,
-    steps: Array.isArray(normalizedSteps) ? (normalizedSteps as FlowStepData[]) : [],
+    steps: Array.isArray(normalizedSteps) ? normalizedSteps : [],
     updatedAt: toTimestamp(value.updatedAt),
   };
 };

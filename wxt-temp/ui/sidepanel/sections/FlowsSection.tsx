@@ -1,14 +1,16 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Check, CheckCircle2, Copy, Play, Search, Square, Trash2 } from 'lucide-react';
 import Card from '../components/Card';
+import ConfirmDialog from '../components/ConfirmDialog';
 import FlowDrawer from '../components/FlowDrawer';
-import FlowStepsBuilder, { type StepData as FlowStepData } from '../components/FlowStepsBuilder';
+import FlowStepsBuilder from '../components/FlowStepsBuilder';
 import { t } from '../utils/i18n';
 import {
   type SelectorPickerAccept,
 } from '../../../shared/messages';
 import { getSiteData, setSiteData, STORAGE_KEY } from '../../../shared/storage';
 import { deriveSiteKey } from '../../../shared/siteDataSchema';
+import type { FlowStepData } from '../../../shared/flowStepMigration';
 import { formatTimestamp, getStepCount, normalizeFlow, type FlowRecord } from './flows/normalize';
 import { getRunnerStateLabel, useFlowRunner } from './flows/useFlowRunner';
 
@@ -56,6 +58,9 @@ export default function FlowsSection({
   const [editFlowSnapshot, setEditFlowSnapshot] = useState('');
   const [editResetKey, setEditResetKey] = useState(0);
   const [flowActionError, setFlowActionError] = useState('');
+  const [flowLoadError, setFlowLoadError] = useState('');
+  const [pendingDeleteFlowId, setPendingDeleteFlowId] = useState<string | null>(null);
+  const [pendingDiscardEdit, setPendingDiscardEdit] = useState(false);
   const [draftFlow, setDraftFlow] = useState({
     name: '',
     description: '',
@@ -112,6 +117,9 @@ export default function FlowsSection({
   }, [filteredFlows, sortMode]);
 
   const showClear = Boolean(normalizedQuery) || sortMode !== 'recent';
+  const pendingDeleteFlow = pendingDeleteFlowId
+    ? flows.find((item) => item.id === pendingDeleteFlowId) ?? null
+    : null;
 
   useEffect(() => {
     if (createFlowOpen) {
@@ -131,26 +139,33 @@ export default function FlowsSection({
     setEditResetKey((prev) => prev + 1);
     setDraftFlow({ name: '', description: '', steps: [] });
     setCreateResetKey((prev) => prev + 1);
+    setPendingDeleteFlowId(null);
+    setPendingDiscardEdit(false);
   }, [normalizedSiteKey]);
 
-  const loadFlows = useCallback(() => {
+  const loadFlows = useCallback(async () => {
     if (!normalizedSiteKey) {
+      setFlows([]);
+      setFlowLoadError('');
       return;
     }
-    getSiteData(normalizedSiteKey)
-      .then((data) => {
-        const next = (Array.isArray(data.flows) ? data.flows : [])
-          .map((item) =>
-            normalizeFlow(item, normalizedSiteKey, t('sidepanel_flows_new_default', 'New flow')),
-          )
-          .filter((item): item is FlowRecord => Boolean(item));
-        setFlows(next);
-      })
-      .catch(() => setFlows([]));
+    try {
+      const data = await getSiteData(normalizedSiteKey);
+      const next = (Array.isArray(data.flows) ? data.flows : [])
+        .map((item) =>
+          normalizeFlow(item, normalizedSiteKey, t('sidepanel_flows_new_default', 'New flow')),
+        )
+        .filter((item): item is FlowRecord => Boolean(item));
+      setFlows(next);
+      setFlowLoadError('');
+    } catch (error) {
+      console.warn('site-load-failed', error);
+      setFlowLoadError(error instanceof Error ? error.message : String(error));
+    }
   }, [normalizedSiteKey]);
 
   useEffect(() => {
-    loadFlows();
+    void loadFlows();
   }, [loadFlows]);
 
   useEffect(() => {
@@ -162,7 +177,7 @@ export default function FlowsSection({
       if (areaName !== 'local' || !changes[STORAGE_KEY]) {
         return;
       }
-      loadFlows();
+      void loadFlows();
     };
     storage.addListener(handleStorageChange);
     return () => storage.removeListener(handleStorageChange);
@@ -205,12 +220,8 @@ export default function FlowsSection({
 
   const closeEditDrawer = useCallback(() => {
     if (isEditDirty) {
-      const confirmed = window.confirm(
-        t('sidepanel_flows_dirty_close_confirm', 'You have unsaved changes. Discard them and close?'),
-      );
-      if (!confirmed) {
-        return;
-      }
+      setPendingDiscardEdit(true);
+      return;
     }
     forceCloseEditDrawer();
   }, [forceCloseEditDrawer, isEditDirty]);
@@ -331,6 +342,26 @@ export default function FlowsSection({
     })();
   };
 
+  const handleDeleteFlow = useCallback(
+    async (flowId: string) => {
+      const next = flows.filter((item) => item.id !== flowId);
+      try {
+        await persistFlows(next);
+      } catch {
+        setFlowActionError(
+          t('sidepanel_flows_persist_error_delete', 'Failed to delete flow. Please try again.'),
+        );
+        return;
+      }
+      setFlowActionError('');
+      setFlows(next);
+      if (activeFlowId === flowId) {
+        forceCloseEditDrawer();
+      }
+    },
+    [activeFlowId, flows, forceCloseEditDrawer, persistFlows],
+  );
+
   const renderSummary = (steps: number, actions: FlowSummaryActions) => (
     <>
       <p className="text-xs font-semibold text-muted-foreground">
@@ -396,6 +427,13 @@ export default function FlowsSection({
       {flowActionError ? (
         <Card className="border-destructive/60 bg-destructive/10 text-destructive">
           <p className="text-xs">{flowActionError}</p>
+        </Card>
+      ) : null}
+      {flowLoadError ? (
+        <Card className="border-destructive/60 bg-destructive/10 text-destructive">
+          <p className="text-xs">
+            {t('sidepanel_flows_load_error', 'Failed to load flows. Showing the last known list.')}
+          </p>
         </Card>
       ) : null}
 
@@ -579,28 +617,7 @@ export default function FlowsSection({
                     }
                     onClick={(event) => {
                       event.stopPropagation();
-                      void (async () => {
-                        const confirmed = window.confirm(
-                          t('sidepanel_flows_delete_confirm', 'Delete flow "{name}"? This action cannot be undone.').replace(
-                            '{name}',
-                            flow.name,
-                          ),
-                        );
-                        if (!confirmed) {
-                          return;
-                        }
-                        const next = flows.filter((item) => item.id !== flow.id);
-                        try {
-                          await persistFlows(next);
-                        } catch {
-                          setFlowActionError(
-                            t('sidepanel_flows_persist_error_delete', 'Failed to delete flow. Please try again.'),
-                          );
-                          return;
-                        }
-                        setFlowActionError('');
-                        setFlows(next);
-                      })();
+                      setPendingDeleteFlowId(flow.id);
                     }}
                     disabled={!hasActivePage}
                   >
@@ -716,6 +733,39 @@ export default function FlowsSection({
           />
         </div>
       </FlowDrawer>
+      <ConfirmDialog
+        open={pendingDiscardEdit}
+        title={t('sidepanel_action_discard', 'Discard changes')}
+        message={t('sidepanel_flows_dirty_close_confirm', 'You have unsaved changes. Discard them and close?')}
+        confirmLabel={t('sidepanel_action_discard', 'Discard')}
+        cancelLabel={t('sidepanel_action_cancel', 'Cancel')}
+        danger
+        onCancel={() => setPendingDiscardEdit(false)}
+        onConfirm={() => {
+          setPendingDiscardEdit(false);
+          forceCloseEditDrawer();
+        }}
+      />
+      <ConfirmDialog
+        open={Boolean(pendingDeleteFlowId)}
+        title={t('sidepanel_flows_delete', 'Delete flow')}
+        message={t('sidepanel_flows_delete_confirm', 'Delete flow "{name}"? This action cannot be undone.').replace(
+          '{name}',
+          pendingDeleteFlow?.name || '',
+        )}
+        confirmLabel={t('sidepanel_action_delete', 'Delete')}
+        cancelLabel={t('sidepanel_action_cancel', 'Cancel')}
+        danger
+        onCancel={() => setPendingDeleteFlowId(null)}
+        onConfirm={() => {
+          const targetId = pendingDeleteFlowId;
+          setPendingDeleteFlowId(null);
+          if (!targetId) {
+            return;
+          }
+          void handleDeleteFlow(targetId);
+        }}
+      />
     </section>
   );
 }

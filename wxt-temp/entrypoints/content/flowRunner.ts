@@ -7,6 +7,7 @@ import type {
 
 const DEFAULT_ACTION_TIMEOUT_MS = 10_000;
 const DEFAULT_POLL_INTERVAL_MS = 120;
+const FLOW_POPUP_CONTAINER_ID = 'ladybird-flow-popup-container';
 
 const sleep = (durationMs: number) =>
   new Promise<void>((resolve) => {
@@ -16,6 +17,63 @@ const sleep = (durationMs: number) =>
 const asString = (value: unknown) => (typeof value === 'string' ? value : String(value ?? ''));
 
 const normalizeText = (value: unknown) => asString(value).trim();
+
+const ensureFlowPopupContainer = () => {
+  const existing = document.getElementById(FLOW_POPUP_CONTAINER_ID);
+  if (existing instanceof HTMLElement) {
+    return existing;
+  }
+  const container = document.createElement('div');
+  container.id = FLOW_POPUP_CONTAINER_ID;
+  container.setAttribute('data-ladybird-flow-popup', 'true');
+  Object.assign(container.style, {
+    position: 'fixed',
+    top: '12px',
+    right: '12px',
+    zIndex: '2147483647',
+    display: 'flex',
+    flexDirection: 'column',
+    gap: '8px',
+    pointerEvents: 'none',
+  });
+  (document.body || document.documentElement).appendChild(container);
+  return container;
+};
+
+const showFlowPopupMessage = (message: string) => {
+  const container = ensureFlowPopupContainer();
+  const item = document.createElement('div');
+  item.setAttribute('role', 'status');
+  item.setAttribute('aria-live', 'polite');
+  item.textContent = message || '';
+  Object.assign(item.style, {
+    maxWidth: '360px',
+    borderRadius: '10px',
+    border: '1px solid rgba(15, 23, 42, 0.16)',
+    background: '#0f172a',
+    color: '#ffffff',
+    padding: '8px 10px',
+    fontSize: '12px',
+    lineHeight: '1.4',
+    boxShadow: '0 10px 24px rgba(0, 0, 0, 0.2)',
+    opacity: '1',
+    transform: 'translateY(0)',
+    transition: 'opacity 160ms ease, transform 160ms ease',
+    pointerEvents: 'none',
+    whiteSpace: 'pre-wrap',
+  });
+  container.appendChild(item);
+  window.setTimeout(() => {
+    item.style.opacity = '0';
+    item.style.transform = 'translateY(-6px)';
+    window.setTimeout(() => {
+      item.remove();
+      if (!container.childElementCount) {
+        container.remove();
+      }
+    }, 180);
+  }, 2200);
+};
 
 const toNumber = (value: unknown) => {
   const parsed = Number(normalizeText(value));
@@ -219,7 +277,7 @@ const executeInput = async (payload: FlowRunExecuteStepPayload): Promise<FlowRun
 
 const executePopup = async (payload: FlowRunExecuteStepPayload): Promise<FlowRunExecuteResultPayload> => {
   const message = asString(payload.message ?? '');
-  window.alert(message);
+  showFlowPopupMessage(message);
   return buildBaseResult(payload, {
     ok: true,
     details: {

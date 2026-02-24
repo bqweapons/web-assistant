@@ -38,8 +38,8 @@ const writeStructuredPayload = async (payload: StructuredStoragePayload) => {
   }
   try {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(payload));
-  } catch {
-    // ignore
+  } catch (error) {
+    console.warn('site-load-failed', error);
   }
 };
 
@@ -62,7 +62,8 @@ const readStructuredPayload = async (): Promise<StructuredStoragePayload> => {
       await writeStructuredPayload(normalized.payload);
     }
     return normalized.payload;
-  } catch {
+  } catch (error) {
+    console.warn('site-load-failed', error);
     return { sites: {} };
   }
 };

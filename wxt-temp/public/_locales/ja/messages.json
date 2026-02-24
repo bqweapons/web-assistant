@@ -1117,5 +1117,32 @@
   },
   "sidepanel_header_no_active_site": {
     "message": "アクティブなサイトなし"
+  },
+  "sidepanel_step_summary_wait_appear": {
+    "message": "{selector} が表示されるまで待機"
+  },
+  "sidepanel_step_summary_wait_disappear": {
+    "message": "{selector} が非表示になるまで待機"
+  },
+  "sidepanel_step_wait_mode_appear": {
+    "message": "要素が表示"
+  },
+  "sidepanel_step_wait_mode_disappear": {
+    "message": "要素が非表示"
+  },
+  "sidepanel_elements_no_active_page_readonly": {
+    "message": "アクティブページがないため読み取り専用です。"
+  },
+  "sidepanel_flows_load_error": {
+    "message": "フローの読み込みに失敗しました。前回の一覧を表示しています。"
+  },
+  "sidepanel_hidden_load_error": {
+    "message": "非表示ルールの読み込みに失敗しました。前回の一覧を表示しています。"
+  },
+  "sidepanel_action_discard": {
+    "message": "破棄"
+  },
+  "sidepanel_action_delete": {
+    "message": "削除"
   }
 }

@@ -2,8 +2,10 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Crosshair, Eye, EyeOff, Search, Sparkles, Trash2 } from 'lucide-react';
 import Card from '../components/Card';
 import Drawer from '../components/Drawer';
+import ConfirmDialog from '../components/ConfirmDialog';
 import SelectorInput from '../components/SelectorInput';
 import { t } from '../utils/i18n';
+import { formatLocalDateTime } from '../utils/dateTime';
 import type { SelectorPickerAccept } from '../../../shared/messages';
 import { getSiteData, setSiteData, STORAGE_KEY } from '../../../shared/storage';
 import { buildDefaultSiteUrl, deriveSiteKey, type StructuredHiddenRecord } from '../../../shared/siteDataSchema';
@@ -64,14 +66,7 @@ const toTimestamp = (value: unknown) => {
 };
 
 const formatTimestamp = (value: number) => {
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) {
-    return '';
-  }
-  const pad = (segment: number) => String(segment).padStart(2, '0');
-  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())} ${pad(
-    date.getHours(),
-  )}:${pad(date.getMinutes())}`;
+  return formatLocalDateTime(value);
 };
 
 const normalizeHiddenRule = (value: unknown, fallbackSiteKey: string): HiddenRuleRecord | null => {
@@ -129,15 +124,21 @@ export default function HiddenRulesSection({
   const rulesRef = useRef<HiddenRuleRecord[]>([]);
   const actionClass = 'btn-icon h-8 w-8';
   const [actionError, setActionError] = useState('');
+  const [hiddenLoadError, setHiddenLoadError] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
   const [sortMode, setSortMode] = useState('recent');
   const [filterMode, setFilterMode] = useState<HiddenFilterMode>('all');
   const [activeRuleId, setActiveRuleId] = useState<string | null>(null);
+  const [pendingDeleteRuleId, setPendingDeleteRuleId] = useState<string | null>(null);
+  const [pendingDiscardEdit, setPendingDiscardEdit] = useState(false);
   const [editRuleSnapshot, setEditRuleSnapshot] = useState('');
   const siteRules = useMemo(
     () => rules.filter((rule) => !normalizedSiteKey || rule.siteKey === normalizedSiteKey),
     [normalizedSiteKey, rules],
   );
+  const pendingDeleteRule = pendingDeleteRuleId
+    ? siteRules.find((rule) => rule.id === pendingDeleteRuleId) ?? null
+    : null;
   const activeRule = siteRules.find((rule) => rule.id === activeRuleId) ?? null;
   const [editRule, setEditRule] = useState<HiddenRuleRecord | null>(activeRule);
   const isEditDirty =
@@ -193,6 +194,7 @@ export default function HiddenRulesSection({
   const loadHiddenRules = useCallback(async () => {
     if (!normalizedSiteKey) {
       setRules([]);
+      setHiddenLoadError('');
       return;
     }
     try {
@@ -201,8 +203,10 @@ export default function HiddenRulesSection({
         .map((entry) => normalizeHiddenRule(entry, normalizedSiteKey))
         .filter((entry): entry is HiddenRuleRecord => Boolean(entry));
       setRules(next);
-    } catch {
-      setRules([]);
+      setHiddenLoadError('');
+    } catch (error) {
+      console.warn('site-load-failed', error);
+      setHiddenLoadError(error instanceof Error ? error.message : String(error));
     }
   }, [normalizedSiteKey]);
 
@@ -227,6 +231,8 @@ export default function HiddenRulesSection({
 
   useEffect(() => {
     setActiveRuleId(null);
+    setPendingDeleteRuleId(null);
+    setPendingDiscardEdit(false);
   }, [normalizedSiteKey]);
 
   const persistHiddenRules = useCallback(
@@ -272,12 +278,8 @@ export default function HiddenRulesSection({
 
   const closeRuleDrawer = () => {
     if (isEditDirty) {
-      const confirmed = window.confirm(
-        t('sidepanel_hidden_dirty_close_confirm', 'You have unsaved changes. Discard them and close?'),
-      );
-      if (!confirmed) {
-        return;
-      }
+      setPendingDiscardEdit(true);
+      return;
     }
     setActiveRuleId(null);
     setEditRule(null);
@@ -325,19 +327,6 @@ export default function HiddenRulesSection({
   };
 
   const handleRuleDelete = async (ruleId: string) => {
-    const target = rulesRef.current.find((item) => item.id === ruleId);
-    if (!target) {
-      return;
-    }
-    const confirmed = window.confirm(
-      t('sidepanel_hidden_delete_confirm', 'Delete rule "{name}"? This action cannot be undone.').replace(
-        '{name}',
-        target.name || target.selector || target.id,
-      ),
-    );
-    if (!confirmed) {
-      return;
-    }
     const next = rulesRef.current.filter((item) => item.id !== ruleId);
     const persisted = await persistHiddenRules(
       next,
@@ -505,6 +494,13 @@ export default function HiddenRulesSection({
           <p className="text-xs">{actionError}</p>
         </Card>
       ) : null}
+      {hiddenLoadError ? (
+        <Card className="border-destructive/60 bg-destructive/10 text-destructive">
+          <p className="text-xs">
+            {t('sidepanel_hidden_load_error', 'Failed to load hidden rules. Showing the last known list.')}
+          </p>
+        </Card>
+      ) : null}
 
       <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
         <div className="relative flex-1">
@@ -639,7 +635,7 @@ export default function HiddenRulesSection({
                       title={t('sidepanel_hidden_delete', 'Delete rule')}
                       onClick={(event) => {
                         event.stopPropagation();
-                        void handleRuleDelete(rule.id);
+                        setPendingDeleteRuleId(rule.id);
                       }}
                     >
                       <Trash2 className="h-4 w-4" />
@@ -739,6 +735,41 @@ export default function HiddenRulesSection({
           </div>
         ) : null}
       </Drawer>
+      <ConfirmDialog
+        open={pendingDiscardEdit}
+        title={t('sidepanel_action_discard', 'Discard changes')}
+        message={t('sidepanel_hidden_dirty_close_confirm', 'You have unsaved changes. Discard them and close?')}
+        confirmLabel={t('sidepanel_action_discard', 'Discard')}
+        cancelLabel={t('sidepanel_action_cancel', 'Cancel')}
+        danger
+        onCancel={() => setPendingDiscardEdit(false)}
+        onConfirm={() => {
+          setPendingDiscardEdit(false);
+          setActiveRuleId(null);
+          setEditRule(null);
+          setEditRuleSnapshot('');
+        }}
+      />
+      <ConfirmDialog
+        open={Boolean(pendingDeleteRuleId)}
+        title={t('sidepanel_hidden_delete', 'Delete rule')}
+        message={t('sidepanel_hidden_delete_confirm', 'Delete rule "{name}"? This action cannot be undone.').replace(
+          '{name}',
+          pendingDeleteRule?.name || pendingDeleteRule?.selector || pendingDeleteRule?.id || '',
+        )}
+        confirmLabel={t('sidepanel_action_delete', 'Delete')}
+        cancelLabel={t('sidepanel_action_cancel', 'Cancel')}
+        danger
+        onCancel={() => setPendingDeleteRuleId(null)}
+        onConfirm={() => {
+          const targetId = pendingDeleteRuleId;
+          setPendingDeleteRuleId(null);
+          if (!targetId) {
+            return;
+          }
+          void handleRuleDelete(targetId);
+        }}
+      />
     </section>
   );
 }
