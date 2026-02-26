@@ -1,1 +1,1 @@
-Add no-code buttons, links, tooltips, hidden rules, and automation flows to websites with reusable Password Vault inputs.
+Add no-code buttons, links, hidden rules, and automation flows to websites with reusable Password Vault inputs.
