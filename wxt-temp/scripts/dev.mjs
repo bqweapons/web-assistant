@@ -7,6 +7,7 @@ import { fileURLToPath } from 'node:url';
 
 const HOST = '127.0.0.1';
 const DEFAULT_PORT = 4173;
+const DEFAULT_DOC_PATH = '/kintai-schedule-mock.html';
 const SCRIPT_DIR = path.dirname(fileURLToPath(import.meta.url));
 const DOCS_ROOT = path.resolve(SCRIPT_DIR, '..', '..', 'docs');
 
@@ -35,12 +36,34 @@ const decodePath = (value) => {
 
 const resolveFilePath = (requestPathname) => {
   const normalizedPath = decodePath(requestPathname || '/').replace(/\\/g, '/');
-  const targetPath = normalizedPath === '/' ? '/datasource-form-a.html' : normalizedPath;
+  const targetPath = normalizedPath === '/' ? DEFAULT_DOC_PATH : normalizedPath;
   const filePath = path.resolve(DOCS_ROOT, `.${targetPath}`);
   if (!filePath.startsWith(DOCS_ROOT)) {
     return null;
   }
   return filePath;
+};
+
+const openUrlInBrowser = (url) => {
+  const spawnOptions = { stdio: 'ignore', detached: true };
+  try {
+    if (process.platform === 'win32') {
+      const child = spawn('cmd.exe', ['/d', '/s', '/c', 'start', '""', url], spawnOptions);
+      child.unref();
+      return true;
+    }
+    if (process.platform === 'darwin') {
+      const child = spawn('open', [url], spawnOptions);
+      child.unref();
+      return true;
+    }
+    const child = spawn('xdg-open', [url], spawnOptions);
+    child.unref();
+    return true;
+  } catch (error) {
+    console.warn('[dev] failed to auto-open browser', error);
+    return false;
+  }
 };
 
 const createDocsServer = async (startPort = DEFAULT_PORT) => {
@@ -102,8 +125,12 @@ const createDocsServer = async (startPort = DEFAULT_PORT) => {
 const main = async () => {
   const { server, port } = await createDocsServer(DEFAULT_PORT);
   console.log(`[docs] serving ${DOCS_ROOT}`);
+  console.log(`[docs] http://${HOST}:${port}${DEFAULT_DOC_PATH} (default)`);
   console.log(`[docs] http://${HOST}:${port}/datasource-form-a.html`);
   console.log(`[docs] http://${HOST}:${port}/datasource-form-b.html`);
+
+  const defaultDocsUrl = `http://${HOST}:${port}${DEFAULT_DOC_PATH}`;
+  openUrlInBrowser(defaultDocsUrl);
 
   const wxtCwd = path.resolve(SCRIPT_DIR, '..');
   const wxtProcess =
