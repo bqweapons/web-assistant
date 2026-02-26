@@ -9,6 +9,7 @@ import {
   getSecretsVaultStatus,
   importSecretVaultTransferPayload,
   parseSecretVaultTransferPayload,
+  resetSecretsVault,
   resolveSecretValue,
   unlockSecretsVault,
 } from '../../../shared/secrets';
@@ -380,6 +381,49 @@ export default function SettingsSection() {
     setIsVaultViewerOpen(true);
   };
 
+  const handleResetVault = async () => {
+    if (isVaultBusy) {
+      return;
+    }
+    const confirmed = window.confirm(
+      t(
+        'sidepanel_settings_vault_viewer_reset_confirm',
+        'Forgot your vault password?\n\nResetting the vault will permanently delete all saved passwords in the vault. Flows that use saved passwords will need to be rebound.\n\nDo you want to reset the vault?',
+      ),
+    );
+    if (!confirmed) {
+      return;
+    }
+    setIsVaultBusy(true);
+    setVaultFeedback(null);
+    try {
+      const status = await resetSecretsVault();
+      setVaultStatus({
+        configured: status.configured,
+        unlocked: status.unlocked,
+        secretCount: status.secretCount,
+        names: status.names,
+      });
+      setVaultPasswordInput('');
+      setRevealedVaultValues({});
+      setRevealingSecretName(null);
+      setVaultFeedback({
+        type: 'success',
+        message: t(
+          'sidepanel_settings_vault_viewer_reset_success',
+          'Password vault was reset. You can create a new vault password now.',
+        ),
+      });
+    } catch (error) {
+      setVaultFeedback({
+        type: 'error',
+        message: error instanceof Error ? error.message : String(error),
+      });
+    } finally {
+      setIsVaultBusy(false);
+    }
+  };
+
 
   return (
     <section className="flex flex-col gap-3">
@@ -621,6 +665,21 @@ export default function SettingsSection() {
                   ? t('sidepanel_settings_vault_viewer_unlock', 'Unlock vault')
                   : t('sidepanel_settings_vault_viewer_create_unlock', 'Create vault')}
               </button>
+              {vaultStatus.configured && !vaultStatus.unlocked ? (
+                <button
+                  type="button"
+                  className="btn-ghost h-9 w-full justify-center text-xs text-amber-700 disabled:cursor-not-allowed disabled:opacity-60"
+                  onClick={() => {
+                    void handleResetVault();
+                  }}
+                  disabled={isVaultBusy}
+                >
+                  {t(
+                    'sidepanel_settings_vault_viewer_reset_action',
+                    'Forgot vault password? Reset vault',
+                  )}
+                </button>
+              ) : null}
             </div>
 
             <div className="mt-3">

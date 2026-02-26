@@ -3,12 +3,16 @@ import type {
   FlowRunAtomicStepType,
   FlowRunExecuteResultPayload,
   FlowRunExecuteStepPayload,
+  FlowRunVaultUnlockPromptPayload,
+  FlowRunVaultUnlockPromptResult,
 } from '../../shared/messages';
 import { isSecretTokenValue } from '../../shared/secrets';
 
 const DEFAULT_ACTION_TIMEOUT_MS = 10_000;
 const DEFAULT_POLL_INTERVAL_MS = 120;
-const FLOW_POPUP_CONTAINER_ID = 'ladybird-flow-popup-container';
+const FLOW_MODAL_HOST_ID = 'ladybird-flow-modal-host';
+let flowModalHostRef: HTMLElement | null = null;
+let flowModalMountRef: HTMLElement | null = null;
 
 const sleep = (durationMs: number) =>
   new Promise<void>((resolve) => {
@@ -19,32 +23,74 @@ const asString = (value: unknown) => (typeof value === 'string' ? value : String
 
 const normalizeText = (value: unknown) => asString(value).trim();
 
-const ensureFlowPopupContainer = () => {
-  const existing = document.getElementById(FLOW_POPUP_CONTAINER_ID);
-  if (existing instanceof HTMLElement) {
-    return existing;
+const getContentI18nMessage = (key: string, fallback: string) => {
+  try {
+    const message = chrome?.i18n?.getMessage?.(key as Parameters<typeof chrome.i18n.getMessage>[0]);
+    return message || fallback;
+  } catch {
+    return fallback;
   }
-  const container = document.createElement('div');
-  container.id = FLOW_POPUP_CONTAINER_ID;
-  container.setAttribute('data-ladybird-flow-popup', 'true');
-  Object.assign(container.style, {
+};
+
+const ensureFlowModalMount = () => {
+  if (flowModalHostRef?.isConnected && flowModalMountRef) {
+    return flowModalMountRef;
+  }
+  flowModalHostRef?.remove();
+  const host = document.createElement('div');
+  host.id = FLOW_MODAL_HOST_ID;
+  host.setAttribute('data-ladybird-flow-modal', 'true');
+  Object.assign(host.style, {
     position: 'fixed',
     inset: '0',
     zIndex: '2147483647',
+    display: 'none',
+    pointerEvents: 'auto',
+  });
+  const root = host.attachShadow({ mode: 'closed' });
+  const mount = document.createElement('div');
+  Object.assign(mount.style, {
+    position: 'fixed',
+    inset: '0',
     display: 'none',
     alignItems: 'center',
     justifyContent: 'center',
     pointerEvents: 'auto',
   });
-  (document.body || document.documentElement).appendChild(container);
-  return container;
+  root.appendChild(mount);
+  (document.body || document.documentElement).appendChild(host);
+  flowModalHostRef = host;
+  flowModalMountRef = mount;
+  return mount;
 };
 
-const showFlowPopupMessage = (message: string) =>
-  new Promise<'ok' | 'navigation'>((resolve) => {
-  const container = ensureFlowPopupContainer();
-  container.replaceChildren();
-  container.style.display = 'flex';
+type FlowModalAction = 'ok' | 'cancel' | 'navigation';
+
+type FlowModalOptions = {
+  title: string;
+  message: string;
+  confirmLabel: string;
+  cancelLabel?: string;
+  accent?: 'green' | 'blue';
+  passwordField?: {
+    placeholder: string;
+    errorMessage?: string;
+    initialValue?: string;
+  };
+  onSubmit?: (value: string) => string | null;
+};
+
+const showFlowModal = (options: FlowModalOptions) =>
+  new Promise<{ action: FlowModalAction; value?: string }>((resolve) => {
+  const mount = ensureFlowModalMount();
+  const host = flowModalHostRef;
+  if (!host) {
+    resolve({ action: 'navigation' });
+    return;
+  }
+  mount.replaceChildren();
+  host.style.display = 'block';
+  mount.style.display = 'flex';
 
   const backdrop = document.createElement('div');
   Object.assign(backdrop.style, {
@@ -73,15 +119,15 @@ const showFlowPopupMessage = (message: string) =>
   });
 
   const title = document.createElement('div');
-  title.textContent = 'Ladybird';
+  title.textContent = options.title;
   Object.assign(title.style, {
-    fontSize: '13px',
+    fontSize: '14px',
     fontWeight: '700',
     color: '#334155',
   });
 
   const body = document.createElement('div');
-  body.textContent = message || '';
+  body.textContent = options.message || '';
   Object.assign(body.style, {
     fontSize: '14px',
     lineHeight: '1.5',
@@ -89,64 +135,217 @@ const showFlowPopupMessage = (message: string) =>
     wordBreak: 'break-word',
   });
 
+  let input: HTMLInputElement | null = null;
+  let errorText: HTMLDivElement | null = null;
+  if (options.passwordField) {
+    input = document.createElement('input');
+    input.type = 'password';
+    input.autocomplete = 'current-password';
+    input.placeholder = options.passwordField.placeholder;
+    input.value = options.passwordField.initialValue || '';
+    Object.assign(input.style, {
+      width: '100%',
+      boxSizing: 'border-box',
+      borderRadius: '10px',
+      border: '1px solid rgba(15, 23, 42, 0.16)',
+      padding: '10px 12px',
+      fontSize: '14px',
+      outline: 'none',
+    });
+    if (options.passwordField.errorMessage) {
+      errorText = document.createElement('div');
+      errorText.textContent = options.passwordField.errorMessage;
+      Object.assign(errorText.style, {
+        color: '#dc2626',
+        fontSize: '12px',
+        lineHeight: '1.4',
+      });
+    }
+  }
+
   const actions = document.createElement('div');
   Object.assign(actions.style, {
     display: 'flex',
-    justifyContent: 'flex-end',
+    justifyContent: options.cancelLabel ? 'space-between' : 'flex-end',
     gap: '8px',
+    flexWrap: 'wrap',
   });
+
+  const cancelButton = options.cancelLabel ? document.createElement('button') : null;
+  if (cancelButton) {
+    cancelButton.type = 'button';
+    cancelButton.textContent = options.cancelLabel ?? '';
+    Object.assign(cancelButton.style, {
+      border: '1px solid rgba(15, 23, 42, 0.12)',
+      borderRadius: '10px',
+      background: '#f8fafc',
+      color: '#0f172a',
+      padding: '8px 12px',
+      fontSize: '13px',
+      fontWeight: '600',
+      cursor: 'pointer',
+      minWidth: '120px',
+    });
+  }
 
   const okButton = document.createElement('button');
   okButton.type = 'button';
-  okButton.textContent = 'OK';
+  okButton.textContent = options.confirmLabel;
   Object.assign(okButton.style, {
     border: 'none',
     borderRadius: '10px',
-    background: '#15803d',
+    background: options.accent === 'blue' ? '#1d4ed8' : '#15803d',
     color: '#ffffff',
     padding: '8px 16px',
     fontSize: '13px',
     fontWeight: '700',
     cursor: 'pointer',
-    minWidth: '84px',
+    minWidth: options.cancelLabel ? '120px' : '84px',
   });
 
   let settled = false;
-  const close = (reason: 'ok' | 'navigation') => {
+  const close = (reason: FlowModalAction, value?: string) => {
     if (settled) {
       return;
     }
     settled = true;
     okButton.removeEventListener('click', onOkClick);
+    cancelButton?.removeEventListener('click', onCancelClick);
     window.removeEventListener('keydown', onKeyDown, true);
     window.removeEventListener('pagehide', onPageHide, true);
     window.removeEventListener('beforeunload', onBeforeUnload, true);
-    container.replaceChildren();
-    container.style.display = 'none';
-    resolve(reason);
+    mount.replaceChildren();
+    mount.style.display = 'none';
+    host.style.display = 'none';
+    resolve({ action: reason, value });
   };
 
   const onKeyDown = (event: KeyboardEvent) => {
-    if (event.key === 'Enter' || event.key === 'Escape') {
+    if (event.key === 'Escape') {
       event.preventDefault();
       event.stopPropagation();
-      close('ok');
+      close(options.cancelLabel ? 'cancel' : 'ok');
+      return;
+    }
+    if (event.key === 'Enter') {
+      if (document.activeElement && cancelButton && document.activeElement === cancelButton) {
+        return;
+      }
+      event.preventDefault();
+      event.stopPropagation();
+      onOkClick();
     }
   };
   const onPageHide = () => close('navigation');
   const onBeforeUnload = () => close('navigation');
-  const onOkClick = () => close('ok');
+  const onCancelClick = () => close('cancel');
+  const onOkClick = () => {
+    const nextValue = input?.value ?? '';
+    if (options.onSubmit) {
+      const validationError = options.onSubmit(nextValue);
+      if (validationError) {
+        if (errorText) {
+          errorText.textContent = validationError;
+        }
+        input?.focus();
+        input?.select();
+        return;
+      }
+    }
+    close('ok', nextValue);
+  };
 
   okButton.addEventListener('click', onOkClick);
+  cancelButton?.addEventListener('click', onCancelClick);
   window.addEventListener('keydown', onKeyDown, true);
   window.addEventListener('pagehide', onPageHide, true);
   window.addEventListener('beforeunload', onBeforeUnload, true);
 
-  actions.appendChild(okButton);
-  dialog.append(title, body, actions);
-  container.append(backdrop, dialog);
-  window.setTimeout(() => okButton.focus(), 0);
+  if (cancelButton) {
+    actions.append(cancelButton, okButton);
+  } else {
+    actions.append(okButton);
+  }
+  dialog.append(title, body);
+  if (input) {
+    dialog.append(input);
+  }
+  if (errorText) {
+    dialog.append(errorText);
+  }
+  dialog.append(actions);
+  mount.append(backdrop, dialog);
+  window.setTimeout(() => (input || okButton).focus(), 0);
 });
+
+const showFlowPopupMessage = (message: string) =>
+  showFlowModal({
+    title: 'Ladybird',
+    message: message || '',
+    confirmLabel: 'OK',
+    accent: 'green',
+  }).then((result) => (result.action === 'navigation' ? 'navigation' : 'ok'));
+
+export const promptFlowVaultUnlockOnPage = async (
+  payload: FlowRunVaultUnlockPromptPayload,
+): Promise<FlowRunVaultUnlockPromptResult> => {
+  const descriptionBase = getContentI18nMessage(
+    'content_flow_vault_unlock_description',
+    'This is the password vault master password, not the website login password.',
+  );
+  const fullMessage = descriptionBase;
+  const normalizedPromptError =
+    typeof payload.errorMessage === 'string' && /invalid master password/i.test(payload.errorMessage)
+      ? getContentI18nMessage(
+          'content_flow_vault_unlock_error_invalid_password',
+          'Invalid password vault master password. Please try again.',
+        )
+      : typeof payload.errorMessage === 'string' && /master password is required/i.test(payload.errorMessage)
+        ? getContentI18nMessage(
+            'content_flow_vault_unlock_error_empty_password',
+            'Please enter the password vault master password.',
+          )
+        : (payload.errorMessage || '');
+  const result = await showFlowModal({
+    title: getContentI18nMessage(
+      'content_flow_vault_unlock_title',
+      'Unlock password vault to continue',
+    ),
+    message: fullMessage,
+    confirmLabel: getContentI18nMessage(
+      'content_flow_vault_unlock_submit',
+      'Unlock and continue',
+    ),
+    cancelLabel: getContentI18nMessage(
+      'content_flow_vault_unlock_cancel_stop',
+      'Cancel and stop run',
+    ),
+    accent: 'blue',
+    passwordField: {
+      placeholder: getContentI18nMessage(
+        'content_flow_vault_unlock_password_placeholder',
+        'Password vault master password',
+      ),
+      errorMessage: normalizedPromptError,
+    },
+    onSubmit(value) {
+      if (!value) {
+        return getContentI18nMessage(
+          'content_flow_vault_unlock_error_empty_password',
+          'Please enter the password vault master password.',
+        );
+      }
+      return null;
+    },
+  });
+  if (result.action === 'navigation') {
+    return { action: 'navigation' };
+  }
+  if (result.action === 'cancel') {
+    return { action: 'cancel' };
+  }
+  return { action: 'submit', password: result.value ?? '' };
+};
 
 const toNumber = (value: unknown) => {
   const parsed = Number(normalizeText(value));

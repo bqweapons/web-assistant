@@ -5,7 +5,7 @@ const ROOT = path.resolve(process.cwd());
 const LOCALES_ROOT = path.join(ROOT, 'public', '_locales');
 const LOCALES = ['en', 'ja', 'zh_CN'];
 const PLACEHOLDER_RE = /\{[a-zA-Z0-9_]+\}/g;
-const BROKEN_QUESTION_RUN_RE = /\?{4,}/;
+const BROKEN_QUESTION_RUN_RE = /\?{4,}/g;
 
 function fail(message) {
   console.error(`i18n:check failed: ${message}`);
@@ -79,7 +79,7 @@ function validateLocaleContent(locale, localeObj, enObj) {
     if (isNonEnglish && message.includes('\uFFFD')) {
       fail(`${filePath} key "${key}" contains replacement character (�)`);
     }
-    if (isNonEnglish && BROKEN_QUESTION_RUN_RE.test(message)) {
+    if (isNonEnglish && message.includes('????')) {
       fail(`${filePath} key "${key}" contains suspicious "????" sequence`);
     }
     if (enMessage !== '' && message === '') {

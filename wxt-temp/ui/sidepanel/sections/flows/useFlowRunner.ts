@@ -71,6 +71,24 @@ export const formatRunnerError = (code?: string, message?: string) => {
       'The selected password could not be found. Please choose it again.',
     );
   }
+  if (code === 'secret-vault-unlock-cancelled') {
+    return t(
+      'sidepanel_flow_runner_error_secret_vault_unlock_cancelled',
+      'Password vault unlock was cancelled. The flow was stopped.',
+    );
+  }
+  if (code === 'secret-vault-unlock-prompt-unavailable') {
+    return t(
+      'sidepanel_flow_runner_error_secret_vault_unlock_prompt_unavailable',
+      'Could not show the vault unlock prompt on the page. Open the side panel, unlock the vault, then try again.',
+    );
+  }
+  if (code === 'secret-vault-unlock-interrupted') {
+    return t(
+      'sidepanel_flow_runner_error_secret_vault_unlock_interrupted',
+      'Vault unlock was interrupted by page refresh or navigation. Please run the flow again.',
+    );
+  }
   if (code === 'popup-dismissed-by-navigation') {
     return t(
       'sidepanel_flow_runner_error_popup_dismissed_by_navigation',

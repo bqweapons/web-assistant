@@ -7,7 +7,7 @@ import {
 } from '../shared/siteDataSchema';
 import { startPicker, stopPicker } from './content/picker';
 import { handleInjectionMessage, registerPageContextIfNeeded, resetInjectionRegistry } from './content/injection';
-import { executeFlowRunStep } from './content/flowRunner';
+import { executeFlowRunStep, promptFlowVaultUnlockOnPage } from './content/flowRunner';
 import { clearHiddenRulesStyle, rehydratePersistedHiddenRules } from './content/hiddenRules';
 
 const CONTENT_RUNTIME_READY_KEY = '__ladybirdContentRuntimeReady__';
@@ -267,6 +267,19 @@ export default defineContentScript({
                   errorCode: 'step-execution-exception',
                   error: error instanceof Error ? error.message : String(error),
                 },
+              });
+            });
+          return true;
+        }
+        case MessageType.FLOW_RUN_VAULT_UNLOCK_PROMPT: {
+          void promptFlowVaultUnlockOnPage(message.data)
+            .then((result) => {
+              sendResponse?.({ ok: true, data: result });
+            })
+            .catch((error) => {
+              sendResponse?.({
+                ok: false,
+                error: error instanceof Error ? error.message : String(error),
               });
             });
           return true;

@@ -1317,25 +1317,25 @@
     "message": "删除"
   },
   "sidepanel_settings_export_include_vault_passwords_confirm": {
-    "message": "检测到密码保管库数据。\n\nOK：本次导出包含已保存的密码（下一步需要输入保管库密码）。\n取消：继续导出，但不包含已保存的密码。"
+    "message": "检测到密码保管库数据。\n\nOK：本次导出包含已保存的密码（下一步会要求输入保管库密码）。\n取消：导出但不包含已保存密码。"
   },
   "sidepanel_settings_export_vault_password_prompt": {
-    "message": "如需在导出中包含已保存密码，请输入保管库密码。"
+    "message": "要在导出中包含已保存密码，请输入保管库密码。"
   },
   "sidepanel_settings_export_vault_password_required": {
     "message": "导出已保存密码需要输入保管库密码。"
   },
   "sidepanel_settings_import_vault_create_confirm": {
-    "message": "此文件包含密码保管库数据。是否现在创建保管库并导入已保存密码？"
+    "message": "此文件包含密码保管库数据。现在创建保管库并导入已保存密码吗？"
   },
   "sidepanel_settings_import_vault_password_prompt_create": {
-    "message": "请创建保管库密码（用于创建/解锁导入后的保管库）。"
+    "message": "请创建保管库密码（用于锁定/解锁导入后的保管库）。"
   },
   "sidepanel_settings_import_vault_password_prompt_unlock": {
     "message": "此文件包含密码保管库数据。请输入保管库密码以导入已保存密码。"
   },
   "sidepanel_settings_import_vault_skipped_no_password": {
-    "message": "未提供保管库密码，已跳过密码保管库导入。"
+    "message": "已跳过密码保管库导入（未提供保管库密码）。"
   },
   "sidepanel_settings_import_vault_skipped_user_declined": {
     "message": "已跳过密码保管库导入。"
@@ -1344,16 +1344,16 @@
     "message": "个密码已导入"
   },
   "sidepanel_settings_vault_viewer_title": {
-    "message": "密码保管库阅览"
+    "message": "密码保管库查看器"
   },
   "sidepanel_settings_vault_viewer_subtitle": {
-    "message": "打开密码保管库阅览窗口，输入保管库密码即可查看已保存密码。"
+    "message": "打开密码保管库查看器并输入保管库密码，即可浏览已保存密码。"
   },
   "sidepanel_settings_vault_viewer_open": {
     "message": "打开密码保管库"
   },
   "sidepanel_settings_vault_viewer_modal_subtitle": {
-    "message": "输入保管库密码以查看已保存密码。"
+    "message": "请输入保管库密码以查看已保存密码。"
   },
   "sidepanel_settings_vault_viewer_status": {
     "message": "状态"
@@ -1380,10 +1380,10 @@
     "message": "创建保管库"
   },
   "sidepanel_settings_vault_viewer_unlock_hint": {
-    "message": "请先解锁保管库后再查看已保存密码。"
+    "message": "请先解锁保管库再浏览已保存密码。"
   },
   "sidepanel_settings_vault_viewer_empty": {
-    "message": "保管库中还没有保存密码。"
+    "message": "保管库中还没有保存的密码。"
   },
   "sidepanel_settings_vault_viewer_show": {
     "message": "显示"
@@ -1392,7 +1392,7 @@
     "message": "隐藏"
   },
   "sidepanel_settings_vault_viewer_loading": {
-    "message": "读取中..."
+    "message": "加载中..."
   },
   "sidepanel_settings_vault_viewer_unlocked": {
     "message": "密码保管库已解锁。"
@@ -1400,14 +1400,23 @@
   "sidepanel_settings_vault_viewer_created": {
     "message": "密码保管库已创建并解锁。"
   },
+  "sidepanel_settings_vault_viewer_reset_action": {
+    "message": "忘记保管库密码？重置保管库"
+  },
+  "sidepanel_settings_vault_viewer_reset_confirm": {
+    "message": "忘记保管库密码了吗？\n\n重置保管库会永久删除保管库中保存的所有密码。使用这些已保存密码的流程需要重新绑定。\n\n确定要重置保管库吗？"
+  },
+  "sidepanel_settings_vault_viewer_reset_success": {
+    "message": "密码保管库已重置。现在可以创建新的保管库密码。"
+  },
   "sidepanel_overview_empty": {
-    "message": "还没有已保存的数据。先添加元素、流程或隐藏规则。"
+    "message": "还没有保存的数据。添加元素、流程或隐藏规则后会显示在这里。"
   },
   "sidepanel_overview_delete_site": {
     "message": "删除站点数据"
   },
   "sidepanel_overview_delete_site_confirm": {
-    "message": "确定删除 {site} 的所有已保存数据吗？此操作无法撤销。"
+    "message": "确定要删除 {site} 的全部保存数据吗？此操作无法撤销。"
   },
   "sidepanel_overview_delete_site_error": {
     "message": "删除站点数据失败，请重试。"
@@ -1419,22 +1428,22 @@
     "message": "当前步骤"
   },
   "sidepanel_flow_runner_current_step_waiting_start": {
-    "message": "正在等待流程开始..."
+    "message": "正在等待开始运行流程..."
   },
   "sidepanel_flow_runner_current_step_idle": {
     "message": "当前没有正在运行的步骤。"
   },
   "sidepanel_flow_runner_current_step_preparing": {
-    "message": "正在准备下一个步骤..."
+    "message": "正在准备下一步..."
   },
   "sidepanel_flow_runner_current_step_popup_waiting": {
-    "message": "正在等待你确认页面弹窗（点击 OK 后继续）。"
+    "message": "正在等待页面弹窗确认（点击 OK 继续）。"
   },
   "sidepanel_flow_runner_current_step_wait_time": {
     "message": "正在等待 {value} ms..."
   },
   "sidepanel_flow_runner_current_step_wait_condition": {
-    "message": "正在等待页面条件成立..."
+    "message": "正在等待页面条件满足..."
   },
   "sidepanel_flow_runner_current_step_running_generic": {
     "message": "正在执行当前步骤..."
@@ -1446,15 +1455,51 @@
     "message": "复制日志"
   },
   "sidepanel_flow_runner_logs_empty": {
-    "message": "还没有日志。"
+    "message": "暂无日志。"
   },
   "sidepanel_flow_runner_logs_show_recent": {
-    "message": "只看最近5条"
+    "message": "显示最近5条"
   },
   "sidepanel_flow_runner_logs_show_all": {
     "message": "显示全部"
   },
   "sidepanel_flow_runner_logs_showing_recent": {
-    "message": "正在显示最新 {count} 条日志"
+    "message": "正在显示最近 {count} 条日志"
+  },
+  "content_flow_vault_unlock_title": {
+    "message": "解锁密码保管库以继续"
+  },
+  "content_flow_vault_unlock_description": {
+    "message": "这里输入的是密码保管库主密码，不是网站登录密码。"
+  },
+  "content_flow_vault_unlock_password_placeholder": {
+    "message": "密码保管库主密码"
+  },
+  "content_flow_vault_unlock_submit": {
+    "message": "解锁并继续"
+  },
+  "content_flow_vault_unlock_cancel_stop": {
+    "message": "取消并停止运行"
+  },
+  "content_flow_vault_unlock_error_invalid_password": {
+    "message": "密码保管库主密码错误，请重试。"
+  },
+  "content_flow_vault_unlock_error_empty_password": {
+    "message": "请输入密码保管库主密码。"
+  },
+  "content_flow_vault_unlock_step_context": {
+    "message": "流程: {flow}\n步骤: {step}"
+  },
+  "sidepanel_flow_runner_error_secret_vault_unlock_cancelled": {
+    "message": "你取消了密码保管库解锁，流程已停止。"
+  },
+  "sidepanel_flow_runner_error_secret_vault_unlock_prompt_unavailable": {
+    "message": "无法在页面显示保管库解锁提示。请打开侧边栏解锁保管库后重试。"
+  },
+  "sidepanel_flow_runner_error_secret_vault_unlock_interrupted": {
+    "message": "页面刷新或跳转导致保管库解锁中断，请重新运行流程。"
+  },
+  "sidepanel_flow_input_secret_bound_missing": {
+    "message": "已绑定的密码在保管库中不存在：{name}。请选择或新建一个密码后重新绑定。"
   }
 }

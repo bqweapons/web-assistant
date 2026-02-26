@@ -23,6 +23,7 @@ export const MessageType = {
   FLOW_RUN_STATUS: 'FLOW_RUN_STATUS',
   FLOW_RUN_EXECUTE_STEP: 'FLOW_RUN_EXECUTE_STEP',
   FLOW_RUN_STEP_RESULT: 'FLOW_RUN_STEP_RESULT',
+  FLOW_RUN_VAULT_UNLOCK_PROMPT: 'FLOW_RUN_VAULT_UNLOCK_PROMPT',
 } as const;
 
 export type MessageType = (typeof MessageType)[keyof typeof MessageType];
@@ -194,6 +195,22 @@ export type FlowRunExecuteResultPayload = {
   errorCode?: string;
 };
 
+export type FlowRunVaultUnlockPromptPayload = {
+  runId: string;
+  stepId: string;
+  stepTitle?: string;
+  flowName?: string;
+  siteKey?: string;
+  attempt: number;
+  errorMessage?: string;
+  reason: 'secret-vault-locked';
+};
+
+export type FlowRunVaultUnlockPromptResult =
+  | { action: 'submit'; password: string }
+  | { action: 'cancel' }
+  | { action: 'navigation' };
+
 export type RuntimeMessage =
   | { type: typeof MessageType.START_PICKER; data?: PickerStartPayload; forwarded?: boolean; targetTabId?: number }
   | { type: typeof MessageType.CANCEL_PICKER; data?: undefined; forwarded?: boolean; targetTabId?: number }
@@ -215,4 +232,5 @@ export type RuntimeMessage =
   | { type: typeof MessageType.STOP_FLOW_RUN; data: FlowRunStopPayload; forwarded?: boolean; targetTabId?: number }
   | { type: typeof MessageType.FLOW_RUN_STATUS; data: FlowRunStatusPayload; forwarded?: boolean; targetTabId?: number }
   | { type: typeof MessageType.FLOW_RUN_EXECUTE_STEP; data: FlowRunExecuteStepPayload; forwarded?: boolean; targetTabId?: number }
-  | { type: typeof MessageType.FLOW_RUN_STEP_RESULT; data: FlowRunExecuteResultPayload; forwarded?: boolean; targetTabId?: number };
+  | { type: typeof MessageType.FLOW_RUN_STEP_RESULT; data: FlowRunExecuteResultPayload; forwarded?: boolean; targetTabId?: number }
+  | { type: typeof MessageType.FLOW_RUN_VAULT_UNLOCK_PROMPT; data: FlowRunVaultUnlockPromptPayload; forwarded?: boolean; targetTabId?: number };

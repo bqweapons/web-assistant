@@ -127,6 +127,12 @@ export default function InputSecretValueControl({
     () => vaultStatus.names.map((name) => ({ value: name, label: name })),
     [vaultStatus.names],
   );
+  const secretTokenMissing = tokenInfo
+    ? !vaultStatus.configured || (vaultStatus.unlocked && !vaultStatus.names.includes(tokenInfo.name))
+    : false;
+  const validSelectedSecretName = vaultStatus.names.includes(effectiveSelectedSecretName)
+    ? effectiveSelectedSecretName
+    : '';
 
   const handleUnlockVault = async () => {
     if (!unlockPassword.trim() || isBusy) {
@@ -193,7 +199,7 @@ export default function InputSecretValueControl({
   };
 
   const handleBindSelectedSecret = () => {
-    const name = effectiveSelectedSecretName.trim();
+    const name = validSelectedSecretName.trim();
     if (!name) {
       setErrorMessage(t('sidepanel_flow_input_secret_select_required', 'Please choose a password.'));
       return;
@@ -306,8 +312,17 @@ export default function InputSecretValueControl({
       ) : (
         <div className="grid gap-2 rounded border border-border/70 bg-card/50 p-2">
           {tokenInfo?.name ? (
-            <div className="text-[11px] text-foreground">
-              {t('sidepanel_flow_input_secret_bound', 'Bound: {name}').replace('{name}', tokenInfo.name)}
+            <div
+              className={`text-[11px] ${
+                secretTokenMissing ? 'rounded border border-amber-400/50 bg-amber-100/30 px-2 py-1 text-amber-900' : 'text-foreground'
+              }`}
+            >
+              {secretTokenMissing
+                ? t(
+                    'sidepanel_flow_input_secret_bound_missing',
+                    'Bound password no longer exists in the vault: {name}. Please choose or create a password and bind again.',
+                  ).replace('{name}', tokenInfo.name)
+                : t('sidepanel_flow_input_secret_bound', 'Bound: {name}').replace('{name}', tokenInfo.name)}
             </div>
           ) : null}
 
@@ -346,7 +361,7 @@ export default function InputSecretValueControl({
                   {t('sidepanel_flow_input_secret_select', 'Password in vault')}
                 </span>
                 <SelectMenu
-                  value={effectiveSelectedSecretName}
+                  value={validSelectedSecretName}
                   options={secretOptions}
                   disabled={!vaultStatus.names.length}
                   placeholder={t('sidepanel_flow_input_secret_select_placeholder', 'Select password')}
@@ -363,7 +378,7 @@ export default function InputSecretValueControl({
                   type="button"
                   className="btn-primary h-8 w-full justify-center px-2 text-[11px] disabled:cursor-not-allowed disabled:opacity-60"
                   onClick={handleBindSelectedSecret}
-                  disabled={!effectiveSelectedSecretName}
+                  disabled={!validSelectedSecretName}
                 >
                   {t('sidepanel_flow_input_secret_bind_selected', 'Bind selected password')}
                 </button>

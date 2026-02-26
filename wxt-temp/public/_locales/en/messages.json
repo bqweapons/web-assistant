@@ -1400,6 +1400,15 @@
   "sidepanel_settings_vault_viewer_created": {
     "message": "Password vault created and unlocked."
   },
+  "sidepanel_settings_vault_viewer_reset_action": {
+    "message": "Forgot vault password? Reset vault"
+  },
+  "sidepanel_settings_vault_viewer_reset_confirm": {
+    "message": "Forgot your vault password?\n\nResetting the vault will permanently delete all saved passwords in the vault. Flows that use saved passwords will need to be rebound.\n\nDo you want to reset the vault?"
+  },
+  "sidepanel_settings_vault_viewer_reset_success": {
+    "message": "Password vault was reset. You can create a new vault password now."
+  },
   "sidepanel_overview_empty": {
     "message": "No saved data yet. Add elements, flows, or hidden rules to get started."
   },
@@ -1456,5 +1465,41 @@
   },
   "sidepanel_flow_runner_logs_showing_recent": {
     "message": "Showing latest {count} logs"
+  },
+  "content_flow_vault_unlock_title": {
+    "message": "Unlock password vault to continue"
+  },
+  "content_flow_vault_unlock_description": {
+    "message": "This is the password vault master password, not the website login password."
+  },
+  "content_flow_vault_unlock_password_placeholder": {
+    "message": "Password vault master password"
+  },
+  "content_flow_vault_unlock_submit": {
+    "message": "Unlock and continue"
+  },
+  "content_flow_vault_unlock_cancel_stop": {
+    "message": "Cancel and stop run"
+  },
+  "content_flow_vault_unlock_error_invalid_password": {
+    "message": "Invalid password vault master password. Please try again."
+  },
+  "content_flow_vault_unlock_error_empty_password": {
+    "message": "Please enter the password vault master password."
+  },
+  "content_flow_vault_unlock_step_context": {
+    "message": "Flow: {flow}\nStep: {step}"
+  },
+  "sidepanel_flow_runner_error_secret_vault_unlock_cancelled": {
+    "message": "Password vault unlock was cancelled. The flow was stopped."
+  },
+  "sidepanel_flow_runner_error_secret_vault_unlock_prompt_unavailable": {
+    "message": "Could not show the vault unlock prompt on the page. Open the side panel, unlock the vault, then try again."
+  },
+  "sidepanel_flow_runner_error_secret_vault_unlock_interrupted": {
+    "message": "Vault unlock was interrupted by page refresh or navigation. Please run the flow again."
+  },
+  "sidepanel_flow_input_secret_bound_missing": {
+    "message": "Bound password no longer exists in the vault: {name}. Please choose or create a password and bind again."
   }
 }

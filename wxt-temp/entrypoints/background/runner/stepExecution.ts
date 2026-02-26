@@ -10,6 +10,8 @@ import {
   type FlowRunStepRequestId,
   type FlowRunState,
   type FlowRunStatusPayload,
+  type FlowRunVaultUnlockPromptPayload,
+  type FlowRunVaultUnlockPromptResult,
   type RuntimeMessage,
 } from '../../../shared/messages';
 import type { FlowStepData } from '../../../shared/flowStepMigration';
@@ -21,7 +23,7 @@ import {
 import { TabBridge } from '../runtime/tabBridge';
 import { parseDataSourceRows } from './dataSource';
 import { JsTransformExecutor } from './jsTransformExecutor';
-import { isSecretTokenValue, resolveSecretTokens } from '../../../shared/secrets';
+import { isSecretTokenValue, resolveSecretTokens, unlockSecretsVault } from '../../../shared/secrets';
 import {
   getRenderedStepFieldValue,
   getStepField,
@@ -142,6 +144,21 @@ const estimateFlowSteps = (steps: FlowStepData[]) =>
   steps.reduce((total, step) => total + estimateFlowStep(step), 0);
 
 const normalizeDelimitedText = (value: string) => value.replace(/\r\n?/g, '\n').replace(/\n+$/, '');
+const isRecordObject = (value: unknown): value is Record<string, unknown> =>
+  Boolean(value) && typeof value === 'object' && !Array.isArray(value);
+
+const isVaultUnlockPromptResult = (value: unknown): value is FlowRunVaultUnlockPromptResult => {
+  if (!isRecordObject(value) || typeof value.action !== 'string') {
+    return false;
+  }
+  if (value.action === 'cancel' || value.action === 'navigation') {
+    return true;
+  }
+  if (value.action === 'submit') {
+    return typeof value.password === 'string';
+  }
+  return false;
+};
 
 const collectDataSourceStepIds = (steps: FlowStepData[], sink: string[] = []) => {
   for (const step of steps) {
@@ -890,7 +907,15 @@ export class FlowRunnerManager {
     stepType: Exclude<FlowRunAtomicStepType, 'condition'>,
     row?: FlowRowContext,
   ) {
-    const payload = await this.buildAtomicPayload(step, stepType, row);
+    let payload: FlowRunExecuteStepPayload;
+    try {
+      payload = await this.buildAtomicPayload(step, stepType, row);
+    } catch (error) {
+      if (!(error instanceof RunnerError) || error.code !== 'secret-vault-locked') {
+        throw error;
+      }
+      payload = await this.promptVaultUnlockAndRetry(run, step, stepType, row);
+    }
     this.appendLog(run, 'info', this.formatAtomicStartMessage(stepType, payload), {
       stepId: step.id,
       stepType,
@@ -913,6 +938,135 @@ export class FlowRunnerManager {
       stepType,
     });
     this.markStepCompleted(run);
+  }
+
+  private async promptVaultUnlockAndRetry(
+    run: FlowRunInternal,
+    step: FlowStepData,
+    stepType: Exclude<FlowRunAtomicStepType, 'condition'>,
+    row?: FlowRowContext,
+  ): Promise<FlowRunExecuteStepPayload> {
+    let promptAttempt = 0;
+    let promptErrorMessage = '';
+    while (true) {
+      this.ensureRunHealthy(run);
+      promptAttempt += 1;
+      this.appendLog(run, 'info', 'Waiting for password vault unlock on page.', {
+        stepId: step.id,
+        stepType,
+      });
+      const promptResult = await this.requestVaultUnlockPromptOnPage(run, step, {
+        attempt: promptAttempt,
+        errorMessage: promptErrorMessage || undefined,
+      });
+
+      if (promptResult.action === 'cancel') {
+        this.appendLog(run, 'info', 'Vault unlock cancelled by user.', {
+          stepId: step.id,
+          stepType,
+        });
+        throw new RunnerError(
+          'secret-vault-unlock-cancelled',
+          'Password vault unlock was cancelled by the user.',
+          { phase: 'execute', recoverable: false },
+        );
+      }
+      if (promptResult.action === 'navigation') {
+        this.appendLog(run, 'info', 'Vault unlock prompt interrupted by navigation.', {
+          stepId: step.id,
+          stepType,
+        });
+        throw new RunnerError(
+          'secret-vault-unlock-interrupted',
+          'Password vault unlock was interrupted by navigation.',
+          { phase: 'execute', recoverable: true },
+        );
+      }
+
+      try {
+        await unlockSecretsVault(promptResult.password);
+        this.appendLog(run, 'success', 'Password vault unlocked. Continuing run.', {
+          stepId: step.id,
+          stepType,
+        });
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        if (/invalid master password/i.test(message)) {
+          promptErrorMessage = 'Invalid master password.';
+          continue;
+        }
+        if (/master password is required/i.test(message)) {
+          promptErrorMessage = 'Master password is required.';
+          continue;
+        }
+        throw new RunnerError('secret-vault-unlock-prompt-unavailable', message, {
+          phase: 'execute',
+          recoverable: false,
+        });
+      }
+
+      try {
+        return await this.buildAtomicPayload(step, stepType, row);
+      } catch (error) {
+        if (error instanceof RunnerError && error.code === 'secret-vault-locked') {
+          promptErrorMessage = 'Password vault is still locked. Please try again.';
+          continue;
+        }
+        throw error;
+      }
+    }
+  }
+
+  private async requestVaultUnlockPromptOnPage(
+    run: FlowRunInternal,
+    step: FlowStepData,
+    options: { attempt: number; errorMessage?: string },
+  ): Promise<FlowRunVaultUnlockPromptResult> {
+    const payload: FlowRunVaultUnlockPromptPayload = {
+      runId: run.runId,
+      stepId: step.id,
+      stepTitle: step.title || undefined,
+      flowName: run.flow.name || undefined,
+      siteKey: run.siteKey || undefined,
+      attempt: options.attempt,
+      errorMessage: options.errorMessage,
+      reason: 'secret-vault-locked',
+    };
+    const message: RuntimeMessage = {
+      type: MessageType.FLOW_RUN_VAULT_UNLOCK_PROMPT,
+      data: payload,
+    };
+
+    const topLevelResponse = await this.tabBridge.sendMessageToTabWithRetry(run.tabId, message, true, { frameId: 0 });
+    let response = topLevelResponse;
+    if (
+      (!response.ok || !isVaultUnlockPromptResult(response.data)) &&
+      typeof run.targetFrameId === 'number' &&
+      run.targetFrameId !== 0
+    ) {
+      response = await this.tabBridge.sendMessageToTabWithRetry(run.tabId, message, true, {
+        frameId: run.targetFrameId,
+      });
+    }
+
+    if (!response.ok) {
+      const errorMessage = response.error || 'Failed to show vault unlock prompt on page.';
+      const code =
+        /message channel|receiving end does not exist|asynchronous response|before a response was received/i.test(
+          errorMessage,
+        )
+          ? 'secret-vault-unlock-interrupted'
+          : 'secret-vault-unlock-prompt-unavailable';
+      throw new RunnerError(code, errorMessage, { phase: 'dispatch', recoverable: true });
+    }
+    if (!isVaultUnlockPromptResult(response.data)) {
+      throw new RunnerError(
+        'secret-vault-unlock-prompt-unavailable',
+        'Invalid vault unlock prompt response from content script.',
+        { phase: 'dispatch', recoverable: false },
+      );
+    }
+    return response.data;
   }
 
   private async executeConditionStep(run: FlowRunInternal, step: FlowStepData, row?: FlowRowContext) {

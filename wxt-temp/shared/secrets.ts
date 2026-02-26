@@ -243,6 +243,26 @@ export const lockSecretsVault = async () => {
   }
 };
 
+export const resetSecretsVault = async (): Promise<SecretVaultStatus> => {
+  const local = getStorageLocal();
+  if (local) {
+    await local.remove(SECRETS_VAULT_KEY);
+  } else {
+    try {
+      localStorage.removeItem(SECRETS_VAULT_KEY);
+    } catch {
+      // ignore local fallback removal failures
+    }
+  }
+  await lockSecretsVault();
+  return {
+    configured: false,
+    unlocked: false,
+    secretCount: 0,
+    names: [],
+  };
+};
+
 const deriveAesKeyFromPassword = async (password: string, salt: Uint8Array) => {
   const material = await crypto.subtle.importKey(
     'raw',

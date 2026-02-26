@@ -1317,25 +1317,25 @@
     "message": "削除"
   },
   "sidepanel_settings_export_include_vault_passwords_confirm": {
-    "message": "パスワード保管庫のデータが見つかりました。\n\nOK：保存済みパスワードを今回のエクスポートに含めます（続けて保管庫のパスワード入力が必要です）。\nキャンセル：保存済みパスワードを含めずにエクスポートします。"
+    "message": "パスワード保管庫のデータが見つかりました。\n\nOK: 今回のエクスポートに保存済みパスワードを含めます（次に保管庫のパスワード入力を求めます）。\nキャンセル: 保存済みパスワードを含めずにエクスポートします。"
   },
   "sidepanel_settings_export_vault_password_prompt": {
-    "message": "保存済みパスワードをエクスポートに含めるには、保管庫のパスワードを入力してください。"
+    "message": "保存済みパスワードを含めてエクスポートするには、保管庫のパスワードを入力してください。"
   },
   "sidepanel_settings_export_vault_password_required": {
     "message": "保存済みパスワードをエクスポートするには、保管庫のパスワードが必要です。"
   },
   "sidepanel_settings_import_vault_create_confirm": {
-    "message": "このファイルにはパスワード保管庫のデータが含まれています。今すぐ保管庫を作成して、保存済みパスワードをインポートしますか？"
+    "message": "このファイルにはパスワード保管庫データが含まれています。今すぐ保管庫を作成して保存済みパスワードをインポートしますか？"
   },
   "sidepanel_settings_import_vault_password_prompt_create": {
-    "message": "保管庫のパスワードを作成してください（インポートした保管庫の作成/解除に使用します）。"
+    "message": "保管庫のパスワードを作成してください（インポートされた保管庫のロック/解除に使用します）。"
   },
   "sidepanel_settings_import_vault_password_prompt_unlock": {
-    "message": "このファイルにはパスワード保管庫のデータが含まれています。保存済みパスワードをインポートするには、保管庫のパスワードを入力してください。"
+    "message": "このファイルにはパスワード保管庫データが含まれています。保存済みパスワードをインポートするには、保管庫のパスワードを入力してください。"
   },
   "sidepanel_settings_import_vault_skipped_no_password": {
-    "message": "保管庫のパスワードが入力されなかったため、パスワード保管庫のインポートをスキップしました。"
+    "message": "パスワード保管庫のインポートをスキップしました（保管庫のパスワードが入力されませんでした）。"
   },
   "sidepanel_settings_import_vault_skipped_user_declined": {
     "message": "パスワード保管庫のインポートをスキップしました。"
@@ -1344,22 +1344,22 @@
     "message": "件のパスワードをインポート"
   },
   "sidepanel_settings_vault_viewer_title": {
-    "message": "パスワード保管庫の閲覧"
+    "message": "パスワード保管庫ビューアー"
   },
   "sidepanel_settings_vault_viewer_subtitle": {
-    "message": "閲覧画面を開いて、保管庫のパスワードを入力すると保存済みパスワードを確認できます。"
+    "message": "パスワード保管庫ビューアーを開き、保管庫のパスワードを入力して保存済みパスワードを閲覧します。"
   },
   "sidepanel_settings_vault_viewer_open": {
     "message": "パスワード保管庫を開く"
   },
   "sidepanel_settings_vault_viewer_modal_subtitle": {
-    "message": "保管庫のパスワードを入力して、保存済みパスワードを表示します。"
+    "message": "保存済みパスワードを表示するには、保管庫のパスワードを入力してください。"
   },
   "sidepanel_settings_vault_viewer_status": {
     "message": "状態"
   },
   "sidepanel_settings_vault_viewer_status_unlocked": {
-    "message": "設定済み / 解除済み"
+    "message": "設定済み / 解錠済み"
   },
   "sidepanel_settings_vault_viewer_status_locked": {
     "message": "設定済み / ロック中"
@@ -1380,7 +1380,7 @@
     "message": "保管庫を作成"
   },
   "sidepanel_settings_vault_viewer_unlock_hint": {
-    "message": "保存済みパスワードを閲覧するには、保管庫を解除してください。"
+    "message": "保存済みパスワードを閲覧するには保管庫を解除してください。"
   },
   "sidepanel_settings_vault_viewer_empty": {
     "message": "保管庫に保存されたパスワードはありません。"
@@ -1399,6 +1399,15 @@
   },
   "sidepanel_settings_vault_viewer_created": {
     "message": "パスワード保管庫を作成して解除しました。"
+  },
+  "sidepanel_settings_vault_viewer_reset_action": {
+    "message": "保管庫のパスワードを忘れた場合（保管庫をリセット）"
+  },
+  "sidepanel_settings_vault_viewer_reset_confirm": {
+    "message": "保管庫のパスワードを忘れましたか？\n\n保管庫をリセットすると、保管庫に保存されたパスワードはすべて完全に削除されます。保存済みパスワードを使用しているフローは再紐付けが必要になります。\n\n保管庫をリセットしますか？"
+  },
+  "sidepanel_settings_vault_viewer_reset_success": {
+    "message": "パスワード保管庫をリセットしました。新しい保管庫パスワードを作成できます。"
   },
   "sidepanel_overview_empty": {
     "message": "まだ保存されたデータがありません。要素・フロー・非表示ルールを追加するとここに表示されます。"
@@ -1419,7 +1428,7 @@
     "message": "現在のステップ"
   },
   "sidepanel_flow_runner_current_step_waiting_start": {
-    "message": "フローの開始を待機しています..."
+    "message": "フローの開始を待っています..."
   },
   "sidepanel_flow_runner_current_step_idle": {
     "message": "現在実行中のステップはありません。"
@@ -1428,13 +1437,13 @@
     "message": "次のステップを準備しています..."
   },
   "sidepanel_flow_runner_current_step_popup_waiting": {
-    "message": "ページ上のポップアップの確認を待機しています（OK を押すと続行）。"
+    "message": "ページ上のポップアップ確認を待っています（OK を押すと続行）。"
   },
   "sidepanel_flow_runner_current_step_wait_time": {
     "message": "{value} ms 待機しています..."
   },
   "sidepanel_flow_runner_current_step_wait_condition": {
-    "message": "ページ条件の成立を待機しています..."
+    "message": "ページ条件の待機中です..."
   },
   "sidepanel_flow_runner_current_step_running_generic": {
     "message": "現在のステップを実行中..."
@@ -1456,5 +1465,41 @@
   },
   "sidepanel_flow_runner_logs_showing_recent": {
     "message": "最新 {count} 件を表示中"
+  },
+  "content_flow_vault_unlock_title": {
+    "message": "続行するにはパスワード保管庫を解除"
+  },
+  "content_flow_vault_unlock_description": {
+    "message": "これはサイトのログインパスワードではなく、パスワード保管庫のマスターパスワードです。"
+  },
+  "content_flow_vault_unlock_password_placeholder": {
+    "message": "保管庫のパスワード（マスターパスワード）"
+  },
+  "content_flow_vault_unlock_submit": {
+    "message": "解除して続行"
+  },
+  "content_flow_vault_unlock_cancel_stop": {
+    "message": "キャンセルして実行を停止"
+  },
+  "content_flow_vault_unlock_error_invalid_password": {
+    "message": "保管庫のパスワードが正しくありません。もう一度お試しください。"
+  },
+  "content_flow_vault_unlock_error_empty_password": {
+    "message": "保管庫のパスワードを入力してください。"
+  },
+  "content_flow_vault_unlock_step_context": {
+    "message": "フロー: {flow}\nステップ: {step}"
+  },
+  "sidepanel_flow_runner_error_secret_vault_unlock_cancelled": {
+    "message": "パスワード保管庫の解除がキャンセルされたため、フローを停止しました。"
+  },
+  "sidepanel_flow_runner_error_secret_vault_unlock_prompt_unavailable": {
+    "message": "ページ上に保管庫解除ダイアログを表示できませんでした。サイドパネルで保管庫を解除してから、もう一度お試しください。"
+  },
+  "sidepanel_flow_runner_error_secret_vault_unlock_interrupted": {
+    "message": "ページの再読み込みまたは移動により保管庫解除が中断されました。フローを再実行してください。"
+  },
+  "sidepanel_flow_input_secret_bound_missing": {
+    "message": "紐付け済みのパスワードが保管庫に見つかりません: {name}。別のパスワードを選択するか、新しく作成して再度紐付けしてください。"
   }
 }
