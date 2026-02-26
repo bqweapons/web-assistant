@@ -163,7 +163,9 @@ export const bootstrapBackground = () => {
       }
       case MessageType.START_FLOW_RUN: {
         void respondPromise(async () => {
-          const result = await flowRunnerManager.start(message.data);
+          const result = await flowRunnerManager.start(message.data, {
+            targetFrameId: typeof sender?.frameId === 'number' ? sender.frameId : undefined,
+          });
           return { ok: true, data: result };
         });
         return true;

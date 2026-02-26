@@ -8,11 +8,12 @@
     "dev": "node ./scripts/dev.mjs",
     "dev:wxt": "wxt",
     "dev:firefox": "wxt -b firefox",
-    "build": "wxt build",
+    "build": "npm run i18n:check && wxt build",
     "build:firefox": "wxt build -b firefox",
     "zip": "wxt zip",
     "zip:firefox": "wxt zip -b firefox",
     "compile": "tsc --noEmit",
+    "i18n:check": "node scripts/check-locales.mjs",
     "postinstall": "wxt prepare"
   },
   "devDependencies": {

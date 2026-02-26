@@ -168,10 +168,10 @@
     "message": "No elements yet. Create your first element to get started."
   },
   "sidepanel_elements_empty_filtered": {
-    "message": "No matches. Try a different search or filter."
+    "message": "No matches found. Try a different search or filter."
   },
   "sidepanel_elements_empty_site": {
-    "message": "No elements for this site yet. Add one to get started."
+    "message": "No elements on this site yet. Add one to get started."
   },
   "sidepanel_elements_no_active_page": {
     "message": "No active page detected. Open a site tab and refresh to manage elements."
@@ -459,13 +459,13 @@
     "message": "Flow details"
   },
   "sidepanel_flows_empty": {
-    "message": "No flows yet. Create one to define automated actions."
+    "message": "No flows yet. Create one to get started."
   },
   "sidepanel_flows_badge": {
     "message": "Flow"
   },
   "sidepanel_flows_empty_filtered": {
-    "message": "No matches. Try a different search or filter."
+    "message": "No matches found. Try a different search or filter."
   },
   "sidepanel_flows_name_placeholder": {
     "message": "Flow name"
@@ -483,7 +483,7 @@
     "message": "No description"
   },
   "sidepanel_flows_no_active_page_readonly": {
-    "message": "No active page detected. You can browse flows in read-only mode. Running is disabled."
+    "message": "No active page detected. You can browse flows in read-only mode, but running is disabled."
   },
   "sidepanel_flows_persist_error_create": {
     "message": "Failed to create flow. Please try again."
@@ -549,10 +549,10 @@
     "message": "Enable rule"
   },
   "sidepanel_hidden_empty": {
-    "message": "No hidden rules yet."
+    "message": "No hidden rules yet. Add one to get started."
   },
   "sidepanel_hidden_empty_filtered": {
-    "message": "No matches. Try a different search or filter."
+    "message": "No matches found. Try a different search or filter."
   },
   "sidepanel_hidden_enabled": {
     "message": "Rule enabled"
@@ -567,7 +567,7 @@
     "message": "Hidden rule name"
   },
   "sidepanel_hidden_no_active_page": {
-    "message": "No active page detected. Open a site tab to manage hidden rules."
+    "message": "No active page detected. Open a site tab and refresh to manage hidden rules."
   },
   "sidepanel_hidden_note_placeholder": {
     "message": "Why this rule exists"
@@ -799,6 +799,177 @@
   },
   "sidepanel_settings_feedback_open_success": {
     "message": "Opened store link in a new tab."
+  },
+  "sidepanel_settings_data_export_dangerous": {
+    "message": "Export (Include literal input values)"
+  },
+  "sidepanel_settings_data_export_dangerous_confirm": {
+    "message": "This export will include literal input values (including plaintext passwords stored in flows). Continue?"
+  },
+  "sidepanel_settings_data_export_dangerous_note": {
+    "message": "Default export clears literal input values in flow steps. Secret tokens like {token} are preserved."
+  },
+  "sidepanel_settings_secrets_title": {
+    "message": "Secrets Vault"
+  },
+  "sidepanel_settings_secrets_subtitle": {
+    "message": "Store passwords encrypted and use them in flow input values like {token}."
+  },
+  "sidepanel_settings_secrets_status_configured": {
+    "message": "Vault configured"
+  },
+  "sidepanel_settings_secrets_status_not_configured": {
+    "message": "Vault not configured"
+  },
+  "sidepanel_settings_secrets_status_unlocked": {
+    "message": "Unlocked"
+  },
+  "sidepanel_settings_secrets_status_locked": {
+    "message": "Locked"
+  },
+  "sidepanel_settings_secrets_status_count": {
+    "message": "{count} secret(s)"
+  },
+  "sidepanel_settings_secrets_master_password_unlock_placeholder": {
+    "message": "Master password to unlock"
+  },
+  "sidepanel_settings_secrets_master_password_create_placeholder": {
+    "message": "Set master password"
+  },
+  "sidepanel_settings_secrets_unlock": {
+    "message": "Unlock"
+  },
+  "sidepanel_settings_secrets_create_vault": {
+    "message": "Create Vault"
+  },
+  "sidepanel_settings_secrets_lock": {
+    "message": "Lock"
+  },
+  "sidepanel_settings_secrets_save_title": {
+    "message": "Save Secret"
+  },
+  "sidepanel_settings_secrets_key_placeholder": {
+    "message": "Secret key (e.g. login_password)"
+  },
+  "sidepanel_settings_secrets_value_placeholder": {
+    "message": "Secret value"
+  },
+  "sidepanel_settings_secrets_save_action": {
+    "message": "Save Secret"
+  },
+  "sidepanel_settings_secrets_input_example": {
+    "message": "Flow input example: {token}"
+  },
+  "sidepanel_settings_secrets_saved_keys_title": {
+    "message": "Saved Secret Keys"
+  },
+  "sidepanel_settings_secrets_delete": {
+    "message": "Delete"
+  },
+  "sidepanel_settings_secrets_empty": {
+    "message": "No secrets saved yet."
+  },
+  "sidepanel_settings_secrets_feedback_unlocked": {
+    "message": "Secret vault unlocked."
+  },
+  "sidepanel_settings_secrets_feedback_ready": {
+    "message": "Secret vault ready."
+  },
+  "sidepanel_settings_secrets_feedback_locked": {
+    "message": "Secret vault locked."
+  },
+  "sidepanel_settings_secrets_feedback_saved": {
+    "message": "Saved secret \"{name}\"."
+  },
+  "sidepanel_settings_secrets_feedback_deleted": {
+    "message": "Deleted secret \"{name}\"."
+  },
+  "sidepanel_flow_input_value_mode": {
+    "message": "Input method"
+  },
+  "sidepanel_flow_input_value_mode_literal": {
+    "message": "Type directly"
+  },
+  "sidepanel_flow_input_value_mode_secret": {
+    "message": "Choose from password vault"
+  },
+  "sidepanel_flow_input_password_warning": {
+    "message": "This looks like a password field. Passwords cannot be saved in plain text inside a flow."
+  },
+  "sidepanel_flow_input_password_migration_required": {
+    "message": "Password fields must use the password vault. Plain text passwords are blocked on save and run."
+  },
+  "sidepanel_flow_input_password_save_to_vault": {
+    "message": "Save to password vault and bind"
+  },
+  "sidepanel_flow_input_password_use_vault": {
+    "message": "Use password vault"
+  },
+  "sidepanel_flow_input_secret_bound": {
+    "message": "Bound: {name}"
+  },
+  "sidepanel_flow_input_secret_select": {
+    "message": "Password in vault"
+  },
+  "sidepanel_flow_input_secret_select_placeholder": {
+    "message": "Select password"
+  },
+  "sidepanel_flow_input_secret_select_required": {
+    "message": "Please choose a password."
+  },
+  "sidepanel_flow_input_secret_bind_selected": {
+    "message": "Bind selected password"
+  },
+  "sidepanel_flow_input_secret_create": {
+    "message": "Create new password"
+  },
+  "sidepanel_flow_input_secret_unlock": {
+    "message": "Unlock vault"
+  },
+  "sidepanel_flow_input_secret_create_and_unlock": {
+    "message": "Create vault and unlock"
+  },
+  "sidepanel_flow_input_secret_save_bind": {
+    "message": "Save and bind"
+  },
+  "sidepanel_flow_input_secret_change": {
+    "message": "Change"
+  },
+  "sidepanel_flow_input_secret_remove": {
+    "message": "Remove"
+  },
+  "sidepanel_flow_input_secret_unlock_help": {
+    "message": "To select a saved password, unlock the vault. Enter the vault password (not the website password)."
+  },
+  "sidepanel_flow_input_secret_create_help": {
+    "message": "This is not the website login password. Create a password vault password to save and reuse passwords."
+  },
+  "sidepanel_flow_input_secret_master_password": {
+    "message": "Vault password (for create/unlock)"
+  },
+  "sidepanel_flow_input_secret_name_placeholder": {
+    "message": "Secret name (e.g. login_password)"
+  },
+  "sidepanel_flow_input_secret_name_required": {
+    "message": "Secret name is required."
+  },
+  "sidepanel_flow_input_secret_name_duplicate": {
+    "message": "A password with this name already exists. Please choose a different name."
+  },
+  "sidepanel_flow_input_secret_value_placeholder": {
+    "message": "Password value"
+  },
+  "sidepanel_flows_validation_password_secret_required": {
+    "message": "Detected a password field using plain text input. Save it to the password vault and bind it before saving or running."
+  },
+  "sidepanel_flow_runner_error_password_literal_blocked": {
+    "message": "Password fields must be saved to the password vault before running."
+  },
+  "sidepanel_flow_runner_error_secret_vault_locked": {
+    "message": "Please unlock the password vault first."
+  },
+  "sidepanel_flow_runner_error_secret_not_found": {
+    "message": "The selected password could not be found. Please choose it again."
   },
   "sidepanel_step_assert_description": {
     "message": "Check a value or state."
@@ -1144,5 +1315,146 @@
   },
   "sidepanel_action_delete": {
     "message": "Delete"
+  },
+  "sidepanel_settings_export_include_vault_passwords_confirm": {
+    "message": "Password vault data was found.\n\nOK: Include saved passwords in this export (you will be asked for your vault password next).\nCancel: Export without saved passwords."
+  },
+  "sidepanel_settings_export_vault_password_prompt": {
+    "message": "Enter your vault password to include saved passwords in the export."
+  },
+  "sidepanel_settings_export_vault_password_required": {
+    "message": "Vault password is required to export saved passwords."
+  },
+  "sidepanel_settings_import_vault_create_confirm": {
+    "message": "This file contains password vault data. Create a password vault now and import saved passwords?"
+  },
+  "sidepanel_settings_import_vault_password_prompt_create": {
+    "message": "Create a vault password (used to lock/unlock the imported password vault)."
+  },
+  "sidepanel_settings_import_vault_password_prompt_unlock": {
+    "message": "This file contains password vault data. Enter your vault password to import saved passwords."
+  },
+  "sidepanel_settings_import_vault_skipped_no_password": {
+    "message": "Skipped password vault import (vault password was not provided)."
+  },
+  "sidepanel_settings_import_vault_skipped_user_declined": {
+    "message": "Skipped password vault import."
+  },
+  "sidepanel_settings_data_import_passwords_suffix": {
+    "message": "password(s) imported"
+  },
+  "sidepanel_settings_vault_viewer_title": {
+    "message": "Password Vault Viewer"
+  },
+  "sidepanel_settings_vault_viewer_subtitle": {
+    "message": "Open the password vault viewer and enter the vault password to browse saved passwords."
+  },
+  "sidepanel_settings_vault_viewer_open": {
+    "message": "Open password vault"
+  },
+  "sidepanel_settings_vault_viewer_modal_subtitle": {
+    "message": "Enter the vault password to view saved passwords."
+  },
+  "sidepanel_settings_vault_viewer_status": {
+    "message": "Status"
+  },
+  "sidepanel_settings_vault_viewer_status_unlocked": {
+    "message": "Configured / Unlocked"
+  },
+  "sidepanel_settings_vault_viewer_status_locked": {
+    "message": "Configured / Locked"
+  },
+  "sidepanel_settings_vault_viewer_status_not_configured": {
+    "message": "Not configured"
+  },
+  "sidepanel_settings_vault_viewer_count": {
+    "message": "{count} password(s)"
+  },
+  "sidepanel_settings_vault_viewer_password_input": {
+    "message": "Vault password (create/unlock)"
+  },
+  "sidepanel_settings_vault_viewer_unlock": {
+    "message": "Unlock vault"
+  },
+  "sidepanel_settings_vault_viewer_create_unlock": {
+    "message": "Create vault"
+  },
+  "sidepanel_settings_vault_viewer_unlock_hint": {
+    "message": "Unlock the vault to browse saved passwords."
+  },
+  "sidepanel_settings_vault_viewer_empty": {
+    "message": "No passwords saved in the vault."
+  },
+  "sidepanel_settings_vault_viewer_show": {
+    "message": "Show"
+  },
+  "sidepanel_settings_vault_viewer_hide": {
+    "message": "Hide"
+  },
+  "sidepanel_settings_vault_viewer_loading": {
+    "message": "Loading..."
+  },
+  "sidepanel_settings_vault_viewer_unlocked": {
+    "message": "Password vault unlocked."
+  },
+  "sidepanel_settings_vault_viewer_created": {
+    "message": "Password vault created and unlocked."
+  },
+  "sidepanel_overview_empty": {
+    "message": "No saved data yet. Add elements, flows, or hidden rules to get started."
+  },
+  "sidepanel_overview_delete_site": {
+    "message": "Delete site data"
+  },
+  "sidepanel_overview_delete_site_confirm": {
+    "message": "Delete all saved data for {site}? This cannot be undone."
+  },
+  "sidepanel_overview_delete_site_error": {
+    "message": "Failed to delete site data. Please try again."
+  },
+  "sidepanel_elements_group_site_scope": {
+    "message": "Site-wide"
+  },
+  "sidepanel_flow_runner_current_step_card_title": {
+    "message": "Current step"
+  },
+  "sidepanel_flow_runner_current_step_waiting_start": {
+    "message": "Waiting to start the flow..."
+  },
+  "sidepanel_flow_runner_current_step_idle": {
+    "message": "No step is currently running."
+  },
+  "sidepanel_flow_runner_current_step_preparing": {
+    "message": "Preparing the next step..."
+  },
+  "sidepanel_flow_runner_current_step_popup_waiting": {
+    "message": "Waiting for confirmation in the page popup (click OK to continue)."
+  },
+  "sidepanel_flow_runner_current_step_wait_time": {
+    "message": "Waiting for {value} ms..."
+  },
+  "sidepanel_flow_runner_current_step_wait_condition": {
+    "message": "Waiting for the page condition..."
+  },
+  "sidepanel_flow_runner_current_step_running_generic": {
+    "message": "Running the current step..."
+  },
+  "sidepanel_flow_runner_logs_title": {
+    "message": "Execution logs"
+  },
+  "sidepanel_flow_runner_logs_copy": {
+    "message": "Copy logs"
+  },
+  "sidepanel_flow_runner_logs_empty": {
+    "message": "No logs yet."
+  },
+  "sidepanel_flow_runner_logs_show_recent": {
+    "message": "Show recent 5"
+  },
+  "sidepanel_flow_runner_logs_show_all": {
+    "message": "Show all"
+  },
+  "sidepanel_flow_runner_logs_showing_recent": {
+    "message": "Showing latest {count} logs"
   }
 }

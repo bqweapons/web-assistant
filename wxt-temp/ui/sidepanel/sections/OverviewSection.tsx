@@ -1,15 +1,17 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Globe, RefreshCw } from 'lucide-react';
+import { Globe, RefreshCw, Trash2 } from 'lucide-react';
 import Card from '../components/Card';
 import StatCard from '../components/StatCard';
 import { t } from '../utils/i18n';
-import { getAllSitesData, STORAGE_KEY, type SiteData } from '../../../shared/storage';
+import { getAllSitesData, setAllSitesData, STORAGE_KEY, type SiteData } from '../../../shared/storage';
 
 export default function OverviewSection() {
   const [siteStats, setSiteStats] = useState<
     Array<{ siteKey: string; elements: number; flows: number; hidden: number }>
   >([]);
   const [loading, setLoading] = useState(false);
+  const [deletingSiteKey, setDeletingSiteKey] = useState('');
+  const [actionError, setActionError] = useState('');
 
   const toCount = (value: unknown) => (Array.isArray(value) ? value.length : 0);
 
@@ -26,6 +28,7 @@ export default function OverviewSection() {
 
   const refreshStats = useCallback(async () => {
     setLoading(true);
+    setActionError('');
     try {
       const sites = await getAllSitesData();
       setSiteStats(buildStats(sites));
@@ -88,6 +91,39 @@ export default function OverviewSection() {
     [siteStats],
   );
 
+  const handleDeleteSite = useCallback(
+    async (siteKey: string) => {
+      const confirmed = window.confirm(
+        t('sidepanel_overview_delete_site_confirm', 'Delete all saved data for this site? This cannot be undone.')
+          .replace('{site}', siteKey),
+      );
+      if (!confirmed) {
+        return;
+      }
+      setDeletingSiteKey(siteKey);
+      setActionError('');
+      try {
+        const sites = await getAllSitesData();
+        if (!sites[siteKey]) {
+          return;
+        }
+        const next = { ...sites };
+        delete next[siteKey];
+        await setAllSitesData(next);
+        await refreshStats();
+      } catch (error) {
+        setActionError(
+          error instanceof Error
+            ? error.message
+            : t('sidepanel_overview_delete_site_error', 'Failed to delete site data. Please try again.'),
+        );
+      } finally {
+        setDeletingSiteKey('');
+      }
+    },
+    [refreshStats],
+  );
+
   return (
     <section className="flex flex-col gap-3">
       <div className="flex items-center justify-between gap-3">
@@ -134,6 +170,11 @@ export default function OverviewSection() {
             </p>
           </div>
         </div>
+        {actionError ? (
+          <div className="border-b border-destructive/20 bg-destructive/10 px-4 py-2 text-xs text-destructive">
+            {actionError}
+          </div>
+        ) : null}
         <div className="divide-y divide-border">
           {sortedSites.length === 0 ? (
             <div className="px-4 py-6 text-center text-xs text-muted-foreground">
@@ -145,11 +186,11 @@ export default function OverviewSection() {
             const href = getSiteHref(site.siteKey);
             return (
               <div key={site.siteKey} className="flex flex-col gap-2 px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
-                <div className="flex items-start gap-3">
+                <div className="flex min-w-0 items-start gap-3">
                   <div className="mt-0.5 flex h-9 w-9 items-center justify-center rounded-full border border-border bg-muted text-muted-foreground">
                     <Globe className="h-4 w-4" />
                   </div>
-                  <div>
+                  <div className="min-w-0">
                     <a className="text-sm font-semibold text-card-foreground underline-offset-2 hover:underline" href={href} target="_blank" rel="noreferrer">
                       {site.siteKey}
                     </a>
@@ -161,7 +202,8 @@ export default function OverviewSection() {
                     </p>
                   </div>
                 </div>
-                <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+                <div className="flex items-center justify-between gap-2 sm:justify-end">
+                  <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
                   <span className="inline-flex items-center gap-1 rounded-full border border-border bg-background px-2 py-1">
                     {t('sidepanel_overview_elements_count', '{count} elements').replace(
                       '{count}',
@@ -180,6 +222,19 @@ export default function OverviewSection() {
                       String(site.hidden),
                     )}
                   </span>
+                  </div>
+                  <button
+                    type="button"
+                    className="btn-icon btn-icon-danger h-8 w-8 shrink-0 disabled:cursor-not-allowed disabled:opacity-50"
+                    onClick={() => {
+                      void handleDeleteSite(site.siteKey);
+                    }}
+                    aria-label={t('sidepanel_overview_delete_site', 'Delete site data')}
+                    title={t('sidepanel_overview_delete_site', 'Delete site data')}
+                    disabled={Boolean(deletingSiteKey) || loading}
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </button>
                 </div>
               </div>
             );

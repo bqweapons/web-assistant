@@ -14,6 +14,10 @@ export type TabMessageResponse = {
   error?: string;
 };
 
+type TabMessageOptions = {
+  frameId?: number;
+};
+
 type TabBridgeOptions = {
   runtime?: {
     lastError?: { message?: string };
@@ -25,7 +29,15 @@ type TabBridgeOptions = {
     ) => void;
     get?: (tabId: number, callback: (tab?: BrowserTab | null) => void) => void;
     update?: (tabId: number, updateProperties: { url: string }, callback: () => void) => void;
-    sendMessage?: (tabId: number, message: RuntimeMessage, callback: (response?: unknown) => void) => void;
+    sendMessage?: {
+      (tabId: number, message: RuntimeMessage, callback: (response?: unknown) => void): void;
+      (
+        tabId: number,
+        message: RuntimeMessage,
+        options: TabMessageOptions,
+        callback: (response?: unknown) => void,
+      ): void;
+    };
     onUpdated?: {
       addListener: (
         callback: (tabId: number, changeInfo: BrowserTabChangeInfo, tab: BrowserTab) => void,
@@ -127,28 +139,50 @@ export class TabBridge {
     });
   }
 
-  async sendMessageToTabRaw(tabId: number, message: RuntimeMessage) {
+  async sendMessageToTabRaw(tabId: number, message: RuntimeMessage, options?: TabMessageOptions) {
     const tabsApi = this.tabsApi;
     const sendMessage = tabsApi?.sendMessage;
     if (!sendMessage) {
       return { response: undefined, lastError: 'Tabs API unavailable.' };
     }
     return new Promise<{ response: unknown; lastError?: string }>((resolve) => {
-      sendMessage(tabId, message, (response) => {
+      const callback = (response?: unknown) => {
         resolve({ response, lastError: this.runtime?.lastError?.message });
-      });
+      };
+      if (typeof options?.frameId === 'number') {
+        (sendMessage as unknown as (
+          tabId: number,
+          message: RuntimeMessage,
+          options: TabMessageOptions,
+          callback: (response?: unknown) => void,
+        ) => void)(tabId, message, options, callback);
+        return;
+      }
+      (sendMessage as unknown as (
+        tabId: number,
+        message: RuntimeMessage,
+        callback: (response?: unknown) => void,
+      ) => void)(tabId, message, callback);
     });
   }
 
-  async sendMessageToTabWithRetry(tabId: number, message: RuntimeMessage, allowRetry = true): Promise<TabMessageResponse> {
-    const { response, lastError } = await this.sendMessageToTabRaw(tabId, message);
+  async sendMessageToTabWithRetry(
+    tabId: number,
+    message: RuntimeMessage,
+    allowRetry = true,
+    options?: TabMessageOptions,
+  ): Promise<TabMessageResponse> {
+    const { response, lastError } = await this.sendMessageToTabRaw(tabId, message, options);
     if (lastError) {
       if (allowRetry && isRecoverableTabMessageError(lastError)) {
         const tab = await this.getTabById(tabId);
         if (tab && isInjectableUrl(tab.url)) {
+          if (!this.scriptingApi?.executeScript) {
+            return { ok: false, error: 'content_script_not_available_refresh_required' };
+          }
           const injected = await this.executeContentScript(tabId);
           if (injected) {
-            return this.sendMessageToTabWithRetry(tabId, message, false);
+            return this.sendMessageToTabWithRetry(tabId, message, false, options);
           }
         }
       }

@@ -11,8 +11,10 @@ import {
 import { getSiteData, setSiteData, STORAGE_KEY } from '../../../shared/storage';
 import { deriveSiteKey } from '../../../shared/siteDataSchema';
 import type { FlowStepData } from '../../../shared/flowStepMigration';
+import { isSecretTokenValue } from '../../../shared/secrets';
 import { formatTimestamp, getStepCount, normalizeFlow, type FlowRecord } from './flows/normalize';
 import { getRunnerStateLabel, useFlowRunner } from './flows/useFlowRunner';
+import { getStepFieldStringValue, isPasswordLikeSelector } from '../components/flowSteps/secretInputUtils';
 
 type FlowsSectionProps = {
   siteKey?: string;
@@ -39,6 +41,65 @@ const getEditableSnapshot = (flow: Pick<FlowRecord, 'name' | 'description' | 'st
     description: flow.description,
     steps: flow.steps,
   });
+
+const hasLiteralPasswordInputStep = (steps: FlowStepData[]): boolean => {
+  for (const step of steps) {
+    if (step.type === 'input') {
+      const selector = getStepFieldStringValue(step, 'selector');
+      const value = getStepFieldStringValue(step, 'value');
+      if (isPasswordLikeSelector(selector) && value.trim() && !isSecretTokenValue(value)) {
+        return true;
+      }
+    }
+    if (Array.isArray(step.children) && hasLiteralPasswordInputStep(step.children)) {
+      return true;
+    }
+    if (Array.isArray(step.branches)) {
+      for (const branch of step.branches) {
+        if (Array.isArray(branch.steps) && hasLiteralPasswordInputStep(branch.steps)) {
+          return true;
+        }
+      }
+    }
+  }
+  return false;
+};
+
+const validateNoLiteralPasswordsInFlow = (flow: Pick<FlowRecord, 'steps'>): string | null => {
+  if (!hasLiteralPasswordInputStep(flow.steps || [])) {
+    return null;
+  }
+  return t(
+    'sidepanel_flows_validation_password_secret_required',
+    'Detected a password field using plain text input. Save it to the password vault and bind it before saving or running.',
+  );
+};
+
+const findStepById = (steps: FlowStepData[], stepId?: string): FlowStepData | null => {
+  if (!stepId) {
+    return null;
+  }
+  for (const step of steps) {
+    if (step.id === stepId) {
+      return step;
+    }
+    if (Array.isArray(step.children) && step.children.length > 0) {
+      const found = findStepById(step.children, stepId);
+      if (found) {
+        return found;
+      }
+    }
+    if (Array.isArray(step.branches) && step.branches.length > 0) {
+      for (const branch of step.branches) {
+        const found = findStepById(branch.steps ?? [], stepId);
+        if (found) {
+          return found;
+        }
+      }
+    }
+  }
+  return null;
+};
 
 export default function FlowsSection({
   siteKey = '',
@@ -67,6 +128,7 @@ export default function FlowsSection({
     steps: [] as FlowStepData[],
   });
   const [createResetKey, setCreateResetKey] = useState(0);
+  const [runLogsExpanded, setRunLogsExpanded] = useState(false);
   const {
     runStatus,
     runErrorMessage,
@@ -81,6 +143,20 @@ export default function FlowsSection({
     formatLogTime,
   } = useFlowRunner(flows);
 
+  const currentRunStep = useMemo(
+    () => findStepById(currentRunFlow?.steps ?? [], runStatus?.currentStepId),
+    [currentRunFlow, runStatus?.currentStepId],
+  );
+  const visibleRunLogs = useMemo(
+    () => (runLogsExpanded ? runLogs : runLogs.slice(-5)),
+    [runLogs, runLogsExpanded],
+  );
+  const hasMoreRunLogs = runLogs.length > 5;
+
+  useEffect(() => {
+    setRunLogsExpanded(false);
+  }, [runStatus?.runId]);
+
   const normalizedQuery = searchQuery.trim().toLowerCase();
   const runDisabledReason = !hasActivePage
     ? t('sidepanel_flows_disabled_no_active_page', 'No active page. Running is disabled.')
@@ -88,6 +164,85 @@ export default function FlowsSection({
       ? t('sidepanel_flows_disabled_runner_busy', 'Another flow is running.')
       : '';
   const isEditDirty = editFlow ? getEditableSnapshot(editFlow) !== editFlowSnapshot : false;
+  const getStepTypeLabel = useCallback((type?: FlowStepData['type']) => {
+    switch (type) {
+      case 'click':
+        return t('sidepanel_step_click_label', 'Click');
+      case 'input':
+        return t('sidepanel_step_input_label', 'Input');
+      case 'wait':
+        return t('sidepanel_step_wait_label', 'Wait');
+      case 'assert':
+        return t('sidepanel_step_assert_label', 'Assert');
+      case 'condition':
+        return t('sidepanel_step_condition_label', 'Condition');
+      case 'popup':
+        return t('sidepanel_step_popup_label', 'Popup');
+      case 'navigate':
+        return t('sidepanel_step_navigate_label', 'Navigate');
+      case 'loop':
+        return t('sidepanel_step_loop_label', 'Loop');
+      case 'if-else':
+        return t('sidepanel_step_if_else_label', 'If / Else');
+      case 'data-source':
+        return t('sidepanel_step_data_source_label', 'Data source');
+      default:
+        return t('sidepanel_label_unknown', 'Unknown');
+    }
+  }, []);
+  const currentStepDetailMessage = useMemo(() => {
+    if (!runStatus) {
+      return '';
+    }
+    if (runStatus.state === 'queued') {
+      return t('sidepanel_flow_runner_current_step_waiting_start', 'Waiting to start the flow...');
+    }
+    if (runStatus.state !== 'running') {
+      if (runErrorMessage) {
+        return runErrorMessage;
+      }
+      return t('sidepanel_flow_runner_current_step_idle', 'No step is currently running.');
+    }
+    if (!currentRunStep) {
+      return t('sidepanel_flow_runner_current_step_preparing', 'Preparing the next step...');
+    }
+    if (currentRunStep.type === 'popup') {
+      return t(
+        'sidepanel_flow_runner_current_step_popup_waiting',
+        'Waiting for confirmation in the page popup (click OK to continue).',
+      );
+    }
+    if (currentRunStep.type === 'wait') {
+      const mode = getStepFieldStringValue(currentRunStep, 'mode');
+      if (mode === 'time') {
+        const duration = getStepFieldStringValue(currentRunStep, 'duration');
+        return t('sidepanel_flow_runner_current_step_wait_time', 'Waiting for {value} ms...').replace(
+          '{value}',
+          duration || '0',
+        );
+      }
+      return t('sidepanel_flow_runner_current_step_wait_condition', 'Waiting for the page condition...');
+    }
+    return t('sidepanel_flow_runner_current_step_running_generic', 'Running the current step...');
+  }, [currentRunStep, runErrorMessage, runStatus]);
+  const currentStepExtraMessage = useMemo(() => {
+    if (!currentRunStep) {
+      return '';
+    }
+    if (currentRunStep.type === 'popup') {
+      const popupMessage = getStepFieldStringValue(currentRunStep, 'message');
+      return popupMessage.trim();
+    }
+    if (currentRunStep.type === 'input') {
+      const selector = getStepFieldStringValue(currentRunStep, 'selector');
+      return selector.trim();
+    }
+    if (currentRunStep.type === 'click') {
+      const selector = getStepFieldStringValue(currentRunStep, 'selector');
+      return selector.trim();
+    }
+    return '';
+  }, [currentRunStep]);
 
   const filteredFlows = useMemo(() => {
     return flows.filter((flow) => {
@@ -248,6 +403,11 @@ export default function FlowsSection({
         description: editFlow.description.trim(),
         updatedAt,
       };
+      const passwordValidationError = validateNoLiteralPasswordsInFlow(nextFlow);
+      if (passwordValidationError) {
+        setFlowActionError(passwordValidationError);
+        return null;
+      }
       const exists = flows.some((item) => item.id === nextFlow.id);
       const next = exists
         ? flows.map((item) => (item.id === nextFlow.id ? nextFlow : item))
@@ -291,6 +451,11 @@ export default function FlowsSection({
       steps: draftFlow.steps,
       updatedAt: Date.now(),
     };
+    const passwordValidationError = validateNoLiteralPasswordsInFlow(nextFlow);
+    if (passwordValidationError) {
+      setFlowActionError(passwordValidationError);
+      return null;
+    }
     const next = [...flows, nextFlow];
     try {
       await persistFlows(next);
@@ -449,79 +614,124 @@ export default function FlowsSection({
       {(runStatus || runErrorMessage) && (
         <Card className="border border-border/70 bg-muted/50">
           <div className="space-y-3">
-            <div className="flex items-start justify-between gap-3">
-              <div className="min-w-0 space-y-1">
-                <p className="text-xs font-semibold text-muted-foreground">
-                  {t('sidepanel_flow_runner_status_title', 'Runner status')}
-                </p>
-                <p className="text-sm font-semibold text-card-foreground">{getRunnerStateLabel(runStatus?.state)}</p>
-                {currentRunFlow?.name ? (
-                  <p className="truncate text-xs text-muted-foreground">{currentRunFlow.name}</p>
-                ) : null}
-                {runStatus ? (
-                  <p className="text-[11px] text-muted-foreground">
-                    {t('sidepanel_flow_runner_progress', '{done}/{total} steps')
-                      .replace('{done}', String(runStatus.progress.completedSteps))
-                      .replace('{total}', String(runStatus.progress.totalSteps))}
+            <div className="rounded-lg border border-border bg-card/70 p-3">
+              <div className="flex items-start justify-between gap-3">
+                <div className="min-w-0 space-y-1">
+                  <p className="text-xs font-semibold text-muted-foreground">
+                    {t('sidepanel_flow_runner_status_title', 'Runner status')}
                   </p>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <p className="text-sm font-semibold text-card-foreground">
+                      {getRunnerStateLabel(runStatus?.state)}
+                    </p>
+                    {runStatus ? (
+                      <span className="rounded-full border border-border bg-background px-2 py-0.5 text-[10px] font-semibold text-muted-foreground">
+                        {t('sidepanel_flow_runner_progress', '{done}/{total} steps')
+                          .replace('{done}', String(runStatus.progress.completedSteps))
+                          .replace('{total}', String(runStatus.progress.totalSteps))}
+                      </span>
+                    ) : null}
+                  </div>
+                  {currentRunFlow?.name ? (
+                    <p className="truncate text-xs text-muted-foreground">{currentRunFlow.name}</p>
+                  ) : null}
+                  {runErrorMessage ? <p className="text-[11px] text-destructive">{runErrorMessage}</p> : null}
+                </div>
+                {isRunActive && runStatus?.runId ? (
+                  <button type="button" className="btn-ghost h-8 px-3 text-xs" onClick={stopFlowRun}>
+                    <span className="inline-flex items-center gap-1">
+                      <Square className="h-3.5 w-3.5" />
+                      {t('sidepanel_flow_runner_stop', 'Stop')}
+                    </span>
+                  </button>
                 ) : null}
-                {runStatus?.currentStepId ? (
-                  <p className="text-[11px] text-muted-foreground">
-                    {t('sidepanel_flow_runner_current_step', 'Current step: {step}').replace(
-                      '{step}',
-                      runStatus.currentStepId,
-                    )}
-                  </p>
-                ) : null}
-                {runErrorMessage ? <p className="text-[11px] text-destructive">{runErrorMessage}</p> : null}
               </div>
-              {isRunActive && runStatus?.runId ? (
-                <button type="button" className="btn-ghost h-8 px-3 text-xs" onClick={stopFlowRun}>
-                  <span className="inline-flex items-center gap-1">
-                    <Square className="h-3.5 w-3.5" />
-                    {t('sidepanel_flow_runner_stop', 'Stop')}
+            </div>
+
+            <div className="rounded-lg border border-border bg-card/70 p-3">
+              <p className="text-[11px] font-semibold text-muted-foreground">
+                {t('sidepanel_flow_runner_current_step_card_title', 'Current step')}
+              </p>
+              <div className="mt-2 space-y-1">
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className="rounded-full border border-border bg-background px-2 py-0.5 text-[10px] font-semibold text-muted-foreground">
+                    {getStepTypeLabel(currentRunStep?.type)}
                   </span>
-                </button>
-              ) : null}
+                  <p className="min-w-0 truncate text-sm font-semibold text-card-foreground">
+                    {currentRunStep?.title?.trim() ||
+                      (runStatus?.currentStepId
+                        ? t('sidepanel_flow_runner_current_step_running_generic', 'Running the current step...')
+                        : t('sidepanel_flow_runner_current_step_idle', 'No step is currently running.'))}
+                  </p>
+                </div>
+                <p className="text-[11px] text-muted-foreground">{currentStepDetailMessage}</p>
+                {currentStepExtraMessage ? (
+                  <p className="truncate text-[11px] text-muted-foreground/90">{currentStepExtraMessage}</p>
+                ) : null}
+              </div>
             </div>
 
             <div className="rounded-lg border border-border bg-card/70 p-2">
-              <div className="flex items-center justify-between gap-2">
+              <div className="flex flex-wrap items-center justify-between gap-2">
                 <p className="text-[11px] font-semibold text-muted-foreground">
                   {t('sidepanel_flow_runner_logs_title', 'Execution logs')}
                 </p>
-                <button
-                  type="button"
-                  className="btn-icon h-7 w-7"
-                  onClick={() => void copyRunLogs()}
-                  aria-label={t('sidepanel_flow_runner_logs_copy', 'Copy logs')}
-                  title={t('sidepanel_flow_runner_logs_copy', 'Copy logs')}
-                >
-                  <Copy className="h-3.5 w-3.5" />
-                </button>
+                <div className="flex items-center gap-2">
+                  {hasMoreRunLogs ? (
+                    <button
+                      type="button"
+                      className="btn-ghost h-7 px-2 text-[11px]"
+                      onClick={() => setRunLogsExpanded((prev) => !prev)}
+                    >
+                      {runLogsExpanded
+                        ? t('sidepanel_flow_runner_logs_show_recent', 'Show recent 5')
+                        : t('sidepanel_flow_runner_logs_show_all', 'Show all')}
+                    </button>
+                  ) : null}
+                  <button
+                    type="button"
+                    className="btn-ghost h-7 px-2 text-[11px]"
+                    onClick={() => void copyRunLogs()}
+                    aria-label={t('sidepanel_flow_runner_logs_copy', 'Copy logs')}
+                    title={t('sidepanel_flow_runner_logs_copy', 'Copy logs')}
+                  >
+                    <span className="inline-flex items-center gap-1">
+                      <Copy className="h-3.5 w-3.5" />
+                      {t('sidepanel_flow_runner_logs_copy', 'Copy logs')}
+                    </span>
+                  </button>
+                </div>
               </div>
               {runLogCopyFeedback ? (
                 <p className="mt-1 text-[10px] text-muted-foreground">{runLogCopyFeedback}</p>
               ) : null}
-              <div ref={runLogScrollRef} className="mt-2 max-h-40 overflow-y-auto pr-1">
+              {!runLogsExpanded && hasMoreRunLogs ? (
+                <p className="mt-1 text-[10px] text-muted-foreground">
+                  {t('sidepanel_flow_runner_logs_showing_recent', 'Showing latest {count} logs')
+                    .replace('{count}', '5')}
+                </p>
+              ) : null}
+              <div ref={runLogScrollRef} className="mt-2 max-h-44 overflow-y-auto pr-1">
                 {runLogs.length ? (
                   <div className="space-y-1">
-                    {runLogs.map((entry) => (
-                      <p
+                    {visibleRunLogs.map((entry) => (
+                      <div
                         key={entry.id}
-                        className={`flex items-start gap-2 text-[11px] ${
+                        className={`rounded px-1 py-0.5 text-[11px] ${
                           entry.level === 'error'
-                            ? 'text-destructive'
+                            ? 'bg-destructive/8 text-destructive'
                             : entry.level === 'success'
-                              ? 'text-foreground'
+                              ? 'bg-primary/5 text-foreground'
                               : 'text-muted-foreground'
                         }`}
                       >
-                        <span className="shrink-0 font-mono text-[10px] text-muted-foreground">
-                          {formatLogTime(entry.timestamp)}
-                        </span>
-                        <span className="min-w-0 break-all">{entry.message}</span>
-                      </p>
+                        <div className="flex items-start gap-2">
+                          <span className="shrink-0 font-mono text-[10px] text-muted-foreground">
+                            {formatLogTime(entry.timestamp)}
+                          </span>
+                          <span className="min-w-0 break-all">{entry.message}</span>
+                        </div>
+                      </div>
                     ))}
                   </div>
                 ) : (

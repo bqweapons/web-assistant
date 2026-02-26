@@ -165,7 +165,7 @@
     "message": "要素がありません。最初の要素を作成しましょう。"
   },
   "sidepanel_elements_empty_filtered": {
-    "message": "一致するものがありません。検索またはフィルターを変更してください。"
+    "message": "一致する項目がありません。検索条件またはフィルターを変更してください。"
   },
   "sidepanel_elements_font_decrease": {
     "message": "文字サイズを小さく"
@@ -417,10 +417,10 @@
     "message": "フローの詳細"
   },
   "sidepanel_flows_empty": {
-    "message": "フローがありません。自動アクションを定義するフローを作成しましょう。"
+    "message": "まだフローがありません。まずは1つ作成してください。"
   },
   "sidepanel_flows_empty_filtered": {
-    "message": "一致するものがありません。検索またはフィルターを変更してください。"
+    "message": "一致する項目がありません。検索条件またはフィルターを変更してください。"
   },
   "sidepanel_flows_name_placeholder": {
     "message": "フロー名"
@@ -489,10 +489,10 @@
     "message": "ルールを有効化"
   },
   "sidepanel_hidden_empty": {
-    "message": "非表示ルールはまだありません。"
+    "message": "まだ非表示ルールがありません。まずは1つ追加してください。"
   },
   "sidepanel_hidden_empty_filtered": {
-    "message": "一致するルールがありません。検索やフィルターを変更してください。"
+    "message": "一致する項目がありません。検索条件またはフィルターを変更してください。"
   },
   "sidepanel_hidden_enabled": {
     "message": "ルール有効"
@@ -507,7 +507,7 @@
     "message": "非表示ルール名"
   },
   "sidepanel_hidden_no_active_page": {
-    "message": "アクティブなページが見つかりません。サイトタブを開いて非表示ルールを管理してください。"
+    "message": "現在のページを検出できません。サイトのタブを開いて更新すると、非表示ルールを管理できます。"
   },
   "sidepanel_hidden_note_placeholder": {
     "message": "このルールの理由"
@@ -739,6 +739,177 @@
   },
   "sidepanel_settings_feedback_open_success": {
     "message": "ストアリンクを新しいタブで開きました。"
+  },
+  "sidepanel_settings_data_export_dangerous": {
+    "message": "エクスポート（プレーンテキスト入力値を含む）"
+  },
+  "sidepanel_settings_data_export_dangerous_confirm": {
+    "message": "このエクスポートにはフロー内のプレーンテキスト入力値（パスワードを含む）が含まれます。続行しますか？"
+  },
+  "sidepanel_settings_data_export_dangerous_note": {
+    "message": "通常のエクスポートでは、フローステップのプレーンテキスト入力値は空になります。{token} のようなシークレットトークンは保持されます。"
+  },
+  "sidepanel_settings_secrets_title": {
+    "message": "シークレット保管庫"
+  },
+  "sidepanel_settings_secrets_subtitle": {
+    "message": "パスワードを暗号化して保存し、フロー入力値で {token} のように使用します。"
+  },
+  "sidepanel_settings_secrets_status_configured": {
+    "message": "保管庫設定済み"
+  },
+  "sidepanel_settings_secrets_status_not_configured": {
+    "message": "保管庫未設定"
+  },
+  "sidepanel_settings_secrets_status_unlocked": {
+    "message": "ロック解除"
+  },
+  "sidepanel_settings_secrets_status_locked": {
+    "message": "ロック中"
+  },
+  "sidepanel_settings_secrets_status_count": {
+    "message": "{count} 件"
+  },
+  "sidepanel_settings_secrets_master_password_unlock_placeholder": {
+    "message": "解除用マスターパスワード"
+  },
+  "sidepanel_settings_secrets_master_password_create_placeholder": {
+    "message": "マスターパスワードを設定"
+  },
+  "sidepanel_settings_secrets_unlock": {
+    "message": "解除"
+  },
+  "sidepanel_settings_secrets_create_vault": {
+    "message": "保管庫を作成"
+  },
+  "sidepanel_settings_secrets_lock": {
+    "message": "ロック"
+  },
+  "sidepanel_settings_secrets_save_title": {
+    "message": "シークレットを保存"
+  },
+  "sidepanel_settings_secrets_key_placeholder": {
+    "message": "シークレットキー（例: login_password）"
+  },
+  "sidepanel_settings_secrets_value_placeholder": {
+    "message": "シークレット値"
+  },
+  "sidepanel_settings_secrets_save_action": {
+    "message": "シークレットを保存"
+  },
+  "sidepanel_settings_secrets_input_example": {
+    "message": "フロー入力例: {token}"
+  },
+  "sidepanel_settings_secrets_saved_keys_title": {
+    "message": "保存済みシークレットキー"
+  },
+  "sidepanel_settings_secrets_delete": {
+    "message": "削除"
+  },
+  "sidepanel_settings_secrets_empty": {
+    "message": "保存されたシークレットはまだありません。"
+  },
+  "sidepanel_settings_secrets_feedback_unlocked": {
+    "message": "シークレット保管庫のロックを解除しました。"
+  },
+  "sidepanel_settings_secrets_feedback_ready": {
+    "message": "シークレット保管庫の準備ができました。"
+  },
+  "sidepanel_settings_secrets_feedback_locked": {
+    "message": "シークレット保管庫をロックしました。"
+  },
+  "sidepanel_settings_secrets_feedback_saved": {
+    "message": "シークレット \"{name}\" を保存しました。"
+  },
+  "sidepanel_settings_secrets_feedback_deleted": {
+    "message": "シークレット \"{name}\" を削除しました。"
+  },
+  "sidepanel_flow_input_value_mode": {
+    "message": "入力方法"
+  },
+  "sidepanel_flow_input_value_mode_literal": {
+    "message": "直接入力"
+  },
+  "sidepanel_flow_input_value_mode_secret": {
+    "message": "パスワード保管庫から選択"
+  },
+  "sidepanel_flow_input_password_warning": {
+    "message": "この入力先はパスワード欄の可能性があります。フロー内に平文パスワードは保存できません。"
+  },
+  "sidepanel_flow_input_password_migration_required": {
+    "message": "パスワード欄はパスワード保管庫を使用してください。平文パスワードは保存時・実行時にブロックされます。"
+  },
+  "sidepanel_flow_input_password_save_to_vault": {
+    "message": "保管庫に保存して紐付け"
+  },
+  "sidepanel_flow_input_password_use_vault": {
+    "message": "パスワード保管庫を使う"
+  },
+  "sidepanel_flow_input_secret_bound": {
+    "message": "紐付け済み: {name}"
+  },
+  "sidepanel_flow_input_secret_select": {
+    "message": "保管庫のパスワード"
+  },
+  "sidepanel_flow_input_secret_select_placeholder": {
+    "message": "パスワードを選択"
+  },
+  "sidepanel_flow_input_secret_select_required": {
+    "message": "パスワードを選択してください。"
+  },
+  "sidepanel_flow_input_secret_bind_selected": {
+    "message": "選択したパスワードを紐付け"
+  },
+  "sidepanel_flow_input_secret_create": {
+    "message": "新しいパスワードを作成"
+  },
+  "sidepanel_flow_input_secret_unlock": {
+    "message": "保管庫を解除"
+  },
+  "sidepanel_flow_input_secret_create_and_unlock": {
+    "message": "保管庫を作成して解除"
+  },
+  "sidepanel_flow_input_secret_save_bind": {
+    "message": "保存して紐付け"
+  },
+  "sidepanel_flow_input_secret_change": {
+    "message": "変更"
+  },
+  "sidepanel_flow_input_secret_remove": {
+    "message": "解除"
+  },
+  "sidepanel_flow_input_secret_unlock_help": {
+    "message": "保存済みのパスワードを選ぶには保管庫を解除してください。ここで入力するのは保管庫のパスワードです。"
+  },
+  "sidepanel_flow_input_secret_create_help": {
+    "message": "これはサイトのログインパスワードではありません。保存したパスワードを再利用するための保管庫パスワードを作成してください。"
+  },
+  "sidepanel_flow_input_secret_master_password": {
+    "message": "保管庫のパスワード（作成・解除用）"
+  },
+  "sidepanel_flow_input_secret_name_placeholder": {
+    "message": "シークレット名（例: login_password）"
+  },
+  "sidepanel_flow_input_secret_name_required": {
+    "message": "シークレット名を入力してください。"
+  },
+  "sidepanel_flow_input_secret_name_duplicate": {
+    "message": "同じ名前のパスワードがすでにあります。別の名前を入力してください。"
+  },
+  "sidepanel_flow_input_secret_value_placeholder": {
+    "message": "パスワード値"
+  },
+  "sidepanel_flows_validation_password_secret_required": {
+    "message": "パスワード欄で平文入力が検出されました。保存または実行する前に、パスワード保管庫に保存して紐付けてください。"
+  },
+  "sidepanel_flow_runner_error_password_literal_blocked": {
+    "message": "実行前に、パスワード欄の値をパスワード保管庫へ保存してください。"
+  },
+  "sidepanel_flow_runner_error_secret_vault_locked": {
+    "message": "先にパスワード保管庫を解除してください。"
+  },
+  "sidepanel_flow_runner_error_secret_not_found": {
+    "message": "紐付けられたパスワードが見つかりません。もう一度選択してください。"
   },
   "sidepanel_step_assert_description": {
     "message": "値や状態を確認します。"
@@ -981,10 +1152,10 @@
     "message": "未グループ"
   },
   "sidepanel_elements_no_active_page": {
-    "message": "有効なページが検出されません。サイトのタブを開いて更新してください。"
+    "message": "現在のページを検出できません。サイトのタブを開いて更新すると、要素を管理できます。"
   },
   "sidepanel_elements_empty_site": {
-    "message": "このサイトにはまだ要素がありません。まずは追加してください。"
+    "message": "このサイトにはまだ要素がありません。まずは1つ追加してください。"
   },
   "sidepanel_flows_badge": {
     "message": "フロー"
@@ -1104,7 +1275,7 @@
     "message": "別のフローが実行中です。"
   },
   "sidepanel_flows_no_active_page_readonly": {
-    "message": "アクティブなページが見つかりません。フローは閲覧できますが、実行は無効です。"
+    "message": "現在のページを検出できません。フローは閲覧できますが、実行はできません。"
   },
   "sidepanel_flows_persist_error_create": {
     "message": "フローの作成に失敗しました。もう一度お試しください。"
@@ -1144,5 +1315,146 @@
   },
   "sidepanel_action_delete": {
     "message": "削除"
+  },
+  "sidepanel_settings_export_include_vault_passwords_confirm": {
+    "message": "パスワード保管庫のデータが見つかりました。\n\nOK：保存済みパスワードを今回のエクスポートに含めます（続けて保管庫のパスワード入力が必要です）。\nキャンセル：保存済みパスワードを含めずにエクスポートします。"
+  },
+  "sidepanel_settings_export_vault_password_prompt": {
+    "message": "保存済みパスワードをエクスポートに含めるには、保管庫のパスワードを入力してください。"
+  },
+  "sidepanel_settings_export_vault_password_required": {
+    "message": "保存済みパスワードをエクスポートするには、保管庫のパスワードが必要です。"
+  },
+  "sidepanel_settings_import_vault_create_confirm": {
+    "message": "このファイルにはパスワード保管庫のデータが含まれています。今すぐ保管庫を作成して、保存済みパスワードをインポートしますか？"
+  },
+  "sidepanel_settings_import_vault_password_prompt_create": {
+    "message": "保管庫のパスワードを作成してください（インポートした保管庫の作成/解除に使用します）。"
+  },
+  "sidepanel_settings_import_vault_password_prompt_unlock": {
+    "message": "このファイルにはパスワード保管庫のデータが含まれています。保存済みパスワードをインポートするには、保管庫のパスワードを入力してください。"
+  },
+  "sidepanel_settings_import_vault_skipped_no_password": {
+    "message": "保管庫のパスワードが入力されなかったため、パスワード保管庫のインポートをスキップしました。"
+  },
+  "sidepanel_settings_import_vault_skipped_user_declined": {
+    "message": "パスワード保管庫のインポートをスキップしました。"
+  },
+  "sidepanel_settings_data_import_passwords_suffix": {
+    "message": "件のパスワードをインポート"
+  },
+  "sidepanel_settings_vault_viewer_title": {
+    "message": "パスワード保管庫の閲覧"
+  },
+  "sidepanel_settings_vault_viewer_subtitle": {
+    "message": "閲覧画面を開いて、保管庫のパスワードを入力すると保存済みパスワードを確認できます。"
+  },
+  "sidepanel_settings_vault_viewer_open": {
+    "message": "パスワード保管庫を開く"
+  },
+  "sidepanel_settings_vault_viewer_modal_subtitle": {
+    "message": "保管庫のパスワードを入力して、保存済みパスワードを表示します。"
+  },
+  "sidepanel_settings_vault_viewer_status": {
+    "message": "状態"
+  },
+  "sidepanel_settings_vault_viewer_status_unlocked": {
+    "message": "設定済み / 解除済み"
+  },
+  "sidepanel_settings_vault_viewer_status_locked": {
+    "message": "設定済み / ロック中"
+  },
+  "sidepanel_settings_vault_viewer_status_not_configured": {
+    "message": "未設定"
+  },
+  "sidepanel_settings_vault_viewer_count": {
+    "message": "{count} 件"
+  },
+  "sidepanel_settings_vault_viewer_password_input": {
+    "message": "保管庫のパスワード（作成・解除用）"
+  },
+  "sidepanel_settings_vault_viewer_unlock": {
+    "message": "保管庫を解除"
+  },
+  "sidepanel_settings_vault_viewer_create_unlock": {
+    "message": "保管庫を作成"
+  },
+  "sidepanel_settings_vault_viewer_unlock_hint": {
+    "message": "保存済みパスワードを閲覧するには、保管庫を解除してください。"
+  },
+  "sidepanel_settings_vault_viewer_empty": {
+    "message": "保管庫に保存されたパスワードはありません。"
+  },
+  "sidepanel_settings_vault_viewer_show": {
+    "message": "表示"
+  },
+  "sidepanel_settings_vault_viewer_hide": {
+    "message": "非表示"
+  },
+  "sidepanel_settings_vault_viewer_loading": {
+    "message": "読み込み中..."
+  },
+  "sidepanel_settings_vault_viewer_unlocked": {
+    "message": "パスワード保管庫を解除しました。"
+  },
+  "sidepanel_settings_vault_viewer_created": {
+    "message": "パスワード保管庫を作成して解除しました。"
+  },
+  "sidepanel_overview_empty": {
+    "message": "まだ保存されたデータがありません。要素・フロー・非表示ルールを追加するとここに表示されます。"
+  },
+  "sidepanel_overview_delete_site": {
+    "message": "サイトデータを削除"
+  },
+  "sidepanel_overview_delete_site_confirm": {
+    "message": "{site} の保存データをすべて削除しますか？この操作は元に戻せません。"
+  },
+  "sidepanel_overview_delete_site_error": {
+    "message": "サイトデータの削除に失敗しました。もう一度お試しください。"
+  },
+  "sidepanel_elements_group_site_scope": {
+    "message": "サイト全体"
+  },
+  "sidepanel_flow_runner_current_step_card_title": {
+    "message": "現在のステップ"
+  },
+  "sidepanel_flow_runner_current_step_waiting_start": {
+    "message": "フローの開始を待機しています..."
+  },
+  "sidepanel_flow_runner_current_step_idle": {
+    "message": "現在実行中のステップはありません。"
+  },
+  "sidepanel_flow_runner_current_step_preparing": {
+    "message": "次のステップを準備しています..."
+  },
+  "sidepanel_flow_runner_current_step_popup_waiting": {
+    "message": "ページ上のポップアップの確認を待機しています（OK を押すと続行）。"
+  },
+  "sidepanel_flow_runner_current_step_wait_time": {
+    "message": "{value} ms 待機しています..."
+  },
+  "sidepanel_flow_runner_current_step_wait_condition": {
+    "message": "ページ条件の成立を待機しています..."
+  },
+  "sidepanel_flow_runner_current_step_running_generic": {
+    "message": "現在のステップを実行中..."
+  },
+  "sidepanel_flow_runner_logs_title": {
+    "message": "実行ログ"
+  },
+  "sidepanel_flow_runner_logs_copy": {
+    "message": "ログをコピー"
+  },
+  "sidepanel_flow_runner_logs_empty": {
+    "message": "まだログはありません。"
+  },
+  "sidepanel_flow_runner_logs_show_recent": {
+    "message": "最新5件を表示"
+  },
+  "sidepanel_flow_runner_logs_show_all": {
+    "message": "すべて表示"
+  },
+  "sidepanel_flow_runner_logs_showing_recent": {
+    "message": "最新 {count} 件を表示中"
   }
 }

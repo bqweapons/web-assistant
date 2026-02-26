@@ -17,7 +17,7 @@ export default defineConfig({
     side_panel: {
       default_path: 'sidepanel.html',
     },
-    permissions: ['storage', 'tabs', 'sidePanel', 'webNavigation', 'scripting'],
+    permissions: ['storage', 'tabs', 'sidePanel', 'webNavigation'],
     host_permissions: ['<all_urls>'],
     icons: {
       16: 'icon/16.png',

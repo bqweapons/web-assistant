@@ -4,6 +4,7 @@ import type {
   FlowRunExecuteResultPayload,
   FlowRunExecuteStepPayload,
 } from '../../shared/messages';
+import { isSecretTokenValue } from '../../shared/secrets';
 
 const DEFAULT_ACTION_TIMEOUT_MS = 10_000;
 const DEFAULT_POLL_INTERVAL_MS = 120;
@@ -28,52 +29,124 @@ const ensureFlowPopupContainer = () => {
   container.setAttribute('data-ladybird-flow-popup', 'true');
   Object.assign(container.style, {
     position: 'fixed',
-    top: '12px',
-    right: '12px',
+    inset: '0',
     zIndex: '2147483647',
-    display: 'flex',
-    flexDirection: 'column',
-    gap: '8px',
-    pointerEvents: 'none',
+    display: 'none',
+    alignItems: 'center',
+    justifyContent: 'center',
+    pointerEvents: 'auto',
   });
   (document.body || document.documentElement).appendChild(container);
   return container;
 };
 
-const showFlowPopupMessage = (message: string) => {
+const showFlowPopupMessage = (message: string) =>
+  new Promise<'ok' | 'navigation'>((resolve) => {
   const container = ensureFlowPopupContainer();
-  const item = document.createElement('div');
-  item.setAttribute('role', 'status');
-  item.setAttribute('aria-live', 'polite');
-  item.textContent = message || '';
-  Object.assign(item.style, {
-    maxWidth: '360px',
-    borderRadius: '10px',
-    border: '1px solid rgba(15, 23, 42, 0.16)',
-    background: '#0f172a',
-    color: '#ffffff',
-    padding: '8px 10px',
-    fontSize: '12px',
-    lineHeight: '1.4',
-    boxShadow: '0 10px 24px rgba(0, 0, 0, 0.2)',
-    opacity: '1',
-    transform: 'translateY(0)',
-    transition: 'opacity 160ms ease, transform 160ms ease',
-    pointerEvents: 'none',
-    whiteSpace: 'pre-wrap',
+  container.replaceChildren();
+  container.style.display = 'flex';
+
+  const backdrop = document.createElement('div');
+  Object.assign(backdrop.style, {
+    position: 'absolute',
+    inset: '0',
+    background: 'rgba(15, 23, 42, 0.45)',
+    backdropFilter: 'blur(1px)',
   });
-  container.appendChild(item);
-  window.setTimeout(() => {
-    item.style.opacity = '0';
-    item.style.transform = 'translateY(-6px)';
-    window.setTimeout(() => {
-      item.remove();
-      if (!container.childElementCount) {
-        container.remove();
-      }
-    }, 180);
-  }, 2200);
-};
+
+  const dialog = document.createElement('div');
+  dialog.setAttribute('role', 'dialog');
+  dialog.setAttribute('aria-modal', 'true');
+  Object.assign(dialog.style, {
+    position: 'relative',
+    width: 'min(92vw, 420px)',
+    borderRadius: '14px',
+    border: '1px solid rgba(15, 23, 42, 0.16)',
+    background: '#ffffff',
+    color: '#0f172a',
+    boxShadow: '0 20px 60px rgba(0, 0, 0, 0.28)',
+    padding: '16px',
+    display: 'grid',
+    gap: '12px',
+    pointerEvents: 'auto',
+    fontFamily: 'system-ui, -apple-system, Segoe UI, sans-serif',
+  });
+
+  const title = document.createElement('div');
+  title.textContent = 'Ladybird';
+  Object.assign(title.style, {
+    fontSize: '13px',
+    fontWeight: '700',
+    color: '#334155',
+  });
+
+  const body = document.createElement('div');
+  body.textContent = message || '';
+  Object.assign(body.style, {
+    fontSize: '14px',
+    lineHeight: '1.5',
+    whiteSpace: 'pre-wrap',
+    wordBreak: 'break-word',
+  });
+
+  const actions = document.createElement('div');
+  Object.assign(actions.style, {
+    display: 'flex',
+    justifyContent: 'flex-end',
+    gap: '8px',
+  });
+
+  const okButton = document.createElement('button');
+  okButton.type = 'button';
+  okButton.textContent = 'OK';
+  Object.assign(okButton.style, {
+    border: 'none',
+    borderRadius: '10px',
+    background: '#15803d',
+    color: '#ffffff',
+    padding: '8px 16px',
+    fontSize: '13px',
+    fontWeight: '700',
+    cursor: 'pointer',
+    minWidth: '84px',
+  });
+
+  let settled = false;
+  const close = (reason: 'ok' | 'navigation') => {
+    if (settled) {
+      return;
+    }
+    settled = true;
+    okButton.removeEventListener('click', onOkClick);
+    window.removeEventListener('keydown', onKeyDown, true);
+    window.removeEventListener('pagehide', onPageHide, true);
+    window.removeEventListener('beforeunload', onBeforeUnload, true);
+    container.replaceChildren();
+    container.style.display = 'none';
+    resolve(reason);
+  };
+
+  const onKeyDown = (event: KeyboardEvent) => {
+    if (event.key === 'Enter' || event.key === 'Escape') {
+      event.preventDefault();
+      event.stopPropagation();
+      close('ok');
+    }
+  };
+  const onPageHide = () => close('navigation');
+  const onBeforeUnload = () => close('navigation');
+  const onOkClick = () => close('ok');
+
+  okButton.addEventListener('click', onOkClick);
+  window.addEventListener('keydown', onKeyDown, true);
+  window.addEventListener('pagehide', onPageHide, true);
+  window.addEventListener('beforeunload', onBeforeUnload, true);
+
+  actions.appendChild(okButton);
+  dialog.append(title, body, actions);
+  container.append(backdrop, dialog);
+  window.setTimeout(() => okButton.focus(), 0);
+});
 
 const toNumber = (value: unknown) => {
   const parsed = Number(normalizeText(value));
@@ -244,6 +317,22 @@ const executeInput = async (payload: FlowRunExecuteStepPayload): Promise<FlowRun
   }
   const nextValue = asString(payload.value ?? '');
   const fieldName = getElementLabel(queried.element);
+  if (
+    queried.element instanceof HTMLInputElement &&
+    queried.element.type?.toLowerCase() === 'password' &&
+    nextValue &&
+    payload.valueSource !== 'secret' &&
+    !isSecretTokenValue(nextValue)
+  ) {
+    return buildBaseResult(payload, {
+      errorCode: 'password-literal-blocked',
+      error: 'Password fields must use Secrets Vault.',
+      details: {
+        selector,
+        fieldName,
+      },
+    });
+  }
   if (queried.element instanceof HTMLInputElement || queried.element instanceof HTMLTextAreaElement) {
     queried.element.focus();
     queried.element.value = nextValue;
@@ -270,14 +359,19 @@ const executeInput = async (payload: FlowRunExecuteStepPayload): Promise<FlowRun
     details: {
       selector,
       fieldName,
-      inputValue: nextValue,
     },
   });
 };
 
 const executePopup = async (payload: FlowRunExecuteStepPayload): Promise<FlowRunExecuteResultPayload> => {
   const message = asString(payload.message ?? '');
-  showFlowPopupMessage(message);
+  const result = await showFlowPopupMessage(message);
+  if (result === 'navigation') {
+    return buildBaseResult(payload, {
+      errorCode: 'popup-dismissed-by-navigation',
+      error: 'Popup was dismissed because the page navigated or refreshed.',
+    });
+  }
   return buildBaseResult(payload, {
     ok: true,
     details: {

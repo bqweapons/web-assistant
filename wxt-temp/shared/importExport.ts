@@ -25,6 +25,10 @@ export type ExportPayload = {
   sites: Record<string, StructuredSiteData>;
 };
 
+export type BuildExportPayloadOptions = {
+  redactLiteralInputs?: boolean;
+};
+
 export type ImportSummary = {
   sourceVersion: string;
   siteCount: number;
@@ -505,11 +509,59 @@ const mergeById = <T>(currentList: T[], incomingList: T[]) => {
   return merged;
 };
 
-export const buildExportPayload = (sites: Record<string, StructuredSiteData>): ExportPayload => {
+const SECRET_TOKEN_PATTERN = /^\{\{secret\.[^{}]+\}\}$/;
+
+const redactFlowStepLiteralInputs = (step: unknown): unknown => {
+  if (!isRecord(step)) {
+    return step;
+  }
+  const next: Record<string, unknown> = { ...step };
+  if (next.type === 'input' && typeof next.value === 'string' && !SECRET_TOKEN_PATTERN.test(next.value)) {
+    next.value = '';
+  }
+  if (Array.isArray(next.children)) {
+    next.children = next.children.map((child) => redactFlowStepLiteralInputs(child));
+  }
+  if (Array.isArray(next.branches)) {
+    next.branches = next.branches.map((branch) => {
+      if (!isRecord(branch)) {
+        return branch;
+      }
+      const nextBranch: Record<string, unknown> = { ...branch };
+      if (Array.isArray(nextBranch.steps)) {
+        nextBranch.steps = nextBranch.steps.map((branchStep) => redactFlowStepLiteralInputs(branchStep));
+      }
+      return nextBranch;
+    });
+  }
+  return next;
+};
+
+export const buildExportPayload = (
+  sites: Record<string, StructuredSiteData>,
+  options?: BuildExportPayloadOptions,
+): ExportPayload => {
   const normalizedSites = normalizeStructuredStoragePayload({ sites: sites || {} }).payload.sites;
+  const redactLiteralInputs = options?.redactLiteralInputs !== false;
+  const exportSites = redactLiteralInputs
+    ? (JSON.parse(JSON.stringify(normalizedSites)) as Record<string, StructuredSiteData>)
+    : normalizedSites;
+  if (redactLiteralInputs) {
+    Object.values(exportSites).forEach((siteData) => {
+      if (!siteData || !Array.isArray(siteData.flows)) {
+        return;
+      }
+      siteData.flows = siteData.flows.map((flow) => ({
+        ...flow,
+        steps: Array.isArray(flow.steps)
+          ? (flow.steps.map((step) => redactFlowStepLiteralInputs(step)) as StructuredSiteData['flows'][number]['steps'])
+          : [],
+      }));
+    });
+  }
   return {
     version: EXPORT_JSON_VERSION,
-    sites: normalizedSites,
+    sites: exportSites,
   };
 };
 

@@ -9,10 +9,12 @@ import SelectMenu from './SelectMenu';
 import StepPicker from './StepPicker';
 import { t, useLocale } from '../utils/i18n';
 import type { SelectorPickerAccept } from '../../../shared/messages';
+import { isSecretTokenValue } from '../../../shared/secrets';
 import { buildDataSourceSummary, parseDataSourceMeta } from './flowSteps/dataSourceParser';
 import { buildStepSummary, getFieldValue, shouldShowField } from './flowSteps/summary';
 import { createInputStepWithValue, createStepTemplate } from './flowSteps/templates';
 import { StepFieldControl } from './flowSteps/fieldRenderer';
+import InputSecretValueControl from './flowSteps/InputSecretValueControl';
 import {
   FIELD_LABEL_KEYS,
   getConditionOperators,
@@ -129,6 +131,7 @@ export default function FlowStepsBuilder({
     stepId: string;
     fieldId: string;
   } | null>(null);
+  const [inputValueModes, setInputValueModes] = useState<Record<string, 'literal' | 'secret'>>({});
   const [collapsedSteps, setCollapsedSteps] = useState<Record<string, boolean>>({});
   const [collapsedBranches, setCollapsedBranches] = useState<Record<string, boolean>>({});
   const [dragState, setDragState] = useState<
@@ -583,8 +586,11 @@ export default function FlowStepsBuilder({
                       .filter((field) => shouldShowField(step, field))
                       .filter((field) => !(isDataSource && field.id === 'headerRow'));
                     if (step.type !== 'wait') {
-                      return visibleFields.map((field) => (
-                        <label key={field.id} className="grid gap-1">
+                      return visibleFields.map((field) => {
+                        const useLabelWrapper = !(step.type === 'input' && field.id === 'value');
+                        const FieldWrapper = (useLabelWrapper ? 'label' : 'div') as 'label' | 'div';
+                        return (
+                        <FieldWrapper key={field.id} className="grid gap-1">
                           <span className="text-xs font-semibold text-muted-foreground">
                             {getFieldLabel(field.label)}
                           </span>
@@ -594,60 +600,70 @@ export default function FlowStepsBuilder({
                                 const hasTransform = Boolean(
                                   field.transform?.mode === 'js' && field.transform.code.trim(),
                                 );
+                                const inputValueModeKey = `${step.id}:${field.id}`;
+                                const inputValueMode =
+                                  inputValueModes[inputValueModeKey] ??
+                                  (isSecretTokenValue(field.value) ? 'secret' : 'literal');
+                                const showInputValueShortcuts = inputValueMode === 'literal';
                                 const transformEditorOpen =
                                   transformEditorTarget?.stepId === step.id &&
                                   transformEditorTarget.fieldId === field.id;
                                 const transformConfig = ensureJsTransform(field.transform);
                                 return (
                                   <div className="grid w-full gap-1.5">
-                                    <input
-                                      ref={setFieldInputRef(step.id, field.id)}
-                                      data-flow-step-id={step.id}
-                                      data-flow-field-id={field.id}
-                                      className="input min-w-0"
-                                      type={field.type === 'number' ? 'number' : 'text'}
-                                      value={field.value}
-                                      onChange={(event) => updateField(step.id, field.id, event.target.value)}
-                                      placeholder={field.placeholder}
-                                      onFocus={() =>
-                                        setActiveFieldTarget({ stepId: step.id, fieldId: field.id })
+                                    <InputSecretValueControl
+                                      step={step}
+                                      field={field}
+                                      onUpdateField={updateField}
+                                      onModeChange={(mode) =>
+                                        setInputValueModes((current) =>
+                                          current[inputValueModeKey] === mode
+                                            ? current
+                                            : { ...current, [inputValueModeKey]: mode },
+                                        )
+                                      }
+                                      setFieldInputRef={setFieldInputRef}
+                                      onFocusField={(stepId, fieldId) =>
+                                        setActiveFieldTarget({ stepId, fieldId })
                                       }
                                     />
-                                    <div className="flex flex-wrap items-center gap-1">
-                                      {inputValueShortcuts.map((shortcut) => {
-                                        const Icon = shortcut.icon;
-                                        return (
-                                          <button
-                                            key={shortcut.id}
-                                            type="button"
-                                            className="btn-icon h-7 w-7"
-                                            title={shortcut.label}
-                                            aria-label={shortcut.label}
-                                            onClick={(event) => {
-                                              event.preventDefault();
-                                              event.stopPropagation();
-                                              insertInputValueShortcut(step.id, field.id, shortcut.token);
-                                            }}
-                                          >
-                                            <Icon className="h-3.5 w-3.5" />
-                                          </button>
-                                        );
-                                      })}
-                                      <button
-                                        type="button"
-                                        className={`btn-icon h-7 w-7 ${hasTransform || transformEditorOpen ? 'bg-primary/15 text-primary' : ''}`}
-                                        title={t('sidepanel_step_input_transform_edit', 'Edit JS transform')}
-                                        aria-label={t('sidepanel_step_input_transform_edit', 'Edit JS transform')}
-                                        onClick={(event) => {
-                                          event.preventDefault();
-                                          event.stopPropagation();
-                                          toggleTransformEditor(step.id, field.id);
-                                        }}
-                                      >
-                                        <Code2 className="h-3.5 w-3.5" />
-                                      </button>
-                                    </div>
-                                    {transformEditorOpen ? (
+                                    {showInputValueShortcuts ? (
+                                      <div className="flex flex-wrap items-center gap-1">
+                                        {inputValueShortcuts.map((shortcut) => {
+                                          const Icon = shortcut.icon;
+                                          return (
+                                            <button
+                                              key={shortcut.id}
+                                              type="button"
+                                              className="btn-icon h-7 w-7"
+                                              title={shortcut.label}
+                                              aria-label={shortcut.label}
+                                              onClick={(event) => {
+                                                event.preventDefault();
+                                                event.stopPropagation();
+                                                insertInputValueShortcut(step.id, field.id, shortcut.token);
+                                              }}
+                                            >
+                                              <Icon className="h-3.5 w-3.5" />
+                                            </button>
+                                          );
+                                        })}
+                                        <button
+                                          type="button"
+                                          className={`btn-icon h-7 w-7 ${hasTransform || transformEditorOpen ? 'bg-primary/15 text-primary' : ''}`}
+                                          title={t('sidepanel_step_input_transform_edit', 'Edit JS transform')}
+                                          aria-label={t('sidepanel_step_input_transform_edit', 'Edit JS transform')}
+                                          onClick={(event) => {
+                                            event.preventDefault();
+                                            event.stopPropagation();
+                                            toggleTransformEditor(step.id, field.id);
+                                          }}
+                                        >
+                                          <Code2 className="h-3.5 w-3.5" />
+                                        </button>
+                                      </div>
+                                    ) : null}
+                                    {showInputValueShortcuts && transformEditorOpen ? (
                                       <div className="grid gap-2 rounded-md border border-border bg-muted/30 p-2">
                                         <label className="flex items-center gap-2 text-[11px] text-muted-foreground">
                                           <input
@@ -744,8 +760,8 @@ export default function FlowStepsBuilder({
                               );
                             })()}
                           </div>
-                        </label>
-                      ));
+                        </FieldWrapper>
+                      )});
                     }
                     const rendered: ReactNode[] = [];
                     const expectedField = visibleFields.find((field) => field.id === 'expected');

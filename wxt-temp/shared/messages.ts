@@ -101,7 +101,6 @@ export type FlowRunExecutionDetails = {
   selector?: string;
   elementText?: string;
   fieldName?: string;
-  inputValue?: string;
   popupMessage?: string;
   mode?: 'time' | 'condition' | 'appear' | 'disappear';
   durationMs?: number;
@@ -170,6 +169,7 @@ export type FlowRunExecuteStepPayload = {
   stepType: FlowRunAtomicStepType;
   selector?: string;
   value?: string;
+  valueSource?: 'literal' | 'secret';
   message?: string;
   mode?: 'time' | 'condition' | 'appear' | 'disappear';
   durationMs?: number;
@@ -177,6 +177,8 @@ export type FlowRunExecuteStepPayload = {
   expected?: string;
   timeoutMs?: number;
   pollIntervalMs?: number;
+  targetFrameId?: number;
+  topFrameOnly?: boolean;
 };
 
 export type FlowRunExecuteResultPayload = {

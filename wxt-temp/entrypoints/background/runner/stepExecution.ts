@@ -21,7 +21,7 @@ import {
 import { TabBridge } from '../runtime/tabBridge';
 import { parseDataSourceRows } from './dataSource';
 import { JsTransformExecutor } from './jsTransformExecutor';
-import { resolveSecretTokens } from '../../../shared/secrets';
+import { isSecretTokenValue, resolveSecretTokens } from '../../../shared/secrets';
 import {
   getRenderedStepFieldValue,
   getStepField,
@@ -74,6 +74,7 @@ type FlowRunInternal = {
   source: FlowRunStartPayload['source'];
   dataSourceInputs: Record<string, FlowRunDataSourceInput>;
   tabId: number;
+  targetFrameId?: number;
   siteKey: string;
   state: FlowRunState;
   currentStepId?: string;
@@ -212,7 +213,7 @@ export class FlowRunnerManager {
     this.statusThrottleMs = options.statusThrottleMs ?? STATUS_THROTTLE_MS;
   }
 
-  async start(payload: FlowRunStartPayload) {
+  async start(payload: FlowRunStartPayload, options?: { targetFrameId?: number }) {
     const flow = payload.flow;
     if (!flow || !flow.id || !Array.isArray(flow.steps)) {
       throw new RunnerError('invalid-flow-payload', 'Flow payload is invalid.');
@@ -282,6 +283,7 @@ export class FlowRunnerManager {
       source: payload.source,
       dataSourceInputs: runDataSourceInputs,
       tabId,
+      targetFrameId: typeof options?.targetFrameId === 'number' ? options.targetFrameId : undefined,
       siteKey: flowSiteKey,
       state: 'queued',
       progress: {
@@ -525,6 +527,10 @@ export class FlowRunnerManager {
       inFlight.stepType === 'condition' ||
       inFlight.stepType === 'popup';
     if (!isRetryableStep) {
+      return;
+    }
+    if (inFlight.stepType === 'popup' && !hasNavigation && source === 'tab-updated') {
+      this.supersedeInFlightRequest(run, source, 'popup-refresh-dismissed');
       return;
     }
     if (inFlight.stepType !== 'wait' && !hasNavigation) {
@@ -943,7 +949,13 @@ export class FlowRunnerManager {
       resolvedValue = await resolveSecretTokens(renderedValue);
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : String(error);
-      throw new RunnerError('secret-resolution-error', `Secret resolution failed for ${fieldId}: ${errorMessage}`);
+      let errorCode = 'secret-resolution-error';
+      if (/secret vault is locked/i.test(errorMessage)) {
+        errorCode = 'secret-vault-locked';
+      } else if (/secret not found/i.test(errorMessage)) {
+        errorCode = 'secret-not-found';
+      }
+      throw new RunnerError(errorCode, `Secret resolution failed for ${fieldId}: ${errorMessage}`);
     }
     const field = getStepField(step, fieldId);
     if (!field?.transform || field.transform.mode !== 'js') {
@@ -987,8 +999,10 @@ export class FlowRunnerManager {
     if (stepType === 'click') {
       payload.selector = await this.resolveStepFieldValue(step, 'selector', row);
     } else if (stepType === 'input') {
+      const rawValue = getRenderedStepFieldValue(step, 'value', row);
       payload.selector = await this.resolveStepFieldValue(step, 'selector', row);
       payload.value = await this.resolveStepFieldValue(step, 'value', row);
+      payload.valueSource = isSecretTokenValue(rawValue) ? 'secret' : 'literal';
     } else if (stepType === 'popup') {
       payload.message = await this.resolveStepFieldValue(step, 'message', row);
     } else if (stepType === 'wait') {
@@ -1050,6 +1064,8 @@ export class FlowRunnerManager {
           runId: run.runId,
           requestId,
           attempt,
+          targetFrameId: run.targetFrameId,
+          topFrameOnly: typeof run.targetFrameId === 'number' ? false : true,
         };
         run.inFlightAtomic = {
           stepId: payload.stepId,
@@ -1063,10 +1079,15 @@ export class FlowRunnerManager {
           startedAt: Date.now(),
           status: 'dispatched',
         };
-        const response = await this.tabBridge.sendMessageToTabWithRetry(run.tabId, {
-          type: MessageType.FLOW_RUN_EXECUTE_STEP,
-          data: requestPayload,
-        });
+        const response = await this.tabBridge.sendMessageToTabWithRetry(
+          run.tabId,
+          {
+            type: MessageType.FLOW_RUN_EXECUTE_STEP,
+            data: requestPayload,
+          },
+          true,
+          typeof run.targetFrameId === 'number' ? { frameId: run.targetFrameId } : undefined,
+        );
         if (!response.ok) {
           lastTransportError = response.error || 'Failed to dispatch step to content script.';
           if (!isRecoverableTabMessageError(lastTransportError)) {
@@ -1110,6 +1131,13 @@ export class FlowRunnerManager {
           });
         } catch (error) {
           if (error instanceof RunnerError && error.code === 'step-request-superseded') {
+            if (payload.stepType === 'popup' && error.message === 'popup-refresh-dismissed') {
+              throw new RunnerError(
+                'popup-dismissed-by-navigation',
+                'Popup step was dismissed because the page refreshed or navigated.',
+                { phase: 'result-wait', recoverable: true },
+              );
+            }
             const recoverUrl = run.activeUrl || run.inFlightAtomic?.lastKnownUrl || stepStartUrl;
             this.appendLog(
               run,

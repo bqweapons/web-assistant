@@ -452,28 +452,30 @@ export default function HiddenRulesSection({
 
   return (
     <section className="flex flex-col gap-2">
-      <div className="grid grid-cols-2 gap-2">
+      <div className="grid grid-cols-[minmax(0,1fr)_minmax(0,1.35fr)] gap-2">
         <button
           type="button"
-          className="btn-primary w-full gap-2 disabled:cursor-not-allowed disabled:opacity-60"
+          className="btn-primary w-full gap-2 whitespace-nowrap disabled:cursor-not-allowed disabled:opacity-60"
           onClick={handleCreateFromPicker}
           disabled={!hasActivePage || !normalizedSiteKey}
         >
-          <Crosshair className="h-4 w-4" />
+          <Crosshair className="h-4 w-4 shrink-0" />
           {t('sidepanel_hidden_action_select', 'Hide page element')}
         </button>
         <button
           type="button"
-          className="btn-ghost w-full gap-2 disabled:cursor-not-allowed disabled:opacity-60"
+          className="btn-ghost w-full gap-2 px-2 text-[13px] whitespace-nowrap disabled:cursor-not-allowed disabled:opacity-60"
           onClick={() => {
             void handleToggleAutoAds();
           }}
           disabled={!hasActivePage || !normalizedSiteKey}
         >
-          <Sparkles className="h-4 w-4" />
-          {allAutoAdsEnabled
-            ? t('sidepanel_hidden_auto_ads_off', 'Pause auto hide ads')
-            : t('sidepanel_hidden_auto_ads_on', 'Enable auto hide ads')}
+          <Sparkles className="h-4 w-4 shrink-0" />
+          <span className="truncate">
+            {allAutoAdsEnabled
+              ? t('sidepanel_hidden_auto_ads_off', 'Pause auto hide ads')
+              : t('sidepanel_hidden_auto_ads_on', 'Enable auto hide ads')}
+          </span>
         </button>
       </div>
 

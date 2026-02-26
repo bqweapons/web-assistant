@@ -199,6 +199,7 @@ export default function ElementsSection({
   const latestElementsRef = useRef<StoredElementRecord[]>(elements);
   const latestFlowsRef = useRef(flows);
   const latestDraftElementIdRef = useRef<string | null>(draftElementId);
+  const draftFlowSeedNameRef = useRef('');
   const elementTargetTabId = hasActivePage && typeof tabId === 'number' ? tabId : undefined;
   const sendElementMessage = useCallback(
     async (type: MessageType, payload?: Record<string, unknown>) => {
@@ -1100,7 +1101,8 @@ export default function ElementsSection({
     if (!flowDrawerOpen) {
       return;
     }
-    setDraftFlow({ name: '', description: '', steps: [] });
+    setDraftFlow({ name: draftFlowSeedNameRef.current, description: '', steps: [] });
+    draftFlowSeedNameRef.current = '';
   }, [flowDrawerOpen]);
 
   const createElementId = () =>
@@ -1697,6 +1699,9 @@ export default function ElementsSection({
             const pageSite = pageElements[0]
               ? resolveElementContext(pageElements[0], normalizedSiteKey).siteUrl
               : currentSite;
+            const isSiteScopeGroup =
+              pageElements.length > 0 &&
+              pageElements.every((element) => normalizeElementScope(element.scope) === 'site');
             return (
               <div key={page} className="grid gap-2">
               <div className="flex items-center justify-between gap-2">
@@ -1706,9 +1711,15 @@ export default function ElementsSection({
                   </span>
                   <p
                     className="max-w-[220px] truncate text-sm font-semibold text-card-foreground"
-                    title={getPageLabel(page, pageSite)}
+                    title={
+                      isSiteScopeGroup
+                        ? `${t('sidepanel_elements_group_site_scope', 'Site-wide')} (${getPageLabel(page, pageSite)})`
+                        : getPageLabel(page, pageSite)
+                    }
                   >
-                    {getPagePathLabel(page, pageSite)}
+                    {isSiteScopeGroup
+                      ? t('sidepanel_elements_group_site_scope', 'Site-wide')
+                      : getPagePathLabel(page, pageSite)}
                   </p>
                 </div>
                 <div className="flex items-center gap-2">
@@ -1878,6 +1889,7 @@ export default function ElementsSection({
                       buttonClassName={selectButtonClass}
                       onChange={(value) => {
                         if (value === '__create__') {
+                          draftFlowSeedNameRef.current = editElement.text.trim();
                           setFlowDrawerOpen(true);
                           return;
                         }

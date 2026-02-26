@@ -12,7 +12,7 @@
     "message": "取消"
   },
   "sidepanel_action_clear": {
-    "message": "清除"
+    "message": "Clear"
   },
   "sidepanel_action_dark_mode": {
     "message": "深色模式"
@@ -45,7 +45,7 @@
     "message": "{title} 标志"
   },
   "sidepanel_app_title": {
-    "message": "Ladybird"
+    "message": "懒鸟"
   },
   "sidepanel_color_black": {
     "message": "黑色"
@@ -165,7 +165,7 @@
     "message": "暂无元素。创建第一个元素开始使用。"
   },
   "sidepanel_elements_empty_filtered": {
-    "message": "没有匹配结果。尝试更换搜索或筛选。"
+    "message": "没有匹配结果。请尝试其他搜索词或筛选条件。"
   },
   "sidepanel_elements_font_decrease": {
     "message": "减小字号"
@@ -417,10 +417,10 @@
     "message": "流程详情"
   },
   "sidepanel_flows_empty": {
-    "message": "暂无流程。创建一个以定义自动化操作。"
+    "message": "还没有流程。先创建一个开始使用。"
   },
   "sidepanel_flows_empty_filtered": {
-    "message": "没有匹配结果。尝试更换搜索或筛选。"
+    "message": "没有匹配结果。请尝试其他搜索词或筛选条件。"
   },
   "sidepanel_flows_name_placeholder": {
     "message": "流程名称"
@@ -483,10 +483,10 @@
     "message": "启用规则"
   },
   "sidepanel_hidden_empty": {
-    "message": "暂无隐藏规则。"
+    "message": "还没有隐藏规则。先添加一条规则开始使用。"
   },
   "sidepanel_hidden_empty_filtered": {
-    "message": "没有匹配结果。尝试更换搜索或筛选。"
+    "message": "没有匹配结果。请尝试其他搜索词或筛选条件。"
   },
   "sidepanel_hidden_enabled": {
     "message": "规则已启用"
@@ -685,6 +685,177 @@
   },
   "sidepanel_settings_feedback_open_success": {
     "message": "已在新标签页中打开商店链接。"
+  },
+  "sidepanel_settings_data_export_dangerous": {
+    "message": "导出（包含明文输入值）"
+  },
+  "sidepanel_settings_data_export_dangerous_confirm": {
+    "message": "此导出将包含明文输入值（包括流程中保存的明文密码）。是否继续？"
+  },
+  "sidepanel_settings_data_export_dangerous_note": {
+    "message": "默认导出会清空流程步骤中的明文输入值。像 {token} 这样的密钥令牌会被保留。"
+  },
+  "sidepanel_settings_secrets_title": {
+    "message": "密钥库"
+  },
+  "sidepanel_settings_secrets_subtitle": {
+    "message": "加密保存密码，并在流程输入值中使用 {token} 这样的占位符。"
+  },
+  "sidepanel_settings_secrets_status_configured": {
+    "message": "密钥库已配置"
+  },
+  "sidepanel_settings_secrets_status_not_configured": {
+    "message": "密钥库未配置"
+  },
+  "sidepanel_settings_secrets_status_unlocked": {
+    "message": "已解锁"
+  },
+  "sidepanel_settings_secrets_status_locked": {
+    "message": "已锁定"
+  },
+  "sidepanel_settings_secrets_status_count": {
+    "message": "{count} 个密钥"
+  },
+  "sidepanel_settings_secrets_master_password_unlock_placeholder": {
+    "message": "输入主密码以解锁"
+  },
+  "sidepanel_settings_secrets_master_password_create_placeholder": {
+    "message": "设置主密码"
+  },
+  "sidepanel_settings_secrets_unlock": {
+    "message": "解锁"
+  },
+  "sidepanel_settings_secrets_create_vault": {
+    "message": "创建密钥库"
+  },
+  "sidepanel_settings_secrets_lock": {
+    "message": "锁定"
+  },
+  "sidepanel_settings_secrets_save_title": {
+    "message": "保存密钥"
+  },
+  "sidepanel_settings_secrets_key_placeholder": {
+    "message": "密钥名（例如 login_password）"
+  },
+  "sidepanel_settings_secrets_value_placeholder": {
+    "message": "密钥值"
+  },
+  "sidepanel_settings_secrets_save_action": {
+    "message": "保存密钥"
+  },
+  "sidepanel_settings_secrets_input_example": {
+    "message": "流程输入示例：{token}"
+  },
+  "sidepanel_settings_secrets_saved_keys_title": {
+    "message": "已保存的密钥名"
+  },
+  "sidepanel_settings_secrets_delete": {
+    "message": "删除"
+  },
+  "sidepanel_settings_secrets_empty": {
+    "message": "还没有保存任何密钥。"
+  },
+  "sidepanel_settings_secrets_feedback_unlocked": {
+    "message": "密钥库已解锁。"
+  },
+  "sidepanel_settings_secrets_feedback_ready": {
+    "message": "密钥库已就绪。"
+  },
+  "sidepanel_settings_secrets_feedback_locked": {
+    "message": "密钥库已锁定。"
+  },
+  "sidepanel_settings_secrets_feedback_saved": {
+    "message": "已保存密钥“{name}”。"
+  },
+  "sidepanel_settings_secrets_feedback_deleted": {
+    "message": "已删除密钥“{name}”。"
+  },
+  "sidepanel_flow_input_value_mode": {
+    "message": "输入方式"
+  },
+  "sidepanel_flow_input_value_mode_literal": {
+    "message": "直接输入"
+  },
+  "sidepanel_flow_input_value_mode_secret": {
+    "message": "从密码库选择"
+  },
+  "sidepanel_flow_input_password_warning": {
+    "message": "这个输入目标看起来像密码字段。密码不能以明文保存在流程中。"
+  },
+  "sidepanel_flow_input_password_migration_required": {
+    "message": "密码字段必须使用密码库。明文密码在保存和运行时都会被拦截。"
+  },
+  "sidepanel_flow_input_password_save_to_vault": {
+    "message": "保存到密码库并绑定"
+  },
+  "sidepanel_flow_input_password_use_vault": {
+    "message": "使用密码库"
+  },
+  "sidepanel_flow_input_secret_bound": {
+    "message": "已绑定：{name}"
+  },
+  "sidepanel_flow_input_secret_select": {
+    "message": "密码库中的密码"
+  },
+  "sidepanel_flow_input_secret_select_placeholder": {
+    "message": "选择密码"
+  },
+  "sidepanel_flow_input_secret_select_required": {
+    "message": "请选择一个密码。"
+  },
+  "sidepanel_flow_input_secret_bind_selected": {
+    "message": "绑定所选密码"
+  },
+  "sidepanel_flow_input_secret_create": {
+    "message": "新建密码"
+  },
+  "sidepanel_flow_input_secret_unlock": {
+    "message": "解锁保管库"
+  },
+  "sidepanel_flow_input_secret_create_and_unlock": {
+    "message": "创建并解锁保管库"
+  },
+  "sidepanel_flow_input_secret_save_bind": {
+    "message": "保存并绑定"
+  },
+  "sidepanel_flow_input_secret_change": {
+    "message": "更换"
+  },
+  "sidepanel_flow_input_secret_remove": {
+    "message": "移除"
+  },
+  "sidepanel_flow_input_secret_unlock_help": {
+    "message": "要选择已保存的密码，请先解锁保管库。这里输入的是保管库密码，不是网站密码。"
+  },
+  "sidepanel_flow_input_secret_create_help": {
+    "message": "这里输入的不是网站登录密码，而是密码保管库的主密码（用于创建和解锁）。"
+  },
+  "sidepanel_flow_input_secret_master_password": {
+    "message": "保管库密码（创建/解锁用）"
+  },
+  "sidepanel_flow_input_secret_name_placeholder": {
+    "message": "密钥名（例如 login_password）"
+  },
+  "sidepanel_flow_input_secret_name_required": {
+    "message": "请输入密钥名。"
+  },
+  "sidepanel_flow_input_secret_name_duplicate": {
+    "message": "已存在同名密码，请使用其他名称。"
+  },
+  "sidepanel_flow_input_secret_value_placeholder": {
+    "message": "密码值"
+  },
+  "sidepanel_flows_validation_password_secret_required": {
+    "message": "检测到密码字段使用明文输入。请先保存到密码库并绑定后再保存或运行。"
+  },
+  "sidepanel_flow_runner_error_password_literal_blocked": {
+    "message": "运行前请先将密码字段保存到密码库。"
+  },
+  "sidepanel_flow_runner_error_secret_vault_locked": {
+    "message": "请先解锁密码库。"
+  },
+  "sidepanel_flow_runner_error_secret_not_found": {
+    "message": "找不到已绑定的密码，请重新选择。"
   },
   "sidepanel_step_assert_description": {
     "message": "检查值或状态。"
@@ -927,10 +1098,10 @@
     "message": "未分组"
   },
   "sidepanel_elements_no_active_page": {
-    "message": "未检测到活动页面。请打开站点标签页并刷新后管理元素。"
+    "message": "未检测到当前页面。请打开站点页面并刷新后管理元素。"
   },
   "sidepanel_elements_empty_site": {
-    "message": "该站点暂无元素，先添加一个吧。"
+    "message": "当前站点还没有元素。先添加一个开始使用。"
   },
   "sidepanel_flows_badge": {
     "message": "流程"
@@ -1050,7 +1221,7 @@
     "message": "另一个流程正在运行。"
   },
   "sidepanel_flows_no_active_page_readonly": {
-    "message": "未检测到活动页面。你仍可只读浏览流程，运行已禁用。"
+    "message": "未检测到当前页面。你可以只读查看流程，但无法运行。"
   },
   "sidepanel_flows_persist_error_create": {
     "message": "创建流程失败，请重试。"
@@ -1071,7 +1242,7 @@
     "message": "你有未保存的更改，确定放弃并关闭吗？"
   },
   "sidepanel_hidden_no_active_page": {
-    "message": "未检测到活动页面。请打开站点标签页后再管理隐藏规则。"
+    "message": "未检测到当前页面。请打开站点页面并刷新后管理隐藏规则。"
   },
   "sidepanel_hidden_invalid_selector": {
     "message": "选择器格式无效。"
@@ -1144,5 +1315,146 @@
   },
   "sidepanel_action_delete": {
     "message": "删除"
+  },
+  "sidepanel_settings_export_include_vault_passwords_confirm": {
+    "message": "检测到密码保管库数据。\n\nOK：本次导出包含已保存的密码（下一步需要输入保管库密码）。\n取消：继续导出，但不包含已保存的密码。"
+  },
+  "sidepanel_settings_export_vault_password_prompt": {
+    "message": "如需在导出中包含已保存密码，请输入保管库密码。"
+  },
+  "sidepanel_settings_export_vault_password_required": {
+    "message": "导出已保存密码需要输入保管库密码。"
+  },
+  "sidepanel_settings_import_vault_create_confirm": {
+    "message": "此文件包含密码保管库数据。是否现在创建保管库并导入已保存密码？"
+  },
+  "sidepanel_settings_import_vault_password_prompt_create": {
+    "message": "请创建保管库密码（用于创建/解锁导入后的保管库）。"
+  },
+  "sidepanel_settings_import_vault_password_prompt_unlock": {
+    "message": "此文件包含密码保管库数据。请输入保管库密码以导入已保存密码。"
+  },
+  "sidepanel_settings_import_vault_skipped_no_password": {
+    "message": "未提供保管库密码，已跳过密码保管库导入。"
+  },
+  "sidepanel_settings_import_vault_skipped_user_declined": {
+    "message": "已跳过密码保管库导入。"
+  },
+  "sidepanel_settings_data_import_passwords_suffix": {
+    "message": "个密码已导入"
+  },
+  "sidepanel_settings_vault_viewer_title": {
+    "message": "密码保管库阅览"
+  },
+  "sidepanel_settings_vault_viewer_subtitle": {
+    "message": "打开密码保管库阅览窗口，输入保管库密码即可查看已保存密码。"
+  },
+  "sidepanel_settings_vault_viewer_open": {
+    "message": "打开密码保管库"
+  },
+  "sidepanel_settings_vault_viewer_modal_subtitle": {
+    "message": "输入保管库密码以查看已保存密码。"
+  },
+  "sidepanel_settings_vault_viewer_status": {
+    "message": "状态"
+  },
+  "sidepanel_settings_vault_viewer_status_unlocked": {
+    "message": "已配置 / 已解锁"
+  },
+  "sidepanel_settings_vault_viewer_status_locked": {
+    "message": "已配置 / 已锁定"
+  },
+  "sidepanel_settings_vault_viewer_status_not_configured": {
+    "message": "未配置"
+  },
+  "sidepanel_settings_vault_viewer_count": {
+    "message": "{count} 个密码"
+  },
+  "sidepanel_settings_vault_viewer_password_input": {
+    "message": "保管库密码（创建/解锁用）"
+  },
+  "sidepanel_settings_vault_viewer_unlock": {
+    "message": "解锁保管库"
+  },
+  "sidepanel_settings_vault_viewer_create_unlock": {
+    "message": "创建保管库"
+  },
+  "sidepanel_settings_vault_viewer_unlock_hint": {
+    "message": "请先解锁保管库后再查看已保存密码。"
+  },
+  "sidepanel_settings_vault_viewer_empty": {
+    "message": "保管库中还没有保存密码。"
+  },
+  "sidepanel_settings_vault_viewer_show": {
+    "message": "显示"
+  },
+  "sidepanel_settings_vault_viewer_hide": {
+    "message": "隐藏"
+  },
+  "sidepanel_settings_vault_viewer_loading": {
+    "message": "读取中..."
+  },
+  "sidepanel_settings_vault_viewer_unlocked": {
+    "message": "密码保管库已解锁。"
+  },
+  "sidepanel_settings_vault_viewer_created": {
+    "message": "密码保管库已创建并解锁。"
+  },
+  "sidepanel_overview_empty": {
+    "message": "还没有已保存的数据。先添加元素、流程或隐藏规则。"
+  },
+  "sidepanel_overview_delete_site": {
+    "message": "删除站点数据"
+  },
+  "sidepanel_overview_delete_site_confirm": {
+    "message": "确定删除 {site} 的所有已保存数据吗？此操作无法撤销。"
+  },
+  "sidepanel_overview_delete_site_error": {
+    "message": "删除站点数据失败，请重试。"
+  },
+  "sidepanel_elements_group_site_scope": {
+    "message": "整个站点"
+  },
+  "sidepanel_flow_runner_current_step_card_title": {
+    "message": "当前步骤"
+  },
+  "sidepanel_flow_runner_current_step_waiting_start": {
+    "message": "正在等待流程开始..."
+  },
+  "sidepanel_flow_runner_current_step_idle": {
+    "message": "当前没有正在运行的步骤。"
+  },
+  "sidepanel_flow_runner_current_step_preparing": {
+    "message": "正在准备下一个步骤..."
+  },
+  "sidepanel_flow_runner_current_step_popup_waiting": {
+    "message": "正在等待你确认页面弹窗（点击 OK 后继续）。"
+  },
+  "sidepanel_flow_runner_current_step_wait_time": {
+    "message": "正在等待 {value} ms..."
+  },
+  "sidepanel_flow_runner_current_step_wait_condition": {
+    "message": "正在等待页面条件成立..."
+  },
+  "sidepanel_flow_runner_current_step_running_generic": {
+    "message": "正在执行当前步骤..."
+  },
+  "sidepanel_flow_runner_logs_title": {
+    "message": "运行日志"
+  },
+  "sidepanel_flow_runner_logs_copy": {
+    "message": "复制日志"
+  },
+  "sidepanel_flow_runner_logs_empty": {
+    "message": "还没有日志。"
+  },
+  "sidepanel_flow_runner_logs_show_recent": {
+    "message": "只看最近5条"
+  },
+  "sidepanel_flow_runner_logs_show_all": {
+    "message": "显示全部"
+  },
+  "sidepanel_flow_runner_logs_showing_recent": {
+    "message": "正在显示最新 {count} 条日志"
   }
 }

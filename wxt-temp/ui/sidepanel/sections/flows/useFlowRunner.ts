@@ -56,6 +56,27 @@ export const formatRunnerError = (code?: string, message?: string) => {
       'Selected CSV does not match the recorded data source.',
     );
   }
+  if (code === 'password-literal-blocked') {
+    return t(
+      'sidepanel_flow_runner_error_password_literal_blocked',
+      'Password fields must be saved to the password vault before running.',
+    );
+  }
+  if (code === 'secret-vault-locked') {
+    return t('sidepanel_flow_runner_error_secret_vault_locked', 'Please unlock the password vault first.');
+  }
+  if (code === 'secret-not-found') {
+    return t(
+      'sidepanel_flow_runner_error_secret_not_found',
+      'The selected password could not be found. Please choose it again.',
+    );
+  }
+  if (code === 'popup-dismissed-by-navigation') {
+    return t(
+      'sidepanel_flow_runner_error_popup_dismissed_by_navigation',
+      'Popup confirmation was closed because the page refreshed or navigated.',
+    );
+  }
   return message || code || t('sidepanel_flow_runner_error_unknown', 'Flow run failed.');
 };
 

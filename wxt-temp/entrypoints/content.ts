@@ -239,6 +239,14 @@ export default defineContentScript({
           return true;
         }
         case MessageType.FLOW_RUN_EXECUTE_STEP: {
+          const topFrameOnly = message.data.topFrameOnly !== false;
+          if (topFrameOnly && window.top !== window) {
+            sendResponse?.({
+              ok: true,
+              data: { accepted: false, reason: 'ignored_non_top_frame' },
+            });
+            return true;
+          }
           sendResponse?.({ ok: true, data: { accepted: true } });
           void executeFlowRunStep(message.data)
             .then((result) => {

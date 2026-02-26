@@ -3,7 +3,11 @@ const SECRETS_SESSION_KEY = 'ladybird_secrets_session_v1';
 const VAULT_VERSION = 1 as const;
 const VERIFIER_PLAINTEXT = 'ladybird-secret-v1';
 const PBKDF2_ITERATIONS = 200_000;
-const SECRET_TOKEN_PATTERN = /{{\s*secret\.([A-Za-z0-9_.:-]+)\s*}}/g;
+export const SECRET_VAULT_TRANSFER_VERSION = 'ladybird-secrets-transfer-v1' as const;
+const SECRET_TOKEN_PATTERN =
+  /{{\s*secret(?:\.([A-Za-z0-9_.:-]+)|\[\s*["']([^"']+)["']\s*\])\s*}}/g;
+const SECRET_TOKEN_EXACT_PATTERN =
+  /^\{\{\s*secret(?:\.([A-Za-z0-9_.:-]+)|\[\s*["']([^"']+)["']\s*\])\s*\}\}$/;
 
 type EncryptedBlob = {
   iv: string;
@@ -35,8 +39,30 @@ type SecretVaultStatus = {
   names: string[];
 };
 
+export type SecretVaultTransferPayload = {
+  version: typeof SECRET_VAULT_TRANSFER_VERSION;
+  items: Record<string, string>;
+};
+
 const textEncoder = new TextEncoder();
 const textDecoder = new TextDecoder();
+
+export const parseSecretTokenValue = (value: string): { name: string } | null => {
+  const match = SECRET_TOKEN_EXACT_PATTERN.exec(value || '');
+  const name = match?.[1] || match?.[2];
+  return name ? { name } : null;
+};
+
+export const isSecretTokenValue = (value: string): boolean => Boolean(parseSecretTokenValue(value));
+
+export const buildSecretToken = (name: string): string => {
+  const normalized = name.trim();
+  if (/^[A-Za-z0-9_:-]+$/.test(normalized)) {
+    return `{{secret.${normalized}}}`;
+  }
+  const escaped = normalized.replace(/\\/g, '\\\\').replace(/"/g, '\\"');
+  return `{{secret["${escaped}"]}}`;
+};
 
 const isRecord = (value: unknown): value is Record<string, unknown> =>
   Boolean(value) && typeof value === 'object' && !Array.isArray(value);
@@ -147,6 +173,27 @@ const normalizeSessionPayload = (raw: unknown): SecretSessionPayload | null => {
     salt: raw.salt,
     key: raw.key,
     unlockedAt,
+  };
+};
+
+export const parseSecretVaultTransferPayload = (raw: unknown): SecretVaultTransferPayload | null => {
+  if (!isRecord(raw) || raw.version !== SECRET_VAULT_TRANSFER_VERSION || !isRecord(raw.items)) {
+    return null;
+  }
+  const items: Record<string, string> = {};
+  Object.entries(raw.items).forEach(([name, value]) => {
+    if (typeof value !== 'string') {
+      return;
+    }
+    const normalizedName = name.trim();
+    if (!normalizedName) {
+      return;
+    }
+    items[normalizedName] = value;
+  });
+  return {
+    version: SECRET_VAULT_TRANSFER_VERSION,
+    items,
   };
 };
 
@@ -294,6 +341,29 @@ export const getSecretsVaultStatus = async (): Promise<SecretVaultStatus> => {
   };
 };
 
+export const listSecretNames = async (): Promise<string[]> => {
+  const status = await getSecretsVaultStatus();
+  return status.names;
+};
+
+export const exportSecretVaultTransferPayload = async (
+  masterPassword: string,
+): Promise<SecretVaultTransferPayload | null> => {
+  const existingVault = await readVaultPayload();
+  if (!existingVault) {
+    return null;
+  }
+  const unlockedStatus = await unlockSecretsVault(masterPassword);
+  const items: Record<string, string> = {};
+  for (const name of unlockedStatus.names) {
+    items[name] = await resolveSecretValue(name);
+  }
+  return {
+    version: SECRET_VAULT_TRANSFER_VERSION,
+    items,
+  };
+};
+
 export const unlockSecretsVault = async (password: string): Promise<SecretVaultStatus> => {
   const trimmed = password;
   if (!trimmed) {
@@ -391,10 +461,29 @@ export const resolveSecretTokens = async (input: string): Promise<string> => {
   if (matches.length === 0) {
     return input;
   }
-  const uniqueNames = Array.from(new Set(matches.map((match) => match[1])));
+  const uniqueNames = Array.from(new Set(matches.map((match) => match[1] || match[2]).filter(Boolean)));
   const resolved = new Map<string, string>();
   for (const name of uniqueNames) {
     resolved.set(name, await resolveSecretValue(name));
   }
-  return input.replace(SECRET_TOKEN_PATTERN, (_full, name: string) => resolved.get(name) ?? '');
+  return input.replace(
+    SECRET_TOKEN_PATTERN,
+    (_full, dotName: string | undefined, bracketName: string | undefined) =>
+      resolved.get(dotName || bracketName || '') ?? '',
+  );
+};
+
+export const importSecretVaultTransferPayload = async (
+  payload: SecretVaultTransferPayload,
+  vaultPassword: string,
+): Promise<SecretVaultStatus> => {
+  const parsed = parseSecretVaultTransferPayload(payload);
+  if (!parsed) {
+    throw new Error('Invalid secret vault transfer payload.');
+  }
+  await unlockSecretsVault(vaultPassword);
+  for (const [name, value] of Object.entries(parsed.items)) {
+    await upsertSecretValue(name, value);
+  }
+  return getSecretsVaultStatus();
 };

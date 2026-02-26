@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import AppHeader from './components/AppHeader';
 import ElementsSection from './sections/ElementsSection';
 import FlowsSection from './sections/FlowsSection';
@@ -28,35 +28,32 @@ const TAB_IDS = {
 
 export default function App() {
   const locale = useLocale();
-  const tabs = useMemo(
-    () => [
-      {
-        id: TAB_IDS.elements,
-        label: t('sidepanel_tab_elements', 'Elements'),
-        tooltip: t('sidepanel_tab_elements_tooltip', 'Saved elements and quick actions.'),
-        icon: <Layers className="h-4 w-4" />,
-      },
-      {
-        id: TAB_IDS.flows,
-        label: t('sidepanel_tab_flows', 'Flows'),
-        tooltip: t('sidepanel_tab_flows_tooltip', 'Reusable action flows.'),
-        icon: <Workflow className="h-4 w-4" />,
-      },
-      {
-        id: TAB_IDS.hiddenRules,
-        label: t('sidepanel_tab_hidden', 'Hidden'),
-        tooltip: t('sidepanel_tab_hidden_tooltip', 'Hidden rules for blocking elements.'),
-        icon: <EyeOff className="h-4 w-4" />,
-      },
-      {
-        id: TAB_IDS.overview,
-        label: t('sidepanel_tab_overview', 'Overview'),
-        tooltip: t('sidepanel_tab_overview_tooltip', 'Summary across sites.'),
-        icon: <LayoutDashboard className="h-4 w-4" />,
-      },
-    ],
-    [locale],
-  );
+  const tabs = [
+    {
+      id: TAB_IDS.elements,
+      label: t('sidepanel_tab_elements', 'Elements'),
+      tooltip: t('sidepanel_tab_elements_tooltip', 'Saved elements and quick actions.'),
+      icon: <Layers className="h-4 w-4" />,
+    },
+    {
+      id: TAB_IDS.flows,
+      label: t('sidepanel_tab_flows', 'Flows'),
+      tooltip: t('sidepanel_tab_flows_tooltip', 'Reusable action flows.'),
+      icon: <Workflow className="h-4 w-4" />,
+    },
+    {
+      id: TAB_IDS.hiddenRules,
+      label: t('sidepanel_tab_hidden', 'Hidden'),
+      tooltip: t('sidepanel_tab_hidden_tooltip', 'Hidden rules for blocking elements.'),
+      icon: <EyeOff className="h-4 w-4" />,
+    },
+    {
+      id: TAB_IDS.overview,
+      label: t('sidepanel_tab_overview', 'Overview'),
+      tooltip: t('sidepanel_tab_overview_tooltip', 'Summary across sites.'),
+      icon: <LayoutDashboard className="h-4 w-4" />,
+    },
+  ];
   const [activeTab, setActiveTab] = useState(TAB_IDS.elements);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [isDark, setIsDark] = useState(false);
@@ -237,23 +234,20 @@ export default function App() {
     ? pageContext.siteKey
     : t('sidepanel_header_no_active_site', 'No active site');
 
-  const headerActions = useMemo(
-    () => [
-      {
-        label: isDark
-          ? t('sidepanel_action_light_mode', 'Light mode')
-          : t('sidepanel_action_dark_mode', 'Dark mode'),
-        onClick: () => setIsDark((prev) => !prev),
-        icon: isDark ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />,
-      },
-      {
-        label: t('sidepanel_action_settings', 'Settings'),
-        onClick: () => setSettingsOpen(true),
-        icon: <Settings className="h-4 w-4" />,
-      },
-    ],
-    [isDark, locale],
-  );
+  const headerActions = [
+    {
+      label: isDark
+        ? t('sidepanel_action_light_mode', 'Light mode')
+        : t('sidepanel_action_dark_mode', 'Dark mode'),
+      onClick: () => setIsDark((prev) => !prev),
+      icon: isDark ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />,
+    },
+    {
+      label: t('sidepanel_action_settings', 'Settings'),
+      onClick: () => setSettingsOpen(true),
+      icon: <Settings className="h-4 w-4" />,
+    },
+  ];
 
   return (
     <div className="relative flex h-screen flex-col bg-background text-foreground">
