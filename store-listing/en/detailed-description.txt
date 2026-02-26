@@ -1,0 +1,49 @@
+Ladybird helps you customize websites with no-code UI elements and user-triggered automation flows.
+
+WHAT IT DOES
+
+- Add buttons, links, tooltips, and areas to pages without writing code.
+- Build flows that can click, input, wait, navigate, log, branch, loop, and show popup confirmations.
+- Hide distracting page elements with Hidden rules.
+- Review saved site data in Overview and manage import/export in Settings.
+
+CORE FEATURES
+
+Elements / Flows / Hidden / Overview / Settings
+- Manage injected UI elements and automation flows from the side panel.
+- Use Overview to inspect saved site data per site and remove data when needed.
+
+Password Vault
+- Save reusable passwords for flow input steps in a locally encrypted Password Vault.
+- Password fields are protected from plain-text flow storage by policy.
+- If a flow needs a vault password while the vault is locked, Ladybird can prompt for vault unlock directly on the page and continue the current step.
+
+Import / Export
+- Export saved configuration as JSON.
+- Export can optionally include Password Vault data after vault-password confirmation.
+- Import supports restoring saved configuration and optional vault data.
+
+Multi-language UI
+- English / Japanese / Simplified Chinese interface support.
+
+TYPICAL USE CASES
+
+- Add quick action buttons to frequently used websites
+- Reuse form-filling flows for repeated tasks
+- Add semi-automated flows with popup confirmations
+- Hide banners or repeated UI sections you do not want to see
+
+PRIVACY & SECURITY
+
+- Data is stored locally in chrome.storage.local unless you export it.
+- Password Vault data is encrypted locally.
+- Ladybird does not upload your configuration data to a telemetry backend.
+- Exported files are your responsibility to store securely.
+- If you forget the vault password, vault contents cannot be recovered and must be reset.
+
+LIMITATIONS
+
+- Some sites may change DOM structure frequently, which can break selectors.
+- Some sites with strict CSP or highly dynamic pages may reduce injection stability.
+- Cross-origin iframe automation is limited and may not work in all cases.
+- Automation only runs based on your configuration and page state; site compatibility is not guaranteed.
