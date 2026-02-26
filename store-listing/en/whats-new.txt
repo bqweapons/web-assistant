@@ -1,0 +1,12 @@
+This update focuses on Password Vault usability and flow run recovery.
+
+- Improved password input binding UX in flows, with clearer vault-based guidance for password fields.
+- Added a reset flow for forgotten Password Vault passwords (vault contents cannot be recovered; you can reset and rebind).
+- Improved handling for broken vault bindings after reset, with clearer prompts to rebind missing passwords.
+
+Flow run experience improvements:
+- When a flow needs the vault while the side panel is closed, Ladybird can now show an in-page vault unlock prompt and continue from the current step after unlock.
+- Clearer feedback when unlock is cancelled or interrupted by page refresh/navigation.
+- Popup step UI is more visible and easier to confirm.
+
+Also includes stability and UI/i18n polish across recent screens.
