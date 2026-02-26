@@ -1,36 +1,45 @@
 # Ladybird Privacy Policy
 
-Last updated: 2025-11-13
+Last updated: 2026-02-26
 
-Summary
+## Summary
+
 - We do not collect, sell, or share personal data.
-- All configuration data is stored locally via `chrome.storage.local`.
-- No remote code is executed; the extension only runs packaged code.
-- Network requests are limited to Chrome APIs and any links you explicitly open.
+- Configuration data is stored locally in `chrome.storage.local`.
+- Password Vault data is encrypted locally and only decrypted when you unlock the vault.
+- The extension does not upload your data to Ladybird servers (there is no telemetry backend).
 
-Details
-1. Data we collect
-   - None. The extension maintains your per‑page configuration locally. There is no telemetry or analytics.
-2. Storage
-   - Configuration is stored in `chrome.storage.local` and is not transmitted to servers by the extension.
-3. Permissions
-   - Permissions are used strictly to render user‑defined UI and manage it from the side panel. See `store-listing/en/privacy-practices.md` (and localized variants) for a breakdown.
-4. Third parties
-   - We do not share data with any third parties.
-5. Security
-   - The extension does not evaluate remote code and sanitizes user‑provided values before use.
-6. Contact
-   - For privacy inquiries, please file an issue in the repository.
+## Details
 
-日本語（要約）
-- 個人情報の収集・販売・第三者共有は行いません。
-- 設定は `chrome.storage.local` にのみ保存され、外部送信しません。
-- リモートコードは実行せず、パッケージ済みコードのみを実行します。
+### 1. Data collection
+Ladybird does not collect analytics, telemetry, or usage data.
 
-简体中文（摘要）
-- 不收集、出售或与第三方共享个人数据。
-- 配置仅存储在 `chrome.storage.local`，不会向服务器传输。
-- 不执行远程代码，仅运行打包内代码。
+### 2. Local storage
+- Extension configuration and saved elements/flows are stored locally in `chrome.storage.local`.
+- Password Vault data is stored locally in encrypted form.
+
+### 3. Export / import
+- If you choose to export your data, a JSON file is generated locally on your device.
+- Export can optionally include Password Vault data after vault-password confirmation.
+- You are responsible for handling exported files securely.
+
+### 4. Permissions
+Permissions are used to render user-defined UI on pages, operate the side panel, and run user-triggered automation flows.
+
+### 5. Third parties
+Ladybird does not sell or share your data with third parties.
+
+### 6. Security notes
+- The extension uses packaged code only (no remote code execution).
+- Password Vault prompts and flow logs are designed to avoid storing or logging plain-text vault passwords.
+- If you forget the vault password, vault contents cannot be recovered and must be reset.
+
+### 7. Contact
+For privacy-related questions, please open an issue in this repository.
 
 ---
-This document can be hosted and linked in the Chrome Web Store “Privacy policy URL” field.
+
+Language versions:
+- [English](./PRIVACY-POLICY.md)
+- [日本語](./PRIVACY-POLICY.ja.md)
+- [简体中文](./PRIVACY-POLICY.zh-CN.md)

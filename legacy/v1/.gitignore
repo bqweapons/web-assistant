@@ -1,0 +1,12 @@
+node_modules/
+sidepanel/dist/
+content/dist/
+store-listing/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+.DS_Store
+Thumbs.db
+release/
