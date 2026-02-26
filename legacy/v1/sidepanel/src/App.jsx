@@ -1,0 +1,1445 @@
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { MessageType, sendMessage } from '../../common/messaging.js';
+import { buildExportPayload } from '../../common/transfer/index.js';
+import { getActiveTab } from '../../common/compat.js';
+import { normalizePageUrl } from '../../common/url.js';
+import { formatDateTime } from '../../common/i18n.js';
+import { serializeBuilderSteps, builderStepsFromSource } from '../../common/flow-builder.js';
+import { ItemList } from './components/ItemList.jsx';
+import { OverviewSection } from './components/OverviewSection.jsx';
+import { PlusIcon } from './components/Icons.jsx';
+import { useI18n } from './hooks/useI18n.js';
+import { createMessage, formatPreview } from './utils/messages.js';
+import { ElementDrawer } from './components/ElementDrawer.jsx';
+import { ActionFlowsSection } from './components/ActionFlowsSection.jsx';
+import { FlowLibraryDrawer } from './components/FlowLibraryDrawer.jsx';
+import { HiddenRulesSection } from './components/HiddenRulesSection.jsx';
+
+const initialContextState = { kind: 'message', key: 'context.loading' };
+
+export default function App() {
+  const { locale, t, options: localeOptions, setLocale } = useI18n();
+  const [pageUrl, setPageUrl] = useState('');
+  const [tabId, setTabId] = useState(undefined);
+  const [contextInfo, setContextInfo] = useState(initialContextState);
+  const [items, setItems] = useState([]);
+  const [filterText, setFilterText] = useState('');
+  const [filterType, setFilterType] = useState('all');
+  const [creationMessage, setCreationMessage] = useState(null);
+  const [activeTab, setActiveTab] = useState('home');
+  const [creationType, setCreationType] = useState('button');
+  const [exporting, setExporting] = useState(false);
+  const [importing, setImporting] = useState(false);
+  const [editingMode, setEditingModeState] = useState(false);
+  const [flowLibraryBusy, setFlowLibraryBusy] = useState(false);
+  const [flows, setFlows] = useState([]);
+  const [flowLibraryOpen, setFlowLibraryOpen] = useState(false);
+  const [flowEditing, setFlowEditing] = useState(null);
+  const [flowLibraryMode, setFlowLibraryMode] = useState('library');
+  const [flowLibraryElementId, setFlowLibraryElementId] = useState(null);
+  const [flowLibrarySeed, setFlowLibrarySeed] = useState({ baseSteps: [], defaultLabel: '', templateId: '' });
+  const [flowPickerTarget, setFlowPickerTarget] = useState(null);
+  const [flowPickerSelection, setFlowPickerSelection] = useState(null);
+  const [flowPickerError, setFlowPickerError] = useState('');
+  const [hiddenPickerActive, setHiddenPickerActive] = useState(false);
+  const [hiddenPickerSelection, setHiddenPickerSelection] = useState(null);
+  const [hiddenPickerError, setHiddenPickerError] = useState('');
+  const [hiddenRules, setHiddenRules] = useState([]);
+  const [hiddenBusy, setHiddenBusy] = useState(false);
+  const [homeSubTab, setHomeSubTab] = useState('add');
+  const [elementDrawerOpen, setElementDrawerOpen] = useState(false);
+  const [elementTargetId, setElementTargetId] = useState(null);
+  const [draftElement, setDraftElement] = useState(null);
+  const importInputRef = useRef(null);
+  const editingModeRef = useRef(false);
+  const lastPageUrlRef = useRef('');
+  const flowMigrationRef = useRef(new Set());
+
+  useEffect(() => {
+    editingModeRef.current = editingMode;
+  }, [editingMode]);
+
+  useEffect(() => {
+    return () => {
+      if (editingModeRef.current && tabId) {
+        sendMessage(MessageType.SET_EDIT_MODE, { enabled: false, tabId, pageUrl }).catch(() => {});
+      }
+    };
+  }, [tabId, pageUrl]);
+
+  useEffect(() => {
+    if (!creationMessage) {
+      return;
+    }
+    const timer = window.setTimeout(() => {
+      setCreationMessage(null);
+    }, 3000);
+    return () => window.clearTimeout(timer);
+  }, [creationMessage]);
+
+  const typeLabels = useMemo(
+    () => ({
+      button: t('type.button'),
+      link: t('type.link'),
+      tooltip: t('type.tooltip'),
+      area: t('type.area'),
+    }),
+    [t],
+  );
+
+  const parseFlowSteps = useCallback((source) => builderStepsFromSource(source), []);
+  const resolveFlowName = useCallback(
+    (element) => {
+      const name = typeof element?.text === 'string' ? element.text.trim() : '';
+      const label = name || t('flow.drawer.untitled');
+      return t('flow.library.defaultElementFlowName', { label });
+    },
+    [t],
+  );
+  const createNamedFlow = useCallback(
+    async (element, steps, overrides = {}) => {
+      if (!Array.isArray(steps) || steps.length === 0) {
+        return '';
+      }
+      const flowId =
+        typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function'
+          ? crypto.randomUUID()
+          : `flow-${Date.now()}-${Math.random().toString(16).slice(2)}`;
+      const baseLabel = resolveFlowName(element);
+      const name = typeof overrides.name === 'string' && overrides.name.trim() ? overrides.name.trim() : baseLabel;
+      const description =
+        typeof overrides.description === 'string' && overrides.description.trim() ? overrides.description.trim() : baseLabel;
+      const flow = {
+        id: flowId,
+        name,
+        description,
+        steps,
+      };
+      const list = await sendMessage(MessageType.UPSERT_FLOW, { flow, pageUrl });
+      setFlows(Array.isArray(list) ? list : []);
+      return flowId;
+    },
+    [pageUrl, resolveFlowName],
+  );
+
+  const linkLegacyFlowForElement = useCallback(
+    async (item) => {
+      if (!item || item.type !== 'button' || !item.actionFlow || item.actionFlowId) {
+        return item;
+      }
+      if (flowMigrationRef.current.has(item.id)) {
+        return item;
+      }
+      flowMigrationRef.current.add(item.id);
+      try {
+        const steps = parseFlowSteps(item.actionFlow);
+        if (!Array.isArray(steps) || steps.length === 0) {
+          return item;
+        }
+        const flowId = await createNamedFlow(item, steps);
+        if (!flowId) {
+          return item;
+        }
+        const nextElement = {
+          ...item,
+          actionFlowId: flowId,
+          pageUrl: item.pageUrl || pageUrl,
+          siteUrl: item.siteUrl || pageUrl,
+        };
+        const list = await sendMessage(MessageType.UPDATE, nextElement);
+        setItems(Array.isArray(list) ? list : items);
+        return { ...nextElement, actionFlowId: flowId };
+      } catch (error) {
+        console.warn('Failed to link legacy action flow', error);
+        return item;
+      } finally {
+        flowMigrationRef.current.delete(item.id);
+      }
+    },
+    [createNamedFlow, items, pageUrl, parseFlowSteps],
+  );
+
+  const ensureElementFlowLinks = useCallback(async () => {
+    if (!pageUrl || items.length === 0) {
+      return;
+    }
+    const pending = items.filter(
+      (item) => item && item.type === 'button' && item.actionFlow && !item.actionFlowId,
+    );
+    if (pending.length === 0) {
+      return;
+    }
+    for (const item of pending) {
+      await linkLegacyFlowForElement(item);
+    }
+  }, [items, linkLegacyFlowForElement, pageUrl]);
+
+  const elementTarget = useMemo(() => {
+    if (draftElement && draftElement.id === elementTargetId) {
+      return draftElement;
+    }
+    return items.find((item) => item.id === elementTargetId) || null;
+  }, [draftElement, items, elementTargetId]);
+
+  const tabs = useMemo(
+    () => [
+      { id: 'home', label: t('navigation.home') },
+      { id: 'flows', label: t('flow.library.heading') },
+      { id: 'overview', label: t('navigation.overview') },
+      { id: 'settings', label: t('navigation.settings') },
+    ],
+    [t],
+  );
+
+  const formatTooltipPosition = useCallback(
+    (position) => {
+      const key = position && typeof position === 'string' ? position : 'top';
+      return t(`tooltip.position.${key}`);
+    },
+    [t],
+  );
+
+  const formatTooltipMode = useCallback((persistent) => t(persistent ? 'tooltip.mode.persistent' : 'tooltip.mode.hover'), [t]);
+
+  const formatTimestamp = useCallback((timestamp) => formatDateTime(timestamp), [locale]);
+
+  const formatFrameSummary = useCallback(
+    (item) => {
+      if (!item || !Array.isArray(item.frameSelectors) || item.frameSelectors.length === 0) {
+        return '';
+      }
+      const parts = [];
+      if (item.frameLabel) {
+        parts.push(item.frameLabel);
+      }
+      if (item.frameUrl) {
+        parts.push(item.frameUrl);
+      }
+      if (parts.length === 0) {
+        parts.push(t('manage.item.frameFallback'));
+      }
+      return t('manage.item.frameContext', { frame: parts.join(' · ') });
+    },
+    [t],
+  );
+
+  const refreshItems = useCallback(
+    async (targetUrl) => {
+      const url = targetUrl || pageUrl;
+      if (!url) {
+        setItems([]);
+        return;
+      }
+      try {
+        const list = await sendMessage(MessageType.LIST_BY_URL, { pageUrl: url });
+        setItems(Array.isArray(list) ? list : []);
+      } catch (error) {
+        console.error('Failed to load elements', error);
+        setCreationMessage(createMessage('manage.loadError', { error: error.message }));
+      }
+    },
+    [pageUrl],
+  );
+
+  const refreshFlows = useCallback(
+    async () => {
+      try {
+      const list = await sendMessage(MessageType.LIST_FLOWS, { pageUrl });
+        setFlows(Array.isArray(list) ? list : []);
+      } catch (error) {
+        console.error('Failed to load flows', error);
+      }
+    },
+    [pageUrl],
+  );
+
+  const refreshHiddenRules = useCallback(
+    async () => {
+      if (!pageUrl) {
+        setHiddenRules([]);
+        return;
+      }
+      try {
+        const list = await sendMessage(MessageType.LIST_HIDDEN_RULES, { pageUrl, effective: true });
+        setHiddenRules(Array.isArray(list) ? list : []);
+      } catch (error) {
+        console.error('Failed to load hidden rules', error);
+      }
+    },
+    [pageUrl],
+  );
+
+  const applyTabContext = useCallback(
+    (tab) => {
+      const normalized = tab?.url ? normalizePageUrl(tab.url) : '';
+      if (editingModeRef.current && tabId && (!tab || tab.id !== tabId || (normalized && normalized !== pageUrl))) {
+        sendMessage(MessageType.SET_EDIT_MODE, { enabled: false, tabId, pageUrl }).catch(() => {});
+        setEditingModeState(false);
+      }
+      if (tab?.url) {
+        setTabId(tab.id);
+        setPageUrl((current) => (current === normalized ? current : normalized));
+        setContextInfo({ kind: 'url', value: normalized });
+      } else {
+        setTabId(undefined);
+        setPageUrl((current) => (current ? '' : current));
+        setContextInfo({ kind: 'message', key: 'context.noActiveTab' });
+        setItems([]);
+      }
+    },
+    [pageUrl, tabId],
+  );
+
+  const resolveActiveTabContext = useCallback(async () => {
+    try {
+      const tab = await getActiveTab();
+      applyTabContext(tab);
+    } catch (error) {
+      console.error('Unable to resolve active tab', error);
+      setContextInfo({ kind: 'message', key: 'context.resolveError', values: { error: error.message } });
+    }
+  }, [applyTabContext]);
+
+  useEffect(() => {
+    resolveActiveTabContext();
+  }, [resolveActiveTabContext]);
+
+  useEffect(() => {
+    if (!chrome?.tabs?.onActivated || !chrome?.tabs?.onUpdated) {
+      return undefined;
+    }
+
+    const handleActivated = async (activeInfo) => {
+      if (!activeInfo?.tabId) {
+        return;
+      }
+      try {
+        const tab = await chrome.tabs.get(activeInfo.tabId);
+        applyTabContext(tab);
+      } catch (error) {
+        console.warn('Failed to handle tab activation', error);
+      }
+    };
+
+    const handleUpdated = (nextTabId, changeInfo, tab) => {
+      if (!tab?.active || !tab.url) {
+        return;
+      }
+      if (typeof changeInfo.url === 'string' || changeInfo.status === 'complete') {
+        applyTabContext(tab);
+      }
+    };
+
+    chrome.tabs.onActivated.addListener(handleActivated);
+    chrome.tabs.onUpdated.addListener(handleUpdated);
+
+    return () => {
+      chrome.tabs.onActivated.removeListener(handleActivated);
+      chrome.tabs.onUpdated.removeListener(handleUpdated);
+    };
+  }, [applyTabContext]);
+
+  useEffect(() => {
+    if (!pageUrl) {
+      return;
+    }
+    refreshItems(pageUrl);
+    refreshFlows();
+    refreshHiddenRules();
+  }, [pageUrl, refreshItems, refreshFlows, refreshHiddenRules]);
+
+  useEffect(() => {
+    ensureElementFlowLinks();
+  }, [ensureElementFlowLinks]);
+
+  useEffect(() => {
+    const handleKeyDown = (event) => {
+      if (event.key === 'Escape' && tabId && pageUrl) {
+        sendMessage(MessageType.CANCEL_PICKER, { tabId, pageUrl }).catch(() => {});
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [tabId, pageUrl]);
+
+  const filteredItems = useMemo(() => {
+    const query = filterText.trim().toLowerCase();
+    return items
+      .filter((item) => {
+        const matchesType = filterType === 'all' || item.type === filterType;
+        if (!matchesType) {
+          return false;
+        }
+        if (!query) {
+          return true;
+        }
+        return (
+          item.text.toLowerCase().includes(query) ||
+          item.selector.toLowerCase().includes(query) ||
+          (item.href || '').toLowerCase().includes(query) ||
+          (item.frameLabel || '').toLowerCase().includes(query) ||
+          (item.frameUrl || '').toLowerCase().includes(query)
+        );
+      })
+      .slice()
+      .sort((a, b) => b.createdAt - a.createdAt);
+  }, [filterText, filterType, items]);
+
+  const groupedByPageUrl = useMemo(() => {
+    const groups = new Map();
+    filteredItems.forEach((item) => {
+      const key = (item && item.pageUrl) || pageUrl || '';
+      if (!key) {
+        return;
+      }
+      if (!groups.has(key)) {
+        groups.set(key, []);
+      }
+      groups.get(key).push(item);
+    });
+    return Array.from(groups.entries()).sort(([a], [b]) => a.localeCompare(b));
+  }, [filteredItems, pageUrl]);
+
+  const handleExport = useCallback(async () => {
+    setExporting(true);
+    try {
+      const [store, flows, hidden] = await Promise.all([
+        sendMessage(MessageType.LIST_ALL),
+        sendMessage(MessageType.LIST_FLOW_STORE),
+        sendMessage(MessageType.LIST_HIDDEN_STORE),
+      ]);
+      const payload = buildExportPayload({
+        elementsStore: store || {},
+        flowStore: flows || {},
+        hiddenStore: hidden || {},
+      });
+      const serialized = JSON.stringify(payload, null, 2);
+      const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+      const filename = `page-augmentor-export-${timestamp}.json`;
+      const blob = new Blob([serialized], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const anchor = document.createElement('a');
+      anchor.href = url;
+      anchor.download = filename;
+      anchor.rel = 'noopener';
+      document.body.appendChild(anchor);
+      anchor.click();
+      anchor.remove();
+      window.setTimeout(() => URL.revokeObjectURL(url), 1000);
+      setCreationMessage(createMessage('manage.export.success', { filename }));
+    } catch (error) {
+      console.error('Failed to export data', error);
+      setCreationMessage(createMessage('manage.export.error', { error: error.message }));
+    } finally {
+      setExporting(false);
+    }
+  }, []);
+
+  const handleImportClick = useCallback(() => {
+    importInputRef.current?.click();
+  }, []);
+
+  const handleImportFile = useCallback(
+    async (event) => {
+      const input = event.target;
+      if (!input) {
+        return;
+      }
+      const [file] = input.files || [];
+      if (!file) {
+        return;
+      }
+      setImporting(true);
+      try {
+        const text = await file.text();
+        let parsed;
+        try {
+          parsed = JSON.parse(text);
+        } catch (error) {
+          throw new Error('Invalid JSON file');
+        }
+        const result = await sendMessage(MessageType.IMPORT_STORE, { store: parsed });
+        const pages = result?.pageCount ?? 0;
+        const elements = result?.elementCount ?? 0;
+        setCreationMessage(createMessage('manage.import.success', { pages, elements }));
+        await refreshItems(pageUrl);
+        await refreshFlows();
+        await refreshHiddenRules();
+      } catch (error) {
+        console.error('Failed to import data', error);
+        setCreationMessage(createMessage('manage.import.error', { error: error.message }));
+      } finally {
+        setImporting(false);
+        input.value = '';
+      }
+    },
+    [pageUrl, refreshItems, refreshFlows, refreshHiddenRules],
+  );
+
+  const cancelDraftElement = useCallback(() => {
+    if (draftElement?.id && tabId && pageUrl) {
+      sendMessage(MessageType.CANCEL_DRAFT, { id: draftElement.id, tabId, pageUrl }).catch(() => {});
+    }
+    setDraftElement(null);
+  }, [draftElement, pageUrl, tabId]);
+
+  const handleStartCreation = useCallback(async () => {
+    if (!pageUrl) {
+      setCreationMessage(createMessage('context.pageUrlUnavailable'));
+      return;
+    }
+    if (!tabId) {
+      setCreationMessage(createMessage('context.tabUnavailable'));
+      return;
+    }
+    try {
+      cancelDraftElement();
+      setElementDrawerOpen(false);
+      setElementTargetId(null);
+      await sendMessage(MessageType.INIT_CREATE, {
+        tabId,
+        pageUrl,
+        type: creationType,
+        scope: 'page',
+        mode: 'drawer',
+      });
+      setCreationMessage(createMessage('manage.creation.started'));
+    } catch (error) {
+      setCreationMessage(createMessage('manage.creation.error', { error: error.message }));
+    }
+  }, [cancelDraftElement, creationType, pageUrl, tabId]);
+
+  const startFlowPicker = useCallback(
+    async (target, accept = 'selector') => {
+      if (!tabId || !pageUrl) {
+        setCreationMessage(createMessage('context.tabUnavailable'));
+        return;
+      }
+      setFlowPickerTarget(target || null);
+      setFlowPickerSelection(null);
+      setFlowPickerError('');
+      try {
+        await sendMessage(MessageType.START_PICKER, {
+          tabId,
+          pageUrl,
+          targetType: 'selector',
+          source: 'flow-library',
+          accept,
+          mode: 'select',
+        });
+      } catch (error) {
+        setCreationMessage(createMessage('manage.picker.startError', { error: error.message }));
+        setFlowPickerTarget(null);
+      }
+    },
+    [pageUrl, tabId],
+  );
+
+  const startHiddenPicker = useCallback(async () => {
+    if (!tabId || !pageUrl) {
+      setCreationMessage(createMessage('context.tabUnavailable'));
+      return;
+    }
+    setHiddenPickerActive(true);
+    setHiddenPickerSelection(null);
+    setHiddenPickerError('');
+    try {
+      await sendMessage(MessageType.START_PICKER, {
+        tabId,
+        pageUrl,
+        targetType: 'selector',
+        source: 'hidden-rules',
+        accept: 'selector',
+        mode: 'select',
+      });
+    } catch (error) {
+      setCreationMessage(createMessage('manage.picker.startError', { error: error.message }));
+      setHiddenPickerActive(false);
+    }
+  }, [pageUrl, tabId]);
+
+  const openFlowLibraryCreate = useCallback(() => {
+    setFlowLibraryMode('library');
+    setFlowLibraryElementId(null);
+    setFlowLibrarySeed({ baseSteps: [], defaultLabel: '', templateId: '' });
+    setFlowEditing(null);
+    setFlowLibraryOpen(true);
+  }, []);
+
+  const openFlowLibraryEdit = useCallback((flow) => {
+    setFlowLibraryMode('library');
+    setFlowLibraryElementId(null);
+    setFlowLibrarySeed({ baseSteps: [], defaultLabel: '', templateId: '' });
+    setFlowEditing(flow || null);
+    setFlowLibraryOpen(true);
+  }, []);
+
+  const closeFlowLibraryDrawer = useCallback(() => {
+    setFlowLibraryOpen(false);
+    setFlowEditing(null);
+    setFlowLibraryMode('library');
+    setFlowLibraryElementId(null);
+    setFlowLibrarySeed({ baseSteps: [], defaultLabel: '', templateId: '' });
+    setFlowPickerTarget(null);
+    setFlowPickerSelection(null);
+    setFlowPickerError('');
+    if (tabId && pageUrl) {
+      sendMessage(MessageType.CANCEL_PICKER, { tabId, pageUrl }).catch(() => {});
+    }
+  }, [pageUrl, tabId]);
+
+  const handleSaveLibraryFlow = useCallback(
+    async (payload, options = {}) => {
+      setFlowLibraryBusy(true);
+      try {
+        if (flowLibraryMode === 'element') {
+          if (!flowLibraryElementId) {
+            throw new Error('Missing target element for flow.');
+          }
+          const target = items.find((item) => item.id === flowLibraryElementId);
+          if (!target) {
+            throw new Error('Missing target element for flow.');
+          }
+          const selectedTemplateId = typeof payload?.templateId === 'string' ? payload.templateId.trim() : '';
+          if (!selectedTemplateId) {
+            throw new Error(t('flow.library.errorSelect'));
+          }
+          const selectedFlow = flows.find((flow) => flow.id === selectedTemplateId);
+          if (!selectedFlow) {
+            throw new Error('Missing flow template.');
+          }
+          const steps = Array.isArray(selectedFlow.steps) ? selectedFlow.steps : [];
+          const actionFlow = serializeBuilderSteps(steps);
+          const nextElement = {
+            ...target,
+            actionFlow,
+            actionFlowId: selectedFlow.id,
+            actionSelector: '',
+            pageUrl,
+            siteUrl: target.siteUrl,
+          };
+          const elementList = await sendMessage(MessageType.UPDATE, nextElement);
+          setItems(Array.isArray(elementList) ? elementList : items);
+          setCreationMessage(createMessage('flow.messages.saveSuccess'));
+          if (options.runAfterSave) {
+            await sendMessage(MessageType.RUN_FLOW, {
+              flowId: selectedFlow.id,
+              steps,
+              tabId,
+              pageKey: pageUrl,
+              pageUrl,
+            });
+          }
+          closeFlowLibraryDrawer();
+          return;
+        }
+        const list = await sendMessage(MessageType.UPSERT_FLOW, { flow: payload, pageUrl });
+        setFlows(Array.isArray(list) ? list : []);
+        setCreationMessage(createMessage('flow.messages.saveSuccess'));
+        if (options.runAfterSave) {
+          const created = Array.isArray(list) ? list.find((f) => f.id === payload.id || f.name === payload.name) : null;
+          await sendMessage(MessageType.RUN_FLOW, {
+            flowId: created?.id || payload.id,
+            steps: payload.steps,
+            tabId,
+            pageKey: pageUrl,
+            pageUrl,
+          });
+        }
+        closeFlowLibraryDrawer();
+      } catch (error) {
+        setCreationMessage(createMessage('flow.messages.saveError', { error: error.message }));
+      } finally {
+        setFlowLibraryBusy(false);
+      }
+    },
+    [closeFlowLibraryDrawer, flowLibraryElementId, flowLibraryMode, flows, items, pageUrl, t, tabId],
+  );
+
+  const handleRunLibraryFlow = useCallback(
+    async (flow) => {
+      if (!tabId || !pageUrl) {
+        setCreationMessage(createMessage('flow.messages.runPrereq'));
+        return;
+      }
+      setFlowLibraryBusy(true);
+      try {
+        await sendMessage(MessageType.RUN_FLOW, {
+          flowId: flow.id,
+          steps: flow.steps,
+          tabId,
+          pageKey: pageUrl,
+          pageUrl,
+        });
+        setCreationMessage(createMessage('flow.messages.runStarted'));
+      } catch (error) {
+        setCreationMessage(createMessage('flow.messages.runError', { error: error.message }));
+      } finally {
+        setFlowLibraryBusy(false);
+      }
+    },
+    [pageUrl, tabId],
+  );
+
+  const handleDeleteLibraryFlow = useCallback(
+    async (flow) => {
+      if (!window.confirm(t('manage.delete.confirm'))) {
+        return;
+      }
+      setFlowLibraryBusy(true);
+      try {
+        const list = await sendMessage(MessageType.DELETE_FLOW, { id: flow.id, pageUrl });
+        setFlows(Array.isArray(list) ? list : []);
+        setCreationMessage(createMessage('manage.delete.success'));
+      } catch (error) {
+        setCreationMessage(createMessage('manage.delete.error', { error: error.message }));
+      } finally {
+        setFlowLibraryBusy(false);
+      }
+    },
+    [pageUrl, t],
+  );
+
+  const focusElement = useCallback(
+    async (id) => {
+      if (!tabId || !pageUrl) {
+        setCreationMessage(createMessage('context.focusRequiresActivation'));
+        return;
+      }
+      try {
+        await chrome.tabs.update(tabId, { active: true });
+        await sendMessage(MessageType.FOCUS_ELEMENT, { id, tabId, pageUrl });
+      } catch (error) {
+        setCreationMessage(createMessage('manage.focusError', { error: error.message }));
+      }
+    },
+    [tabId, pageUrl],
+  );
+
+  const deleteElement = useCallback(
+    async (id) => {
+      if (!window.confirm(t('manage.delete.confirm'))) {
+        return;
+      }
+      try {
+        const list = await sendMessage(MessageType.DELETE, { id, pageUrl });
+        setItems(Array.isArray(list) ? list : []);
+        setCreationMessage(createMessage('manage.delete.success'));
+      } catch (error) {
+        setCreationMessage(createMessage('manage.delete.error', { error: error.message }));
+      }
+    },
+    [pageUrl, t],
+  );
+
+  const openElementDrawer = useCallback(
+    (id) => {
+      const target = items.find((item) => item.id === id);
+      if (!target) {
+        setCreationMessage(createMessage('flow.messages.missingTarget'));
+        return;
+      }
+      cancelDraftElement();
+      setElementTargetId(id);
+      setElementDrawerOpen(true);
+      if (tabId && pageUrl) {
+        sendMessage(MessageType.FOCUS_ELEMENT, { id, tabId, pageUrl }).catch(() => {});
+        sendMessage(MessageType.SET_EDITING_ELEMENT, { id, enabled: true, tabId, pageUrl }).catch(() => {});
+      }
+    },
+    [cancelDraftElement, items, pageUrl, tabId],
+  );
+
+  useEffect(() => {
+    const listener = (message) => {
+      if (!message?.type) {
+        return;
+      }
+      if (
+        message.pageUrl &&
+        message.pageUrl !== pageUrl &&
+        !((flowPickerTarget || hiddenPickerActive) && message.type === MessageType.PICKER_RESULT)
+      ) {
+        return;
+      }
+      switch (message.type) {
+        case MessageType.PICKER_RESULT: {
+          if (message.data?.intent === 'create-draft') {
+            const draft = message.data?.draft;
+            if (draft?.id) {
+              setDraftElement(draft);
+              setElementTargetId(draft.id);
+              setElementDrawerOpen(true);
+              setCreationMessage(createMessage('manage.creation.started'));
+            } else {
+              setCreationMessage(createMessage('manage.creation.error', { error: 'Draft element unavailable.' }));
+            }
+            break;
+          }
+          if (message.data?.selector) {
+            const preview = formatPreview(message.data.preview, t);
+            if (flowPickerTarget) {
+              setCreationMessage(createMessage('flow.messages.pickerApplied', { selector: message.data.selector }));
+            } else {
+              setCreationMessage(
+                preview
+                  ? createMessage('manage.picker.selectedWithPreview', { preview })
+                  : createMessage('manage.picker.selected'),
+              );
+            }
+          }
+          if (flowPickerTarget && message.data?.selector) {
+            setFlowPickerSelection({ selector: message.data.selector, target: flowPickerTarget });
+            setFlowPickerTarget(null);
+            setFlowPickerError('');
+          }
+          if (hiddenPickerActive && message.data?.selector) {
+            setHiddenPickerSelection({ selector: message.data.selector });
+            setHiddenPickerActive(false);
+            setHiddenPickerError('');
+          }
+          break;
+        }
+        case MessageType.OPEN_ELEMENT_DRAWER: {
+          if (message.data?.id) {
+            openElementDrawer(message.data.id);
+          }
+          break;
+        }
+        case MessageType.PICKER_CANCELLED:
+          if (message.data?.error) {
+            setCreationMessage(createMessage('manage.creation.error', { error: message.data.error }));
+          } else {
+            setCreationMessage(createMessage('manage.picker.cancelled'));
+          }
+          if (flowPickerTarget) {
+            setFlowPickerError(message.data?.error || t('manage.picker.cancelled'));
+            setFlowPickerTarget(null);
+          }
+          if (hiddenPickerActive) {
+            setHiddenPickerError(message.data?.error || t('manage.picker.cancelled'));
+            setHiddenPickerActive(false);
+          }
+          break;
+        case MessageType.REHYDRATE:
+          setItems(Array.isArray(message.data) ? message.data : []);
+          break;
+        case MessageType.UPDATE: {
+          const updated = message.data;
+          if (!updated) {
+            break;
+          }
+          setItems((current) => {
+            const index = current.findIndex((item) => item.id === updated.id);
+            if (index >= 0) {
+              const copy = [...current];
+              copy[index] = updated;
+              return copy;
+            }
+            return [...current, updated];
+          });
+          break;
+        }
+        case MessageType.DELETE:
+          if (message.data?.id) {
+            setItems((current) => current.filter((item) => item.id !== message.data.id));
+          }
+          break;
+        default:
+          break;
+      }
+    };
+    chrome.runtime.onMessage.addListener(listener);
+    return () => {
+      chrome.runtime.onMessage.removeListener(listener);
+    };
+  }, [pageUrl, t, flowPickerTarget, hiddenPickerActive, openElementDrawer]);
+
+  const openFlowLibraryForElement = useCallback(
+    async (id) => {
+      const target = items.find((item) => item.id === id);
+      if (!target) {
+        setCreationMessage(createMessage('flow.messages.missingTarget'));
+        return;
+      }
+      const resolvedTarget = await linkLegacyFlowForElement(target);
+      const linkedFlow = resolvedTarget.actionFlowId
+        ? flows.find((flow) => flow.id === resolvedTarget.actionFlowId)
+        : null;
+      if (elementTargetId && tabId && pageUrl) {
+        sendMessage(MessageType.SET_EDITING_ELEMENT, { id: elementTargetId, enabled: false, tabId, pageUrl }).catch(
+          () => {},
+        );
+      }
+      cancelDraftElement();
+      setElementTargetId(null);
+      setElementDrawerOpen(false);
+      setFlowLibraryMode('element');
+      setFlowLibraryElementId(id);
+      const baseSteps = resolvedTarget.actionFlow
+        ? parseFlowSteps(resolvedTarget.actionFlow)
+        : Array.isArray(linkedFlow?.steps)
+          ? linkedFlow.steps
+          : [];
+      const defaultLabel = resolveFlowName(resolvedTarget);
+      setFlowLibrarySeed({ baseSteps, defaultLabel, templateId: linkedFlow?.id || '' });
+      setFlowEditing(null);
+      setFlowLibraryOpen(true);
+    },
+    [
+      cancelDraftElement,
+      elementTargetId,
+      flows,
+      items,
+      linkLegacyFlowForElement,
+      pageUrl,
+      parseFlowSteps,
+      resolveFlowName,
+      tabId,
+    ],
+  );
+
+  const closeElementDrawer = useCallback((options = {}) => {
+    const keepDraft = options.keepDraft === true;
+    if (elementTargetId && tabId && pageUrl) {
+      sendMessage(MessageType.SET_EDITING_ELEMENT, { id: elementTargetId, enabled: false, tabId, pageUrl }).catch(
+        () => {},
+      );
+    }
+    if (!keepDraft) {
+      cancelDraftElement();
+    }
+    setElementDrawerOpen(false);
+    setElementTargetId(null);
+    if (tabId && pageUrl) {
+      sendMessage(MessageType.CANCEL_PICKER, { tabId, pageUrl }).catch(() => {});
+    }
+  }, [cancelDraftElement, elementTargetId, pageUrl, tabId]);
+
+  const handleSaveElement = useCallback(
+    async (properties) => {
+      const isDraft = draftElement && draftElement.id === elementTargetId;
+      const target = isDraft ? draftElement : items.find((item) => item.id === elementTargetId);
+      if (!target || !pageUrl) {
+        setCreationMessage(createMessage('flow.messages.missingTarget'));
+        return;
+      }
+      try {
+        const payload = {
+          ...target,
+          ...properties,
+          pageUrl: properties?.pageUrl || pageUrl,
+          siteUrl: properties?.siteUrl || target.siteUrl,
+        };
+        if (payload.actionFlow && !payload.actionFlowId) {
+          const steps = builderStepsFromSource(payload.actionFlow);
+          const flowId = await createNamedFlow(payload, steps);
+          if (flowId) {
+            payload.actionFlowId = flowId;
+          }
+        }
+        const list = await sendMessage(isDraft ? MessageType.CREATE : MessageType.UPDATE, payload);
+        setItems(Array.isArray(list) ? list : items);
+        setCreationMessage(createMessage('flow.messages.saveSuccess'));
+        if (isDraft) {
+          setDraftElement(null);
+          if (tabId && pageUrl) {
+            sendMessage(MessageType.FINALIZE_DRAFT, { id: target.id, tabId, pageUrl }).catch(() => {});
+          }
+        }
+        closeElementDrawer({ keepDraft: isDraft });
+      } catch (error) {
+        setCreationMessage(createMessage('flow.messages.saveError', { error: error.message }));
+      }
+    },
+    [closeElementDrawer, createNamedFlow, draftElement, elementTargetId, items, pageUrl, tabId],
+  );
+
+  const openPageUrl = useCallback((targetUrl) => {
+    if (!targetUrl) {
+      return;
+    }
+    try {
+      chrome.tabs.create({ url: targetUrl, active: true });
+    } catch (_error) {
+      // ignore
+    }
+  }, []);
+
+  const toggleEditingMode = useCallback(async () => {
+    if (!tabId) {
+      setCreationMessage(createMessage('context.tabUnavailable'));
+      return;
+    }
+    try {
+      await chrome.tabs.update(tabId, { active: true });
+    } catch (error) {
+      console.warn('Failed to activate tab before toggling edit mode', error);
+    }
+    const next = !editingMode;
+    try {
+      await sendMessage(MessageType.SET_EDIT_MODE, { enabled: next, tabId, pageUrl });
+      setEditingModeState(next);
+      setCreationMessage(createMessage(next ? 'manage.editMode.enabled' : 'manage.editMode.disabled'));
+    } catch (error) {
+      setCreationMessage(createMessage('manage.editMode.error', { error: error.message }));
+    }
+  }, [editingMode, pageUrl, tabId]);
+
+  const storeUrl =
+    'https://chromewebstore.google.com/detail/page-augmentor/nefpepdpcjejamkgpndlfehkffkfgbpe';
+
+  const handleShareCopy = useCallback(async () => {
+    try {
+      if (navigator.clipboard && typeof navigator.clipboard.writeText === 'function') {
+        await navigator.clipboard.writeText(storeUrl);
+        setCreationMessage(createMessage('settings.share.copied', { url: storeUrl }));
+      } else {
+        chrome.tabs.create({ url: storeUrl, active: true });
+      }
+    } catch (_error) {
+      chrome.tabs.create({ url: storeUrl, active: true });
+    }
+  }, []);
+
+  const handleCreateHiddenRule = useCallback(
+    async (rule) => {
+      if (!pageUrl) {
+        setCreationMessage(createMessage('context.pageUrlUnavailable'));
+        return;
+      }
+      setHiddenBusy(true);
+      try {
+        const list = await sendMessage(MessageType.UPSERT_HIDDEN_RULE, {
+          rule: { ...rule, pageUrl },
+          scope: rule.scope || 'page',
+          pageUrl,
+          tabId,
+        });
+        setHiddenRules(Array.isArray(list) ? list : []);
+        setCreationMessage(createMessage('manage.creation.started'));
+      } catch (error) {
+        setCreationMessage(createMessage('manage.creation.error', { error: error.message }));
+      } finally {
+        setHiddenBusy(false);
+      }
+    },
+    [pageUrl, tabId],
+  );
+
+  const handleDeleteHiddenRule = useCallback(
+    async (rule) => {
+      if (!pageUrl) return;
+      setHiddenBusy(true);
+      try {
+        const list = await sendMessage(MessageType.DELETE_HIDDEN_RULE, {
+          id: rule.id,
+          scope: rule.scope || 'page',
+          pageUrl,
+          tabId,
+        });
+        setHiddenRules(Array.isArray(list) ? list : []);
+      } catch (error) {
+        setCreationMessage(createMessage('manage.delete.error', { error: error.message }));
+      } finally {
+        setHiddenBusy(false);
+      }
+    },
+    [pageUrl, tabId],
+  );
+
+  const handleToggleHiddenRule = useCallback(
+    async (rule, enabled) => {
+      if (!pageUrl) return;
+      setHiddenBusy(true);
+      try {
+        const list = await sendMessage(MessageType.SET_HIDDEN_RULE_ENABLED, {
+          id: rule.id,
+          enabled,
+          scope: rule.scope || 'page',
+          pageUrl,
+          tabId,
+        });
+        setHiddenRules(Array.isArray(list) ? list : []);
+      } catch (error) {
+        setCreationMessage(createMessage('manage.creation.error', { error: error.message }));
+      } finally {
+        setHiddenBusy(false);
+      }
+    },
+    [pageUrl, tabId],
+  );
+
+  const handleShareOpen = useCallback(() => {
+    try {
+      chrome.tabs.create({ url: storeUrl, active: true });
+    } catch (_error) {
+      // ignore
+    }
+  }, []);
+
+  useEffect(() => {
+    if (flowLibraryOpen && lastPageUrlRef.current && pageUrl && lastPageUrlRef.current !== pageUrl) {
+      closeFlowLibraryDrawer();
+    }
+    if (elementDrawerOpen && lastPageUrlRef.current && pageUrl && lastPageUrlRef.current !== pageUrl) {
+      closeElementDrawer();
+    }
+    if (pageUrl) {
+      lastPageUrlRef.current = pageUrl;
+    }
+  }, [pageUrl, flowLibraryOpen, elementDrawerOpen, closeFlowLibraryDrawer, closeElementDrawer]);
+
+  const contextLabelText = contextInfo?.kind === 'url' ? contextInfo.value : t(contextInfo.key, contextInfo.values);
+  const statusMessageText = creationMessage ? t(creationMessage.key, creationMessage.values) : '';
+
+  return (
+    <>
+      {statusMessageText && (
+        <div className="fixed left-1/2 top-4 z-50 w-[90%] max-w-sm -translate-x-1/2 rounded-2xl border border-slate-900 bg-slate-900 px-4 py-3 text-sm font-semibold text-white shadow-lg shadow-slate-900/40">
+          {statusMessageText}
+        </div>
+      )}
+      <main className="flex min-h-screen flex-col gap-4 bg-slate-50 p-6">
+        <nav className="flex gap-2 rounded-2xl border border-slate-200 bg-white p-1 shadow-brand">
+          {tabs.map((tab) => {
+            const isActive = tab.id === activeTab;
+            return (
+              <button
+                key={tab.id}
+                type="button"
+                className={`btn-secondary flex-1 ${
+                  isActive
+                    ? 'bg-slate-900 text-white shadow-sm hover:bg-slate-900 hover:text-white'
+                    : 'border-transparent text-slate-600 hover:text-slate-900'
+                }`}
+                onClick={() => setActiveTab(tab.id)}
+              >
+                {tab.label}
+              </button>
+            );
+          })}
+        </nav>
+
+        {activeTab === 'home' && (
+          <div className="flex flex-col gap-4">
+            <section className="flex rounded-2xl border border-slate-200 bg-white p-1 shadow-brand">
+              <button
+                type="button"
+                className={`btn-secondary flex-1 ${
+                  homeSubTab === 'add'
+                    ? 'bg-slate-900 text-white shadow-sm hover:bg-slate-900 hover:text-white'
+                    : 'border-transparent text-slate-600 hover:text-slate-900'
+                }`}
+                onClick={() => setHomeSubTab('add')}
+              >
+                {t('manage.actions.addElement')}
+              </button>
+              <button
+                type="button"
+                className={`btn-secondary flex-1 ${
+                  homeSubTab === 'hide'
+                    ? 'bg-slate-900 text-white shadow-sm hover:bg-slate-900 hover:text-white'
+                    : 'border-transparent text-slate-600 hover:text-slate-900'
+                }`}
+                onClick={() => setHomeSubTab('hide')}
+              >
+                {t('hidden.heading')}
+              </button>
+            </section>
+
+            {homeSubTab === 'add' && (
+              <div className="flex flex-col gap-4">
+                <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-brand space-y-4">
+                  <div className="space-y-1">
+                    <h2 className="text-sm font-semibold text-slate-900">
+                      {t('manage.sections.add.description')}
+                    </h2>
+                    <p className="text-xs text-slate-500">{t('manage.sections.add.title')}</p>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <select
+                      className="flex-1 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-700 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-100"
+                      value={creationType}
+                      onChange={(event) => setCreationType(event.target.value)}
+                    >
+                      <option value="button">{t('type.button')}</option>
+                      <option value="link">{t('type.link')}</option>
+                      <option value="tooltip">{t('type.tooltip')}</option>
+                      <option value="area">{t('type.area')}</option>
+                    </select>
+                    <button
+                      type="button"
+                      className="btn-primary inline-flex h-9 w-9 items-center justify-center p-0"
+                      onClick={handleStartCreation}
+                      aria-label={t('manage.actions.addElement')}
+                      title={t('manage.actions.addElement')}
+                    >
+                      <PlusIcon className="h-5 w-5" />
+                      <span className="sr-only">{t('manage.actions.addElement')}</span>
+                    </button>
+                  </div>
+                </section>
+
+                <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-brand space-y-3">
+                  <button
+                    type="button"
+                    aria-pressed={editingMode}
+                    className={`btn-secondary ${
+                      editingMode ? 'bg-slate-900 text-white shadow-sm hover:bg-slate-900 hover:text-white' : ''
+                    }`}
+                    onClick={toggleEditingMode}
+                    disabled={!tabId}
+                  >
+                    {editingMode ? t('manage.actions.editModeDisable') : t('manage.actions.editModeEnable')}
+                  </button>
+                  <p className="text-xs text-slate-500">{t('manage.editMode.hint')}</p>
+                </section>
+
+                <section className="flex flex-col gap-3 rounded-2xl border border-slate-200 bg-white p-5 shadow-brand md:flex-row md:items-end md:justify-between">
+                  <label className="flex w-full flex-col gap-2 text-sm text-slate-700 md:max-w-md">
+                    {t('manage.sections.filters.searchLabel')}
+                    <input
+                      className="rounded-lg border border-slate-200 bg-white p-2 text-sm shadow-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-100"
+                      type="search"
+                      placeholder={t('manage.sections.filters.searchPlaceholder')}
+                      value={filterText}
+                      onChange={(event) => setFilterText(event.target.value)}
+                    />
+                  </label>
+                  <label className="flex flex-col gap-2 text-sm text-slate-700 md:w-48">
+                    {t('manage.sections.filters.filterLabel')}
+                    <select
+                      className="rounded-lg border border-slate-200 bg-white p-2 text-sm shadow-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-100"
+                      value={filterType}
+                      onChange={(event) => setFilterType(event.target.value)}
+                    >
+                      <option value="all">{t('manage.sections.filters.options.all')}</option>
+                      <option value="button">{t('manage.sections.filters.options.button')}</option>
+                      <option value="link">{t('manage.sections.filters.options.link')}</option>
+                      <option value="tooltip">{t('manage.sections.filters.options.tooltip')}</option>
+                      <option value="area">{t('manage.sections.filters.options.area')}</option>
+                    </select>
+                  </label>
+                </section>
+
+                <section className="grid gap-4">
+                  {groupedByPageUrl.length === 0 ? (
+                    <ItemList
+                      items={[]}
+                      t={t}
+                      typeLabels={typeLabels}
+                      formatTimestamp={formatTimestamp}
+                      formatFrameSummary={formatFrameSummary}
+                      formatTooltipPosition={formatTooltipPosition}
+                      formatTooltipMode={formatTooltipMode}
+                      onFocus={focusElement}
+                      onOpenFlow={openElementDrawer}
+                      onDelete={deleteElement}
+                      showActions
+                    />
+                  ) : (
+                    groupedByPageUrl.map(([groupPageUrl, groupItems]) => (
+                      <article
+                        key={groupPageUrl}
+                        className="space-y-3 rounded-2xl border border-slate-200 bg-white p-4 shadow-brand"
+                      >
+                        <header className="flex items-center justify-between gap-2">
+                          <div className="min-w-0 space-y-1">
+                            <h3 className="break-all text-sm font-semibold text-slate-900">{groupPageUrl}</h3>
+                            <p className="text-xs text-slate-500">
+                              {t('overview.pageSummary', { count: groupItems.length })}
+                            </p>
+                          </div>
+                          <button
+                            type="button"
+                            className="btn-secondary mt-1 px-3 py-1.5 text-xs md:mt-0"
+                            onClick={() => openPageUrl(groupPageUrl)}
+                          >
+                            {t('overview.openPage')}
+                          </button>
+                        </header>
+                        <ItemList
+                          items={groupItems}
+                          t={t}
+                          typeLabels={typeLabels}
+                          formatTimestamp={formatTimestamp}
+                          formatFrameSummary={formatFrameSummary}
+                          formatTooltipPosition={formatTooltipPosition}
+                          formatTooltipMode={formatTooltipMode}
+                          onFocus={focusElement}
+                          onOpenFlow={openElementDrawer}
+                          onDelete={deleteElement}
+                          showActions
+                        />
+                      </article>
+                    ))
+                  )}
+                </section>
+              </div>
+            )}
+
+            {homeSubTab === 'hide' && (
+              <HiddenRulesSection
+                rules={hiddenRules}
+                onCreate={handleCreateHiddenRule}
+                onDelete={handleDeleteHiddenRule}
+                onToggle={handleToggleHiddenRule}
+                onPickSelector={startHiddenPicker}
+                pickerSelection={hiddenPickerSelection}
+                onPickerSelectionHandled={() => setHiddenPickerSelection(null)}
+                pickerError={hiddenPickerError}
+                busy={hiddenBusy}
+                t={t}
+              />
+            )}
+          </div>
+        )}
+
+      {activeTab === 'flows' && (
+        <ActionFlowsSection
+          flows={flows}
+          onCreate={openFlowLibraryCreate}
+          onEdit={openFlowLibraryEdit}
+          onDelete={handleDeleteLibraryFlow}
+          onRun={handleRunLibraryFlow}
+          t={t}
+        />
+      )}
+
+      {activeTab === 'overview' && (
+        <OverviewSection
+          t={t}
+          typeLabels={typeLabels}
+          formatTooltipPosition={formatTooltipPosition}
+          formatTooltipMode={formatTooltipMode}
+          formatDateTime={formatTimestamp}
+          formatFrameSummary={formatFrameSummary}
+        />
+      )}
+
+      {activeTab === 'settings' && (
+        <section className="flex flex-col gap-4">
+          <article className="rounded-2xl border border-slate-200 bg-white p-5 shadow-brand">
+            <h2 className="text-lg font-semibold text-slate-900">{t('settings.heading')}</h2>
+            <p className="mt-2 text-sm text-slate-500">{t('settings.description')}</p>
+          </article>
+
+          <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-brand">
+            <header className="space-y-2">
+              <h3 className="text-base font-semibold text-slate-900">{t('settings.sections.data.title')}</h3>
+              <p className="text-sm text-slate-500">{t('settings.sections.data.description')}</p>
+            </header>
+            <div className="mt-4 flex flex-wrap items-center gap-3">
+              <input
+                ref={importInputRef}
+                type="file"
+                accept="application/json,.json"
+                className="hidden"
+                onChange={handleImportFile}
+              />
+              <button
+                type="button"
+                className="btn-secondary"
+                onClick={handleImportClick}
+                disabled={importing}
+              >
+                {importing ? t('manage.actions.importing') : t('manage.actions.import')}
+              </button>
+              <button
+                type="button"
+                className="btn-secondary"
+                onClick={handleExport}
+                disabled={exporting}
+              >
+                {exporting ? t('manage.actions.exporting') : t('manage.actions.export')}
+              </button>
+            </div>
+          </section>
+
+          <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-brand">
+            <header className="space-y-2">
+              <h3 className="text-base font-semibold text-slate-900">{t('settings.sections.preferences.title')}</h3>
+              <p className="text-sm text-slate-500">{t('settings.sections.preferences.description')}</p>
+            </header>
+            <label className="mt-4 flex max-w-xs flex-col gap-2 text-sm text-slate-700">
+              <span>{t('app.language.label')}</span>
+              <select
+                className="rounded-xl border border-slate-200 bg-slate-100 px-3 py-2 text-sm font-medium text-slate-700 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-100"
+                value={locale}
+                onChange={(event) => setLocale(event.target.value)}
+              >
+                {localeOptions.map((option) => (
+                  <option key={option.value} value={option.value}>
+                    {option.label}
+                  </option>
+                ))}
+              </select>
+            </label>
+          </section>
+          
+          <section className="rounded-2xl border border-slate-200 bg-gradient-to-r from-slate-900 via-slate-800 to-slate-900 p-5 shadow-brand">
+            <header className="space-y-2 text-white">
+              <h3 className="text-base font-semibold">
+                {t('settings.sections.share.title')}
+              </h3>
+              <p className="text-sm text-slate-200">
+                {t('settings.sections.share.description')}
+              </p>
+            </header>
+            <div className="mt-4 flex flex-wrap gap-3">
+              <button
+                type="button"
+                className="btn-secondary"
+                onClick={handleShareCopy}
+              >
+                {t('settings.actions.shareCopy')}
+              </button>
+              <button
+                type="button"
+                className="btn-secondary"
+                onClick={handleShareOpen}
+              >
+                {t('settings.actions.shareOpen')}
+              </button>
+            </div>
+          </section>
+        </section>
+      )}
+    </main>
+      <ElementDrawer
+        open={elementDrawerOpen}
+        onClose={closeElementDrawer}
+        item={elementTarget}
+        onSave={handleSaveElement}
+        busyAction={flowLibraryBusy}
+        onSwitchToFlow={() => {
+          if (elementTargetId) {
+            openFlowLibraryForElement(elementTargetId);
+          }
+        }}
+        tabId={tabId}
+        pageUrl={pageUrl}
+        t={t}
+      />
+      <FlowLibraryDrawer
+        open={flowLibraryOpen}
+        flow={flowEditing}
+        mode={flowLibraryMode}
+        seed={flowLibrarySeed}
+        templates={flows}
+        onClose={closeFlowLibraryDrawer}
+        onSave={handleSaveLibraryFlow}
+        onRun={handleRunLibraryFlow}
+        onPickSelector={(target) => startFlowPicker(target, target?.stepType === 'input' ? 'input' : 'selector')}
+        pickerSelection={flowPickerSelection}
+        onPickerSelectionHandled={() => setFlowPickerSelection(null)}
+        pickerError={flowPickerError}
+        busyAction={flowLibraryBusy}
+        t={t}
+      />
+    </>
+  );
+}

@@ -1,0 +1,46 @@
+{
+  "extensionName": {
+    "message": "懒鸟：无需编码即可为网页添加按钮、链接和提示",
+    "description": "Chrome 网上应用店展示用扩展名称"
+  },
+  "extensionDescription": {
+    "message": "为任意网页添加自定义按钮、链接和提示，并在侧边栏集中管理所有增强内容。",
+    "description": "Chrome 网上应用店和 manifest 使用的描述"
+  },
+  "actionDefaultTitle": {
+    "message": "打开懒鸟",
+    "description": "浏览器操作的默认标题"
+  },
+  "hud_running_step": {
+    "message": "正在执行流程步骤",
+    "description": "HUD 状态：运行中"
+  },
+  "hud_waiting_navigation": {
+    "message": "等待页面导航…",
+    "description": "HUD 状态：等待导航"
+  },
+  "hud_flow_paused": {
+    "message": "流程已暂停",
+    "description": "HUD 状态：暂停"
+  },
+  "hud_flow_resumed": {
+    "message": "流程已继续",
+    "description": "HUD 状态：继续"
+  },
+  "hud_flow_stopped": {
+    "message": "流程已停止",
+    "description": "HUD 状态：停止"
+  },
+  "hud_flow_finished": {
+    "message": "流程已完成",
+    "description": "HUD 状态：完成"
+  },
+  "hud_step_completed": {
+    "message": "步骤已完成",
+    "description": "HUD 状态：步骤完成"
+  },
+  "hud_rejoin_waiting": {
+    "message": "流程恢复，正在等待导航…",
+    "description": "HUD 状态：恢复后等待"
+  }
+}

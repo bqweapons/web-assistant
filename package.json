@@ -1,21 +1,36 @@
 {
-  "name": "page-augmentor",
-  "version": "1.0.1",
+  "name": "ladybird",
+  "description": "Ladybird browser extension",
   "private": true,
+  "version": "2.0.0",
   "type": "module",
   "scripts": {
-    "build:content": "node ./scripts/build.mjs content",
-    "build:sidepanel": "node ./scripts/build.mjs sidepanel",
-    "build:css": "tailwindcss -c tailwind.config.js -i ./sidepanel/src/index.css -o ./sidepanel/dist/index.css --minify",
-    "build": "npm run build:content && npm run build:sidepanel && npm run build:css",
-    "package": "node ./scripts/package.mjs"
+    "dev": "node ./scripts/dev.mjs",
+    "dev:wxt": "wxt",
+    "dev:firefox": "wxt -b firefox",
+    "build": "npm run i18n:check && wxt build",
+    "build:firefox": "wxt build -b firefox",
+    "zip": "wxt zip",
+    "zip:firefox": "wxt zip -b firefox",
+    "compile": "tsc --noEmit",
+    "i18n:check": "node scripts/check-locales.mjs",
+    "i18n:unused-check": "node scripts/check-unused-locales.mjs",
+    "postinstall": "wxt prepare"
   },
   "devDependencies": {
-    "@heroicons/react": "^2.2.0",
-    "@tailwindcss/forms": "^0.5.7",
-    "esbuild": "^0.21.5",
-    "react": "^18.3.1",
-    "react-dom": "^18.3.1",
-    "tailwindcss": "^3.4.14"
+    "@types/react": "^19.2.7",
+    "@types/react-dom": "^19.2.3",
+    "@vitejs/plugin-react": "^5.1.2",
+    "@tailwindcss/postcss": "^4.0.0",
+    "autoprefixer": "^10.4.23",
+    "postcss": "^8.5.6",
+    "tailwindcss": "^4.0.0",
+    "typescript": "^5.9.3",
+    "wxt": "^0.20.6"
+  },
+  "dependencies": {
+    "lucide-react": "^0.562.0",
+    "react": "^19.2.3",
+    "react-dom": "^19.2.3"
   }
 }

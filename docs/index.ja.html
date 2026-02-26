@@ -1,0 +1,85 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Ladybird Docs（日本語）</title>
+  <style>
+    :root { --bg:#f7fafc; --card:#fff; --ink:#0f172a; --muted:#475569; --line:#e2e8f0; --accent:#1d4ed8; --soft:#eff6ff; --tag:#ecfeff; }
+    * { box-sizing: border-box; }
+    body { margin:0; background:linear-gradient(180deg,#f8fafc 0%,#eef2ff 100%); color:var(--ink); font:14px/1.6 "Noto Sans JP","Segoe UI",system-ui,sans-serif; }
+    .wrap { max-width:1080px; margin:0 auto; padding:24px 16px 48px; }
+    .hero,.card { background:var(--card); border:1px solid var(--line); border-radius:16px; box-shadow:0 12px 32px rgba(15,23,42,.06); }
+    .hero { padding:24px; margin-bottom:16px; } h1 { margin:0 0 8px; font-size:28px; line-height:1.2; } h2 { margin:0 0 10px; font-size:20px; } h3 { margin:0 0 8px; font-size:16px; }
+    p { margin:0; color:var(--muted); } .langs { margin-top:12px; display:flex; gap:8px; flex-wrap:wrap; }
+    .langs a,.quick a { text-decoration:none; color:var(--accent); border:1px solid #bfdbfe; background:var(--soft); border-radius:999px; padding:6px 10px; font-weight:600; display:inline-flex; align-items:center; gap:6px; }
+    .quick { display:grid; grid-template-columns:repeat(auto-fit,minmax(220px,1fr)); gap:12px; margin-bottom:16px; } .quick a { border-radius:12px; padding:12px; justify-content:center; }
+    .card { padding:18px; } .grid { display:grid; gap:16px; } .groups { display:grid; grid-template-columns:repeat(auto-fit,minmax(280px,1fr)); gap:12px; }
+    .group { border:1px solid var(--line); border-radius:12px; padding:14px; background:#fff; }
+    .links { margin-top:10px; display:grid; gap:6px; } .links a { color:var(--accent); text-decoration:none; font-weight:600; }
+    .tags { margin-top:10px; display:flex; flex-wrap:wrap; gap:6px; } .tag { font-size:12px; border-radius:999px; padding:3px 8px; border:1px solid #bae6fd; background:var(--tag); color:#0f766e; }
+    .assets { display:grid; grid-template-columns:repeat(auto-fit,minmax(240px,1fr)); gap:10px; } .asset { border:1px solid var(--line); border-radius:12px; padding:12px; background:#fff; } .asset a { color:var(--accent); font-weight:600; text-decoration:none; }
+    footer { margin-top:16px; color:var(--muted); font-size:12px; }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <section class="hero">
+      <h1>Ladybird Docs</h1>
+      <p>テストページ、テスト計画ドキュメント、デモ素材、プライバシーポリシーの入口ページです。</p>
+      <div class="langs">
+        <a href="./index.html">English</a>
+        <a href="./index.ja.html">日本語</a>
+        <a href="./index.zh-CN.html">简体中文</a>
+      </div>
+    </section>
+
+    <section class="quick">
+      <a href="./test-pages/index.ja.html">テストページ一覧</a>
+      <a href="./testing/screen-test-matrix.ja.md">画面テストマトリクス（MD）</a>
+      <a href="./testing/test-checklist.ja.md">テストチェックリスト（MD）</a>
+      <a href="./PRIVACY-POLICY.ja.md">プライバシーポリシー（MD）</a>
+    </section>
+
+    <section class="card grid">
+      <h2>テストページ</h2>
+      <div class="groups">
+        <div class="group">
+          <h3>Basic Playground</h3>
+          <p>基本的な要素注入、非表示、popup、input、ページ遷移を2ページ構成で確認します。</p>
+          <div class="links">
+            <a href="./test-pages/basic/test-page.html">test-page.html を開く</a>
+            <a href="./test-pages/basic/test-page2.html">test-page2.html を開く</a>
+          </div>
+          <div class="tags"><span class="tag">elements</span><span class="tag">hidden</span><span class="tag">popup</span><span class="tag">navigate</span></div>
+        </div>
+        <div class="group">
+          <h3>Data Source Flow</h3>
+          <p>Screen A と Screen B を使って、フォーム入力と送信結果のフローを検証します。</p>
+          <div class="links">
+            <a href="./test-pages/data-source/datasource-form-a.html">Screen A を開く</a>
+            <a href="./test-pages/data-source/datasource-form-b.html">Screen B を開く</a>
+            <a href="./assets/data/datasource-form-data.csv">サンプル CSV を開く</a>
+          </div>
+          <div class="tags"><span class="tag">input</span><span class="tag">form-submit</span><span class="tag">date</span><span class="tag">number</span></div>
+        </div>
+      </div>
+    </section>
+
+    <section class="card grid" style="margin-top:16px;">
+      <h2>デモ素材（参照用）</h2>
+      <p>以下は説明用の画像/GIFであり、実行可能なテストページではありません。</p>
+      <div class="assets">
+        <div class="asset"><a href="./assets/demos/Overview.png">Overview.png</a></div>
+        <div class="asset"><a href="./assets/demos/add%20button.gif">add button.gif</a></div>
+        <div class="asset"><a href="./assets/demos/add%20Action.gif">add Action.gif</a></div>
+        <div class="asset"><a href="./assets/demos/add%20area.gif">add area.gif</a></div>
+        <div class="asset"><a href="./assets/demos/move%20button.gif">move button.gif</a></div>
+        <div class="asset"><a href="./assets/demos/button%20sample.gif">button sample.gif</a></div>
+      </div>
+    </section>
+
+    <footer>Ladybird docs portal（日本語）</footer>
+  </div>
+</body>
+</html>

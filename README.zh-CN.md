@@ -1,92 +1,136 @@
-﻿# Ladybird（懒鸟）
+# Ladybird
+
 [English](README.md) / [日本語](README.ja.md) / [简体中文](README.zh-CN.md)
 
 ---
 
-### 概述
-Ladybird（懒鸟） 是一款基于 Manifest V3 的 Chrome 扩展，可以在任意网页上叠加自定义按钮、链接、提示气泡和富文本标注。你可以在侧边栏（Manage / Overview / Settings）中集中管理这些元素。每个注入元素都会按页面 URL 存储在 `chrome.storage.local` 中，当你再次访问同一站点时会自动恢复。
+## 概览
 
-## 演示视频
-[![Demo Video](https://img.youtube.com/vi/-iTlNX4J8FM/maxresdefault.jpg)](https://youtu.be/-iTlNX4J8FM)
+Ladybird 是一个 Manifest V3 浏览器扩展，用于在网页中添加无代码按钮、链接、工具提示、区域以及自动化流程。
 
-### 功能亮点
-- **统一侧边栏**：在不离开 Chrome 的前提下，在同一个侧边栏中切换每页的 Manage 视图、跨站点 Overview 视图，以及 Settings（导入 / 导出、语言切换）。
-- **支持 iframe 的可视化拾取器**：在当前页面（包括同源 iframe）中高亮 DOM 节点，自动生成 CSS 选择器，并直接跳转到编辑气泡。
-- **丰富的元素类型**：支持按钮、链接、提示气泡和区域标注，可配置 `append` / `prepend` / `before` / `after` 插入位置、可选的镜像点击选择器，以及细粒度样式。
-- **动作流程构建器**：将 `click` / `wait` / `input` / `navigate` / `log` / `if` / `while` 等步骤串联起来，在按钮回退到链接或选择器之前先执行自动化流程。
-- **拖拽友好的区域元素**：可以把区域元素像面板一样拖拽到页面任意位置，位置会自动保存；其他注入元素也可以放到区域内部作为子项。
-- **Shadow DOM 隔离**：控件渲染在 Shadow DOM 中，即使宿主页面的 CSS 很重，也能保持外观一致。
-- **可靠的同步与持久化**：数据存储在 `chrome.storage.local` 中并在加载时恢复；`MutationObserver` 监听 DOM 变化并重新挂载宿主，同时在所有相关标签页和侧边栏之间广播更新。
+当前仓库已将 **WXT 实现作为主线版本**（此前在 `wxt-temp/` 下开发）。旧的根目录实现已归档到 `legacy/v1/`。
 
-### 1.0.2 更新
-- 动作流程：支持拖动步骤序号调整顺序；将“新增步骤”移到列表上方并增加提示，避免长列表时下拉菜单溢出。
-- UI 优化：步骤类型以标签形式展示在序号旁，减少误触更改，同时保留现有构建器布局。
+核心能力：
+- 侧边栏管理（`Elements` / `Flows` / `Hidden` / `Overview` / `Settings`）
+- 动作流编辑器（`click`, `wait`, `input`, `navigate`, `log`, `if`, `while`, `popup`）
+- 用于流程复用输入的密码保管库（Password Vault）
+- 导入 / 导出（可选包含保管库数据）
+- 多语言界面（`en`, `ja`, `zh_CN`）
 
-### Chrome Webstore
-- 从Chrome 应用商店安装: https://chromewebstore.google.com/detail/ladybird-no-code-buttons/nefpepdpcjejamkgpndlfehkffkfgbpe
+## Chrome Web Store
+
+https://chromewebstore.google.com/detail/ladybird-no-code-buttons/nefpepdpcjejamkgpndlfehkffkfgbpe
 
 
+## 快速开始（WXT 主线）
 
-### 使用方法
-1. 点击 Ladybird（懒鸟） 图标，在当前标签页中打开侧边栏。
-2. 在 **Manage** 中点击 **Pick target**，选择需要增强的元素（支持同源 iframe）。
-3. 在编辑气泡中选择类型（按钮 / 链接 / 提示 / 区域），调整文本、位置和样式，并可以选择性地配置 URL、镜像点击选择器或动作流程。区域元素可以直接在页面上拖拽微调位置，也可以作为容器承载其它注入元素。
-4. 使用 Manage 中的过滤和搜索功能查找元素，并进行聚焦、重新编辑或按页面删除。
-5. 切换到 **Overview** 查看所有已保存的条目，可以在新标签页中打开页面或按 URL 批量清理。
-6. 在 **Settings** 中导入 / 导出 JSON 备份，并切换界面语言。
+请在仓库根目录执行。
 
-### 动作流程（可选）
-按钮在回退到链接或镜像选择器之前，可以先执行一段脚本化的动作流程。流程使用包含 `steps` 数组的 JSON 定义，保存时会自动校验：解析失败的 JSON、无效的选择器或不支持的步骤类型都会被拒绝。
-
-支持的步骤类型包括:
-- `click`：点击单个元素，或在设置 `all: true` 时点击所有匹配元素。
-- `wait`：等待指定的毫秒数（每个步骤都有安全上限）。
-- `input`：向输入框、textarea 或 contenteditable 元素写入文本，并触发 `input` / `change` 事件。
-- `navigate`：在 `_blank` 或指定 target 中打开经过安全过滤的 URL。
-- `log`：向页面控制台输出调试信息。
-- `if`：对条件求值一次，执行 `thenSteps` 或 `elseSteps`。
-- `while`：在条件为真时重复执行 `bodySteps`（循环次数有上限）。
-
-条件由 `exists`、`not`、`textContains`、`attributeEquals` 组合而成。流程仅在当前活动 frame（包括同源 iframe）中执行，总步骤数上限为 200，循环次数上限为 50，整体运行时间约 10 秒；超过限制的流程会被安全地中止。如果需要在流程中引用按钮自身，请使用特殊选择器 `:self`。
-
-```json
-{
-  "steps": [
-    { "type": "click", "selector": "#login" },
-    { "type": "wait", "ms": 500 },
-    { "type": "input", "selector": "#otp", "value": "123456" }
-  ]
-}
+### 安装依赖
+```bash
+npm install
 ```
 
-例如，上面的流程会点击登录按钮，填写一次性验证码，然后继续后续操作：
+### 开发
+```bash
+npm run dev
+```
 
-![Login button action flow sample](docs/button%20sample.gif)
+### 校验与构建
+```bash
+npm run i18n:check
+npm run compile
+npm run build
+```
 
-更多步骤字段说明、条件表达式示例和运行时限制，请参见仓库根目录下的 `AGENTS.md`。
+### 打包 zip（分发用）
+```bash
+npm run zip
+```
 
-### 所需权限
-- `tabs`：读取当前活动标签页、从侧边栏打开或切换标签页，并保持 UI 同步。
-- `storage`：在单一存储键下持久化每个页面的增强元素元数据。
-- `sidePanel`：在 Chrome 侧边栏中展示基于 React 的管理界面（若 API 不可用则退回到标签页界面）。
-- `webNavigation`：枚举同源 iframe，使拾取器和重新挂载逻辑可以访问嵌套文档。
-- `host_permissions`（`<all_urls>`）：允许用户在任意站点上注入元素。
+### 在 Chrome 中加载（开发）
+从以下目录加载未打包扩展：
+- `.output/chrome-mv3/`
 
-### 运行时架构概览
-- **消息层（`common/messaging.js`）**：包装 `chrome.runtime.sendMessage` 和端口连接，让所有上下文都通过 `{ ok, data | error }` 结构交换数据。所有异步处理都被标准化为 Promise，方便侧边栏、后台 Service Worker 与内容脚本复用同一套请求模式。
-- **持久化存储（`common/storage.js`）**：将所有注入元素的元数据集中保存在一个 `injectedElements` 键下。更新辅助方法会复制包含样式和 frame 信息的负载，`observePage` 则按 URL 扩散 `chrome.storage.onChanged` 事件。
-- **URL 规范化（`common/url.js`）**：去掉查询参数和哈希片段以生成稳定的页面键，在 URL 构造函数不可用时回退到手动裁剪。
-- **流程解析（`common/flows.js`）**：验证动作流 JSON、规范化简写字段、强制执行步骤数 / 循环次数 / 等待时间等上限，并向编辑器和 Service Worker 返回可读的错误信息。
-- **注入注册表（`content/injection/core/registry.js`）**：同时跟踪元素描述和实际宿主节点，优先复用已有宿主，在位置元数据变化时重建宿主，并通过 `data-*` 属性切换编辑状态。
-- **宿主与 Shadow DOM（`content/injection/host/create-host.js`）**：创建包裹元素和 Shadow DOM 结构，为按钮 / 链接 / 提示气泡 / 区域设置基础外观，并为区域元素添加尺寸控制。
-- **交互层（`content/injection/interactions/*`）**：负责拖拽、放置和尺寸调整，将草稿更新回写到自动保存层。
-- **内容运行时（`content/app/*.js`）**：在各个 frame 中挂载元素、监听存储变化、协调拾取器与编辑器会话，并应用自动保存的移动 / 调整结果。
+## 使用方式
 
-### 隐私与商店页面
-- `docs/PRIVACY-POLICY.md`：可以单独托管并在 Chrome 网上应用店的 “Privacy policy URL” 字段中引用的隐私政策正文。
+1. 在当前标签页打开 Ladybird 侧边栏。
+2. 在 **Elements** 中创建或编辑元素（按钮 / 链接 / 工具提示 / 区域）。
+3. 在 **Flows** 中绑定自动化流程。
+4. 在 **Hidden** 中隐藏网页元素。
+5. 在 **Overview** 中查看并删除站点保存数据。
+6. 在 **Settings** 中进行导入导出、语言切换和密码保管库查看。
 
-### 已知限制
-- 严格的 CSP 可能会阻止脚本或样式注入。
-- 目前只支持增强同源 iframe。
-- 对于高度动态的页面，注入元素可能会被临时覆盖，但观察器会重新挂载。
-- 动作流限制为最多 200 步、50 次循环，总运行时间约 10 秒；超出限制的流程会被中止。
+### 密码保管库（Flows）
+- 在流程步骤中绑定密码输入时，请使用 Password Vault UI。
+- 密码字段不允许以明文形式保存在流程中。
+- 运行时如果保管库处于锁定状态，Ladybird 可在网页内弹出解锁提示，并从当前步骤继续执行。
+- 如果忘记保管库密码，**无法找回**，只能重置（已保存密码会被删除）。
+
+## 动作流（概览）
+
+当注入按钮被点击时，流程会执行，并在链接跳转或选择器回退动作之前自动操作页面。
+
+支持的步骤类型包括：
+- `click`
+- `wait`
+- `input`
+- `navigate`
+- `log`
+- `if` / `while`
+- `popup`
+
+详细的步骤字段、条件、运行限制、frame 行为、保管库使用说明请参见 `AGENTS.md` 的 Action Flow Reference。
+
+## 从旧版迁移（重要）
+
+旧的根目录实现已迁移至：
+- `legacy/v1/`
+
+### 同一条目下的现有用户升级
+
+由于新版继续使用 **同一个 Chrome Web Store 条目 / 扩展 ID**，浏览器本地存储仍在同一个扩展作用域内。
+
+Ladybird 内置了兼容迁移逻辑，可在升级后将旧格式保存数据（例如 `injectedElements`）迁移到新的结构化存储。
+
+发布前/支持时建议：
+1. 使用真实旧数据进行升级验证后再发布。
+2. 保留导入/导出作为手动恢复路径。
+3. 如需处理 Password Vault 数据：
+   - 导出时可选择是否包含保管库密码（需要输入保管库密码确认）
+   - 导入时可能需要先创建/解锁保管库再恢复保管库数据
+
+说明：
+- 忘记保管库密码时，已保存的保管库密码无法恢复。
+- 重置保管库会删除已保存密码；流程中的绑定 token 仍会保留，但需要重新绑定。
+
+## 仓库结构
+
+### WXT版本
+- `entrypoints/` 后台与内容脚本入口
+- `ui/` 侧边栏 UI
+- `shared/` 共享协议、存储、导入导出、Secrets
+- `public/_locales/` i18n 文案
+- `scripts/` 开发与校验脚本
+
+### 旧版归档
+- `legacy/v1/` 旧根目录实现（仅供参考 / 维护）
+
+### 辅助材料
+- `docs/` 文档与策略内容
+- `release/` 历史产物、评审记录与商店素材
+
+## 开发与贡献说明
+
+请查看 `AGENTS.md` 获取：
+- 仓库约定
+- 构建 / 发布流程
+- i18n 规则
+- 动作流参考
+
+## 隐私与限制
+
+- 除非你主动导出，数据默认存储在 `chrome.storage.local`。
+- Password Vault 的秘密值仅在本地加密存储，使用时需要保管库密码解锁。
+- 不支持跨域 iframe 自动化。
+- 对 CSP 严格或 DOM 高频变化的网站，注入稳定性可能受影响。

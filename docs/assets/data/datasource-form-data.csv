@@ -1,0 +1,4 @@
+customerId,fullName,email,phone,company,plan,startDate,budget,note
+C-1001,Alex Morgan,alex.morgan@example.com,+1-415-555-0101,Northwind Labs,starter,2026-02-20,3500,first batch user
+C-1002,Jamie Lee,jamie.lee@example.com,+1-415-555-0102,Blue Harbor Inc,growth,2026-02-22,5400,needs onboarding call
+C-1003,Taylor Kim,taylor.kim@example.com,+1-415-555-0103,Silver Pine LLC,enterprise,2026-02-28,12000,"priority account, custom contract"

@@ -1,0 +1,229 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Data Source Flow Test - Screen A</title>
+    <style>
+      :root {
+        --bg-1: #f3f8f4;
+        --bg-2: #e6efe8;
+        --card: #ffffff;
+        --ink: #1f2e24;
+        --muted: #5d7365;
+        --accent: #1f7a43;
+        --accent-2: #14532d;
+        --line: #cfe0d4;
+        --radius: 14px;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        min-height: 100vh;
+        font-family: "IBM Plex Sans", "Segoe UI", sans-serif;
+        color: var(--ink);
+        background:
+          radial-gradient(circle at 10% 10%, #d8eadf 0%, transparent 45%),
+          radial-gradient(circle at 90% 15%, #d9efe4 0%, transparent 40%),
+          linear-gradient(160deg, var(--bg-1), var(--bg-2));
+        padding: 24px;
+      }
+
+      .page {
+        width: min(920px, 100%);
+        margin: 0 auto;
+        display: grid;
+        gap: 16px;
+      }
+
+      .card {
+        background: var(--card);
+        border: 1px solid var(--line);
+        border-radius: var(--radius);
+        box-shadow: 0 16px 40px rgba(20, 83, 45, 0.08);
+        padding: 18px;
+      }
+
+      h1 {
+        margin: 0 0 6px;
+        font-size: 26px;
+      }
+
+      p {
+        margin: 0;
+        color: var(--muted);
+      }
+
+      form {
+        display: grid;
+        gap: 14px;
+      }
+
+      .grid {
+        display: grid;
+        gap: 12px;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+      }
+
+      label {
+        display: grid;
+        gap: 6px;
+        font-size: 13px;
+        font-weight: 700;
+      }
+
+      input,
+      select,
+      textarea {
+        width: 100%;
+        border: 1px solid var(--line);
+        border-radius: 10px;
+        padding: 10px 11px;
+        font: inherit;
+        color: var(--ink);
+        background: #fbfefc;
+      }
+
+      textarea {
+        min-height: 86px;
+        resize: vertical;
+      }
+
+      input:focus,
+      select:focus,
+      textarea:focus {
+        outline: none;
+        border-color: var(--accent);
+        box-shadow: 0 0 0 3px rgba(31, 122, 67, 0.16);
+      }
+
+      .actions {
+        display: flex;
+        gap: 10px;
+        flex-wrap: wrap;
+      }
+
+      button {
+        border: 0;
+        border-radius: 10px;
+        padding: 10px 15px;
+        font: inherit;
+        font-weight: 700;
+        cursor: pointer;
+      }
+
+      #submit-button {
+        background: linear-gradient(135deg, var(--accent), var(--accent-2));
+        color: #fff;
+      }
+
+      #reset-button {
+        background: #ecf4ef;
+        color: var(--ink);
+        border: 1px solid var(--line);
+      }
+
+      .selectors {
+        margin: 0;
+        padding-left: 18px;
+        color: var(--muted);
+        font-size: 13px;
+        line-height: 1.55;
+      }
+
+      code {
+        background: #edf7f0;
+        border: 1px solid var(--line);
+        border-radius: 6px;
+        padding: 1px 6px;
+      }
+
+      @media (max-width: 720px) {
+        .grid {
+          grid-template-columns: 1fr;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <main class="page">
+      <section class="card">
+        <h1>Screen A: Intake Form</h1>
+        <p>Fill fields and submit. It will navigate to Screen B.</p>
+      </section>
+
+      <section class="card">
+        <form id="lead-form" action="./datasource-form-b.html" method="get">
+          <div class="grid">
+            <label for="field-customerId">
+              Customer ID
+              <input id="field-customerId" name="customerId" placeholder="C-1001" required />
+            </label>
+            <label for="field-fullName">
+              Full Name
+              <input id="field-fullName" name="fullName" placeholder="Alex Morgan" required />
+            </label>
+            <label for="field-email">
+              Email
+              <input id="field-email" name="email" type="email" placeholder="alex@example.com" required />
+            </label>
+            <label for="field-phone">
+              Phone
+              <input id="field-phone" name="phone" placeholder="+1 415 555 0189" />
+            </label>
+            <label for="field-company">
+              Company
+              <input id="field-company" name="company" placeholder="Northwind Labs" />
+            </label>
+            <label for="field-plan">
+              Plan
+              <select id="field-plan" name="plan">
+                <option value="starter">starter</option>
+                <option value="growth">growth</option>
+                <option value="enterprise">enterprise</option>
+              </select>
+            </label>
+            <label for="field-startDate">
+              Start Date
+              <input id="field-startDate" name="startDate" type="date" />
+            </label>
+            <label for="field-budget">
+              Budget (USD)
+              <input id="field-budget" name="budget" type="number" min="0" step="100" placeholder="5000" />
+            </label>
+          </div>
+
+          <label for="field-note">
+            Note
+            <textarea id="field-note" name="note" placeholder="Any extra context for this submission."></textarea>
+          </label>
+
+          <div class="actions">
+            <button id="submit-button" type="submit">Submit and Go Screen B</button>
+            <button id="reset-button" type="reset">Reset</button>
+          </div>
+        </form>
+      </section>
+
+      <section class="card">
+        <p>Useful selectors for flow:</p>
+        <ul class="selectors">
+          <li><code>input[name="customerId"]</code></li>
+          <li><code>input[name="fullName"]</code></li>
+          <li><code>input[name="email"]</code></li>
+          <li><code>input[name="phone"]</code></li>
+          <li><code>input[name="company"]</code></li>
+          <li><code>select[name="plan"]</code></li>
+          <li><code>input[name="startDate"]</code></li>
+          <li><code>input[name="budget"]</code></li>
+          <li><code>textarea[name="note"]</code></li>
+          <li><code>button#submit-button</code></li>
+        </ul>
+      </section>
+    </main>
+  </body>
+</html>

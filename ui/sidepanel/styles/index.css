@@ -1,0 +1,145 @@
+@import "tailwindcss";
+@import "./theme.css";
+
+@layer base {
+  :root {
+    --lightningcss-light: initial;
+    --lightningcss-dark: ;
+  }
+
+  *, ::before, ::after {
+    border-color: var(--color-border, var(--border));
+  }
+
+  body {
+    margin: 0;
+    background: var(--background);
+    color: var(--foreground);
+    font-family: var(--font-sans);
+    letter-spacing: var(--tracking-normal);
+    height: 100vh;
+    overflow: hidden;
+  }
+
+  #root {
+    height: 100vh;
+  }
+
+  details > summary {
+    list-style: none;
+  }
+
+  details > summary::-webkit-details-marker {
+    display: none;
+  }
+
+  input[type="checkbox"] {
+    accent-color: var(--primary);
+    cursor: pointer;
+  }
+
+}
+
+@layer components {
+
+  /* .rounded {
+    border-radius: var(--radius);
+  } */
+
+  .badge-pill {
+    @apply inline-flex items-center rounded-full border px-2 py-0.5 text-[10px] font-semibold;
+    background-color: color-mix(in oklch, var(--primary) 18%, transparent);
+    border-color: color-mix(in oklch, var(--primary) 35%, transparent);
+    color: var(--secondary-foreground);
+  }
+
+  .btn-primary {
+    @apply inline-flex cursor-pointer items-center justify-center px-4 py-2 text-sm font-semibold shadow-sm transition;
+    border-radius: var(--radius);
+    background-color: var(--primary);
+    color: var(--primary-foreground);
+  }
+
+  .btn-primary:hover {
+    filter: brightness(0.96);
+  }
+
+  .btn-ghost {
+    @apply inline-flex cursor-pointer items-center justify-center border px-3 py-2 text-sm font-semibold shadow-sm transition;
+    border-radius: var(--radius);
+    background-color: var(--secondary);
+    border-color: var(--border);
+    color: var(--secondary-foreground);
+  }
+
+  .btn-ghost:hover {
+    background-color: var(--accent);
+    color: var(--accent-foreground);
+  }
+
+  .btn-invert {
+    @apply inline-flex cursor-pointer items-center justify-center border px-3 py-2 text-xs font-semibold transition;
+    border-radius: var(--radius);
+    border-color: color-mix(in oklch, var(--primary-foreground) 25%, transparent);
+    background-color: color-mix(in oklch, var(--primary-foreground) 12%, transparent);
+    color: var(--primary-foreground);
+  }
+
+  .btn-invert:hover {
+    background-color: color-mix(in oklch, var(--primary-foreground) 20%, transparent);
+  }
+
+  .btn-tab {
+    @apply flex-1 cursor-pointer px-3 py-2 text-sm font-semibold transition;
+    color: var(--muted-foreground);
+  }
+
+  .btn-tab:hover {
+    color: var(--accent-foreground);
+    background-color: var(--accent);
+  }
+
+  .btn-tab-active {
+    background-color: var(--primary) !important;
+    color: var(--primary-foreground) !important;
+  }
+
+  .input {
+    @apply w-full border px-3 py-2 text-sm;
+    border-radius: var(--radius);
+      background-color: color-mix(in oklab, var(--input) 25%, transparent);
+    border-color: var(--border);
+    color: var(--foreground);
+  }
+
+  .input:focus {
+    border-color: var(--ring);
+    box-shadow: inset 0 0 0 1px var(--ring);
+    outline: none;
+  }
+
+  .select {
+    @apply pr-8 cursor-pointer;
+  }
+
+  .btn-icon {
+    @apply relative inline-flex h-9 w-9 cursor-pointer items-center justify-center border shadow-sm transition;
+    border-radius: 9999px;
+    background-color: var(--secondary);
+    border-color: var(--border);
+    color: var(--secondary-foreground);
+  }
+
+  .btn-icon:hover {
+    background-color: var(--accent);
+  }
+
+  .btn-icon-danger {
+    background-color: transparent;
+    color: var(--destructive);
+  }
+
+  .btn-icon-danger:hover {
+    background-color: color-mix(in oklch, var(--destructive) 12%, transparent);
+  }
+}

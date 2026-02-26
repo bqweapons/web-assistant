@@ -1,0 +1,342 @@
+import { useCallback, useEffect, useMemo, useRef, useState, type MutableRefObject } from 'react';
+import {
+  MessageType,
+  type FlowRunDataSourceInput,
+  type FlowRunStartSource,
+  type FlowRunStatusPayload,
+  type RuntimeMessage,
+} from '../../../../shared/messages';
+import { inferDataSourceFileType, requestDataSourceFile } from '../../../../shared/filePicker';
+import { sendRuntimeMessage } from '../../utils/runtimeMessaging';
+import { t } from '../../utils/i18n';
+import { getStepCount, toFlowSnapshot, type FlowRecord } from './normalize';
+import type { FlowStepData } from '../../../../shared/flowStepMigration';
+
+export const getRunnerStateLabel = (state?: FlowRunStatusPayload['state']) => {
+  if (state === 'running') {
+    return t('sidepanel_flow_runner_state_running', 'Running');
+  }
+  if (state === 'queued') {
+    return t('sidepanel_flow_runner_state_queued', 'Queued');
+  }
+  if (state === 'succeeded') {
+    return t('sidepanel_flow_runner_state_succeeded', 'Succeeded');
+  }
+  if (state === 'failed') {
+    return t('sidepanel_flow_runner_state_failed', 'Failed');
+  }
+  if (state === 'cancelled') {
+    return t('sidepanel_flow_runner_state_cancelled', 'Cancelled');
+  }
+  return t('sidepanel_label_unknown', 'Unknown');
+};
+
+export const formatRunnerError = (code?: string, message?: string) => {
+  if (!code && !message) {
+    return '';
+  }
+  if (code === 'site-mismatch' || code === 'cross-site-navigation') {
+    return t('sidepanel_flow_runner_error_site_mismatch', 'Flow can only run on the same site.');
+  }
+  if (code === 'runner-busy') {
+    return t('sidepanel_flow_runner_error_busy', 'Another flow is already running.');
+  }
+  if (code === 'unsupported-step-type') {
+    return t('sidepanel_flow_runner_error_unsupported_step', 'Flow has an unsupported step type.');
+  }
+  if (code === 'data-source-input-required' || code === 'data-source-input-missing') {
+    return t(
+      'sidepanel_flow_runner_error_data_source_required',
+      'Please select a data source CSV before running this flow.',
+    );
+  }
+  if (code === 'data-source-mismatch') {
+    return t(
+      'sidepanel_flow_runner_error_data_source_mismatch',
+      'Selected CSV does not match the recorded data source.',
+    );
+  }
+  if (code === 'password-literal-blocked') {
+    return t(
+      'sidepanel_flow_runner_error_password_literal_blocked',
+      'Password fields must be saved to the password vault before running.',
+    );
+  }
+  if (code === 'secret-vault-locked') {
+    return t('sidepanel_flow_runner_error_secret_vault_locked', 'Please unlock the password vault first.');
+  }
+  if (code === 'secret-not-found') {
+    return t(
+      'sidepanel_flow_runner_error_secret_not_found',
+      'The selected password could not be found. Please choose it again.',
+    );
+  }
+  if (code === 'secret-vault-unlock-cancelled') {
+    return t(
+      'sidepanel_flow_runner_error_secret_vault_unlock_cancelled',
+      'Password vault unlock was cancelled. The flow was stopped.',
+    );
+  }
+  if (code === 'secret-vault-unlock-prompt-unavailable') {
+    return t(
+      'sidepanel_flow_runner_error_secret_vault_unlock_prompt_unavailable',
+      'Could not show the vault unlock prompt on the page. Open the side panel, unlock the vault, then try again.',
+    );
+  }
+  if (code === 'secret-vault-unlock-interrupted') {
+    return t(
+      'sidepanel_flow_runner_error_secret_vault_unlock_interrupted',
+      'Vault unlock was interrupted by page refresh or navigation. Please run the flow again.',
+    );
+  }
+  if (code === 'popup-dismissed-by-navigation') {
+    return t(
+      'sidepanel_flow_runner_error_popup_dismissed_by_navigation',
+      'Popup confirmation was closed because the page refreshed or navigated.',
+    );
+  }
+  return message || code || t('sidepanel_flow_runner_error_unknown', 'Flow run failed.');
+};
+
+type DataSourceStepDescriptor = {
+  id: string;
+  title: string;
+  fileType: 'csv' | 'tsv';
+};
+
+const collectDataSourceSteps = (steps: FlowStepData[], sink: DataSourceStepDescriptor[] = []) => {
+  for (const step of steps) {
+    if (step.type === 'data-source') {
+      sink.push({
+        id: step.id,
+        title: step.title || step.id,
+        fileType: step.dataSource?.fileType === 'tsv' ? 'tsv' : 'csv',
+      });
+    }
+    if (Array.isArray(step.children) && step.children.length > 0) {
+      collectDataSourceSteps(step.children, sink);
+    }
+    if (Array.isArray(step.branches) && step.branches.length > 0) {
+      for (const branch of step.branches) {
+        collectDataSourceSteps(branch.steps ?? [], sink);
+      }
+    }
+  }
+  return sink;
+};
+
+const requestFileForDataSourceStep = (step: DataSourceStepDescriptor): Promise<File | null> => {
+  return requestDataSourceFile(
+    { title: step.title, fileType: step.fileType },
+    {
+      requireConfirm: true,
+      confirmMessage: t('sidepanel_flow_runner_data_source_pick_confirm', 'Select CSV/TSV for step: {step}').replace(
+        '{step}',
+        step.title,
+      ),
+    },
+  );
+};
+
+const collectDataSourceInputsForRun = async (flow: FlowRecord) => {
+  const steps = collectDataSourceSteps(flow.steps);
+  if (steps.length === 0) {
+    return {} as Record<string, FlowRunDataSourceInput>;
+  }
+  const selected: Record<string, FlowRunDataSourceInput> = {};
+  for (const step of steps) {
+    const file = await requestFileForDataSourceStep(step);
+    if (!file) {
+      throw new Error('data-source-selection-cancelled');
+    }
+    const rawText = await file.text();
+    selected[step.id] = {
+      fileName: file.name,
+      fileType: inferDataSourceFileType(file.name, step.fileType),
+      rawText,
+    };
+  }
+  return selected;
+};
+
+type UseFlowRunnerResult = {
+  runStatus: FlowRunStatusPayload | null;
+  runRequestError: string;
+  runErrorMessage: string;
+  runLogCopyFeedback: string;
+  runLogScrollRef: MutableRefObject<HTMLDivElement | null>;
+  runLogs: NonNullable<FlowRunStatusPayload['logs']>;
+  isRunActive: boolean;
+  currentRunFlow: FlowRecord | null;
+  startFlowRun: (flow: FlowRecord, source: FlowRunStartSource) => Promise<void>;
+  stopFlowRun: () => Promise<void>;
+  copyRunLogs: () => Promise<void>;
+  clearRunRequestError: () => void;
+  formatLogTime: (timestamp: number) => string;
+};
+
+export const useFlowRunner = (flows: FlowRecord[]): UseFlowRunnerResult => {
+  const [runStatus, setRunStatus] = useState<FlowRunStatusPayload | null>(null);
+  const [runRequestError, setRunRequestError] = useState('');
+  const [runLogCopyFeedback, setRunLogCopyFeedback] = useState('');
+  const runLogScrollRef = useRef<HTMLDivElement | null>(null);
+
+  const runLogs = runStatus?.logs ?? [];
+  const lastRunLogId = runLogs.length ? runLogs[runLogs.length - 1]?.id : '';
+
+  const isRunActive = runStatus?.state === 'queued' || runStatus?.state === 'running';
+
+  const runErrorMessage = useMemo(() => {
+    if (runRequestError) {
+      return runRequestError;
+    }
+    if (!runStatus?.error) {
+      return '';
+    }
+    return formatRunnerError(runStatus.error.code, runStatus.error.message);
+  }, [runRequestError, runStatus?.error]);
+
+  const currentRunFlow = useMemo(
+    () => (runStatus?.flowId ? flows.find((flow) => flow.id === runStatus.flowId) ?? null : null),
+    [flows, runStatus?.flowId],
+  );
+
+  useEffect(() => {
+    const runtime = chrome?.runtime;
+    if (!runtime?.onMessage) {
+      return;
+    }
+    const handleRuntimeMessage = (rawMessage: RuntimeMessage) => {
+      if (!rawMessage?.forwarded || rawMessage.type !== MessageType.FLOW_RUN_STATUS) {
+        return;
+      }
+      setRunStatus(rawMessage.data);
+      if (rawMessage.data.state !== 'failed') {
+        setRunRequestError('');
+      }
+    };
+    runtime.onMessage.addListener(handleRuntimeMessage);
+    return () => runtime.onMessage.removeListener(handleRuntimeMessage);
+  }, []);
+
+  const startFlowRun = useCallback(async (flow: FlowRecord, source: FlowRunStartSource) => {
+    setRunRequestError('');
+    const startedAt = Date.now();
+    try {
+      const dataSourceInputs = await collectDataSourceInputsForRun(flow);
+      const response = await sendRuntimeMessage({
+        type: MessageType.START_FLOW_RUN,
+        data: {
+          flow: toFlowSnapshot(flow),
+          source,
+          dataSourceInputs,
+        },
+      });
+      const runId =
+        response && typeof response === 'object' && 'runId' in response && typeof response.runId === 'string'
+          ? response.runId
+          : `run-${startedAt}`;
+      setRunStatus((prev) => ({
+        runId,
+        flowId: flow.id,
+        siteKey: flow.siteKey,
+        tabId: prev?.tabId ?? 0,
+        state: 'queued',
+        progress: { completedSteps: 0, totalSteps: Math.max(1, getStepCount(flow.steps)) },
+        startedAt,
+        activeUrl: prev?.activeUrl || '',
+        currentStepId: prev?.currentStepId,
+        endedAt: undefined,
+        error: undefined,
+        logs: [],
+      }));
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      if (message === 'data-source-selection-cancelled') {
+        setRunRequestError(
+          t(
+            'sidepanel_flow_runner_data_source_selection_cancelled',
+            'Run cancelled because data source selection was cancelled.',
+          ),
+        );
+        return;
+      }
+      setRunRequestError(formatRunnerError(message, message));
+    }
+  }, []);
+
+  const formatLogTime = useCallback((timestamp: number) => {
+    const date = new Date(timestamp);
+    if (Number.isNaN(date.getTime())) {
+      return '--:--:--';
+    }
+    return date.toLocaleTimeString([], {
+      hour: '2-digit',
+      minute: '2-digit',
+      second: '2-digit',
+      hour12: false,
+    });
+  }, []);
+
+  const copyRunLogs = useCallback(async () => {
+    if (!runLogs.length) {
+      setRunLogCopyFeedback(t('sidepanel_flow_runner_logs_empty', 'No logs to copy.'));
+      return;
+    }
+    const output = runLogs
+      .map((entry) => `[${formatLogTime(entry.timestamp)}] ${entry.level.toUpperCase()} ${entry.message}`)
+      .join('\n');
+    try {
+      await navigator.clipboard.writeText(output);
+      setRunLogCopyFeedback(t('sidepanel_flow_runner_logs_copied', 'Logs copied.'));
+    } catch {
+      setRunLogCopyFeedback(t('sidepanel_flow_runner_logs_copy_failed', 'Failed to copy logs.'));
+    }
+  }, [formatLogTime, runLogs]);
+
+  useEffect(() => {
+    if (!lastRunLogId) {
+      return;
+    }
+    const container = runLogScrollRef.current;
+    if (!container) {
+      return;
+    }
+    const rafId = window.requestAnimationFrame(() => {
+      container.scrollTop = container.scrollHeight;
+    });
+    return () => window.cancelAnimationFrame(rafId);
+  }, [lastRunLogId]);
+
+  const stopFlowRun = useCallback(async () => {
+    if (!runStatus?.runId) {
+      return;
+    }
+    setRunRequestError('');
+    try {
+      await sendRuntimeMessage({
+        type: MessageType.STOP_FLOW_RUN,
+        data: { runId: runStatus.runId },
+      });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      setRunRequestError(formatRunnerError(message, message));
+    }
+  }, [runStatus?.runId]);
+
+  return {
+    runStatus,
+    runRequestError,
+    runErrorMessage,
+    runLogCopyFeedback,
+    runLogScrollRef,
+    runLogs,
+    isRunActive,
+    currentRunFlow,
+    startFlowRun,
+    stopFlowRun,
+    copyRunLogs,
+    clearRunRequestError: () => setRunRequestError(''),
+    formatLogTime,
+  };
+};
