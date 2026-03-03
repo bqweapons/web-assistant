@@ -67,7 +67,18 @@ export default function SettingsSection() {
 
   const downloadExportJson = async (payload: unknown) => {
     const content = JSON.stringify(payload, null, 2);
-    const filename = `page-augmentor-export-${new Date().toISOString().replace(/[:.]/g, '-')}.json`;
+    const timestamp = new Date();
+    const pad = (value: number, length = 2) => String(value).padStart(length, '0');
+    const timezoneOffsetMinutes = -timestamp.getTimezoneOffset();
+    const timezoneSign = timezoneOffsetMinutes >= 0 ? '+' : '-';
+    const timezoneHours = pad(Math.floor(Math.abs(timezoneOffsetMinutes) / 60));
+    const timezoneMinutes = pad(Math.abs(timezoneOffsetMinutes) % 60);
+    const filename = `ladybrid-export-${timestamp.getFullYear()}-${pad(timestamp.getMonth() + 1)}-${pad(
+      timestamp.getDate(),
+    )}T${pad(timestamp.getHours())}-${pad(timestamp.getMinutes())}-${pad(timestamp.getSeconds())}-${pad(
+      timestamp.getMilliseconds(),
+      3,
+    )}${timezoneSign}${timezoneHours}-${timezoneMinutes}.json`;
     const blob = new Blob([content], { type: 'application/json' });
     const url = URL.createObjectURL(blob);
     const anchor = document.createElement('a');

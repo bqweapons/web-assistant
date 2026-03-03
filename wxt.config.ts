@@ -6,6 +6,11 @@ export default defineConfig({
   vite: () => ({
     plugins: [react()],
   }),
+  webExt: process.env.WXT_DEV_START_URL
+    ? {
+        startUrls: [process.env.WXT_DEV_START_URL],
+      }
+    : undefined,
   manifest: {
     name: '__MSG_extensionName__',
     description: '__MSG_extensionDescription__',

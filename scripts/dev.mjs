@@ -7,9 +7,9 @@ import { fileURLToPath } from 'node:url';
 
 const HOST = '127.0.0.1';
 const DEFAULT_PORT = 4173;
-const DEFAULT_DOC_PATH = '/kintai-schedule-mock.html';
+const DEFAULT_DOC_PATH = '/index.html';
 const SCRIPT_DIR = path.dirname(fileURLToPath(import.meta.url));
-const DOCS_ROOT = path.resolve(SCRIPT_DIR, '..', '..', 'docs');
+const DOCS_ROOT = path.resolve(SCRIPT_DIR, '..', 'docs');
 
 const MIME_TYPES = {
   '.html': 'text/html; charset=utf-8',
@@ -42,28 +42,6 @@ const resolveFilePath = (requestPathname) => {
     return null;
   }
   return filePath;
-};
-
-const openUrlInBrowser = (url) => {
-  const spawnOptions = { stdio: 'ignore', detached: true };
-  try {
-    if (process.platform === 'win32') {
-      const child = spawn('cmd.exe', ['/d', '/s', '/c', 'start', '""', url], spawnOptions);
-      child.unref();
-      return true;
-    }
-    if (process.platform === 'darwin') {
-      const child = spawn('open', [url], spawnOptions);
-      child.unref();
-      return true;
-    }
-    const child = spawn('xdg-open', [url], spawnOptions);
-    child.unref();
-    return true;
-  } catch (error) {
-    console.warn('[dev] failed to auto-open browser', error);
-    return false;
-  }
 };
 
 const createDocsServer = async (startPort = DEFAULT_PORT) => {
@@ -126,21 +104,26 @@ const main = async () => {
   const { server, port } = await createDocsServer(DEFAULT_PORT);
   console.log(`[docs] serving ${DOCS_ROOT}`);
   console.log(`[docs] http://${HOST}:${port}${DEFAULT_DOC_PATH} (default)`);
-  console.log(`[docs] http://${HOST}:${port}/datasource-form-a.html`);
-  console.log(`[docs] http://${HOST}:${port}/datasource-form-b.html`);
+  console.log(`[docs] http://${HOST}:${port}/test-pages/data-source/datasource-form-a.html`);
+  console.log(`[docs] http://${HOST}:${port}/test-pages/data-source/datasource-form-b.html`);
 
   const defaultDocsUrl = `http://${HOST}:${port}${DEFAULT_DOC_PATH}`;
-  openUrlInBrowser(defaultDocsUrl);
+  const wxtEnv = {
+    ...process.env,
+    WXT_DEV_START_URL: defaultDocsUrl,
+  };
 
   const wxtCwd = path.resolve(SCRIPT_DIR, '..');
   const wxtProcess =
     process.platform === 'win32'
       ? spawn('cmd.exe', ['/d', '/s', '/c', 'npm run dev:wxt'], {
           cwd: wxtCwd,
+          env: wxtEnv,
           stdio: 'inherit',
         })
       : spawn('npm', ['run', 'dev:wxt'], {
           cwd: wxtCwd,
+          env: wxtEnv,
           stdio: 'inherit',
         });
 
