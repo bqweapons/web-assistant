@@ -773,8 +773,14 @@
   "sidepanel_flow_input_secret_bind_selected": {
     "message": "Bind selected password"
   },
+  "sidepanel_flow_input_secret_bind_action": {
+    "message": "Bind"
+  },
   "sidepanel_flow_input_secret_create": {
     "message": "Create new password"
+  },
+  "sidepanel_flow_input_secret_create_action": {
+    "message": "New"
   },
   "sidepanel_flow_input_secret_unlock": {
     "message": "Unlock vault"
@@ -784,6 +790,9 @@
   },
   "sidepanel_flow_input_secret_save_bind": {
     "message": "Save and bind"
+  },
+  "sidepanel_flow_input_secret_save_bind_action": {
+    "message": "Save & bind"
   },
   "sidepanel_flow_input_secret_unlock_help": {
     "message": "To select a saved password, unlock the vault. Enter the vault password (not the website password)."
@@ -1179,13 +1188,13 @@
     "message": "Password Vault Viewer"
   },
   "sidepanel_settings_vault_viewer_subtitle": {
-    "message": "Open the password vault viewer and enter the vault password to browse saved passwords."
+    "message": "Open the password vault viewer and enter the vault password to view and manage saved passwords."
   },
   "sidepanel_settings_vault_viewer_open": {
     "message": "Open password vault"
   },
   "sidepanel_settings_vault_viewer_modal_subtitle": {
-    "message": "Enter the vault password to view saved passwords."
+    "message": "Enter the vault password to view and manage saved passwords."
   },
   "sidepanel_settings_vault_viewer_status": {
     "message": "Status"
@@ -1240,6 +1249,63 @@
   },
   "sidepanel_settings_vault_viewer_reset_success": {
     "message": "Password vault was reset. You can create a new vault password now."
+  },
+  "sidepanel_settings_vault_secret_manage_title": {
+    "message": "Manage passwords"
+  },
+  "sidepanel_settings_vault_secret_manage_hint": {
+    "message": "Add, edit, or delete saved passwords stored in the vault."
+  },
+  "sidepanel_settings_vault_secret_editor_create": {
+    "message": "Add password"
+  },
+  "sidepanel_settings_vault_secret_editor_edit": {
+    "message": "Edit password"
+  },
+  "sidepanel_settings_vault_secret_add": {
+    "message": "Add password"
+  },
+  "sidepanel_settings_vault_secret_edit": {
+    "message": "Edit"
+  },
+  "sidepanel_settings_vault_secret_delete": {
+    "message": "Delete"
+  },
+  "sidepanel_settings_vault_secret_name_label": {
+    "message": "Password name"
+  },
+  "sidepanel_settings_vault_secret_name_placeholder": {
+    "message": "example: login_password"
+  },
+  "sidepanel_settings_vault_secret_value_label": {
+    "message": "Password"
+  },
+  "sidepanel_settings_vault_secret_value_placeholder": {
+    "message": "Enter the password value"
+  },
+  "sidepanel_settings_vault_secret_save": {
+    "message": "Save"
+  },
+  "sidepanel_settings_vault_secret_cancel": {
+    "message": "Cancel"
+  },
+  "sidepanel_settings_vault_secret_name_required": {
+    "message": "Password name is required."
+  },
+  "sidepanel_settings_vault_secret_value_required": {
+    "message": "Password value is required."
+  },
+  "sidepanel_settings_vault_secret_saved": {
+    "message": "Password updated."
+  },
+  "sidepanel_settings_vault_secret_created": {
+    "message": "Password saved."
+  },
+  "sidepanel_settings_vault_secret_delete_confirm": {
+    "message": "Delete password \"{name}\"? This action cannot be undone."
+  },
+  "sidepanel_settings_vault_secret_deleted": {
+    "message": "Password deleted."
   },
   "sidepanel_overview_empty": {
     "message": "No saved data yet. Add elements, flows, or hidden rules to get started."
@@ -1330,5 +1396,50 @@
   },
   "sidepanel_flow_input_secret_bound_missing": {
     "message": "Bound password no longer exists in the vault: {name}. Please choose or create a password and bind again."
+  },
+  "sidepanel_flow_recording_start": {
+    "message": "Start recording"
+  },
+  "sidepanel_flow_recording_stop": {
+    "message": "Stop recording"
+  },
+  "sidepanel_flow_recording_status_label": {
+    "message": "Recorder"
+  },
+  "sidepanel_flow_recording_status_active": {
+    "message": "Recording"
+  },
+  "sidepanel_flow_recording_status_idle": {
+    "message": "Idle"
+  },
+  "sidepanel_flow_recording_hint_basic": {
+    "message": "Record clicks and inputs from the page."
+  },
+  "sidepanel_flow_recording_feedback_password_skipped": {
+    "message": "Password input was skipped. Add it manually with a Password Vault binding."
+  },
+  "sidepanel_flow_recording_feedback_navigation_not_recorded": {
+    "message": "Navigation was detected. No Navigate step was added."
+  },
+  "sidepanel_flow_recording_feedback_started": {
+    "message": "Recording started."
+  },
+  "sidepanel_flow_recording_feedback_stopped": {
+    "message": "Recording stopped."
+  },
+  "sidepanel_flow_recording_feedback_error_start": {
+    "message": "Unable to start recording on the page."
+  },
+  "sidepanel_flow_recording_feedback_interrupted": {
+    "message": "Navigation interrupted recording. No Navigate step was added."
+  },
+  "sidepanel_flow_recording_stop_before_save": {
+    "message": "Stop recording before saving or running."
+  },
+  "sidepanel_elements_style_margin": {
+    "message": "Margin"
+  },
+  "sidepanel_elements_margin_placeholder": {
+    "message": "0 auto"
   }
 }

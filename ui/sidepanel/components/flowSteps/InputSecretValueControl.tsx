@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
+import { Check, KeyRound, Keyboard, Link2, Plus, Unlock, X } from 'lucide-react';
 import SelectMenu from '../SelectMenu';
 import { t } from '../../utils/i18n';
 import {
@@ -227,7 +228,7 @@ export default function InputSecretValueControl({
         <div className="grid grid-cols-2 gap-1">
           <button
             type="button"
-            className={`h-7 w-full rounded border px-2 text-[11px] ${
+            className={`inline-flex h-7 w-full items-center justify-center gap-1 rounded border px-2 text-[11px] ${
               mode === 'literal' ? 'border-primary/40 bg-primary/10 text-foreground' : 'border-border bg-card text-muted-foreground'
             }`}
             onClick={() => {
@@ -235,11 +236,12 @@ export default function InputSecretValueControl({
               setErrorMessage('');
             }}
           >
+            <Keyboard className="h-3.5 w-3.5" />
             {t('sidepanel_flow_input_value_mode_literal', 'Type directly')}
           </button>
           <button
             type="button"
-            className={`h-7 w-full rounded border px-2 text-[11px] ${
+            className={`inline-flex h-7 w-full items-center justify-center gap-1 rounded border px-2 text-[11px] ${
               mode === 'secret'
                 ? 'border-primary/40 bg-primary/10 text-foreground'
                 : passwordLike
@@ -253,6 +255,7 @@ export default function InputSecretValueControl({
               });
             }}
           >
+            <KeyRound className="h-3.5 w-3.5" />
             {t('sidepanel_flow_input_value_mode_secret', 'Choose from password vault')}
           </button>
         </div>
@@ -279,10 +282,10 @@ export default function InputSecretValueControl({
                   'This looks like a password field. Passwords cannot be saved in plain text inside a flow.',
                 )}
               </p>
-              <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+              <div className="grid grid-cols-2 gap-2">
                 <button
                   type="button"
-                  className="btn-primary h-8 w-full justify-center px-2 text-[11px] disabled:cursor-not-allowed disabled:opacity-60"
+                  className="btn-primary h-8 w-full justify-center gap-1 px-2 text-[11px] disabled:cursor-not-allowed disabled:opacity-60"
                   onClick={() => {
                     void refreshVaultStatus().catch((error) => {
                       setErrorMessage(error instanceof Error ? error.message : String(error));
@@ -291,11 +294,12 @@ export default function InputSecretValueControl({
                   }}
                   disabled={isBusy}
                 >
+                  <Check className="h-3.5 w-3.5" />
                   {t('sidepanel_flow_input_password_save_to_vault', 'Save to password vault and bind')}
                 </button>
                 <button
                   type="button"
-                  className="btn-ghost h-8 w-full justify-center px-2 text-[11px]"
+                  className="btn-ghost h-8 w-full justify-center gap-1 px-2 text-[11px]"
                   onClick={() => {
                     setMode('secret');
                     void refreshVaultStatus().catch((error) => {
@@ -303,6 +307,7 @@ export default function InputSecretValueControl({
                     });
                   }}
                 >
+                  <KeyRound className="h-3.5 w-3.5" />
                   {t('sidepanel_flow_input_password_use_vault', 'Use password vault')}
                 </button>
               </div>
@@ -344,10 +349,11 @@ export default function InputSecretValueControl({
                 />
                 <button
                   type="button"
-                  className="btn-primary h-8 w-full justify-center px-3 text-xs disabled:cursor-not-allowed disabled:opacity-60"
+                  className="btn-primary h-8 w-full justify-center gap-1 px-3 text-xs disabled:cursor-not-allowed disabled:opacity-60"
                   onClick={() => void handleUnlockVault()}
                   disabled={isBusy || !unlockPassword.trim()}
                 >
+                  <Unlock className="h-3.5 w-3.5" />
                   {vaultStatus.configured
                     ? t('sidepanel_flow_input_secret_unlock', 'Unlock password vault')
                     : t('sidepanel_flow_input_secret_create_and_unlock', 'Create and unlock password vault')}
@@ -373,21 +379,23 @@ export default function InputSecretValueControl({
                   buttonClassName="btn-ghost h-8 w-full min-w-0 justify-between px-2 text-xs"
                 />
               </div>
-              <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+              <div className="grid grid-cols-2 gap-2">
                 <button
                   type="button"
-                  className="btn-primary h-8 w-full justify-center px-2 text-[11px] disabled:cursor-not-allowed disabled:opacity-60"
+                  className="btn-primary h-8 w-full justify-center gap-1 px-2 text-[11px] disabled:cursor-not-allowed disabled:opacity-60"
                   onClick={handleBindSelectedSecret}
                   disabled={!validSelectedSecretName}
                 >
-                  {t('sidepanel_flow_input_secret_bind_selected', 'Bind selected password')}
+                  <Link2 className="h-3.5 w-3.5" />
+                  {t('sidepanel_flow_input_secret_bind_action', 'Bind')}
                 </button>
                 <button
                   type="button"
-                  className="btn-ghost h-8 w-full justify-center px-2 text-[11px]"
+                  className="btn-ghost h-8 w-full justify-center gap-1 px-2 text-[11px]"
                   onClick={() => openCreateSecretForm(passwordLike && !tokenInfo ? field.value : '')}
                 >
-                  {t('sidepanel_flow_input_secret_create', 'Create new password')}
+                  <Plus className="h-3.5 w-3.5" />
+                  {t('sidepanel_flow_input_secret_create_action', 'New')}
                 </button>
               </div>
             </div>
@@ -413,20 +421,22 @@ export default function InputSecretValueControl({
                 placeholder={t('sidepanel_flow_input_secret_value_placeholder', 'Password value')}
                 onChange={(event) => setNewSecretValue(event.target.value)}
               />
-              <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+              <div className="grid grid-cols-2 gap-2">
                 <button
                   type="button"
-                  className="btn-primary h-8 w-full justify-center px-2 text-[11px] disabled:cursor-not-allowed disabled:opacity-60"
+                  className="btn-primary h-8 w-full min-w-0 justify-center gap-1 px-2 text-[11px] whitespace-nowrap disabled:cursor-not-allowed disabled:opacity-60"
                   onClick={() => void handleCreateAndBindSecret()}
                   disabled={isBusy || !vaultStatus.unlocked || !newSecretName.trim()}
                 >
-                  {t('sidepanel_flow_input_secret_save_bind', 'Save and bind')}
+                  <Check className="h-3.5 w-3.5" />
+                  {t('sidepanel_flow_input_secret_save_bind_action', 'Save & bind')}
                 </button>
                 <button
                   type="button"
-                  className="btn-ghost h-8 w-full justify-center px-2 text-[11px]"
+                  className="btn-ghost h-8 w-full min-w-0 justify-center gap-1 px-2 text-[11px] whitespace-nowrap"
                   onClick={() => setShowCreateSecretForm(false)}
                 >
+                  <X className="h-3.5 w-3.5" />
                   {t('sidepanel_action_cancel', 'Cancel')}
                 </button>
               </div>
@@ -436,7 +446,7 @@ export default function InputSecretValueControl({
       )}
 
       {passwordLike ? (
-        <p className="text-[10px] text-muted-foreground">
+        <p className="text-[10px] text-destructive">
           {t(
             'sidepanel_flow_input_password_migration_required',
             'Password fields must use the password vault. Plain text passwords are blocked on save and run.',

@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Crosshair, Eye, EyeOff, Search, Sparkles, Trash2 } from 'lucide-react';
+import { Check, Crosshair, Eye, EyeOff, Search, Sparkles, Trash2, X } from 'lucide-react';
 import Card from '../components/Card';
 import Drawer from '../components/Drawer';
 import ConfirmDialog from '../components/ConfirmDialog';
@@ -538,13 +538,14 @@ export default function HiddenRulesSection({
           {showClear ? (
             <button
               type="button"
-              className="btn-ghost h-9 shrink-0 px-3"
+              className="btn-ghost h-9 shrink-0 gap-1 px-3"
               onClick={() => {
                 setSearchQuery('');
                 setSortMode('recent');
                 setFilterMode('all');
               }}
             >
+              <X className="h-3.5 w-3.5" />
               {t('sidepanel_action_clear', 'Clear')}
             </button>
           ) : null}
@@ -555,22 +556,24 @@ export default function HiddenRulesSection({
         <div className="grid grid-cols-2 gap-2">
           <button
             type="button"
-            className="btn-ghost h-8 w-full px-3 text-xs"
+            className="btn-ghost h-8 w-full gap-1 px-3 text-xs"
             onClick={() => {
               void handleBulkEnableAll();
             }}
             disabled={!siteRules.length}
           >
+            <Eye className="h-3.5 w-3.5" />
             {t('sidepanel_hidden_bulk_enable_all', 'Enable all')}
           </button>
           <button
             type="button"
-            className="btn-ghost h-8 w-full px-3 text-xs"
+            className="btn-ghost h-8 w-full gap-1 px-3 text-xs"
             onClick={() => {
               void handleBulkPauseAll();
             }}
             disabled={!siteRules.length}
           >
+            <EyeOff className="h-3.5 w-3.5" />
             {t('sidepanel_hidden_bulk_pause_all', 'Pause all')}
           </button>
         </div>
@@ -721,16 +724,18 @@ export default function HiddenRulesSection({
               <p className="text-sm text-foreground">{formatTimestamp(editRule.updatedAt)}</p>
             </div>
             <div className="flex items-center justify-end gap-2 pt-2">
-              <button type="button" className="btn-ghost" onClick={closeRuleDrawer}>
+              <button type="button" className="btn-ghost gap-1" onClick={closeRuleDrawer}>
+                <X className="h-3.5 w-3.5" />
                 {t('sidepanel_action_cancel', 'Cancel')}
               </button>
               <button
                 type="button"
-                className="btn-primary"
+                className="btn-primary gap-1"
                 onClick={() => {
                   void handleRuleSave();
                 }}
               >
+                <Check className="h-3.5 w-3.5" />
                 {t('sidepanel_action_save_changes', 'Save changes')}
               </button>
             </div>

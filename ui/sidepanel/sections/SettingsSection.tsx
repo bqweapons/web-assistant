@@ -1,6 +1,7 @@
-import { useEffect, useRef, useState, type ChangeEvent } from 'react';
-import { Copy, Download, ExternalLink, Eye, EyeOff, KeyRound, Languages, Share2, Unlock, Upload, X } from 'lucide-react';
+import { useRef, useState, type ChangeEvent } from 'react';
+import { Copy, Download, ExternalLink, Languages, Share2, Upload } from 'lucide-react';
 import Card from '../components/Card';
+import PasswordVaultManager from '../components/PasswordVaultManager';
 import { LOCALE_OPTIONS, SupportedLocale, getLocaleLabel, setLocale, t, useLocale } from '../utils/i18n';
 import { getAllSitesData, setAllSitesData } from '../../../shared/storage';
 import { buildExportPayload, mergeSitesData, parseImportPayload } from '../../../shared/importExport';
@@ -9,9 +10,6 @@ import {
   getSecretsVaultStatus,
   importSecretVaultTransferPayload,
   parseSecretVaultTransferPayload,
-  resetSecretsVault,
-  resolveSecretValue,
-  unlockSecretsVault,
 } from '../../../shared/secrets';
 
 const isRecord = (value: unknown): value is Record<string, unknown> =>
@@ -24,46 +22,9 @@ export default function SettingsSection() {
   const [isImporting, setIsImporting] = useState(false);
   const [isExporting, setIsExporting] = useState(false);
   const [feedback, setFeedback] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
-  const [vaultStatus, setVaultStatus] = useState<{
-    configured: boolean;
-    unlocked: boolean;
-    secretCount: number;
-    names: string[];
-  }>({
-    configured: false,
-    unlocked: false,
-    secretCount: 0,
-    names: [],
-  });
-  const [vaultPasswordInput, setVaultPasswordInput] = useState('');
-  const [isVaultBusy, setIsVaultBusy] = useState(false);
-  const [vaultFeedback, setVaultFeedback] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
-  const [revealedVaultValues, setRevealedVaultValues] = useState<Record<string, string>>({});
-  const [revealingSecretName, setRevealingSecretName] = useState<string | null>(null);
-  const [isVaultViewerOpen, setIsVaultViewerOpen] = useState(false);
   const storeUrl = chrome?.runtime?.id
     ? `https://chromewebstore.google.com/detail/${chrome.runtime.id}`
     : 'https://chromewebstore.google.com/';
-
-  const refreshVaultStatus = async () => {
-    const status = await getSecretsVaultStatus();
-    setVaultStatus({
-      configured: status.configured,
-      unlocked: status.unlocked,
-      secretCount: status.secretCount,
-      names: status.names,
-    });
-    if (!status.unlocked) {
-      setRevealedVaultValues({});
-      setRevealingSecretName(null);
-    }
-  };
-
-  useEffect(() => {
-    void refreshVaultStatus().catch(() => {
-      // Non-blocking: settings page should still load even if vault status can't be read.
-    });
-  }, []);
 
   const downloadExportJson = async (payload: unknown) => {
     const content = JSON.stringify(payload, null, 2);
@@ -232,9 +193,6 @@ export default function SettingsSection() {
         if (vaultPassword) {
           await importSecretVaultTransferPayload(secretsBundle, vaultPassword);
           secretImportCount = Object.keys(secretsBundle.items).length;
-          await refreshVaultStatus().catch(() => {
-            // Ignore UI refresh failure; import already completed.
-          });
         }
       }
       const warningSuffix =
@@ -326,116 +284,6 @@ export default function SettingsSection() {
     });
   };
 
-  const handleUnlockOrCreateVault = async () => {
-    if (!vaultPasswordInput || isVaultBusy) {
-      return;
-    }
-    setIsVaultBusy(true);
-    setVaultFeedback(null);
-    try {
-      const status = await unlockSecretsVault(vaultPasswordInput);
-      setVaultStatus({
-        configured: status.configured,
-        unlocked: status.unlocked,
-        secretCount: status.secretCount,
-        names: status.names,
-      });
-      setVaultPasswordInput('');
-      setVaultFeedback({
-        type: 'success',
-        message: status.configured
-          ? t('sidepanel_settings_vault_viewer_unlocked', 'Password vault unlocked.')
-          : t('sidepanel_settings_vault_viewer_created', 'Password vault created and unlocked.'),
-      });
-    } catch (error) {
-      setVaultFeedback({
-        type: 'error',
-        message: error instanceof Error ? error.message : String(error),
-      });
-    } finally {
-      setIsVaultBusy(false);
-    }
-  };
-
-  const handleToggleRevealSecret = async (name: string) => {
-    if (revealedVaultValues[name]) {
-      setRevealedVaultValues((current) => {
-        const next = { ...current };
-        delete next[name];
-        return next;
-      });
-      return;
-    }
-    if (!vaultStatus.unlocked || revealingSecretName || isVaultBusy) {
-      return;
-    }
-    setRevealingSecretName(name);
-    setVaultFeedback(null);
-    try {
-      const value = await resolveSecretValue(name);
-      setRevealedVaultValues((current) => ({ ...current, [name]: value }));
-    } catch (error) {
-      setVaultFeedback({
-        type: 'error',
-        message: error instanceof Error ? error.message : String(error),
-      });
-    } finally {
-      setRevealingSecretName(null);
-    }
-  };
-
-  const handleOpenVaultViewer = async () => {
-    setVaultFeedback(null);
-    await refreshVaultStatus().catch(() => {
-      // Ignore status refresh failures here; the modal can still open.
-    });
-    setIsVaultViewerOpen(true);
-  };
-
-  const handleResetVault = async () => {
-    if (isVaultBusy) {
-      return;
-    }
-    const confirmed = window.confirm(
-      t(
-        'sidepanel_settings_vault_viewer_reset_confirm',
-        'Forgot your vault password?\n\nResetting the vault will permanently delete all saved passwords in the vault. Flows that use saved passwords will need to be rebound.\n\nDo you want to reset the vault?',
-      ),
-    );
-    if (!confirmed) {
-      return;
-    }
-    setIsVaultBusy(true);
-    setVaultFeedback(null);
-    try {
-      const status = await resetSecretsVault();
-      setVaultStatus({
-        configured: status.configured,
-        unlocked: status.unlocked,
-        secretCount: status.secretCount,
-        names: status.names,
-      });
-      setVaultPasswordInput('');
-      setRevealedVaultValues({});
-      setRevealingSecretName(null);
-      setVaultFeedback({
-        type: 'success',
-        message: t(
-          'sidepanel_settings_vault_viewer_reset_success',
-          'Password vault was reset. You can create a new vault password now.',
-        ),
-      });
-    } catch (error) {
-      setVaultFeedback({
-        type: 'error',
-        message: error instanceof Error ? error.message : String(error),
-      });
-    } finally {
-      setIsVaultBusy(false);
-    }
-  };
-
-
   return (
     <section className="flex flex-col gap-3">
       <div>
@@ -505,36 +353,7 @@ export default function SettingsSection() {
         </div>
       </Card>
 
-      <Card>
-        <div className="flex flex-col gap-3">
-          <div className="flex items-start gap-3">
-            <div className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-border bg-secondary text-secondary-foreground">
-              <KeyRound className="h-4 w-4" />
-            </div>
-            <div>
-              <h3 className="text-sm font-semibold text-card-foreground">
-                {t('sidepanel_settings_vault_viewer_title', 'Password Vault Viewer')}
-              </h3>
-              <p className="mt-1 text-xs text-muted-foreground">
-                {t(
-                  'sidepanel_settings_vault_viewer_subtitle',
-                  'Open the password vault viewer and enter the vault password to browse saved passwords.',
-                )}
-              </p>
-            </div>
-          </div>
-          <button
-            type="button"
-            className="btn-primary gap-2 w-full"
-            onClick={() => {
-              void handleOpenVaultViewer();
-            }}
-          >
-            <KeyRound className="h-4 w-4" />
-            {t('sidepanel_settings_vault_viewer_open', 'Open password vault')}
-          </button>
-        </div>
-      </Card>
+      <PasswordVaultManager />
 
       <Card>
         <div className="flex flex-col gap-3">
@@ -599,161 +418,6 @@ export default function SettingsSection() {
           </div>
         </div>
       </Card>
-      {isVaultViewerOpen ? (
-        <div
-          className="fixed inset-0 z-[2147483000] flex items-center justify-center bg-black/40 p-3"
-          onClick={() => setIsVaultViewerOpen(false)}
-        >
-          <div
-            className="max-h-[85vh] w-full max-w-md overflow-auto rounded-xl border border-border bg-card p-3 shadow-2xl"
-            onClick={(event) => event.stopPropagation()}
-          >
-            <div className="mb-3 flex items-start justify-between gap-2">
-              <div>
-                <h3 className="text-sm font-semibold text-card-foreground">
-                  {t('sidepanel_settings_vault_viewer_title', 'Password Vault Viewer')}
-                </h3>
-                <p className="mt-1 text-xs text-muted-foreground">
-                  {t(
-                    'sidepanel_settings_vault_viewer_modal_subtitle',
-                    'Enter the vault password to view saved passwords.',
-                  )}
-                </p>
-              </div>
-              <button
-                type="button"
-                className="btn-icon h-8 w-8"
-                aria-label={t('sidepanel_action_close', 'Close')}
-                onClick={() => setIsVaultViewerOpen(false)}
-              >
-                <X className="h-4 w-4" />
-              </button>
-            </div>
-
-            <div className="mb-3 rounded-md border border-border/70 bg-muted/20 p-3 text-xs">
-              <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
-                <span className="font-semibold text-foreground">
-                  {t('sidepanel_settings_vault_viewer_status', 'Status')}:
-                </span>
-                <span className="text-muted-foreground">
-                  {vaultStatus.configured
-                    ? vaultStatus.unlocked
-                      ? t('sidepanel_settings_vault_viewer_status_unlocked', 'Configured / Unlocked')
-                      : t('sidepanel_settings_vault_viewer_status_locked', 'Configured / Locked')
-                    : t('sidepanel_settings_vault_viewer_status_not_configured', 'Not configured')}
-                </span>
-                <span className="text-muted-foreground">
-                  {t('sidepanel_settings_vault_viewer_count', '{count} password(s)').replace(
-                    '{count}',
-                    String(vaultStatus.secretCount),
-                  )}
-                </span>
-              </div>
-            </div>
-
-            <div className="grid gap-2">
-              <input
-                className="input h-9 min-w-0"
-                type="password"
-                autoComplete="new-password"
-                value={vaultPasswordInput}
-                placeholder={t(
-                  'sidepanel_settings_vault_viewer_password_input',
-                  'Vault password (create/unlock)',
-                )}
-                onChange={(event) => setVaultPasswordInput(event.target.value)}
-              />
-              <button
-                type="button"
-                className="btn-primary gap-2 w-full disabled:cursor-not-allowed disabled:opacity-60"
-                onClick={() => {
-                  void handleUnlockOrCreateVault();
-                }}
-                disabled={isVaultBusy || !vaultPasswordInput.trim()}
-              >
-                <Unlock className="h-4 w-4" />
-                {vaultStatus.configured
-                  ? t('sidepanel_settings_vault_viewer_unlock', 'Unlock vault')
-                  : t('sidepanel_settings_vault_viewer_create_unlock', 'Create vault')}
-              </button>
-              {vaultStatus.configured && !vaultStatus.unlocked ? (
-                <button
-                  type="button"
-                  className="btn-ghost h-9 w-full justify-center text-xs text-amber-700 disabled:cursor-not-allowed disabled:opacity-60"
-                  onClick={() => {
-                    void handleResetVault();
-                  }}
-                  disabled={isVaultBusy}
-                >
-                  {t(
-                    'sidepanel_settings_vault_viewer_reset_action',
-                    'Forgot vault password? Reset vault',
-                  )}
-                </button>
-              ) : null}
-            </div>
-
-            <div className="mt-3">
-              {vaultStatus.unlocked ? (
-                vaultStatus.names.length > 0 ? (
-                  <div className="grid gap-2">
-                    {vaultStatus.names.map((name) => {
-                      const isRevealed = Object.prototype.hasOwnProperty.call(revealedVaultValues, name);
-                      const isLoadingReveal = revealingSecretName === name;
-                      return (
-                        <div
-                          key={name}
-                          className="grid gap-2 rounded-md border border-border/70 bg-card/50 p-2"
-                        >
-                          <div className="flex items-center justify-between gap-2">
-                            <span className="truncate text-xs font-semibold text-card-foreground">{name}</span>
-                            <button
-                              type="button"
-                              className="btn-ghost h-7 gap-1 px-2 text-[11px] disabled:cursor-not-allowed disabled:opacity-60"
-                              onClick={() => {
-                                void handleToggleRevealSecret(name);
-                              }}
-                              disabled={Boolean(revealingSecretName && !isLoadingReveal)}
-                            >
-                              {isRevealed ? <EyeOff className="h-3.5 w-3.5" /> : <Eye className="h-3.5 w-3.5" />}
-                              {isLoadingReveal
-                                ? t('sidepanel_settings_vault_viewer_loading', 'Loading...')
-                                : isRevealed
-                                  ? t('sidepanel_settings_vault_viewer_hide', 'Hide')
-                                  : t('sidepanel_settings_vault_viewer_show', 'Show')}
-                            </button>
-                          </div>
-                          <div className="rounded border border-border bg-muted/30 px-2 py-1.5 font-mono text-[11px] text-muted-foreground">
-                            {isRevealed ? revealedVaultValues[name] : '********'}
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                ) : (
-                  <p className="text-xs text-muted-foreground">
-                    {t('sidepanel_settings_vault_viewer_empty', 'No passwords saved in the vault.')}
-                  </p>
-                )
-              ) : (
-                <p className="text-xs text-muted-foreground">
-                  {t(
-                    'sidepanel_settings_vault_viewer_unlock_hint',
-                    'Unlock the vault to browse saved passwords.',
-                  )}
-                </p>
-              )}
-            </div>
-
-            {vaultFeedback ? (
-              <p className={'mt-3 text-xs ' + (vaultFeedback.type === 'error' ? 'text-red-600' : 'text-emerald-600')}>
-                {vaultFeedback.message}
-              </p>
-            ) : null}
-          </div>
-        </div>
-      ) : null}
-
     </section>
   );
 }

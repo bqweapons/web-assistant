@@ -734,6 +734,12 @@
   "sidepanel_flow_input_secret_create": {
     "message": "新しいパスワードを作成"
   },
+  "sidepanel_flow_input_secret_bind_action": {
+    "message": "バインド"
+  },
+  "sidepanel_flow_input_secret_create_action": {
+    "message": "新規"
+  },
   "sidepanel_flow_input_secret_unlock": {
     "message": "保管庫を解除"
   },
@@ -742,6 +748,9 @@
   },
   "sidepanel_flow_input_secret_save_bind": {
     "message": "保存して紐付け"
+  },
+  "sidepanel_flow_input_secret_save_bind_action": {
+    "message": "保存してバインド"
   },
   "sidepanel_flow_input_secret_unlock_help": {
     "message": "保存済みのパスワードを選ぶには保管庫を解除してください。ここで入力するのは保管庫のパスワードです。"
@@ -1241,6 +1250,63 @@
   "sidepanel_settings_vault_viewer_reset_success": {
     "message": "パスワード保管庫をリセットしました。新しい保管庫パスワードを作成できます。"
   },
+  "sidepanel_settings_vault_secret_manage_title": {
+    "message": "パスワード管理"
+  },
+  "sidepanel_settings_vault_secret_manage_hint": {
+    "message": "保管庫に保存されたパスワードを追加・編集・削除できます。"
+  },
+  "sidepanel_settings_vault_secret_editor_create": {
+    "message": "パスワードを追加"
+  },
+  "sidepanel_settings_vault_secret_editor_edit": {
+    "message": "パスワードを編集"
+  },
+  "sidepanel_settings_vault_secret_add": {
+    "message": "パスワードを追加"
+  },
+  "sidepanel_settings_vault_secret_edit": {
+    "message": "編集"
+  },
+  "sidepanel_settings_vault_secret_delete": {
+    "message": "削除"
+  },
+  "sidepanel_settings_vault_secret_name_label": {
+    "message": "パスワード名"
+  },
+  "sidepanel_settings_vault_secret_name_placeholder": {
+    "message": "例: login_password"
+  },
+  "sidepanel_settings_vault_secret_value_label": {
+    "message": "パスワード"
+  },
+  "sidepanel_settings_vault_secret_value_placeholder": {
+    "message": "パスワードを入力"
+  },
+  "sidepanel_settings_vault_secret_save": {
+    "message": "保存"
+  },
+  "sidepanel_settings_vault_secret_cancel": {
+    "message": "キャンセル"
+  },
+  "sidepanel_settings_vault_secret_name_required": {
+    "message": "パスワード名を入力してください。"
+  },
+  "sidepanel_settings_vault_secret_value_required": {
+    "message": "パスワードを入力してください。"
+  },
+  "sidepanel_settings_vault_secret_saved": {
+    "message": "パスワードを更新しました。"
+  },
+  "sidepanel_settings_vault_secret_created": {
+    "message": "パスワードを保存しました。"
+  },
+  "sidepanel_settings_vault_secret_delete_confirm": {
+    "message": "パスワード「{name}」を削除しますか？ この操作は元に戻せません。"
+  },
+  "sidepanel_settings_vault_secret_deleted": {
+    "message": "パスワードを削除しました。"
+  },
   "sidepanel_overview_empty": {
     "message": "まだ保存されたデータがありません。要素・フロー・非表示ルールを追加するとここに表示されます。"
   },
@@ -1330,5 +1396,50 @@
   },
   "sidepanel_flow_input_secret_bound_missing": {
     "message": "紐付け済みのパスワードが保管庫に見つかりません: {name}。別のパスワードを選択するか、新しく作成して再度紐付けしてください。"
+  },
+  "sidepanel_flow_recording_start": {
+    "message": "記録を開始"
+  },
+  "sidepanel_flow_recording_stop": {
+    "message": "記録を停止"
+  },
+  "sidepanel_flow_recording_status_label": {
+    "message": "レコーダー"
+  },
+  "sidepanel_flow_recording_status_active": {
+    "message": "記録中"
+  },
+  "sidepanel_flow_recording_status_idle": {
+    "message": "待機中"
+  },
+  "sidepanel_flow_recording_hint_basic": {
+    "message": "ページ上のクリックと入力を記録します。"
+  },
+  "sidepanel_flow_recording_feedback_password_skipped": {
+    "message": "パスワード入力は記録されませんでした。Password Vault 連携で手動追加してください。"
+  },
+  "sidepanel_flow_recording_feedback_navigation_not_recorded": {
+    "message": "画面遷移を検出しました。Navigate ステップは追加されていません。"
+  },
+  "sidepanel_flow_recording_feedback_started": {
+    "message": "記録を開始しました。"
+  },
+  "sidepanel_flow_recording_feedback_stopped": {
+    "message": "記録を停止しました。"
+  },
+  "sidepanel_flow_recording_feedback_error_start": {
+    "message": "ページ上で記録を開始できませんでした。"
+  },
+  "sidepanel_flow_recording_feedback_interrupted": {
+    "message": "画面遷移により記録が中断されました。Navigate ステップは追加されていません。"
+  },
+  "sidepanel_flow_recording_stop_before_save": {
+    "message": "保存または実行する前に記録を停止してください。"
+  },
+  "sidepanel_elements_style_margin": {
+    "message": "余白"
+  },
+  "sidepanel_elements_margin_placeholder": {
+    "message": "0 auto"
   }
 }

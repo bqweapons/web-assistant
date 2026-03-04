@@ -683,6 +683,12 @@
   "sidepanel_flow_input_secret_create": {
     "message": "新建密码"
   },
+  "sidepanel_flow_input_secret_bind_action": {
+    "message": "绑定"
+  },
+  "sidepanel_flow_input_secret_create_action": {
+    "message": "新建"
+  },
   "sidepanel_flow_input_secret_unlock": {
     "message": "解锁保管库"
   },
@@ -690,6 +696,9 @@
     "message": "创建并解锁保管库"
   },
   "sidepanel_flow_input_secret_save_bind": {
+    "message": "保存并绑定"
+  },
+  "sidepanel_flow_input_secret_save_bind_action": {
     "message": "保存并绑定"
   },
   "sidepanel_flow_input_secret_unlock_help": {
@@ -1241,6 +1250,63 @@
   "sidepanel_settings_vault_viewer_reset_success": {
     "message": "密码保管库已重置。现在可以创建新的保管库密码。"
   },
+  "sidepanel_settings_vault_secret_manage_title": {
+    "message": "密码管理"
+  },
+  "sidepanel_settings_vault_secret_manage_hint": {
+    "message": "可以新增、编辑或删除密码库中保存的密码。"
+  },
+  "sidepanel_settings_vault_secret_editor_create": {
+    "message": "新增密码"
+  },
+  "sidepanel_settings_vault_secret_editor_edit": {
+    "message": "编辑密码"
+  },
+  "sidepanel_settings_vault_secret_add": {
+    "message": "新增密码"
+  },
+  "sidepanel_settings_vault_secret_edit": {
+    "message": "编辑"
+  },
+  "sidepanel_settings_vault_secret_delete": {
+    "message": "删除"
+  },
+  "sidepanel_settings_vault_secret_name_label": {
+    "message": "密码名称"
+  },
+  "sidepanel_settings_vault_secret_name_placeholder": {
+    "message": "例如：login_password"
+  },
+  "sidepanel_settings_vault_secret_value_label": {
+    "message": "密码"
+  },
+  "sidepanel_settings_vault_secret_value_placeholder": {
+    "message": "输入密码内容"
+  },
+  "sidepanel_settings_vault_secret_save": {
+    "message": "保存"
+  },
+  "sidepanel_settings_vault_secret_cancel": {
+    "message": "取消"
+  },
+  "sidepanel_settings_vault_secret_name_required": {
+    "message": "请输入密码名称。"
+  },
+  "sidepanel_settings_vault_secret_value_required": {
+    "message": "请输入密码内容。"
+  },
+  "sidepanel_settings_vault_secret_saved": {
+    "message": "密码已更新。"
+  },
+  "sidepanel_settings_vault_secret_created": {
+    "message": "密码已保存。"
+  },
+  "sidepanel_settings_vault_secret_delete_confirm": {
+    "message": "要删除密码“{name}”吗？此操作无法撤销。"
+  },
+  "sidepanel_settings_vault_secret_deleted": {
+    "message": "密码已删除。"
+  },
   "sidepanel_overview_empty": {
     "message": "还没有保存的数据。添加元素、流程或隐藏规则后会显示在这里。"
   },
@@ -1330,5 +1396,50 @@
   },
   "sidepanel_flow_input_secret_bound_missing": {
     "message": "已绑定的密码在保管库中不存在：{name}。请选择或新建一个密码后重新绑定。"
+  },
+  "sidepanel_flow_recording_start": {
+    "message": "开始录制"
+  },
+  "sidepanel_flow_recording_stop": {
+    "message": "停止录制"
+  },
+  "sidepanel_flow_recording_status_label": {
+    "message": "录制器"
+  },
+  "sidepanel_flow_recording_status_active": {
+    "message": "录制中"
+  },
+  "sidepanel_flow_recording_status_idle": {
+    "message": "空闲"
+  },
+  "sidepanel_flow_recording_hint_basic": {
+    "message": "录制页面上的点击和输入操作。"
+  },
+  "sidepanel_flow_recording_feedback_password_skipped": {
+    "message": "密码输入已跳过。请稍后使用 Password Vault 绑定手动添加。"
+  },
+  "sidepanel_flow_recording_feedback_navigation_not_recorded": {
+    "message": "检测到页面跳转，未添加 Navigate 步骤。"
+  },
+  "sidepanel_flow_recording_feedback_started": {
+    "message": "已开始录制。"
+  },
+  "sidepanel_flow_recording_feedback_stopped": {
+    "message": "已停止录制。"
+  },
+  "sidepanel_flow_recording_feedback_error_start": {
+    "message": "无法在页面上开始录制。"
+  },
+  "sidepanel_flow_recording_feedback_interrupted": {
+    "message": "页面跳转中断了录制，未添加 Navigate 步骤。"
+  },
+  "sidepanel_flow_recording_stop_before_save": {
+    "message": "请先停止录制，再保存或运行。"
+  },
+  "sidepanel_elements_style_margin": {
+    "message": "外边距"
+  },
+  "sidepanel_elements_margin_placeholder": {
+    "message": "0 auto"
   }
 }

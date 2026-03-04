@@ -9,6 +9,7 @@ type FlowDrawerProps = {
   onClose: () => void;
   children: ReactNode;
   summary?: ReactNode;
+  toolbar?: ReactNode;
   overlayClassName?: string;
   panelClassName?: string;
 };
@@ -20,6 +21,7 @@ export default function FlowDrawer({
   onClose,
   children,
   summary,
+  toolbar,
   overlayClassName = 'z-40',
   panelClassName = 'z-50',
 }: FlowDrawerProps) {
@@ -93,6 +95,7 @@ export default function FlowDrawer({
               <X className="h-4 w-4" />
             </button>
           </header>
+          {toolbar ? <div className="border-b border-border px-5 py-3">{toolbar}</div> : null}
           <div className="grid grid-cols-1 gap-4 px-5 py-4 lg:grid-cols-[2fr,1fr]">
             <div className="order-1 max-h-[70vh] overflow-x-hidden overflow-y-auto pr-1">{children}</div>
             <aside className="order-2 flex flex-col gap-3 rounded-2xl border border-border bg-muted p-4 lg:order-none lg:sticky lg:top-4">

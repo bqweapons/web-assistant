@@ -8,6 +8,7 @@ import {
 import { startPicker, stopPicker } from './content/picker';
 import { handleInjectionMessage, registerPageContextIfNeeded, resetInjectionRegistry } from './content/injection';
 import { executeFlowRunStep, promptFlowVaultUnlockOnPage } from './content/flowRunner';
+import { startFlowRecorder, stopFlowRecorder } from './content/flowRecorder';
 import { clearHiddenRulesStyle, rehydratePersistedHiddenRules } from './content/hiddenRules';
 
 const CONTENT_RUNTIME_READY_KEY = '__ladybirdContentRuntimeReady__';
@@ -227,6 +228,16 @@ export default defineContentScript({
           sendResponse?.({ ok: true });
           return true;
         }
+        case MessageType.START_FLOW_RECORDING: {
+          startFlowRecorder(message.data);
+          sendResponse?.({ ok: true });
+          return true;
+        }
+        case MessageType.STOP_FLOW_RECORDING: {
+          stopFlowRecorder(message.data.sessionId);
+          sendResponse?.({ ok: true });
+          return true;
+        }
         case MessageType.CREATE_ELEMENT:
         case MessageType.UPDATE_ELEMENT:
         case MessageType.DELETE_ELEMENT:
@@ -290,6 +301,7 @@ export default defineContentScript({
     });
     return () => {
       stopWatcher();
+      stopFlowRecorder();
       clearHiddenRulesStyle();
       resetInjectionRegistry();
       storageApi?.removeListener(handleStorageChange);

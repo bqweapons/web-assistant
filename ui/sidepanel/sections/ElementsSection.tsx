@@ -5,15 +5,18 @@ import {
   AlignRight,
   AArrowDown,
   AArrowUp,
+  Circle,
   Bold,
   Check,
   ChevronDown,
   Crosshair,
   ExternalLink,
   Italic,
+  Play,
   RefreshCw,
   Link as LinkIcon,
   Search,
+  Square,
   Trash2,
   Underline,
   X,
@@ -27,6 +30,7 @@ import SelectMenu from '../components/SelectMenu';
 import { t, useLocale } from '../utils/i18n';
 import { formatLocalDateTime } from '../utils/dateTime';
 import {
+  type FlowRecordingEventPayload,
   MessageType,
   type PickerRect,
   type RuntimeMessage,
@@ -64,6 +68,8 @@ import {
 import { getInjectionErrorMessage, sendElementMessage as sendElementMessageShared } from './elements/useElementsMessaging';
 import { useElementsStore } from './elements/useElementsStore';
 import { getStepCount } from './flows/normalize';
+import { appendRecordedEventToSteps } from './flows/recording';
+import { useFlowRecording } from './flows/useFlowRecording';
 
 type ElementsSectionProps = {
   siteKey?: string;
@@ -143,6 +149,22 @@ export default function ElementsSection({
     name: '',
     description: '',
     steps: [] as FlowStepData[],
+  });
+  const applyRecordedEvent = useCallback((event: FlowRecordingEventPayload) => {
+    setDraftFlow((prev) => ({
+      ...prev,
+      steps: appendRecordedEventToSteps(prev.steps, event),
+    }));
+  }, []);
+  const {
+    isRecording,
+    recordingFeedback,
+    startRecording,
+    stopRecording,
+  } = useFlowRecording({
+    pageUrl,
+    tabId,
+    onRecordingEvent: applyRecordedEvent,
   });
   useEffect(() => {
     setActiveElementId(null);
@@ -367,8 +389,9 @@ export default function ElementsSection({
         backgroundColor: '#1b84ff',
         fontSize: '12px',
         fontWeight: '600',
+        textAlign: 'center',
         padding: '8px 16px',
-        borderRadius: '8px',
+        borderRadius: '2px',
       },
     },
     {
@@ -378,8 +401,9 @@ export default function ElementsSection({
         backgroundColor: 'transparent',
         color: '#2563eb',
         border: '2px solid #2563eb',
+        textAlign: 'center',
         padding: '8px 16px',
-        borderRadius: '10px',
+        borderRadius: '2px',
       },
     },
     {
@@ -489,6 +513,7 @@ export default function ElementsSection({
     'borderRadius',
     'boxShadow',
     'padding',
+    'margin',
     'position',
     'width',
     'height',
@@ -556,38 +581,77 @@ export default function ElementsSection({
           }
         : prev,
     );
+    void stopRecording({ silent: true });
     setFlowDrawerOpen(false);
   };
 
-  const getFlowStepCount = (value: FlowStepData[]) => getStepCount(value);
+  const closeFlowDrawer = useCallback(() => {
+    void stopRecording({ silent: true });
+    setFlowDrawerOpen(false);
+  }, [stopRecording]);
 
-  const renderFlowSummary = (steps: number, onSave: () => void) => (
+  const renderFlowSummary = (onSave: () => void) => (
     <>
-      <p className="text-xs font-semibold text-muted-foreground">
-        {t('sidepanel_flows_summary_title', 'Summary')}
-      </p>
-      <p className="text-sm text-foreground">
-        {t('sidepanel_steps_count', '{count} steps').replace('{count}', String(steps))}
-      </p>
-      <div className="flex flex-wrap items-center gap-2">
-        <button
-          type="button"
-          className="btn-primary text-xs"
-          onClick={onSave}
-          disabled={!hasActivePage}
-          title={!hasActivePage ? readOnlyReason : undefined}
-        >
-          {t('sidepanel_action_save', 'Save')}
-        </button>
-        <button type="button" className="btn-primary text-xs" disabled>
-          {t('sidepanel_action_save_run', 'Save & Run')}
-        </button>
-        <button type="button" className="btn-primary text-xs" disabled>
+      <div className="flex flex-wrap items-center justify-end gap-2">
+        <button type="button" className="btn-primary gap-1 text-xs" disabled>
+          <Play className="h-3.5 w-3.5" />
           {t('sidepanel_action_run', 'Run')}
         </button>
+        <button
+          type="button"
+          className="btn-primary gap-1 text-xs"
+          onClick={onSave}
+          disabled={!hasActivePage || isRecording}
+          title={
+            !hasActivePage
+              ? readOnlyReason
+              : isRecording
+                ? t('sidepanel_flow_recording_stop_before_save', 'Stop recording before saving or running.')
+                : undefined
+          }
+        >
+          <Check className="h-3.5 w-3.5" />
+          {t('sidepanel_action_save', 'Save')}
+        </button>
+      </div>
+      <div className="grid gap-2 rounded-xl border border-border bg-card/60 p-3">
+        <div className="flex items-center gap-2">
+          {isRecording ? (
+            <button
+              type="button"
+              className="btn-icon h-8 w-8 text-destructive"
+              onClick={() => void stopRecording()}
+              aria-label={t('sidepanel_flow_recording_stop', 'Stop recording')}
+              title={t('sidepanel_flow_recording_stop', 'Stop recording')}
+            >
+              <Square className="h-3.5 w-3.5 fill-current" />
+            </button>
+          ) : (
+            <button
+              type="button"
+              className="btn-icon h-8 w-8 disabled:cursor-not-allowed disabled:opacity-60"
+              onClick={() => void startRecording()}
+              disabled={!hasActivePage}
+              aria-label={!hasActivePage ? readOnlyReason : t('sidepanel_flow_recording_start', 'Start recording')}
+              title={!hasActivePage ? readOnlyReason : t('sidepanel_flow_recording_start', 'Start recording')}
+            >
+              <Circle className="h-3.5 w-3.5" />
+            </button>
+          )}
+          <div className="min-w-0">
+            <p className="text-[11px] font-semibold text-muted-foreground">
+              {t('sidepanel_flow_recording_status_label', 'Recorder')}
+            </p>
+            <p className="text-[11px] text-muted-foreground">{flowRecordingHelperText}</p>
+          </div>
+        </div>
       </div>
     </>
   );
+
+  const flowRecordingHelperText = isRecording
+    ? recordingFeedback || t('sidepanel_flow_recording_hint_basic', 'Record clicks and inputs from the page.')
+    : t('sidepanel_flow_recording_hint_basic', 'Record clicks and inputs from the page.');
 
   const getElementLabel = (element: ElementRecord) => {
     const text = element.text?.trim();
@@ -873,9 +937,9 @@ export default function ElementsSection({
     const currentCustom = parseCustomCss(editElement.style?.customCss || '');
     const nextCustom = { ...currentCustom };
     Object.entries(updates).forEach(([key, value]) => {
-      const nextValue = value?.trim();
-      if (nextValue) {
-        nextCustom[key] = nextValue;
+      const rawValue = value ?? '';
+      if (rawValue.trim()) {
+        nextCustom[key] = rawValue;
       } else {
         delete nextCustom[key];
       }
@@ -883,9 +947,9 @@ export default function ElementsSection({
     const nextCustomCss = formatCustomCss(nextCustom);
     const nextInline = { ...(editElement.style?.inline || {}) };
     Object.entries(updates).forEach(([key, value]) => {
-      const nextValue = value?.trim();
-      if (nextValue) {
-        nextInline[key] = nextValue;
+      const rawValue = value ?? '';
+      if (rawValue.trim()) {
+        nextInline[key] = rawValue;
       } else {
         delete nextInline[key];
       }
@@ -916,8 +980,11 @@ export default function ElementsSection({
   };
 
   const getStyleValue = (key: string) => {
+    if (editElement?.style?.inline?.[key] !== undefined) {
+      return editElement.style.inline[key] || '';
+    }
     if (customStyleOverrides[key] !== undefined) {
-      return customStyleOverrides[key];
+      return customStyleOverrides[key] || '';
     }
     return editElement?.style?.inline?.[key] || '';
   };
@@ -1027,6 +1094,7 @@ export default function ElementsSection({
   const borderRadiusValue = getNumericStyleValue('borderRadius');
   const boxShadowValue = getStyleValue('boxShadow');
   const paddingValue = getStyleValue('padding');
+  const marginValue = getStyleValue('margin');
   const positionValue = getStyleValue('position');
   const widthValue = getNumericStyleValue('width');
   const heightValue = getNumericStyleValue('height');
@@ -1250,10 +1318,11 @@ export default function ElementsSection({
             }
           : {
               backgroundColor: '#1b84ff',
-              borderRadius: '8px',
+              borderRadius: '2px',
               color: '#ffffff',
               fontSize: '12px',
               fontWeight: '600',
+              textAlign: 'center',
               padding: '8px 16px',
             };
     const newElement: ElementRecord = {
@@ -1664,12 +1733,13 @@ export default function ElementsSection({
           {showClear ? (
             <button
               type="button"
-              className="btn-ghost px-3"
+              className="btn-ghost gap-1 px-3"
               onClick={() => {
                 setSearchQuery('');
                 setTypeFilter('all');
               }}
             >
+              <X className="h-3.5 w-3.5" />
               {t('sidepanel_action_clear', 'Clear')}
             </button>
           ) : null}
@@ -2170,6 +2240,17 @@ export default function ElementsSection({
                         placeholder={t('sidepanel_elements_padding_placeholder', '8px 16px')}
                       />
                     </div>
+                    <div className="flex items-center gap-2">
+                      <span className="text-[10px] font-semibold uppercase text-muted-foreground">
+                        {t('sidepanel_elements_style_margin', 'Margin')}
+                      </span>
+                      <input
+                        className="input h-8 w-28 px-2 text-xs"
+                        value={marginValue}
+                        onChange={(event) => applyCustomCssUpdates({ margin: event.target.value })}
+                        placeholder={t('sidepanel_elements_margin_placeholder', '0 auto')}
+                      />
+                    </div>
                   </div>
                 </details>
 
@@ -2280,8 +2361,8 @@ export default function ElementsSection({
         open={flowDrawerOpen}
         title={t('sidepanel_flows_new_title', 'New flow')}
         subtitle={t('sidepanel_flows_new_subtitle', 'Create a new action flow.')}
-        onClose={() => setFlowDrawerOpen(false)}
-        summary={renderFlowSummary(getFlowStepCount(draftFlow.steps), () => {
+        onClose={closeFlowDrawer}
+        summary={renderFlowSummary(() => {
           void handleCreateFlow();
         })}
         overlayClassName="z-[70]"

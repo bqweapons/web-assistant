@@ -3,6 +3,7 @@ import {
   ChevronRight,
   Code2,
   GripVertical,
+  Plus,
   Trash2,
 } from 'lucide-react';
 import SelectMenu from './SelectMenu';
@@ -95,6 +96,15 @@ function AddStepPlaceholder({ label, ariaLabel, onPick, onDropReorder, canDrop }
 
 const DEFAULT_STEPS: StepData[] = [];
 
+const countNestedSteps = (items: StepData[]): number =>
+  items.reduce((total, step) => {
+    const childCount = Array.isArray(step.children) ? countNestedSteps(step.children) : 0;
+    const branchCount = Array.isArray(step.branches)
+      ? step.branches.reduce((branchTotal, branch) => branchTotal + countNestedSteps(branch.steps ?? []), 0)
+      : 0;
+    return total + 1 + childCount + branchCount;
+  }, 0);
+
 type FlowStepsBuilderProps = {
   steps?: StepData[];
   resetKey?: string | number;
@@ -149,6 +159,7 @@ export default function FlowStepsBuilder({
     (_stepId: string, _fieldId: string) => (_node: HTMLInputElement | HTMLTextAreaElement | null) => undefined;
   const templateOptions = { waitModes, conditionOperators };
   const summarizeStep = (step: StepData) => buildStepSummary(step, conditionOperators);
+  const totalSteps = countNestedSteps(draftSteps);
 
   const getFieldLabel = (label: string) => {
     const key = FIELD_LABEL_KEYS[label];
@@ -184,10 +195,9 @@ export default function FlowStepsBuilder({
 
   useEffect(() => {
     if (typeof resetKey !== 'undefined') {
-      if (appliedResetKeyRef.current === resetKey) {
-        return;
+      if (appliedResetKeyRef.current !== resetKey) {
+        appliedResetKeyRef.current = resetKey;
       }
-      appliedResetKeyRef.current = resetKey;
     }
     syncingFromPropsRef.current = true;
     setDraftSteps(steps);
@@ -917,10 +927,11 @@ export default function FlowStepsBuilder({
                               <button
                                 key={column}
                                 type="button"
-                                className="btn-ghost h-7 px-2 text-[10px]"
+                                className="btn-ghost h-7 gap-1 px-2 text-[10px]"
                                 onClick={() => insertColumnToken(column, step.id)}
                                 title={t('sidepanel_steps_insert_column', 'Insert {column}').replace('{column}', column)}
                               >
+                                <Plus className="h-3 w-3" />
                                 {column}
                               </button>
                             ))}
@@ -1073,6 +1084,9 @@ export default function FlowStepsBuilder({
       <div className="flex items-center justify-between">
         <span className="text-xs font-semibold text-muted-foreground">
           {t('sidepanel_steps_title', 'Steps')}
+        </span>
+        <span className="badge-pill text-[10px]">
+          {t('sidepanel_steps_count', '{count} steps').replace('{count}', String(totalSteps))}
         </span>
       </div>
       <div className="max-h-[35.5vh] overflow-x-hidden overflow-y-auto pr-1" data-step-scroll>

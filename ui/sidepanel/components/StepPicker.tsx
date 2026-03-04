@@ -151,7 +151,7 @@ export default function StepPicker({ onPick, ariaLabel, buttonRef }: StepPickerP
     <div ref={pickerRef} className="relative" data-step-picker>
       <button
         type="button"
-        className="inline-flex h-7 w-7 items-center justify-center rounded-full border border-border bg-secondary text-secondary-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
+        className="inline-flex h-7 w-7 items-center justify-center rounded-full border border-border bg-transparent text-muted-foreground transition hover:bg-accent hover:text-accent-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
         aria-label={ariaLabel}
         ref={buttonRef}
         onClick={() => setOpen((prev) => !prev)}
