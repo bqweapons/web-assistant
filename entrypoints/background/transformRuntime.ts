@@ -1,5 +1,9 @@
 export type TransformRowContext = Record<string, string>;
 
+export type TransformLoopContext = {
+  index: number;
+};
+
 export type TransformNowContext = {
   timestamp: number;
   unix: number;
@@ -145,6 +149,11 @@ const tokenizeExpression = (input: string): Token[] => {
       index += 2;
       continue;
     }
+    if (char === '?' && input[index + 1] === '.') {
+      tokens.push({ type: 'symbol', value: '?.' });
+      index += 2;
+      continue;
+    }
     if ('.(),[]+-'.includes(char)) {
       tokens.push({ type: 'symbol', value: char });
       index += 1;
@@ -210,7 +219,7 @@ class ExpressionParser {
   private parsePostfix(): ExprNode {
     let node = this.parsePrimary();
     while (true) {
-      if (this.matchSymbol('.')) {
+      if (this.matchSymbol('.') || this.matchSymbol('?.')) {
         const token = this.consumeIdentifier('Expected property name after "."');
         node = {
           type: 'member',
@@ -427,11 +436,15 @@ export const runSafeTransformCode = (input: {
   code: string;
   input: string;
   row?: TransformRowContext;
+  loop?: TransformLoopContext;
+  vars?: Record<string, string>;
   nowTimestamp?: number;
 }): string => {
   const scope: Record<string, unknown> = {
     input: input.input,
     row: input.row ?? {},
+    loop: input.loop,
+    vars: input.vars ?? {},
     now: buildTransformNowContext(input.nowTimestamp ?? Date.now()),
     helpers: transformHelpers,
     String,

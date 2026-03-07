@@ -1,11 +1,13 @@
 import { runSafeTransformCode } from '../transformRuntime';
-import type { FlowRowContext } from './tokenRenderer';
+import type { FlowLoopContext, FlowRowContext } from './tokenRenderer';
 
 type JsTransformRequest = {
   id: string;
   code: string;
   input: string;
   row: Record<string, string>;
+  loop?: FlowLoopContext;
+  vars: Record<string, string>;
   nowTimestamp: number;
 };
 
@@ -31,6 +33,8 @@ export type JsTransformInput = {
   code: string;
   value: string;
   row?: FlowRowContext;
+  loop?: FlowLoopContext;
+  variables: Record<string, string>;
   timeoutMs?: number;
 };
 
@@ -112,6 +116,8 @@ export class JsTransformExecutor {
     code: string;
     value: string;
     row?: FlowRowContext;
+    loop?: FlowLoopContext;
+    variables: Record<string, string>;
     timeoutMs: number;
   }) {
     const execution = Promise.resolve(
@@ -119,6 +125,8 @@ export class JsTransformExecutor {
         code: input.code,
         input: input.value,
         row: input.row,
+        loop: input.loop,
+        vars: input.variables,
         nowTimestamp: Date.now(),
       }),
     );
@@ -137,6 +145,8 @@ export class JsTransformExecutor {
         code: input.code,
         value: input.value,
         row: input.row,
+        loop: input.loop,
+        variables: input.variables,
         timeoutMs,
       });
     }
@@ -154,6 +164,8 @@ export class JsTransformExecutor {
         code: input.code,
         input: input.value,
         row: input.row ?? {},
+        loop: input.loop,
+        vars: input.variables,
         nowTimestamp: Date.now(),
       };
       worker.postMessage(request);

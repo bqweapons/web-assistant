@@ -2,7 +2,19 @@ import type { FlowStepData, FlowStepField } from '../../../shared/flowStepMigrat
 
 export type FlowRowContext = Record<string, string>;
 
+export type FlowLoopContext = {
+  index: number;
+};
+
+export type FlowRenderContext = {
+  row?: FlowRowContext;
+  loop?: FlowLoopContext;
+  variables: Record<string, string>;
+};
+
 const ROW_TOKEN_PATTERN = /{{\s*row(?:\.([A-Za-z0-9_$]+)|\[\s*["']([^"']+)["']\s*\])\s*}}/g;
+const VARIABLE_TOKEN_PATTERN = /{{\s*var\.([A-Za-z_][0-9A-Za-z_]*)\s*}}/g;
+const LOOP_INDEX_TOKEN_PATTERN = /{{\s*loop\.index\s*}}/g;
 const NOW_TOKEN_PATTERN = /{{\s*now\.(date|time|datetime|timestamp)\s*}}/g;
 
 const toTwoDigits = (value: number) => String(value).padStart(2, '0');
@@ -35,7 +47,7 @@ export const getStepFieldRawValue = (step: FlowStepData, fieldId: string) =>
 export const getStepField = (step: FlowStepData, fieldId: string): FlowStepField | undefined =>
   step.fields.find((field) => field.id === fieldId);
 
-export const renderWithRowContext = (input: string, row?: FlowRowContext) => {
+export const renderWithContext = (input: string, context: FlowRenderContext) => {
   if (!input) {
     return input;
   }
@@ -43,17 +55,27 @@ export const renderWithRowContext = (input: string, row?: FlowRowContext) => {
   const withNow = input.replace(NOW_TOKEN_PATTERN, (_full, tokenType: string) =>
     formatNowToken(tokenType, now),
   );
-  if (!row) {
-    return withNow;
-  }
-  return withNow.replace(ROW_TOKEN_PATTERN, (_full, dotKey: string | undefined, bracketKey: string | undefined) => {
-    const key = dotKey || bracketKey || '';
-    return key in row ? row[key] : '';
-  });
+  const withVariables = withNow.replace(VARIABLE_TOKEN_PATTERN, (_full, variableName: string) =>
+    variableName in context.variables ? context.variables[variableName] : '',
+  );
+  const withLoop = withVariables.replace(LOOP_INDEX_TOKEN_PATTERN, () =>
+    typeof context.loop?.index === 'number' ? String(context.loop.index) : '',
+  );
+  const row = context.row;
+  return withLoop.replace(
+    ROW_TOKEN_PATTERN,
+    (_full, dotKey: string | undefined, bracketKey: string | undefined) => {
+      const key = dotKey || bracketKey || '';
+      if (!row) {
+        return '';
+      }
+      return key in row ? row[key] : '';
+    },
+  );
 };
 
-export const getRenderedStepFieldValue = (step: FlowStepData, fieldId: string, row?: FlowRowContext) =>
-  renderWithRowContext(getStepFieldRawValue(step, fieldId), row);
+export const getRenderedStepFieldValue = (step: FlowStepData, fieldId: string, context: FlowRenderContext) =>
+  renderWithContext(getStepFieldRawValue(step, fieldId), context);
 
 export const toNonNegativeInteger = (input: string, fallback = 0) => {
   const parsed = Number.parseInt(input, 10);

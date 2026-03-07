@@ -3,6 +3,7 @@ import { Copy, Download, ExternalLink, Languages, Share2, Upload } from 'lucide-
 import Card from '../components/Card';
 import PasswordVaultManager from '../components/PasswordVaultManager';
 import { LOCALE_OPTIONS, SupportedLocale, getLocaleLabel, setLocale, t, useLocale } from '../utils/i18n';
+import { getGlobalSettings, setGlobalSettings } from '../../../shared/globalSettings';
 import { getAllSitesData, setAllSitesData } from '../../../shared/storage';
 import { buildExportPayload, mergeSitesData, parseImportPayload } from '../../../shared/importExport';
 import {
@@ -60,6 +61,7 @@ export default function SettingsSection() {
     setFeedback(null);
     try {
       const sites = await getAllSitesData();
+      const globalSettings = await getGlobalSettings();
       let secretVaultTransfer: ReturnType<typeof parseSecretVaultTransferPayload> = null;
       const vaultStatus = await getSecretsVaultStatus();
       if (vaultStatus.configured && vaultStatus.secretCount > 0) {
@@ -94,6 +96,7 @@ export default function SettingsSection() {
       }
       const payload = buildExportPayload(sites, {
         redactLiteralInputs: true,
+        settings: globalSettings,
       });
       const finalPayload =
         secretVaultTransfer && Object.keys(secretVaultTransfer.items).length > 0
@@ -142,6 +145,9 @@ export default function SettingsSection() {
       const currentSites = await getAllSitesData();
       const mergedSites = mergeSitesData(currentSites, parsed.sites);
       await setAllSitesData(mergedSites);
+      if (parsed.settings) {
+        await setGlobalSettings(parsed.settings);
+      }
       let secretImportCount = 0;
       let secretImportSkippedReason = '';
       if (secretsBundle && Object.keys(secretsBundle.items).length > 0) {

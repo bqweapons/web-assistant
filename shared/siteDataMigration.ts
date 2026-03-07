@@ -10,6 +10,7 @@ import {
   type StructuredSiteData,
   type StructuredStoragePayload,
 } from './siteDataSchema';
+import { AUTO_ADS_RULE_PREFIX } from './hiddenRulePresets';
 import {
   formatCustomCss,
   isRecord,
@@ -315,8 +316,12 @@ const normalizeStructuredHidden = (raw: unknown, siteKey: string): StructuredHid
   if (!isRecord(raw)) {
     return null;
   }
+  const id = typeof raw.id === 'string' && raw.id.trim() ? raw.id.trim() : `hidden-${Date.now()}`;
+  if (id.startsWith(AUTO_ADS_RULE_PREFIX)) {
+    return null;
+  }
   return {
-    id: typeof raw.id === 'string' && raw.id.trim() ? raw.id.trim() : `hidden-${Date.now()}`,
+    id,
     name: typeof raw.name === 'string' ? raw.name : 'Hidden rule',
     note: typeof raw.note === 'string' ? raw.note : undefined,
     scope: raw.scope === 'page' || raw.scope === 'global' ? raw.scope : 'site',
@@ -332,8 +337,12 @@ const normalizeFlatHidden = (raw: unknown, siteKey: string): StructuredHiddenRec
   if (!isRecord(raw)) {
     return null;
   }
+  const id = typeof raw.id === 'string' && raw.id.trim() ? raw.id.trim() : `hidden-${Date.now()}`;
+  if (id.startsWith(AUTO_ADS_RULE_PREFIX)) {
+    return null;
+  }
   return {
-    id: typeof raw.id === 'string' && raw.id.trim() ? raw.id.trim() : `hidden-${Date.now()}`,
+    id,
     name: typeof raw.name === 'string' ? raw.name : 'Hidden rule',
     note: typeof raw.note === 'string' ? raw.note : undefined,
     scope: raw.scope === 'page' || raw.scope === 'global' ? raw.scope : 'site',

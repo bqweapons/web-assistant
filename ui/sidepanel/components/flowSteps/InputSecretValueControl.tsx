@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Check, KeyRound, Keyboard, Link2, Plus, Unlock, X } from 'lucide-react';
 import SelectMenu from '../SelectMenu';
+import SegmentedTabs from '../SegmentedTabs';
 import { t } from '../../utils/i18n';
 import {
   buildSecretToken,
@@ -225,40 +226,34 @@ export default function InputSecretValueControl({
         <span className="text-[11px] font-semibold text-muted-foreground">
           {t('sidepanel_flow_input_value_mode', 'Input method')}
         </span>
-        <div className="grid grid-cols-2 gap-1">
-          <button
-            type="button"
-            className={`inline-flex h-7 w-full items-center justify-center gap-1 rounded border px-2 text-[11px] ${
-              mode === 'literal' ? 'border-primary/40 bg-primary/10 text-foreground' : 'border-border bg-card text-muted-foreground'
-            }`}
-            onClick={() => {
+        <SegmentedTabs
+          value={mode}
+          className="gap-1"
+          options={[
+            {
+              value: 'literal',
+              icon: <Keyboard className="h-3.5 w-3.5" />,
+              label: t('sidepanel_flow_input_value_mode_literal', 'Type directly'),
+            },
+            {
+              value: 'secret',
+              icon: <KeyRound className="h-3.5 w-3.5" />,
+              label: t('sidepanel_flow_input_value_mode_secret', 'Choose from password vault'),
+              tone: passwordLike ? 'warning' : 'default',
+            },
+          ]}
+          onChange={(nextMode) => {
+            if (nextMode === 'literal') {
               setMode('literal');
               setErrorMessage('');
-            }}
-          >
-            <Keyboard className="h-3.5 w-3.5" />
-            {t('sidepanel_flow_input_value_mode_literal', 'Type directly')}
-          </button>
-          <button
-            type="button"
-            className={`inline-flex h-7 w-full items-center justify-center gap-1 rounded border px-2 text-[11px] ${
-              mode === 'secret'
-                ? 'border-primary/40 bg-primary/10 text-foreground'
-                : passwordLike
-                  ? 'border-amber-400/50 bg-amber-100/40 text-amber-900'
-                  : 'border-border bg-card text-muted-foreground'
-            }`}
-            onClick={() => {
-              setMode('secret');
-              void refreshVaultStatus().catch((error) => {
-                setErrorMessage(error instanceof Error ? error.message : String(error));
-              });
-            }}
-          >
-            <KeyRound className="h-3.5 w-3.5" />
-            {t('sidepanel_flow_input_value_mode_secret', 'Choose from password vault')}
-          </button>
-        </div>
+              return;
+            }
+            setMode('secret');
+            void refreshVaultStatus().catch((error) => {
+              setErrorMessage(error instanceof Error ? error.message : String(error));
+            });
+          }}
+        />
       </div>
 
       {mode === 'literal' ? (

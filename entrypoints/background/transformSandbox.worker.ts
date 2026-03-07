@@ -7,6 +7,8 @@ type JsTransformRequest = {
   code: string;
   input: string;
   row: Record<string, string>;
+  loop?: { index: number };
+  vars: Record<string, string>;
   nowTimestamp: number;
 };
 
@@ -33,6 +35,8 @@ self.addEventListener('message', async (event: MessageEvent<JsTransformRequest>)
       code: payload.code,
       input: payload.input,
       row: payload.row,
+      loop: payload.loop,
+      vars: payload.vars,
       nowTimestamp: payload.nowTimestamp,
     });
     response = {

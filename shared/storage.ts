@@ -3,10 +3,12 @@ import {
   type StructuredSiteData,
   type StructuredStoragePayload,
 } from './siteDataSchema';
+import { ensureLegacyAutoAdsMigration } from './globalSettings';
 import { mergeSitesData, parseImportPayload } from './importExport';
 import { normalizeStructuredStoragePayload } from './siteDataMigration';
+import { SITE_DATA_STORAGE_KEY } from './storageKeys';
 
-export const STORAGE_KEY = 'ladybird_sites';
+export const STORAGE_KEY = SITE_DATA_STORAGE_KEY;
 // Legacy auto-migration (old extension -> new extension).
 // To disable automatic legacy detection + migration in a future version, remove:
 // 1) `LEGACY_STORAGE_KEY` and `LEGACY_MIGRATION_FLAG_KEY`
@@ -169,6 +171,7 @@ const readStructuredPayload = async (
   if (storage) {
     const result = await storage.get([STORAGE_KEY, LEGACY_STORAGE_KEY, LEGACY_MIGRATION_FLAG_KEY]);
     const rawPayload = result?.[STORAGE_KEY] as unknown;
+    await ensureLegacyAutoAdsMigration(rawPayload);
     const normalized = normalizeStructuredStoragePayload(rawPayload);
     if (normalized.changed) {
       await writeStructuredPayload(normalized.payload);
@@ -192,6 +195,7 @@ const readStructuredPayload = async (
   try {
     const rawText = localStorage.getItem(STORAGE_KEY);
     const parsed = rawText ? (JSON.parse(rawText) as unknown) : { sites: {} };
+    await ensureLegacyAutoAdsMigration(parsed);
     const normalized = normalizeStructuredStoragePayload(parsed);
     if (normalized.changed) {
       await writeStructuredPayload(normalized.payload);

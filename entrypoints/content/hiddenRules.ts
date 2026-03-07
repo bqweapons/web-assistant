@@ -1,3 +1,5 @@
+import { getGlobalSettings } from '../../shared/globalSettings';
+import { AUTO_ADS_SELECTORS } from '../../shared/hiddenRulePresets';
 import { getSiteData } from '../../shared/storage';
 import { deriveSiteKey, type StructuredHiddenRecord } from '../../shared/siteDataSchema';
 import { deriveSiteKeyFromUrl } from '../../shared/urlKeys';
@@ -86,12 +88,19 @@ export const rehydratePersistedHiddenRules = async () => {
     return;
   }
   try {
-    const data = await getSiteData(siteKey);
+    const [data, globalSettings] = await Promise.all([getSiteData(siteKey), getGlobalSettings()]);
     const hiddenRules = (Array.isArray(data.hidden) ? data.hidden : [])
       .map((rule) => normalizeHiddenRule(rule as StructuredHiddenRecord, siteKey))
       .filter((rule): rule is RuntimeHiddenRule => Boolean(rule))
       .filter((rule) => rule.siteKey === siteKey);
-    applyHiddenRules(hiddenRules);
+    const builtInRules = globalSettings.autoHideAdsEnabled
+      ? AUTO_ADS_SELECTORS.map((selector) => ({
+          siteKey,
+          selector,
+          enabled: true,
+        }))
+      : [];
+    applyHiddenRules([...hiddenRules, ...builtInRules]);
   } catch (error) {
     console.warn('Failed to rehydrate persisted hidden rules', error);
     clearHiddenRulesStyle();

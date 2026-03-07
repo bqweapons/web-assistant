@@ -95,6 +95,12 @@ export const formatRunnerError = (code?: string, message?: string) => {
       'Popup confirmation was closed because the page refreshed or navigated.',
     );
   }
+  if (code === 'invalid-variable-name') {
+    return t(
+      'sidepanel_flow_runner_error_invalid_variable_name',
+      'Variable names must start with a letter or underscore and use only letters, numbers, or underscores.',
+    );
+  }
   return message || code || t('sidepanel_flow_runner_error_unknown', 'Flow run failed.');
 };
 

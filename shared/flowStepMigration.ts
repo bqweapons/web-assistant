@@ -64,6 +64,9 @@ const buildLegacySummary = (type: string, selector: string, value: string) => {
   if (type === 'input') {
     return value ? `Value: ${value}` : selector ? `Selector: ${selector}` : 'Input';
   }
+  if (type === 'set-variable') {
+    return selector ? `Set ${selector} = ${value}` : 'Variable not set';
+  }
   if (type === 'click') {
     return selector ? `Selector: ${selector}` : 'Click';
   }
@@ -149,6 +152,59 @@ const normalizeFlowStepField = (raw: unknown, idFactory: (prefix: string) => str
   return normalized;
 };
 
+const findFieldById = (fields: FlowStepField[], fieldId: string) =>
+  fields.find((field) => field.id === fieldId);
+
+const normalizeSetVariableFields = (fields: FlowStepField[]): FlowStepField[] => {
+  const nameField = findFieldById(fields, 'name');
+  const selectorField = findFieldById(fields, 'selector');
+  const valueField = findFieldById(fields, 'value');
+  const sourceModeField = findFieldById(fields, 'sourceMode');
+  const fallbackMode = selectorField?.value?.trim() ? 'selector' : 'value';
+  const sourceMode =
+    sourceModeField?.value === 'selector' || sourceModeField?.value === 'value'
+      ? sourceModeField.value
+      : fallbackMode;
+
+  return [
+    {
+      id: 'name',
+      label: nameField?.label || 'Name',
+      value: nameField?.value || '',
+      placeholder: nameField?.placeholder || 'username',
+      type: 'text',
+    },
+    {
+      id: 'sourceMode',
+      label: sourceModeField?.label || 'Source',
+      value: sourceMode,
+      type: 'select',
+      options: [
+        { value: 'value', label: 'Value' },
+        { value: 'selector', label: 'Selector' },
+      ],
+    },
+    {
+      id: 'selector',
+      label: selectorField?.label || 'Selector',
+      value: selectorField?.value || '',
+      placeholder: selectorField?.placeholder || '.user-email',
+      type: 'text',
+      withPicker: true,
+      showWhen: { fieldId: 'sourceMode', value: 'selector' },
+    },
+    {
+      id: 'value',
+      label: valueField?.label || 'Value',
+      value: valueField?.value || '',
+      placeholder: valueField?.placeholder || '{{row.email}}',
+      type: valueField?.type === 'number' ? 'number' : 'text',
+      transform: valueField?.transform,
+      showWhen: { fieldId: 'sourceMode', value: 'value' },
+    },
+  ];
+};
+
 export const isFlowStepData = (value: unknown): value is FlowStepData =>
   isRecord(value) &&
   typeof value.id === 'string' &&
@@ -174,6 +230,9 @@ const normalizeExistingFlowStep = (
       .map((field) => normalizeFlowStepField(field, idFactory))
       .filter((field): field is FlowStepField => Boolean(field)),
   };
+  if (normalized.type === 'set-variable') {
+    normalized.fields = normalizeSetVariableFields(normalized.fields);
+  }
   if (Array.isArray(raw.children)) {
     const children = raw.children
       .map((child) => normalizeExistingFlowStep(child, idFactory))
@@ -269,6 +328,52 @@ const normalizeLegacyActionStep = (
           label: 'Value',
           value,
           type: 'text',
+        },
+      ],
+    };
+  }
+
+  if (type === 'set-variable') {
+    const name = asText(raw.name);
+    const value = asText(raw.value);
+    const selectorValue = asText(raw.selector);
+    const sourceMode = selectorValue ? 'selector' : 'value';
+    return {
+      id: stepId,
+      type: 'set-variable',
+      title: 'Set Variable',
+      summary: buildLegacySummary('set-variable', name, value),
+      fields: [
+        {
+          id: 'name',
+          label: 'Name',
+          value: name,
+          type: 'text',
+        },
+        {
+          id: 'sourceMode',
+          label: 'Source',
+          value: sourceMode,
+          type: 'select',
+          options: [
+            { value: 'value', label: 'Value' },
+            { value: 'selector', label: 'Selector' },
+          ],
+        },
+        {
+          id: 'selector',
+          label: 'Selector',
+          value: selectorValue,
+          type: 'text',
+          withPicker: true,
+          showWhen: { fieldId: 'sourceMode', value: 'selector' },
+        },
+        {
+          id: 'value',
+          label: 'Value',
+          value,
+          type: 'text',
+          showWhen: { fieldId: 'sourceMode', value: 'value' },
         },
       ],
     };

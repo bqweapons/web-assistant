@@ -124,7 +124,7 @@ export type FlowRecordingStatusPayload = {
 export type FlowRunState = 'queued' | 'running' | 'succeeded' | 'failed' | 'cancelled';
 export type FlowRunStartSource = 'flows-list' | 'flow-drawer-save-run';
 export type FlowConditionOperator = 'contains' | 'equals' | 'greater' | 'less';
-export type FlowRunAtomicStepType = 'click' | 'input' | 'wait' | 'assert' | 'condition' | 'popup';
+export type FlowRunAtomicStepType = 'click' | 'input' | 'wait' | 'assert' | 'condition' | 'popup' | 'read';
 export type FlowRunLogLevel = 'info' | 'success' | 'error';
 
 export type FlowRunLogEntry = {
@@ -133,7 +133,7 @@ export type FlowRunLogEntry = {
   level: FlowRunLogLevel;
   message: string;
   stepId?: string;
-  stepType?: FlowRunAtomicStepType | 'navigate' | 'loop' | 'if-else' | 'data-source';
+  stepType?: FlowRunAtomicStepType | 'navigate' | 'loop' | 'if-else' | 'data-source' | 'set-variable';
 };
 
 export type FlowRunExecutionDetails = {

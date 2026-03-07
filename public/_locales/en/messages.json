@@ -555,7 +555,7 @@
     "message": "Recently updated"
   },
   "sidepanel_hidden_subtitle": {
-    "message": "Hide or suppress elements automatically."
+    "message": "Manual rules for the current site."
   },
   "sidepanel_hidden_bulk_enable_all": {
     "message": "Enable all"
@@ -564,10 +564,22 @@
     "message": "Pause all"
   },
   "sidepanel_hidden_auto_ads_on": {
-    "message": "Enable auto hide ads"
+    "message": "Enable automatic ad blocking"
   },
   "sidepanel_hidden_auto_ads_off": {
-    "message": "Pause auto hide ads"
+    "message": "Pause automatic ad blocking"
+  },
+  "sidepanel_hidden_auto_ads_title": {
+    "message": "Automatic ad blocking"
+  },
+  "sidepanel_hidden_auto_ads_subtitle": {
+    "message": "Built-in rules for common ads on all pages."
+  },
+  "sidepanel_hidden_auto_ads_helper": {
+    "message": "This is a global built-in feature. Manual hidden rules below are separate."
+  },
+  "sidepanel_hidden_auto_ads_update_error": {
+    "message": "Failed to update automatic ad blocking. Please try again."
   },
   "sidepanel_hidden_auto_rule_name": {
     "message": "Auto ad rule"
@@ -576,7 +588,7 @@
     "message": "Generated from Auto hide ads."
   },
   "sidepanel_hidden_action_select": {
-    "message": "Hide element"
+    "message": "Hide page element"
   },
   "sidepanel_hidden_title": {
     "message": "Hidden rules"
@@ -800,6 +812,15 @@
   "sidepanel_flow_input_secret_create_help": {
     "message": "This is not the website login password. Create a password vault password to save and reuse passwords."
   },
+  "sidepanel_step_input_shortcut_variable": {
+    "message": "Insert variable"
+  },
+  "sidepanel_step_input_shortcut_loop_index": {
+    "message": "Loop index"
+  },
+  "sidepanel_step_input_shortcut_row_index": {
+    "message": "Row index"
+  },
   "sidepanel_flow_input_secret_master_password": {
     "message": "Vault password (for create/unlock)"
   },
@@ -826,6 +847,9 @@
   },
   "sidepanel_flow_runner_error_secret_not_found": {
     "message": "The selected password could not be found. Please choose it again."
+  },
+  "sidepanel_flow_runner_error_invalid_variable_name": {
+    "message": "Variable names must start with a letter or underscore and use only letters, numbers, or underscores."
   },
   "sidepanel_step_assert_description": {
     "message": "Check a value or state."
@@ -875,8 +899,17 @@
   "sidepanel_step_input_label": {
     "message": "Input"
   },
+  "sidepanel_step_input_transform_hint": {
+    "message": "Use input, row, loop, vars, now, helpers and return the final string."
+  },
   "sidepanel_step_loop_description": {
     "message": "Repeat nested steps for a count."
+  },
+  "sidepanel_step_loop_hint": {
+    "message": "Nested steps can use"
+  },
+  "sidepanel_step_loop_hint_suffix": {
+    "message": "for the current 0-based loop index."
   },
   "sidepanel_step_loop_label": {
     "message": "Loop"
@@ -892,6 +925,18 @@
   },
   "sidepanel_step_popup_label": {
     "message": "Popup"
+  },
+  "sidepanel_step_set_variable_description": {
+    "message": "Store a runtime variable for later steps."
+  },
+  "sidepanel_step_set_variable_hint": {
+    "message": "Later steps can read this value with"
+  },
+  "sidepanel_step_set_variable_selector_hint": {
+    "message": "Use the tabs to switch between Value input and Selector source."
+  },
+  "sidepanel_step_set_variable_label": {
+    "message": "Set Variable"
   },
   "sidepanel_step_summary_conditional": {
     "message": "Conditional check"
@@ -917,11 +962,23 @@
   "sidepanel_step_summary_selector": {
     "message": "Selector: {value}"
   },
+  "sidepanel_step_summary_set_variable": {
+    "message": "Set {name} = {value}"
+  },
+  "sidepanel_step_summary_set_variable_from_selector": {
+    "message": "Set {name} from {selector}"
+  },
+  "sidepanel_step_summary_set_variable_selector_missing": {
+    "message": "Set {name} from selector"
+  },
   "sidepanel_step_summary_url": {
     "message": "URL: {value}"
   },
   "sidepanel_step_summary_value": {
     "message": "Value: {value}"
+  },
+  "sidepanel_step_summary_variable_not_set": {
+    "message": "Variable not set"
   },
   "sidepanel_step_summary_message": {
     "message": "Message: {value}"
@@ -985,6 +1042,12 @@
   },
   "sidepanel_steps_columns_hint": {
     "message": "Click a column to create an Input step with"
+  },
+  "sidepanel_steps_row_index_hint": {
+    "message": "Use"
+  },
+  "sidepanel_steps_row_index_hint_suffix": {
+    "message": "for the current 0-based row index."
   },
   "sidepanel_steps_columns_missing": {
     "message": "No columns detected"

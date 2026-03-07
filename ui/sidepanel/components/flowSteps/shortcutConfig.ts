@@ -26,6 +26,7 @@ export const getConditionOperators = (): StepFieldOption[] => [
 ];
 
 export const FIELD_LABEL_KEYS: Record<string, string> = {
+  Name: 'sidepanel_field_name',
   Selector: 'sidepanel_field_selector',
   Value: 'sidepanel_field_value',
   Message: 'sidepanel_field_message',

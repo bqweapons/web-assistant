@@ -6,6 +6,7 @@ import ConfirmDialog from '../components/ConfirmDialog';
 import SelectorInput from '../components/SelectorInput';
 import { t } from '../utils/i18n';
 import { formatLocalDateTime } from '../utils/dateTime';
+import { GLOBAL_SETTINGS_STORAGE_KEY, getGlobalSettings, setGlobalSettings, type GlobalSettings } from '../../../shared/globalSettings';
 import type { SelectorPickerAccept } from '../../../shared/messages';
 import { getSiteData, setSiteData, STORAGE_KEY } from '../../../shared/storage';
 import { buildDefaultSiteUrl, deriveSiteKey, type StructuredHiddenRecord } from '../../../shared/siteDataSchema';
@@ -26,26 +27,14 @@ type HiddenRuleRecord = StructuredHiddenRecord & {
   updatedAt: number;
 };
 
-type HiddenFilterMode = 'all' | 'enabled' | 'paused' | 'auto' | 'manual';
+type HiddenFilterMode = 'all' | 'enabled' | 'paused';
 
 const isRecord = (value: unknown): value is Record<string, unknown> =>
   Boolean(value) && typeof value === 'object' && !Array.isArray(value);
 
-const AUTO_ADS_RULE_PREFIX = 'hidden-auto-ads-v1-';
-const AUTO_ADS_PRESETS = [
-  { key: 'doubleclick-iframe', selector: 'iframe[src*="doubleclick.net"]' },
-  { key: 'googlesyndication-iframe', selector: 'iframe[src*="googlesyndication.com"]' },
-  { key: 'google-ads-id', selector: '[id*="google_ads"]' },
-  { key: 'google-ad-class', selector: '[class*="google-ad"]' },
-  { key: 'ad-prefix-id', selector: '[id^="ad-"]' },
-  { key: 'ad-infix-id', selector: '[id*="-ad-"]' },
-  { key: 'ad-prefix-class', selector: '[class^="ad-"]' },
-  { key: 'ad-infix-class', selector: '[class*="-ad-"]' },
-  { key: 'advert-class', selector: '[class*="advert"]' },
-  { key: 'advert-id', selector: '[id*="advert"]' },
-  { key: 'data-ad', selector: '[data-ad]' },
-  { key: 'aria-label-advert', selector: '[aria-label*="advert"]' },
-] as const;
+const DEFAULT_GLOBAL_SETTINGS: GlobalSettings = {
+  autoHideAdsEnabled: false,
+};
 
 const toTimestamp = (value: unknown) => {
   if (typeof value === 'number' && Number.isFinite(value)) {
@@ -98,8 +87,6 @@ const normalizeHiddenRule = (value: unknown, fallbackSiteKey: string): HiddenRul
   };
 };
 
-const isAutoAdsRule = (rule: HiddenRuleRecord) => rule.id.startsWith(AUTO_ADS_RULE_PREFIX);
-
 const isSelectorSyntaxValid = (selector: string) => {
   const normalized = selector.trim();
   if (!normalized) {
@@ -121,6 +108,7 @@ export default function HiddenRulesSection({
 }: HiddenRulesSectionProps) {
   const normalizedSiteKey = useMemo(() => deriveSiteKey(siteKey), [siteKey]);
   const [rules, setRules] = useState<HiddenRuleRecord[]>([]);
+  const [globalSettings, setGlobalSettingsState] = useState<GlobalSettings>(DEFAULT_GLOBAL_SETTINGS);
   const rulesRef = useRef<HiddenRuleRecord[]>([]);
   const actionClass = 'btn-icon h-8 w-8';
   const [actionError, setActionError] = useState('');
@@ -158,12 +146,6 @@ export default function HiddenRulesSection({
       if (filterMode === 'paused' && rule.enabled) {
         return false;
       }
-      if (filterMode === 'auto' && !isAutoAdsRule(rule)) {
-        return false;
-      }
-      if (filterMode === 'manual' && isAutoAdsRule(rule)) {
-        return false;
-      }
       if (!normalizedQuery) {
         return true;
       }
@@ -181,11 +163,6 @@ export default function HiddenRulesSection({
     return items;
   }, [filteredRules, sortMode]);
   const showClear = Boolean(searchQuery) || filterMode !== 'all' || sortMode !== 'recent';
-  const allAutoAdsEnabled = AUTO_ADS_PRESETS.every((preset) => {
-    const id = `${AUTO_ADS_RULE_PREFIX}${preset.key}`;
-    const existing = siteRules.find((rule) => rule.id === id);
-    return Boolean(existing && existing.enabled);
-  });
 
   useEffect(() => {
     rulesRef.current = rules;
@@ -210,24 +187,43 @@ export default function HiddenRulesSection({
     }
   }, [normalizedSiteKey]);
 
+  const loadGlobalHiddenSettings = useCallback(async () => {
+    try {
+      const nextSettings = await getGlobalSettings();
+      setGlobalSettingsState(nextSettings);
+    } catch (error) {
+      console.warn('global-settings-load-failed', error);
+      setGlobalSettingsState(DEFAULT_GLOBAL_SETTINGS);
+    }
+  }, []);
+
   useEffect(() => {
     void loadHiddenRules();
   }, [loadHiddenRules]);
 
   useEffect(() => {
+    void loadGlobalHiddenSettings();
+  }, [loadGlobalHiddenSettings]);
+
+  useEffect(() => {
     const storage = chrome?.storage?.onChanged;
-    if (!storage || !normalizedSiteKey) {
+    if (!storage) {
       return;
     }
     const handleStorageChange = (changes: Record<string, unknown>, areaName: string) => {
-      if (areaName !== 'local' || !changes[STORAGE_KEY]) {
+      if (areaName !== 'local') {
         return;
       }
-      void loadHiddenRules();
+      if (changes[STORAGE_KEY]) {
+        void loadHiddenRules();
+      }
+      if (changes[GLOBAL_SETTINGS_STORAGE_KEY]) {
+        void loadGlobalHiddenSettings();
+      }
     };
     storage.addListener(handleStorageChange);
     return () => storage.removeListener(handleStorageChange);
-  }, [loadHiddenRules, normalizedSiteKey]);
+  }, [loadGlobalHiddenSettings, loadHiddenRules]);
 
   useEffect(() => {
     setActiveRuleId(null);
@@ -405,79 +401,79 @@ export default function HiddenRulesSection({
   };
 
   const handleToggleAutoAds = async () => {
-    if (!normalizedSiteKey || !hasActivePage) {
-      return;
+    const nextValue = !globalSettings.autoHideAdsEnabled;
+    try {
+      await setGlobalSettings({ autoHideAdsEnabled: nextValue });
+      setGlobalSettingsState((current) => ({ ...current, autoHideAdsEnabled: nextValue }));
+      setActionError('');
+    } catch {
+      setActionError(
+        t(
+          'sidepanel_hidden_auto_ads_update_error',
+          'Failed to update automatic ad blocking. Please try again.',
+        ),
+      );
     }
-    const now = Date.now();
-    const next = [...rulesRef.current];
-    if (allAutoAdsEnabled) {
-      for (let index = 0; index < next.length; index += 1) {
-        const rule = next[index];
-        if (rule.siteKey !== normalizedSiteKey || !isAutoAdsRule(rule) || !rule.enabled) {
-          continue;
-        }
-        next[index] = { ...rule, enabled: false, updatedAt: now };
-      }
-    } else {
-      AUTO_ADS_PRESETS.forEach((preset) => {
-        const presetId = `${AUTO_ADS_RULE_PREFIX}${preset.key}`;
-        const existingIndex = next.findIndex((rule) => rule.id === presetId);
-        const nextRule: HiddenRuleRecord = {
-          id: presetId,
-          name: t('sidepanel_hidden_auto_rule_name', 'Auto ad rule'),
-          note: t('sidepanel_hidden_auto_rule_note', 'Generated from Auto hide ads.'),
-          scope: 'site',
-          siteKey: normalizedSiteKey,
-          pageKey: null,
-          selector: preset.selector,
-          enabled: true,
-          updatedAt: now,
-        };
-        if (existingIndex === -1) {
-          next.push(nextRule);
-          return;
-        }
-        next[existingIndex] = {
-          ...next[existingIndex],
-          ...nextRule,
-          id: presetId,
-        };
-      });
-    }
-    await persistHiddenRules(
-      next,
-      t('sidepanel_hidden_persist_error_save', 'Failed to save rule. Please try again.'),
-    );
   };
 
   return (
-    <section className="flex flex-col gap-2">
-      <div className="grid grid-cols-[minmax(0,1fr)_minmax(0,1.35fr)] gap-2">
-        <button
-          type="button"
-          className="btn-primary w-full gap-2 whitespace-nowrap disabled:cursor-not-allowed disabled:opacity-60"
-          onClick={handleCreateFromPicker}
-          disabled={!hasActivePage || !normalizedSiteKey}
-        >
-          <Crosshair className="h-4 w-4 shrink-0" />
-          {t('sidepanel_hidden_action_select', 'Hide page element')}
-        </button>
-        <button
-          type="button"
-          className="btn-ghost w-full gap-2 px-2 text-[13px] whitespace-nowrap disabled:cursor-not-allowed disabled:opacity-60"
-          onClick={() => {
-            void handleToggleAutoAds();
-          }}
-          disabled={!hasActivePage || !normalizedSiteKey}
-        >
-          <Sparkles className="h-4 w-4 shrink-0" />
-          <span className="truncate">
-            {allAutoAdsEnabled
-              ? t('sidepanel_hidden_auto_ads_off', 'Pause auto hide ads')
-              : t('sidepanel_hidden_auto_ads_on', 'Enable auto hide ads')}
-          </span>
-        </button>
-      </div>
+    <section className="flex flex-col gap-3">
+      <button
+        type="button"
+        className="btn-primary w-full gap-2 whitespace-nowrap disabled:cursor-not-allowed disabled:opacity-60"
+        onClick={handleCreateFromPicker}
+        disabled={!hasActivePage || !normalizedSiteKey}
+      >
+        <Crosshair className="h-4 w-4 shrink-0" />
+        {t('sidepanel_hidden_action_select', 'Hide page element')}
+      </button>
+
+      <Card className="border-border/80 bg-card/80">
+        <div className="flex items-start gap-3">
+          <div className="rounded-xl bg-primary/10 p-2 text-primary">
+            <Sparkles className="h-4 w-4" />
+          </div>
+          <div className="min-w-0 flex-1">
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+              <div className="min-w-0">
+                <div className="flex items-center gap-2">
+                  <h2 className="text-sm font-semibold text-card-foreground">
+                    {t('sidepanel_hidden_auto_ads_title', 'Automatic ad blocking')}
+                  </h2>
+                  <span className="badge-pill shrink-0">
+                    {globalSettings.autoHideAdsEnabled
+                      ? t('sidepanel_hidden_status_enabled', 'Enabled')
+                      : t('sidepanel_hidden_status_paused', 'Paused')}
+                  </span>
+                </div>
+                <p className="mt-1 text-xs text-muted-foreground">
+                  {t('sidepanel_hidden_auto_ads_subtitle', 'Built-in rules for common ads on all pages.')}
+                </p>
+                <p className="mt-2 text-xs text-muted-foreground">
+                  {t(
+                    'sidepanel_hidden_auto_ads_helper',
+                    'This is a global built-in feature. Manual hidden rules below are separate.',
+                  )}
+                </p>
+              </div>
+              <button
+                type="button"
+                className={`h-8 shrink-0 gap-2 px-3 text-xs ${
+                  globalSettings.autoHideAdsEnabled ? 'btn-ghost' : 'btn-primary'
+                }`}
+                onClick={() => {
+                  void handleToggleAutoAds();
+                }}
+              >
+                <Sparkles className="h-3.5 w-3.5" />
+                {globalSettings.autoHideAdsEnabled
+                  ? t('sidepanel_hidden_auto_ads_off', 'Pause auto hide ads')
+                  : t('sidepanel_hidden_auto_ads_on', 'Enable auto hide ads')}
+              </button>
+            </div>
+          </div>
+        </div>
+      </Card>
 
       <div className="flex items-center justify-between gap-2">
         <div>
@@ -485,7 +481,7 @@ export default function HiddenRulesSection({
             {t('sidepanel_hidden_title', 'Hidden rules')}
           </h2>
           <p className="text-xs text-muted-foreground">
-            {t('sidepanel_hidden_subtitle', 'Hide or suppress elements automatically.')}
+            {t('sidepanel_hidden_subtitle', 'Manual rules for the current site.')}
           </p>
         </div>
         <span className="text-xs text-muted-foreground">{visibleRules.length}</span>
@@ -504,95 +500,95 @@ export default function HiddenRulesSection({
         </Card>
       ) : null}
 
-      <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
-        <div className="relative flex-1">
-          <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-          <input
-            className="input pl-9"
-            type="search"
-            value={searchQuery}
-            onChange={(event) => setSearchQuery(event.target.value)}
-            placeholder={t('sidepanel_hidden_search_placeholder', 'Search hidden rules')}
-          />
-        </div>
-        <div className="flex min-w-0 flex-1 items-center gap-2">
-          <select
-            className="input select min-w-0 flex-1"
-            value={filterMode}
-            onChange={(event) => setFilterMode(event.target.value as HiddenFilterMode)}
-          >
-            <option value="all">{t('sidepanel_hidden_filter_all', 'All')}</option>
-            <option value="enabled">{t('sidepanel_hidden_filter_enabled', 'Enabled')}</option>
-            <option value="paused">{t('sidepanel_hidden_filter_paused', 'Paused')}</option>
-            <option value="auto">{t('sidepanel_hidden_filter_auto', 'Auto')}</option>
-            <option value="manual">{t('sidepanel_hidden_filter_manual', 'Manual')}</option>
-          </select>
-          <select
-            className="input select min-w-0 flex-1"
-            value={sortMode}
-            onChange={(event) => setSortMode(event.target.value)}
-          >
-            <option value="recent">{t('sidepanel_hidden_sort_recent', 'Recently updated')}</option>
-            <option value="name">{t('sidepanel_hidden_sort_name', 'Name')}</option>
-          </select>
-          {showClear ? (
+      {hasActivePage ? (
+        <>
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+            <div className="relative flex-1">
+              <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+              <input
+                className="input pl-9"
+                type="search"
+                value={searchQuery}
+                onChange={(event) => setSearchQuery(event.target.value)}
+                placeholder={t('sidepanel_hidden_search_placeholder', 'Search hidden rules')}
+              />
+            </div>
+            <div className="flex min-w-0 flex-1 items-center gap-2">
+              <select
+                className="input select min-w-0 flex-1"
+                value={filterMode}
+                onChange={(event) => setFilterMode(event.target.value as HiddenFilterMode)}
+              >
+                <option value="all">{t('sidepanel_hidden_filter_all', 'All')}</option>
+                <option value="enabled">{t('sidepanel_hidden_filter_enabled', 'Enabled')}</option>
+                <option value="paused">{t('sidepanel_hidden_filter_paused', 'Paused')}</option>
+              </select>
+              <select
+                className="input select min-w-0 flex-1"
+                value={sortMode}
+                onChange={(event) => setSortMode(event.target.value)}
+              >
+                <option value="recent">{t('sidepanel_hidden_sort_recent', 'Recently updated')}</option>
+                <option value="name">{t('sidepanel_hidden_sort_name', 'Name')}</option>
+              </select>
+              {showClear ? (
+                <button
+                  type="button"
+                  className="btn-ghost h-9 shrink-0 gap-1 px-3"
+                  onClick={() => {
+                    setSearchQuery('');
+                    setSortMode('recent');
+                    setFilterMode('all');
+                  }}
+                >
+                  <X className="h-3.5 w-3.5" />
+                  {t('sidepanel_action_clear', 'Clear')}
+                </button>
+              ) : null}
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 gap-2">
             <button
               type="button"
-              className="btn-ghost h-9 shrink-0 gap-1 px-3"
+              className="btn-ghost h-8 w-full gap-1 px-3 text-xs"
               onClick={() => {
-                setSearchQuery('');
-                setSortMode('recent');
-                setFilterMode('all');
+                void handleBulkEnableAll();
               }}
+              disabled={!siteRules.length}
             >
-              <X className="h-3.5 w-3.5" />
-              {t('sidepanel_action_clear', 'Clear')}
+              <Eye className="h-3.5 w-3.5" />
+              {t('sidepanel_hidden_bulk_enable_all', 'Enable all')}
             </button>
-          ) : null}
-        </div>
-      </div>
-
-      {hasActivePage ? (
-        <div className="grid grid-cols-2 gap-2">
-          <button
-            type="button"
-            className="btn-ghost h-8 w-full gap-1 px-3 text-xs"
-            onClick={() => {
-              void handleBulkEnableAll();
-            }}
-            disabled={!siteRules.length}
-          >
-            <Eye className="h-3.5 w-3.5" />
-            {t('sidepanel_hidden_bulk_enable_all', 'Enable all')}
-          </button>
-          <button
-            type="button"
-            className="btn-ghost h-8 w-full gap-1 px-3 text-xs"
-            onClick={() => {
-              void handleBulkPauseAll();
-            }}
-            disabled={!siteRules.length}
-          >
-            <EyeOff className="h-3.5 w-3.5" />
-            {t('sidepanel_hidden_bulk_pause_all', 'Pause all')}
-          </button>
-        </div>
+            <button
+              type="button"
+              className="btn-ghost h-8 w-full gap-1 px-3 text-xs"
+              onClick={() => {
+                void handleBulkPauseAll();
+              }}
+              disabled={!siteRules.length}
+            >
+              <EyeOff className="h-3.5 w-3.5" />
+              {t('sidepanel_hidden_bulk_pause_all', 'Pause all')}
+            </button>
+          </div>
+        </>
       ) : null}
 
       {!hasActivePage ? (
         <Card className="bg-muted text-center text-sm text-muted-foreground">
           {t(
             'sidepanel_hidden_no_active_page',
-            'No active page detected. Open a site tab to manage hidden rules.',
+            'No active page detected. Open a site tab and refresh to manage hidden rules.',
           )}
         </Card>
       ) : siteRules.length === 0 ? (
         <Card className="bg-muted text-center text-sm text-muted-foreground">
-          {t('sidepanel_hidden_empty', 'No hidden rules yet.')}
+          {t('sidepanel_hidden_empty', 'No hidden rules yet. Add one to get started.')}
         </Card>
       ) : visibleRules.length === 0 ? (
         <Card className="bg-muted text-center text-sm text-muted-foreground">
-          {t('sidepanel_hidden_empty_filtered', 'No matches. Try a different search or filter.')}
+          {t('sidepanel_hidden_empty_filtered', 'No matches found. Try a different search or filter.')}
         </Card>
       ) : (
         <div className="grid gap-2">
@@ -602,14 +598,7 @@ export default function HiddenRulesSection({
               <Card key={rule.id} onClick={() => setActiveRuleId(rule.id)}>
                 <div className="flex items-start justify-between gap-2">
                   <div className="min-w-0 flex-1">
-                    <div className="flex items-center gap-2">
-                      <h3 className="truncate text-sm font-semibold text-card-foreground">{title}</h3>
-                      {isAutoAdsRule(rule) ? (
-                        <span className="badge-pill shrink-0 text-[9px] uppercase tracking-wide">
-                          {t('sidepanel_hidden_filter_auto', 'Auto')}
-                        </span>
-                      ) : null}
-                    </div>
+                    <h3 className="truncate text-sm font-semibold text-card-foreground">{title}</h3>
                     <p className="mt-1 truncate text-xs text-muted-foreground">{rule.selector}</p>
                   </div>
                   <div className="flex shrink-0 items-center gap-1">
@@ -628,7 +617,7 @@ export default function HiddenRulesSection({
                       }
                       onClick={(event) => {
                         event.stopPropagation();
-                        handleRuleToggle(rule.id);
+                        void handleRuleToggle(rule.id);
                       }}
                     >
                       {rule.enabled ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}

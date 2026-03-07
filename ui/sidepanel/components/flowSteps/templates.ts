@@ -52,6 +52,45 @@ export const createStepTemplate = (type: string, options: TemplateOptions): Step
           { id: 'value', label: 'Value', placeholder: 'Example text', type: 'text', value: '' },
         ],
       };
+    case 'set-variable':
+      return {
+        id: createStepId('set-variable'),
+        type: 'set-variable',
+        title: t('sidepanel_step_set_variable_label', 'Set Variable'),
+        summary: t('sidepanel_step_summary_set_variable', 'Set {name} = {value}')
+          .replace('{name}', 'username')
+          .replace('{value}', '{{row.email}}'),
+        fields: [
+          { id: 'name', label: 'Name', placeholder: 'username', type: 'text', value: '' },
+          {
+            id: 'sourceMode',
+            label: 'Source',
+            type: 'select',
+            value: 'value',
+            options: [
+              { value: 'value', label: 'Value' },
+              { value: 'selector', label: 'Selector' },
+            ],
+          },
+          {
+            id: 'selector',
+            label: 'Selector',
+            placeholder: '.user-email',
+            type: 'text',
+            value: '',
+            withPicker: true,
+            showWhen: { fieldId: 'sourceMode', value: 'selector' },
+          },
+          {
+            id: 'value',
+            label: 'Value',
+            placeholder: '{{row.email}}',
+            type: 'text',
+            value: '',
+            showWhen: { fieldId: 'sourceMode', value: 'value' },
+          },
+        ],
+      };
     case 'popup':
       return {
         id: createStepId('popup'),

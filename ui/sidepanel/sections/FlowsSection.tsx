@@ -224,6 +224,8 @@ export default function FlowsSection({
         return t('sidepanel_step_click_label', 'Click');
       case 'input':
         return t('sidepanel_step_input_label', 'Input');
+      case 'set-variable':
+        return t('sidepanel_step_set_variable_label', 'Set Variable');
       case 'wait':
         return t('sidepanel_step_wait_label', 'Wait');
       case 'assert':
@@ -290,6 +292,10 @@ export default function FlowsSection({
     if (currentRunStep.type === 'input') {
       const selector = getStepFieldStringValue(currentRunStep, 'selector');
       return selector.trim();
+    }
+    if (currentRunStep.type === 'set-variable') {
+      const variableName = getStepFieldStringValue(currentRunStep, 'name');
+      return variableName.trim();
     }
     if (currentRunStep.type === 'click') {
       const selector = getStepFieldStringValue(currentRunStep, 'selector');
