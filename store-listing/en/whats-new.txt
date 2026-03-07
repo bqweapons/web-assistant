@@ -1,12 +1,10 @@
-This update focuses on Password Vault usability and flow run recovery.
+This release expands flow authoring and simplifies built-in ad blocking.
 
-- Improved password input binding UX in flows, with clearer vault-based guidance for password fields.
-- Added a reset flow for forgotten Password Vault passwords (vault contents cannot be recovered; you can reset and rebind).
-- Improved handling for broken vault bindings after reset, with clearer prompts to rebind missing passwords.
+- Added runtime variables with `set-variable`, including reusable `{{var.name}}` tokens across later steps.
+- Added `{{loop.index}}` and `{{row.index}}` tokens for loop and data-source steps.
+- `set-variable` can now read values from page elements by selector.
+- Improved the step editor with variable shortcuts in more fields and more consistent mode-switch tabs.
+- Automatic ad blocking is now a built-in global feature instead of per-site stored rules.
+- Hidden Rules UI now separates manual site rules from the global automatic ad-blocking toggle.
 
-Flow run experience improvements:
-- When a flow needs the vault while the side panel is closed, Ladybird can now show an in-page vault unlock prompt and continue from the current step after unlock.
-- Clearer feedback when unlock is cancelled or interrupted by page refresh/navigation.
-- Popup step UI is more visible and easier to confirm.
-
-Also includes stability and UI/i18n polish across recent screens.
+Also includes UI, i18n, and flow-runner polish across recent screens.
