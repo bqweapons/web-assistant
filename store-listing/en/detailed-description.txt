@@ -1,10 +1,11 @@
-Ladybird helps you customize websites with no-code UI elements and user-triggered automation flows.
+Ladybird helps you customize websites with no-code UI elements, hidden rules, and reusable automation flows.
 
 WHAT IT DOES
 
 - Add buttons, links, tooltips, and areas to pages without writing code.
-- Build flows that can click, input, wait, navigate, log, branch, loop, and show popup confirmations.
-- Hide distracting page elements with Hidden rules.
+- Build flows that can click, input, wait, assert, branch, loop, navigate, log, read data sources, set runtime variables, and show popup confirmations.
+- Hide distracting page elements with manual hidden rules.
+- Enable built-in automatic ad blocking with a single global toggle.
 - Review saved site data in Overview and manage import/export in Settings.
 
 CORE FEATURES
@@ -13,10 +14,20 @@ Elements / Flows / Hidden / Overview / Settings
 - Manage injected UI elements and automation flows from the side panel.
 - Use Overview to inspect saved site data per site and remove data when needed.
 
+Flow Builder
+- Create reusable runtime variables with `set-variable` steps.
+- Reuse values across steps with tokens such as `{{var.name}}`, `{{loop.index}}`, and `{{row.index}}`.
+- Load CSV/TSV data sources and run steps per row.
+- Show popup checkpoints with custom messages before continuing a flow.
+
+Hidden Rules
+- Add manual hidden rules for the current site.
+- Built-in ad blocking is global and separate from your manual hidden-rule list.
+
 Password Vault
 - Save reusable passwords for flow input steps in a locally encrypted Password Vault.
 - Password fields are protected from plain-text flow storage by policy.
-- If a flow needs a vault password while the vault is locked, Ladybird can prompt for vault unlock directly on the page and continue the current step.
+- If a flow needs the vault while the side panel is closed, Ladybird can prompt for vault unlock directly on the page and continue the current step.
 
 Import / Export
 - Export saved configuration as JSON.
@@ -30,12 +41,12 @@ TYPICAL USE CASES
 
 - Add quick action buttons to frequently used websites
 - Reuse form-filling flows for repeated tasks
-- Add semi-automated flows with popup confirmations
-- Hide banners or repeated UI sections you do not want to see
+- Run semi-automated flows with popup confirmations and variables
+- Hide banners, repeated UI sections, or common ads you do not want to see
 
 PRIVACY & SECURITY
 
-- Data is stored locally in chrome.storage.local unless you export it.
+- Data is stored locally in `chrome.storage.local` unless you export it.
 - Password Vault data is encrypted locally.
 - Ladybird does not upload your configuration data to a telemetry backend.
 - Exported files are your responsibility to store securely.
