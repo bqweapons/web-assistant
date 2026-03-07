@@ -1,4 +1,5 @@
 import { MessageType, type RuntimeMessage } from '../shared/messages';
+import { GLOBAL_SETTINGS_STORAGE_KEY } from '../shared/globalSettings';
 import { getSiteData, STORAGE_KEY } from '../shared/storage';
 import { derivePageKeyFromUrl, deriveSiteKeyFromUrl, normalizeStoredPageKey } from '../shared/urlKeys';
 import {
@@ -8,6 +9,7 @@ import {
 import { startPicker, stopPicker } from './content/picker';
 import { handleInjectionMessage, registerPageContextIfNeeded, resetInjectionRegistry } from './content/injection';
 import { executeFlowRunStep, promptFlowVaultUnlockOnPage } from './content/flowRunner';
+import { startFlowRecorder, stopFlowRecorder } from './content/flowRecorder';
 import { clearHiddenRulesStyle, rehydratePersistedHiddenRules } from './content/hiddenRules';
 
 const CONTENT_RUNTIME_READY_KEY = '__ladybirdContentRuntimeReady__';
@@ -180,7 +182,7 @@ export default defineContentScript({
     requestRehydrate('init');
     const storageApi = chrome?.storage?.onChanged;
     const handleStorageChange = (changes: Record<string, unknown>, areaName: string) => {
-      if (areaName !== 'local' || !changes[STORAGE_KEY]) {
+      if (areaName !== 'local' || (!changes[STORAGE_KEY] && !changes[GLOBAL_SETTINGS_STORAGE_KEY])) {
         return;
       }
       requestRehydrate('storage-change');
@@ -224,6 +226,16 @@ export default defineContentScript({
         }
         case MessageType.CANCEL_PICKER: {
           stopPicker();
+          sendResponse?.({ ok: true });
+          return true;
+        }
+        case MessageType.START_FLOW_RECORDING: {
+          startFlowRecorder(message.data);
+          sendResponse?.({ ok: true });
+          return true;
+        }
+        case MessageType.STOP_FLOW_RECORDING: {
+          stopFlowRecorder(message.data.sessionId);
           sendResponse?.({ ok: true });
           return true;
         }
@@ -290,6 +302,7 @@ export default defineContentScript({
     });
     return () => {
       stopWatcher();
+      stopFlowRecorder();
       clearHiddenRulesStyle();
       resetInjectionRegistry();
       storageApi?.removeListener(handleStorageChange);

@@ -22,6 +22,13 @@ export const STEP_LIBRARY: StepLibraryItem[] = [
     description: 'Type text into a field.',
   },
   {
+    type: 'set-variable',
+    labelKey: 'sidepanel_step_set_variable_label',
+    label: 'Set Variable',
+    descriptionKey: 'sidepanel_step_set_variable_description',
+    description: 'Store a runtime variable for later steps.',
+  },
+  {
     type: 'popup',
     labelKey: 'sidepanel_step_popup_label',
     label: 'Popup',

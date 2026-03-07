@@ -49,6 +49,28 @@ Repository conventions and action-flow reference for Ladybird (WXT mainline).
 - Keep placeholders identical across locales (for example `{count}`, `{name}`).
 - Do **not** use PowerShell inline non-ASCII text to patch locale JSON (Windows code page can corrupt text into `????`).
 - Run `npm run i18n:check` after locale edits.
+- Locale text must not contain mojibake / garbled characters. If any locale string is corrupted, fix it before finishing the task.
+- Do not leave newly added UI strings as English-only placeholders in `ja` / `zh_CN`.
+
+### UI consistency rules
+- All visible action buttons should use `icon + label` by default. Pure text buttons are only acceptable for intentionally minimal text-only controls, not for normal primary/secondary actions.
+- Use only existing shared button styles (`btn-primary`, `btn-ghost`, `btn-icon`, `btn-icon-danger`). Do not introduce undefined button classes.
+- If two sibling actions belong to the same action group (for example `Save / Cancel`, `Bind / New`), prefer rendering them on one row and splitting the available width evenly.
+- If button labels are too long for the sidepanel width, shorten the label and keep the icon instead of allowing layout-breaking wrapping.
+- Reuse existing visual patterns across sections. Delete, save, cancel, clear, close, unlock, and confirm actions should look and behave consistently.
+
+### Dialog and dropdown rules
+- Use the shared `ConfirmDialog` for normal in-app delete / discard confirmations. Do not use `window.confirm` for routine sidepanel confirmation flows.
+- If a confirmation dialog is opened from inside another modal, verify its `z-index` so the dialog is visible above the parent modal.
+- Utility actions inside dialogs (close, delete, small tool actions) should prefer circular `btn-icon` styling.
+- Dropdowns and select menus must respect the available space inside drawers / sidepanels. Large menus must clamp height dynamically and scroll internally instead of expanding the layout.
+
+### Password Vault UI rules
+- Password-related flows should prefer Password Vault bindings over literal values.
+- Password warnings or blocked-state guidance should use warning / destructive styling instead of normal muted helper text.
+- Password Vault UI work should preserve add / edit / delete flows and keep them visually aligned with the rest of the sidepanel.
+- When Password Vault UI logic grows, extract it into dedicated components / hooks instead of expanding already-large section components.
+- Closing, resetting, or re-locking vault-related UI must clear transient state (editor state, pending delete state, revealed values, etc.).
 
 ### Message contract changes
 When changing runtime messages:

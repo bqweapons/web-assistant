@@ -3,7 +3,7 @@
     "message": "Open Ladybird"
   },
   "extensionDescription": {
-    "message": "Create no-code buttons, links and tooltips on any page, personalize calls-to-action, and manage everything from a unified side panel"
+    "message": "Add no-code buttons, links, hidden rules, and automation flows to websites with reusable Password Vault inputs."
   },
   "extensionName": {
     "message": "Ladybird: no-code buttons, links and tooltips"
@@ -555,7 +555,7 @@
     "message": "Recently updated"
   },
   "sidepanel_hidden_subtitle": {
-    "message": "Hide or suppress elements automatically."
+    "message": "Manual rules for the current site."
   },
   "sidepanel_hidden_bulk_enable_all": {
     "message": "Enable all"
@@ -564,10 +564,22 @@
     "message": "Pause all"
   },
   "sidepanel_hidden_auto_ads_on": {
-    "message": "Enable auto hide ads"
+    "message": "Enable automatic ad blocking"
   },
   "sidepanel_hidden_auto_ads_off": {
-    "message": "Pause auto hide ads"
+    "message": "Pause automatic ad blocking"
+  },
+  "sidepanel_hidden_auto_ads_title": {
+    "message": "Automatic ad blocking"
+  },
+  "sidepanel_hidden_auto_ads_subtitle": {
+    "message": "Built-in rules for common ads on all pages."
+  },
+  "sidepanel_hidden_auto_ads_helper": {
+    "message": "This is a global built-in feature. Manual hidden rules below are separate."
+  },
+  "sidepanel_hidden_auto_ads_update_error": {
+    "message": "Failed to update automatic ad blocking. Please try again."
   },
   "sidepanel_hidden_auto_rule_name": {
     "message": "Auto ad rule"
@@ -576,7 +588,7 @@
     "message": "Generated from Auto hide ads."
   },
   "sidepanel_hidden_action_select": {
-    "message": "Hide element"
+    "message": "Hide page element"
   },
   "sidepanel_hidden_title": {
     "message": "Hidden rules"
@@ -773,8 +785,14 @@
   "sidepanel_flow_input_secret_bind_selected": {
     "message": "Bind selected password"
   },
+  "sidepanel_flow_input_secret_bind_action": {
+    "message": "Bind"
+  },
   "sidepanel_flow_input_secret_create": {
     "message": "Create new password"
+  },
+  "sidepanel_flow_input_secret_create_action": {
+    "message": "New"
   },
   "sidepanel_flow_input_secret_unlock": {
     "message": "Unlock vault"
@@ -785,11 +803,23 @@
   "sidepanel_flow_input_secret_save_bind": {
     "message": "Save and bind"
   },
+  "sidepanel_flow_input_secret_save_bind_action": {
+    "message": "Save & bind"
+  },
   "sidepanel_flow_input_secret_unlock_help": {
     "message": "To select a saved password, unlock the vault. Enter the vault password (not the website password)."
   },
   "sidepanel_flow_input_secret_create_help": {
     "message": "This is not the website login password. Create a password vault password to save and reuse passwords."
+  },
+  "sidepanel_step_input_shortcut_variable": {
+    "message": "Insert variable"
+  },
+  "sidepanel_step_input_shortcut_loop_index": {
+    "message": "Loop index"
+  },
+  "sidepanel_step_input_shortcut_row_index": {
+    "message": "Row index"
   },
   "sidepanel_flow_input_secret_master_password": {
     "message": "Vault password (for create/unlock)"
@@ -817,6 +847,9 @@
   },
   "sidepanel_flow_runner_error_secret_not_found": {
     "message": "The selected password could not be found. Please choose it again."
+  },
+  "sidepanel_flow_runner_error_invalid_variable_name": {
+    "message": "Variable names must start with a letter or underscore and use only letters, numbers, or underscores."
   },
   "sidepanel_step_assert_description": {
     "message": "Check a value or state."
@@ -866,8 +899,17 @@
   "sidepanel_step_input_label": {
     "message": "Input"
   },
+  "sidepanel_step_input_transform_hint": {
+    "message": "Use input, row, loop, vars, now, helpers and return the final string."
+  },
   "sidepanel_step_loop_description": {
     "message": "Repeat nested steps for a count."
+  },
+  "sidepanel_step_loop_hint": {
+    "message": "Nested steps can use"
+  },
+  "sidepanel_step_loop_hint_suffix": {
+    "message": "for the current 0-based loop index."
   },
   "sidepanel_step_loop_label": {
     "message": "Loop"
@@ -883,6 +925,18 @@
   },
   "sidepanel_step_popup_label": {
     "message": "Popup"
+  },
+  "sidepanel_step_set_variable_description": {
+    "message": "Store a runtime variable for later steps."
+  },
+  "sidepanel_step_set_variable_hint": {
+    "message": "Later steps can read this value with"
+  },
+  "sidepanel_step_set_variable_selector_hint": {
+    "message": "Use the tabs to switch between Value input and Selector source."
+  },
+  "sidepanel_step_set_variable_label": {
+    "message": "Set Variable"
   },
   "sidepanel_step_summary_conditional": {
     "message": "Conditional check"
@@ -908,11 +962,23 @@
   "sidepanel_step_summary_selector": {
     "message": "Selector: {value}"
   },
+  "sidepanel_step_summary_set_variable": {
+    "message": "Set {name} = {value}"
+  },
+  "sidepanel_step_summary_set_variable_from_selector": {
+    "message": "Set {name} from {selector}"
+  },
+  "sidepanel_step_summary_set_variable_selector_missing": {
+    "message": "Set {name} from selector"
+  },
   "sidepanel_step_summary_url": {
     "message": "URL: {value}"
   },
   "sidepanel_step_summary_value": {
     "message": "Value: {value}"
+  },
+  "sidepanel_step_summary_variable_not_set": {
+    "message": "Variable not set"
   },
   "sidepanel_step_summary_message": {
     "message": "Message: {value}"
@@ -976,6 +1042,12 @@
   },
   "sidepanel_steps_columns_hint": {
     "message": "Click a column to create an Input step with"
+  },
+  "sidepanel_steps_row_index_hint": {
+    "message": "Use"
+  },
+  "sidepanel_steps_row_index_hint_suffix": {
+    "message": "for the current 0-based row index."
   },
   "sidepanel_steps_columns_missing": {
     "message": "No columns detected"
@@ -1179,13 +1251,13 @@
     "message": "Password Vault Viewer"
   },
   "sidepanel_settings_vault_viewer_subtitle": {
-    "message": "Open the password vault viewer and enter the vault password to browse saved passwords."
+    "message": "Open the password vault viewer and enter the vault password to view and manage saved passwords."
   },
   "sidepanel_settings_vault_viewer_open": {
     "message": "Open password vault"
   },
   "sidepanel_settings_vault_viewer_modal_subtitle": {
-    "message": "Enter the vault password to view saved passwords."
+    "message": "Enter the vault password to view and manage saved passwords."
   },
   "sidepanel_settings_vault_viewer_status": {
     "message": "Status"
@@ -1240,6 +1312,63 @@
   },
   "sidepanel_settings_vault_viewer_reset_success": {
     "message": "Password vault was reset. You can create a new vault password now."
+  },
+  "sidepanel_settings_vault_secret_manage_title": {
+    "message": "Manage passwords"
+  },
+  "sidepanel_settings_vault_secret_manage_hint": {
+    "message": "Add, edit, or delete saved passwords stored in the vault."
+  },
+  "sidepanel_settings_vault_secret_editor_create": {
+    "message": "Add password"
+  },
+  "sidepanel_settings_vault_secret_editor_edit": {
+    "message": "Edit password"
+  },
+  "sidepanel_settings_vault_secret_add": {
+    "message": "Add password"
+  },
+  "sidepanel_settings_vault_secret_edit": {
+    "message": "Edit"
+  },
+  "sidepanel_settings_vault_secret_delete": {
+    "message": "Delete"
+  },
+  "sidepanel_settings_vault_secret_name_label": {
+    "message": "Password name"
+  },
+  "sidepanel_settings_vault_secret_name_placeholder": {
+    "message": "example: login_password"
+  },
+  "sidepanel_settings_vault_secret_value_label": {
+    "message": "Password"
+  },
+  "sidepanel_settings_vault_secret_value_placeholder": {
+    "message": "Enter the password value"
+  },
+  "sidepanel_settings_vault_secret_save": {
+    "message": "Save"
+  },
+  "sidepanel_settings_vault_secret_cancel": {
+    "message": "Cancel"
+  },
+  "sidepanel_settings_vault_secret_name_required": {
+    "message": "Password name is required."
+  },
+  "sidepanel_settings_vault_secret_value_required": {
+    "message": "Password value is required."
+  },
+  "sidepanel_settings_vault_secret_saved": {
+    "message": "Password updated."
+  },
+  "sidepanel_settings_vault_secret_created": {
+    "message": "Password saved."
+  },
+  "sidepanel_settings_vault_secret_delete_confirm": {
+    "message": "Delete password \"{name}\"? This action cannot be undone."
+  },
+  "sidepanel_settings_vault_secret_deleted": {
+    "message": "Password deleted."
   },
   "sidepanel_overview_empty": {
     "message": "No saved data yet. Add elements, flows, or hidden rules to get started."
@@ -1330,5 +1459,50 @@
   },
   "sidepanel_flow_input_secret_bound_missing": {
     "message": "Bound password no longer exists in the vault: {name}. Please choose or create a password and bind again."
+  },
+  "sidepanel_flow_recording_start": {
+    "message": "Start recording"
+  },
+  "sidepanel_flow_recording_stop": {
+    "message": "Stop recording"
+  },
+  "sidepanel_flow_recording_status_label": {
+    "message": "Recorder"
+  },
+  "sidepanel_flow_recording_status_active": {
+    "message": "Recording"
+  },
+  "sidepanel_flow_recording_status_idle": {
+    "message": "Idle"
+  },
+  "sidepanel_flow_recording_hint_basic": {
+    "message": "Record clicks and inputs from the page."
+  },
+  "sidepanel_flow_recording_feedback_password_skipped": {
+    "message": "Password input was skipped. Add it manually with a Password Vault binding."
+  },
+  "sidepanel_flow_recording_feedback_navigation_not_recorded": {
+    "message": "Navigation was detected. No Navigate step was added."
+  },
+  "sidepanel_flow_recording_feedback_started": {
+    "message": "Recording started."
+  },
+  "sidepanel_flow_recording_feedback_stopped": {
+    "message": "Recording stopped."
+  },
+  "sidepanel_flow_recording_feedback_error_start": {
+    "message": "Unable to start recording on the page."
+  },
+  "sidepanel_flow_recording_feedback_interrupted": {
+    "message": "Navigation interrupted recording. No Navigate step was added."
+  },
+  "sidepanel_flow_recording_stop_before_save": {
+    "message": "Stop recording before saving or running."
+  },
+  "sidepanel_elements_style_margin": {
+    "message": "Margin"
+  },
+  "sidepanel_elements_margin_placeholder": {
+    "message": "0 auto"
   }
 }

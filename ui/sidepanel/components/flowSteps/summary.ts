@@ -24,6 +24,8 @@ const getOperatorLabel = (operators: StepFieldOption[], value: string) =>
 export const buildStepSummary = (step: StepData, operators: StepFieldOption[]) => {
   const selector = getFieldValue(step, 'selector');
   const value = getFieldValue(step, 'value');
+  const name = getFieldValue(step, 'name');
+  const sourceMode = getFieldValue(step, 'sourceMode');
   const message = getFieldValue(step, 'message');
   const operator = getFieldValue(step, 'operator');
   const expected = getFieldValue(step, 'expected');
@@ -46,6 +48,22 @@ export const buildStepSummary = (step: StepData, operators: StepFieldOption[]) =
       return selector
         ? t('sidepanel_step_summary_selector', 'Selector: {value}').replace('{value}', selector)
         : t('sidepanel_step_summary_input', 'Input');
+    case 'set-variable':
+      if (!name) {
+        return t('sidepanel_step_summary_variable_not_set', 'Variable not set');
+      }
+      if (sourceMode === 'selector') {
+        if (!selector) {
+          return t('sidepanel_step_summary_set_variable_selector_missing', 'Set {name} from selector')
+            .replace('{name}', name);
+        }
+        return t('sidepanel_step_summary_set_variable_from_selector', 'Set {name} from {selector}')
+          .replace('{name}', name)
+          .replace('{selector}', selector);
+      }
+      return t('sidepanel_step_summary_set_variable', 'Set {name} = {value}')
+        .replace('{name}', name)
+        .replace('{value}', value);
     case 'popup':
       return t('sidepanel_step_summary_message', 'Message: {value}').replace(
         '{value}',

@@ -1,11 +1,12 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Check, CheckCircle2, Copy, Play, Search, Square, Trash2 } from 'lucide-react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { Check, ChevronDown, ChevronUp, Circle, Copy, Play, Search, Square, Trash2, X } from 'lucide-react';
 import Card from '../components/Card';
 import ConfirmDialog from '../components/ConfirmDialog';
 import FlowDrawer from '../components/FlowDrawer';
 import FlowStepsBuilder from '../components/FlowStepsBuilder';
 import { t } from '../utils/i18n';
 import {
+  type FlowRecordingEventPayload,
   type SelectorPickerAccept,
 } from '../../../shared/messages';
 import { getSiteData, setSiteData, STORAGE_KEY } from '../../../shared/storage';
@@ -13,11 +14,15 @@ import { deriveSiteKey } from '../../../shared/siteDataSchema';
 import type { FlowStepData } from '../../../shared/flowStepMigration';
 import { isSecretTokenValue } from '../../../shared/secrets';
 import { formatTimestamp, getStepCount, normalizeFlow, type FlowRecord } from './flows/normalize';
+import { appendRecordedEventToSteps } from './flows/recording';
+import { useFlowRecording } from './flows/useFlowRecording';
 import { getRunnerStateLabel, useFlowRunner } from './flows/useFlowRunner';
 import { getStepFieldStringValue, isPasswordLikeSelector } from '../components/flowSteps/secretInputUtils';
 
 type FlowsSectionProps = {
   siteKey?: string;
+  pageUrl?: string;
+  tabId?: number;
   hasActivePage?: boolean;
   createFlowOpen?: boolean;
   onCreateFlowClose?: () => void;
@@ -26,13 +31,16 @@ type FlowsSectionProps = {
 
 type FlowSummaryActions = {
   onSave: () => void;
-  onSaveRun?: () => void;
+  onStartRecording?: () => void;
+  onStopRecording?: () => void;
   onRun?: () => void;
   disableSave?: boolean;
-  disableSaveRun?: boolean;
+  disableRecording?: boolean;
   disableRun?: boolean;
-  saveRunDisabledReason?: string;
+  recordingDisabledReason?: string;
   runDisabledReason?: string;
+  isRecording?: boolean;
+  recordingHelperText?: string;
 };
 
 const getEditableSnapshot = (flow: Pick<FlowRecord, 'name' | 'description' | 'steps'>) =>
@@ -103,6 +111,8 @@ const findStepById = (steps: FlowStepData[], stepId?: string): FlowStepData | nu
 
 export default function FlowsSection({
   siteKey = '',
+  pageUrl = '',
+  tabId,
   hasActivePage = false,
   createFlowOpen = false,
   onCreateFlowClose,
@@ -129,6 +139,7 @@ export default function FlowsSection({
   });
   const [createResetKey, setCreateResetKey] = useState(0);
   const [runLogsExpanded, setRunLogsExpanded] = useState(false);
+  const recordingTargetRef = useRef<'edit' | 'create' | null>(null);
   const {
     runStatus,
     runErrorMessage,
@@ -142,6 +153,35 @@ export default function FlowsSection({
     copyRunLogs,
     formatLogTime,
   } = useFlowRunner(flows);
+  const applyRecordedEvent = useCallback((event: FlowRecordingEventPayload) => {
+    if (recordingTargetRef.current === 'edit') {
+      setEditFlow((prev) =>
+        prev
+          ? {
+              ...prev,
+              steps: appendRecordedEventToSteps(prev.steps, event),
+            }
+          : prev,
+      );
+      return;
+    }
+    if (recordingTargetRef.current === 'create') {
+      setDraftFlow((prev) => ({
+        ...prev,
+        steps: appendRecordedEventToSteps(prev.steps, event),
+      }));
+    }
+  }, []);
+  const {
+    isRecording,
+    recordingFeedback,
+    startRecording,
+    stopRecording,
+  } = useFlowRecording({
+    pageUrl,
+    tabId,
+    onRecordingEvent: applyRecordedEvent,
+  });
 
   const currentRunStep = useMemo(
     () => findStepById(currentRunFlow?.steps ?? [], runStatus?.currentStepId),
@@ -157,12 +197,26 @@ export default function FlowsSection({
     setRunLogsExpanded(false);
   }, [runStatus?.runId]);
 
+  useEffect(() => {
+    if (!isRecording) {
+      recordingTargetRef.current = null;
+    }
+  }, [isRecording]);
+
   const normalizedQuery = searchQuery.trim().toLowerCase();
   const runDisabledReason = !hasActivePage
     ? t('sidepanel_flows_disabled_no_active_page', 'No active page. Running is disabled.')
     : isRunActive
       ? t('sidepanel_flows_disabled_runner_busy', 'Another flow is running.')
       : '';
+  const recordingDisabledReason = !hasActivePage
+    ? t('sidepanel_flows_disabled_read_only', 'Read-only mode without an active page.')
+    : isRunActive
+      ? t('sidepanel_flows_disabled_runner_busy', 'Another flow is running.')
+      : '';
+  const recordingActionDisabledReason = isRecording
+    ? t('sidepanel_flow_recording_stop_before_save', 'Stop recording before saving or running.')
+    : runDisabledReason;
   const isEditDirty = editFlow ? getEditableSnapshot(editFlow) !== editFlowSnapshot : false;
   const getStepTypeLabel = useCallback((type?: FlowStepData['type']) => {
     switch (type) {
@@ -170,6 +224,8 @@ export default function FlowsSection({
         return t('sidepanel_step_click_label', 'Click');
       case 'input':
         return t('sidepanel_step_input_label', 'Input');
+      case 'set-variable':
+        return t('sidepanel_step_set_variable_label', 'Set Variable');
       case 'wait':
         return t('sidepanel_step_wait_label', 'Wait');
       case 'assert':
@@ -236,6 +292,10 @@ export default function FlowsSection({
     if (currentRunStep.type === 'input') {
       const selector = getStepFieldStringValue(currentRunStep, 'selector');
       return selector.trim();
+    }
+    if (currentRunStep.type === 'set-variable') {
+      const variableName = getStepFieldStringValue(currentRunStep, 'name');
+      return variableName.trim();
     }
     if (currentRunStep.type === 'click') {
       const selector = getStepFieldStringValue(currentRunStep, 'selector');
@@ -368,10 +428,12 @@ export default function FlowsSection({
   );
 
   const forceCloseEditDrawer = useCallback(() => {
+    recordingTargetRef.current = null;
+    void stopRecording({ silent: true });
     setActiveFlowId(null);
     setEditFlow(null);
     setEditFlowSnapshot('');
-  }, []);
+  }, [stopRecording]);
 
   const closeEditDrawer = useCallback(() => {
     if (isEditDirty) {
@@ -382,8 +444,10 @@ export default function FlowsSection({
   }, [forceCloseEditDrawer, isEditDirty]);
 
   const closeCreateDrawer = useCallback(() => {
+    recordingTargetRef.current = null;
+    void stopRecording({ silent: true });
     onCreateFlowClose?.();
-  }, [onCreateFlowClose]);
+  }, [onCreateFlowClose, stopRecording]);
 
   const saveEditedFlow = useCallback(
     async (closeDrawer = true): Promise<FlowRecord | null> => {
@@ -483,28 +547,8 @@ export default function FlowsSection({
     void saveEditedFlow(true);
   };
 
-  const handleFlowSaveRun = () => {
-    void (async () => {
-      const saved = await saveEditedFlow(false);
-      if (!saved) {
-        return;
-      }
-      await startFlowRun(saved, 'flow-drawer-save-run');
-    })();
-  };
-
   const handleCreateFlow = () => {
     void createDraftFlow();
-  };
-
-  const handleCreateFlowSaveRun = () => {
-    void (async () => {
-      const created = await createDraftFlow();
-      if (!created) {
-        return;
-      }
-      await startFlowRun(created, 'flow-drawer-save-run');
-    })();
   };
 
   const handleDeleteFlow = useCallback(
@@ -527,38 +571,33 @@ export default function FlowsSection({
     [activeFlowId, flows, forceCloseEditDrawer, persistFlows],
   );
 
-  const renderSummary = (steps: number, actions: FlowSummaryActions) => (
+  const handleStartRecording = useCallback(
+    (target: 'edit' | 'create') => {
+      if (recordingDisabledReason) {
+        return;
+      }
+      recordingTargetRef.current = target;
+      void startRecording().then((started) => {
+        if (!started) {
+          recordingTargetRef.current = null;
+        }
+      });
+    },
+    [recordingDisabledReason, startRecording],
+  );
+
+  const handleStopRecording = useCallback(() => {
+    recordingTargetRef.current = null;
+    void stopRecording();
+  }, [stopRecording]);
+
+  const recordingHelperText = isRecording
+    ? recordingFeedback || t('sidepanel_flow_recording_hint_basic', 'Record clicks and inputs from the page.')
+    : t('sidepanel_flow_recording_hint_basic', 'Record clicks and inputs from the page.');
+
+  const renderSummary = (actions: FlowSummaryActions) => (
     <>
-      <p className="text-xs font-semibold text-muted-foreground">
-        {t('sidepanel_flows_summary_title', 'Summary')}
-      </p>
-      <p className="text-sm text-foreground">
-        {t('sidepanel_steps_count', '{count} steps').replace('{count}', String(steps))}
-      </p>
-      <div className="flex flex-wrap items-center gap-2">
-        <button
-          type="button"
-          className="btn-primary h-8 px-3 text-xs disabled:cursor-not-allowed disabled:opacity-60"
-          onClick={actions.onSave}
-          disabled={actions.disableSave}
-        >
-          <span className="inline-flex items-center gap-1">
-            <Check className="h-3.5 w-3.5" />
-            {t('sidepanel_action_save', 'Save')}
-          </span>
-        </button>
-        <button
-          type="button"
-          className="btn-ghost h-8 px-3 text-xs disabled:cursor-not-allowed disabled:opacity-60"
-          onClick={actions.onSaveRun}
-          disabled={actions.disableSaveRun || !actions.onSaveRun}
-          title={actions.disableSaveRun ? actions.saveRunDisabledReason : undefined}
-        >
-          <span className="inline-flex items-center gap-1">
-            <CheckCircle2 className="h-3.5 w-3.5" />
-            {t('sidepanel_action_save_run', 'Save & Run')}
-          </span>
-        </button>
+      <div className="flex flex-wrap items-center justify-end gap-2">
         <button
           type="button"
           className="btn-ghost h-8 px-3 text-xs disabled:cursor-not-allowed disabled:opacity-60"
@@ -571,6 +610,49 @@ export default function FlowsSection({
             {t('sidepanel_action_run', 'Run')}
           </span>
         </button>
+        <button
+          type="button"
+          className="btn-primary h-8 px-3 text-xs disabled:cursor-not-allowed disabled:opacity-60"
+          onClick={actions.onSave}
+          disabled={actions.disableSave}
+        >
+          <span className="inline-flex items-center gap-1">
+            <Check className="h-3.5 w-3.5" />
+            {t('sidepanel_action_save', 'Save')}
+          </span>
+        </button>
+      </div>
+      <div className="grid gap-2 rounded-xl border border-border bg-card/60 p-3">
+        <div className="flex items-center gap-2">
+          {actions.isRecording ? (
+            <button
+              type="button"
+              className="btn-icon h-8 w-8 text-destructive"
+              onClick={actions.onStopRecording}
+              aria-label={t('sidepanel_flow_recording_stop', 'Stop recording')}
+              title={t('sidepanel_flow_recording_stop', 'Stop recording')}
+            >
+              <Square className="h-3.5 w-3.5 fill-current" />
+            </button>
+          ) : (
+            <button
+              type="button"
+              className="btn-icon h-8 w-8 disabled:cursor-not-allowed disabled:opacity-60"
+              onClick={actions.onStartRecording}
+              disabled={actions.disableRecording || !actions.onStartRecording}
+              aria-label={actions.recordingDisabledReason || t('sidepanel_flow_recording_start', 'Start recording')}
+              title={actions.recordingDisabledReason || t('sidepanel_flow_recording_start', 'Start recording')}
+            >
+              <Circle className="h-3.5 w-3.5" />
+            </button>
+          )}
+          <div className="min-w-0">
+            <p className="text-[11px] font-semibold text-muted-foreground">
+              {t('sidepanel_flow_recording_status_label', 'Recorder')}
+            </p>
+            <p className="text-[11px] text-muted-foreground">{actions.recordingHelperText}</p>
+          </div>
+        </div>
       </div>
     </>
   );
@@ -680,9 +762,10 @@ export default function FlowsSection({
                   {hasMoreRunLogs ? (
                     <button
                       type="button"
-                      className="btn-ghost h-7 px-2 text-[11px]"
+                      className="btn-ghost h-7 gap-1 px-2 text-[11px]"
                       onClick={() => setRunLogsExpanded((prev) => !prev)}
                     >
+                      {runLogsExpanded ? <ChevronUp className="h-3.5 w-3.5" /> : <ChevronDown className="h-3.5 w-3.5" />}
                       {runLogsExpanded
                         ? t('sidepanel_flow_runner_logs_show_recent', 'Show recent 5')
                         : t('sidepanel_flow_runner_logs_show_all', 'Show all')}
@@ -769,12 +852,13 @@ export default function FlowsSection({
           {showClear ? (
             <button
               type="button"
-              className="btn-ghost px-3"
+              className="btn-ghost gap-1 px-3"
               onClick={() => {
                 setSearchQuery('');
                 setSortMode('recent');
               }}
             >
+              <X className="h-3.5 w-3.5" />
               {t('sidepanel_action_clear', 'Clear')}
             </button>
           ) : null}
@@ -851,19 +935,22 @@ export default function FlowsSection({
         title={editFlow?.name ?? t('sidepanel_flows_detail_title', 'Flow details')}
         subtitle={t('sidepanel_flows_detail_subtitle', 'Edit the flow settings below.')}
         onClose={closeEditDrawer}
-        summary={renderSummary(getStepCount(editFlow?.steps || []), {
+        summary={renderSummary({
           onSave: handleFlowSave,
-          onSaveRun: handleFlowSaveRun,
+          onStartRecording: () => handleStartRecording('edit'),
+          onStopRecording: handleStopRecording,
           onRun: editFlow
             ? () => {
                 void startFlowRun(editFlow, 'flows-list');
               }
             : undefined,
-          disableSave: !hasActivePage,
-          disableSaveRun: !hasActivePage || isRunActive,
-          disableRun: !hasActivePage || isRunActive || !editFlow,
-          saveRunDisabledReason: runDisabledReason,
-          runDisabledReason: runDisabledReason,
+          disableSave: !hasActivePage || isRecording,
+          disableRecording: Boolean(recordingDisabledReason),
+          disableRun: !hasActivePage || isRunActive || isRecording || !editFlow,
+          recordingDisabledReason: recordingDisabledReason,
+          runDisabledReason: recordingActionDisabledReason,
+          isRecording,
+          recordingHelperText,
         })}
       >
         {editFlow ? (
@@ -904,13 +991,16 @@ export default function FlowsSection({
         title={t('sidepanel_flows_new_title', 'New flow')}
         subtitle={t('sidepanel_flows_new_subtitle', 'Create a new action flow.')}
         onClose={closeCreateDrawer}
-        summary={renderSummary(getStepCount(draftFlow.steps), {
+        summary={renderSummary({
           onSave: handleCreateFlow,
-          onSaveRun: handleCreateFlowSaveRun,
-          disableSave: !hasActivePage,
-          disableSaveRun: !hasActivePage || isRunActive,
+          onStartRecording: () => handleStartRecording('create'),
+          onStopRecording: handleStopRecording,
+          disableSave: !hasActivePage || isRecording,
+          disableRecording: Boolean(recordingDisabledReason),
           disableRun: true,
-          saveRunDisabledReason: runDisabledReason,
+          recordingDisabledReason: recordingDisabledReason,
+          isRecording,
+          recordingHelperText,
         })}
       >
         <div className="space-y-4 text-xs text-muted-foreground">

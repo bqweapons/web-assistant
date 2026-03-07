@@ -82,6 +82,22 @@ export const bootstrapBackground = () => {
     return tabBridge.forwardToActiveTab(message);
   };
 
+  const forwardToRequestedTabOrActive = async (message: RuntimeMessage) => {
+    const requestedTabId = typeof message.targetTabId === 'number' ? message.targetTabId : undefined;
+    if (!requestedTabId) {
+      return tabBridge.forwardToActiveTab(message);
+    }
+    const targeted = await tabBridge.forwardToTab(requestedTabId, message);
+    if (targeted.ok) {
+      return targeted;
+    }
+    console.warn('tab-forward-fallback', {
+      targetTabId: requestedTabId,
+      error: targeted.error || 'unknown-error',
+    });
+    return tabBridge.forwardToActiveTab(message);
+  };
+
   if (!runtime?.onMessage) {
     return;
   }
@@ -107,6 +123,8 @@ export const bootstrapBackground = () => {
     switch (message.type) {
       case MessageType.START_PICKER:
       case MessageType.CANCEL_PICKER:
+      case MessageType.START_FLOW_RECORDING:
+      case MessageType.STOP_FLOW_RECORDING:
       case MessageType.CREATE_ELEMENT:
       case MessageType.UPDATE_ELEMENT:
       case MessageType.DELETE_ELEMENT:
@@ -118,13 +136,15 @@ export const bootstrapBackground = () => {
           void respondPromise(() => forwardElementMessage(message));
           return true;
         }
-        void respondPromise(() => tabBridge.forwardToActiveTab(message));
+        void respondPromise(() => forwardToRequestedTabOrActive(message));
         return true;
       }
       case MessageType.PICKER_RESULT:
       case MessageType.PICKER_CANCELLED:
       case MessageType.PICKER_INVALID:
-      case MessageType.ELEMENT_DRAFT_UPDATED: {
+      case MessageType.ELEMENT_DRAFT_UPDATED:
+      case MessageType.FLOW_RECORDING_EVENT:
+      case MessageType.FLOW_RECORDING_STATUS: {
         safeBroadcast({ ...message, forwarded: true });
         sendResponse?.({ ok: true });
         return true;

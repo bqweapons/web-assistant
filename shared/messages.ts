@@ -18,6 +18,10 @@ export const MessageType = {
   SET_EDITING_ELEMENT: 'SET_EDITING_ELEMENT',
   ELEMENT_DRAFT_UPDATED: 'ELEMENT_DRAFT_UPDATED',
   REHYDRATE_ELEMENTS: 'REHYDRATE_ELEMENTS',
+  START_FLOW_RECORDING: 'START_FLOW_RECORDING',
+  STOP_FLOW_RECORDING: 'STOP_FLOW_RECORDING',
+  FLOW_RECORDING_EVENT: 'FLOW_RECORDING_EVENT',
+  FLOW_RECORDING_STATUS: 'FLOW_RECORDING_STATUS',
   START_FLOW_RUN: 'START_FLOW_RUN',
   STOP_FLOW_RUN: 'STOP_FLOW_RUN',
   FLOW_RUN_STATUS: 'FLOW_RUN_STATUS',
@@ -83,10 +87,44 @@ export type ElementStylePayload = {
 
 export type MessageElementPayload = StructuredElementRecord;
 
+export type FlowRecordingState = 'idle' | 'recording' | 'stopped' | 'error';
+export type FlowRecordingEventType = 'click' | 'input' | 'password-skipped' | 'navigation-noted';
+
+export type FlowRecordingStartPayload = {
+  sessionId: string;
+  siteKey?: string;
+  pageKey?: string;
+  flowId?: string;
+  resumeAfterNavigation?: boolean;
+};
+
+export type FlowRecordingStopPayload = {
+  sessionId: string;
+};
+
+export type FlowRecordingEventPayload = {
+  sessionId: string;
+  eventId: string;
+  timestamp: number;
+  type: FlowRecordingEventType;
+  url: string;
+  selector?: string;
+  value?: string;
+  inputKind?: 'text' | 'textarea' | 'select' | 'contenteditable' | 'password';
+  message?: string;
+};
+
+export type FlowRecordingStatusPayload = {
+  sessionId: string;
+  state: FlowRecordingState;
+  reason?: string;
+  url?: string;
+};
+
 export type FlowRunState = 'queued' | 'running' | 'succeeded' | 'failed' | 'cancelled';
 export type FlowRunStartSource = 'flows-list' | 'flow-drawer-save-run';
 export type FlowConditionOperator = 'contains' | 'equals' | 'greater' | 'less';
-export type FlowRunAtomicStepType = 'click' | 'input' | 'wait' | 'assert' | 'condition' | 'popup';
+export type FlowRunAtomicStepType = 'click' | 'input' | 'wait' | 'assert' | 'condition' | 'popup' | 'read';
 export type FlowRunLogLevel = 'info' | 'success' | 'error';
 
 export type FlowRunLogEntry = {
@@ -95,7 +133,7 @@ export type FlowRunLogEntry = {
   level: FlowRunLogLevel;
   message: string;
   stepId?: string;
-  stepType?: FlowRunAtomicStepType | 'navigate' | 'loop' | 'if-else' | 'data-source';
+  stepType?: FlowRunAtomicStepType | 'navigate' | 'loop' | 'if-else' | 'data-source' | 'set-variable';
 };
 
 export type FlowRunExecutionDetails = {
@@ -228,6 +266,10 @@ export type RuntimeMessage =
   | { type: typeof MessageType.SET_EDITING_ELEMENT; data: { id?: string }; forwarded?: boolean; targetTabId?: number }
   | { type: typeof MessageType.ELEMENT_DRAFT_UPDATED; data: { element: MessageElementPayload }; forwarded?: boolean; targetTabId?: number }
   | { type: typeof MessageType.REHYDRATE_ELEMENTS; data: { elements: MessageElementPayload[] }; forwarded?: boolean; targetTabId?: number }
+  | { type: typeof MessageType.START_FLOW_RECORDING; data: FlowRecordingStartPayload; forwarded?: boolean; targetTabId?: number }
+  | { type: typeof MessageType.STOP_FLOW_RECORDING; data: FlowRecordingStopPayload; forwarded?: boolean; targetTabId?: number }
+  | { type: typeof MessageType.FLOW_RECORDING_EVENT; data: FlowRecordingEventPayload; forwarded?: boolean; targetTabId?: number }
+  | { type: typeof MessageType.FLOW_RECORDING_STATUS; data: FlowRecordingStatusPayload; forwarded?: boolean; targetTabId?: number }
   | { type: typeof MessageType.START_FLOW_RUN; data: FlowRunStartPayload; forwarded?: boolean; targetTabId?: number }
   | { type: typeof MessageType.STOP_FLOW_RUN; data: FlowRunStopPayload; forwarded?: boolean; targetTabId?: number }
   | { type: typeof MessageType.FLOW_RUN_STATUS; data: FlowRunStatusPayload; forwarded?: boolean; targetTabId?: number }

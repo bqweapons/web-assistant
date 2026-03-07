@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Globe, RefreshCw, Trash2 } from 'lucide-react';
 import Card from '../components/Card';
+import ConfirmDialog from '../components/ConfirmDialog';
 import StatCard from '../components/StatCard';
 import { t } from '../utils/i18n';
 import { getAllSitesData, setAllSitesData, STORAGE_KEY, type SiteData } from '../../../shared/storage';
@@ -11,6 +12,7 @@ export default function OverviewSection() {
   >([]);
   const [loading, setLoading] = useState(false);
   const [deletingSiteKey, setDeletingSiteKey] = useState('');
+  const [pendingDeleteSiteKey, setPendingDeleteSiteKey] = useState('');
   const [actionError, setActionError] = useState('');
 
   const toCount = (value: unknown) => (Array.isArray(value) ? value.length : 0);
@@ -93,13 +95,6 @@ export default function OverviewSection() {
 
   const handleDeleteSite = useCallback(
     async (siteKey: string) => {
-      const confirmed = window.confirm(
-        t('sidepanel_overview_delete_site_confirm', 'Delete all saved data for this site? This cannot be undone.')
-          .replace('{site}', siteKey),
-      );
-      if (!confirmed) {
-        return;
-      }
       setDeletingSiteKey(siteKey);
       setActionError('');
       try {
@@ -123,6 +118,10 @@ export default function OverviewSection() {
     },
     [refreshStats],
   );
+
+  const pendingDeleteSite = pendingDeleteSiteKey
+    ? sortedSites.find((site) => site.siteKey === pendingDeleteSiteKey) ?? null
+    : null;
 
   return (
     <section className="flex flex-col gap-3">
@@ -227,7 +226,7 @@ export default function OverviewSection() {
                     type="button"
                     className="btn-icon btn-icon-danger h-8 w-8 shrink-0 disabled:cursor-not-allowed disabled:opacity-50"
                     onClick={() => {
-                      void handleDeleteSite(site.siteKey);
+                      setPendingDeleteSiteKey(site.siteKey);
                     }}
                     aria-label={t('sidepanel_overview_delete_site', 'Delete site data')}
                     title={t('sidepanel_overview_delete_site', 'Delete site data')}
@@ -241,6 +240,24 @@ export default function OverviewSection() {
           })}
         </div>
       </Card>
+      <ConfirmDialog
+        open={Boolean(pendingDeleteSiteKey)}
+        title={t('sidepanel_overview_delete_site', 'Delete site data')}
+        message={t('sidepanel_overview_delete_site_confirm', 'Delete all saved data for "{site}"? This cannot be undone.')
+          .replace('{site}', pendingDeleteSite?.siteKey || pendingDeleteSiteKey)}
+        confirmLabel={t('sidepanel_action_delete', 'Delete')}
+        cancelLabel={t('sidepanel_action_cancel', 'Cancel')}
+        danger
+        onCancel={() => setPendingDeleteSiteKey('')}
+        onConfirm={() => {
+          const targetSiteKey = pendingDeleteSiteKey;
+          setPendingDeleteSiteKey('');
+          if (!targetSiteKey) {
+            return;
+          }
+          void handleDeleteSite(targetSiteKey);
+        }}
+      />
     </section>
   );
 }

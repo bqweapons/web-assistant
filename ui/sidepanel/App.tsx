@@ -7,7 +7,7 @@ import OverviewSection from './sections/OverviewSection';
 import SettingsSection from './sections/SettingsSection';
 import SettingsPopover from './components/SettingsPopover';
 import PickerOverlay from './components/PickerOverlay';
-import { EyeOff, Layers, LayoutDashboard, Moon, Settings, Sun, Workflow } from 'lucide-react';
+import { EyeOff, Layers, LayoutDashboard, Moon, Plus, Settings, Sun, Workflow } from 'lucide-react';
 import { t, useLocale } from './utils/i18n';
 import {
   MessageType,
@@ -265,7 +265,7 @@ export default function App() {
           <div className="mt-2">
             <button
               type="button"
-              className="btn-primary w-full disabled:cursor-not-allowed disabled:opacity-60"
+              className="btn-primary flex w-full items-center justify-center gap-2 disabled:cursor-not-allowed disabled:opacity-60"
               onClick={() => setCreateFlowOpen(true)}
               disabled={!hasActivePage}
               title={
@@ -274,6 +274,7 @@ export default function App() {
                   : t('sidepanel_flows_disabled_read_only', 'Read-only mode without an active page.')
               }
             >
+              <Plus className="h-4 w-4" />
               {t('sidepanel_flows_create', 'Create flow')}
             </button>
           </div>
@@ -298,6 +299,8 @@ export default function App() {
           {activeTab === TAB_IDS.flows && (
             <FlowsSection
               siteKey={pageContext?.siteKey || ''}
+              pageUrl={pageContext?.url || ''}
+              tabId={pageContext?.tabId}
               hasActivePage={hasActivePage}
               createFlowOpen={createFlowOpen}
               onCreateFlowClose={() => setCreateFlowOpen(false)}

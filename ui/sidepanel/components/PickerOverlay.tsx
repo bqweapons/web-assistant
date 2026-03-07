@@ -1,3 +1,5 @@
+import { X } from 'lucide-react';
+
 type PickerOverlayProps = {
   title: string;
   hint: string;
@@ -20,7 +22,8 @@ export default function PickerOverlay({
         <p className="mt-2 text-xs text-muted-foreground">{hint}</p>
         {error ? <p className="mt-2 text-xs text-rose-600">{error}</p> : null}
         {onCancel && cancelLabel ? (
-          <button type="button" className="btn-ghost mt-3 h-8 px-3 text-xs" onClick={onCancel}>
+          <button type="button" className="btn-ghost mt-3 h-8 gap-1 px-3 text-xs" onClick={onCancel}>
+            <X className="h-3.5 w-3.5" />
             {cancelLabel}
           </button>
         ) : null}

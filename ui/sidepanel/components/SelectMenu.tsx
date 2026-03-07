@@ -40,6 +40,7 @@ export default function SelectMenu({
 }: SelectMenuProps) {
   const [open, setOpen] = useState(false);
   const [openUpward, setOpenUpward] = useState(false);
+  const [menuMaxHeight, setMenuMaxHeight] = useState<number | null>(null);
   const containerRef = useRef<HTMLDivElement | null>(null);
   const menuRef = useRef<HTMLDivElement | null>(null);
 
@@ -57,6 +58,7 @@ export default function SelectMenu({
   useEffect(() => {
     if (!open) {
       setOpenUpward(false);
+      setMenuMaxHeight(null);
       return;
     }
     const handlePointer = (event: MouseEvent | TouchEvent) => {
@@ -109,13 +111,17 @@ export default function SelectMenu({
         top: 0,
         bottom: window.innerHeight,
       };
+      const defaultMaxHeight = Math.min((boundaryRect.bottom - boundaryRect.top) * 0.6, 320);
       const spaceBelow = boundaryRect.bottom - rect.bottom;
       const spaceAbove = rect.top - boundaryRect.top;
       const menuHeight =
         menuRef.current?.getBoundingClientRect().height ??
-        Math.min((boundaryRect.bottom - boundaryRect.top) * 0.6, 320);
+        defaultMaxHeight;
       const shouldOpenUpward = spaceBelow < menuHeight && spaceAbove > spaceBelow;
+      const availableSpace = shouldOpenUpward ? spaceAbove : spaceBelow;
+      const nextMaxHeight = Math.max(Math.min(availableSpace - 8, defaultMaxHeight), 0);
       setOpenUpward(shouldOpenUpward);
+      setMenuMaxHeight(nextMaxHeight || defaultMaxHeight);
     };
     const scheduleUpdate = () => {
       window.cancelAnimationFrame(frameId);
@@ -161,7 +167,12 @@ export default function SelectMenu({
         {iconPosition === 'right' ? <ChevronDown className={iconClassName} /> : null}
       </button>
       {open ? (
-        <div ref={menuRef} className={menuClasses} role="listbox">
+        <div
+          ref={menuRef}
+          className={menuClasses}
+          role="listbox"
+          style={menuMaxHeight ? { maxHeight: `${menuMaxHeight}px` } : undefined}
+        >
           <div className="flex flex-col gap-1">
             {options.map((option) => {
               const isSelected = option.value === value;

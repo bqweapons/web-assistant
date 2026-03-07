@@ -1,11 +1,16 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import {
+  Crosshair,
   ChevronRight,
   Code2,
   GripVertical,
+  Keyboard,
+  Plus,
   Trash2,
+  Variable,
 } from 'lucide-react';
 import SelectMenu from './SelectMenu';
+import SegmentedTabs from './SegmentedTabs';
 import StepPicker from './StepPicker';
 import { t, useLocale } from '../utils/i18n';
 import type { SelectorPickerAccept } from '../../../shared/messages';
@@ -95,6 +100,65 @@ function AddStepPlaceholder({ label, ariaLabel, onPick, onDropReorder, canDrop }
 
 const DEFAULT_STEPS: StepData[] = [];
 
+const countNestedSteps = (items: StepData[]): number =>
+  items.reduce((total, step) => {
+    const childCount = Array.isArray(step.children) ? countNestedSteps(step.children) : 0;
+    const branchCount = Array.isArray(step.branches)
+      ? step.branches.reduce((branchTotal, branch) => branchTotal + countNestedSteps(branch.steps ?? []), 0)
+      : 0;
+    return total + 1 + childCount + branchCount;
+  }, 0);
+
+const VARIABLE_NAME_PATTERN = /^[A-Za-z_][0-9A-Za-z_]*$/;
+
+const collectVariableNames = (items: StepData[], seen = new Set<string>(), sink: string[] = []) => {
+  for (const step of items) {
+    if (step.type === 'set-variable') {
+      const rawName = getFieldValue(step, 'name').trim();
+      if (VARIABLE_NAME_PATTERN.test(rawName) && !seen.has(rawName)) {
+        seen.add(rawName);
+        sink.push(rawName);
+      }
+    }
+    if (Array.isArray(step.children) && step.children.length > 0) {
+      collectVariableNames(step.children, seen, sink);
+    }
+    if (Array.isArray(step.branches) && step.branches.length > 0) {
+      for (const branch of step.branches) {
+        collectVariableNames(branch.steps ?? [], seen, sink);
+      }
+    }
+  }
+  return sink;
+};
+
+const collectAncestorTypes = (
+  items: StepData[],
+  stepId: string,
+  ancestors: string[] = [],
+): string[] | null => {
+  for (const step of items) {
+    if (step.id === stepId) {
+      return ancestors;
+    }
+    if (Array.isArray(step.children) && step.children.length > 0) {
+      const nested = collectAncestorTypes(step.children, stepId, [...ancestors, step.type]);
+      if (nested) {
+        return nested;
+      }
+    }
+    if (Array.isArray(step.branches) && step.branches.length > 0) {
+      for (const branch of step.branches) {
+        const nested = collectAncestorTypes(branch.steps ?? [], stepId, [...ancestors, step.type]);
+        if (nested) {
+          return nested;
+        }
+      }
+    }
+  }
+  return null;
+};
+
 type FlowStepsBuilderProps = {
   steps?: StepData[];
   resetKey?: string | number;
@@ -116,6 +180,7 @@ export default function FlowStepsBuilder({
   const stepTypeLabels: Record<string, string> = {
     click: t('sidepanel_step_click_label', 'Click'),
     input: t('sidepanel_step_input_label', 'Input'),
+    'set-variable': t('sidepanel_step_set_variable_label', 'Set Variable'),
     popup: t('sidepanel_step_popup_label', 'Popup'),
     loop: t('sidepanel_step_loop_label', 'Loop'),
     'data-source': t('sidepanel_step_data_source_label', 'Data Source'),
@@ -128,6 +193,10 @@ export default function FlowStepsBuilder({
   const [activeStepId, setActiveStepId] = useState('');
   const [activeFieldTarget, setActiveFieldTarget] = useState<{ stepId: string; fieldId: string } | null>(null);
   const [transformEditorTarget, setTransformEditorTarget] = useState<{
+    stepId: string;
+    fieldId: string;
+  } | null>(null);
+  const [variablePickerTarget, setVariablePickerTarget] = useState<{
     stepId: string;
     fieldId: string;
   } | null>(null);
@@ -149,10 +218,20 @@ export default function FlowStepsBuilder({
     (_stepId: string, _fieldId: string) => (_node: HTMLInputElement | HTMLTextAreaElement | null) => undefined;
   const templateOptions = { waitModes, conditionOperators };
   const summarizeStep = (step: StepData) => buildStepSummary(step, conditionOperators);
+  const totalSteps = countNestedSteps(draftSteps);
+  const availableVariableNames = collectVariableNames(draftSteps);
 
   const getFieldLabel = (label: string) => {
     const key = FIELD_LABEL_KEYS[label];
     return key ? t(key, label) : label;
+  };
+
+  const getVariableTokenPreview = (step: StepData) => {
+    const rawName = getFieldValue(step, 'name').trim();
+    if (/^[A-Za-z_][0-9A-Za-z_]*$/.test(rawName)) {
+      return `{{var.${rawName}}}`;
+    }
+    return '{{var.name}}';
   };
 
   const resolveFieldOptions = (step: StepData, field: StepField) => {
@@ -184,10 +263,9 @@ export default function FlowStepsBuilder({
 
   useEffect(() => {
     if (typeof resetKey !== 'undefined') {
-      if (appliedResetKeyRef.current === resetKey) {
-        return;
+      if (appliedResetKeyRef.current !== resetKey) {
+        appliedResetKeyRef.current = resetKey;
       }
-      appliedResetKeyRef.current = resetKey;
     }
     syncingFromPropsRef.current = true;
     setDraftSteps(steps);
@@ -198,6 +276,7 @@ export default function FlowStepsBuilder({
       return '';
     });
     setTransformEditorTarget(null);
+    setVariablePickerTarget(null);
   }, [resetKey, steps]);
 
   useEffect(() => {
@@ -311,6 +390,7 @@ export default function FlowStepsBuilder({
       return next;
     });
     setTransformEditorTarget((prev) => (prev?.stepId === stepId ? null : prev));
+    setVariablePickerTarget((prev) => (prev?.stepId === stepId ? null : prev));
   };
 
   const normalizeColumnToken = (column: string) => {
@@ -387,6 +467,84 @@ export default function FlowStepsBuilder({
     );
     setActiveStepId(stepId);
     setActiveFieldTarget({ stepId, fieldId });
+    setVariablePickerTarget(null);
+  };
+
+  const renderVariableShortcutButton = (
+    stepId: string,
+    fieldId: string,
+    options?: { disabled?: boolean },
+  ) => {
+    const ancestorTypes = collectAncestorTypes(draftSteps, stepId) ?? [];
+    const shortcutItems: Array<{ key: string; token: string; label: string }> = [];
+    if (ancestorTypes.includes('loop')) {
+      shortcutItems.push({
+        key: 'loop-index',
+        token: '{{loop.index}}',
+        label: t('sidepanel_step_input_shortcut_loop_index', 'Loop index'),
+      });
+    }
+    if (ancestorTypes.includes('data-source')) {
+      shortcutItems.push({
+        key: 'row-index',
+        token: '{{row.index}}',
+        label: t('sidepanel_step_input_shortcut_row_index', 'Row index'),
+      });
+    }
+    availableVariableNames.forEach((variableName) => {
+      shortcutItems.push({
+        key: `var-${variableName}`,
+        token: `{{var.${variableName}}}`,
+        label: variableName,
+      });
+    });
+    const isOpen =
+      variablePickerTarget?.stepId === stepId && variablePickerTarget.fieldId === fieldId;
+    const disabled = options?.disabled === true || shortcutItems.length === 0;
+    return (
+      <div className="relative">
+        <button
+          type="button"
+          className={`btn-icon h-7 w-7 ${isOpen ? 'bg-primary/15 text-primary' : ''}`}
+          title={t('sidepanel_step_input_shortcut_variable', 'Insert variable')}
+          aria-label={t('sidepanel_step_input_shortcut_variable', 'Insert variable')}
+          disabled={disabled}
+          onClick={(event) => {
+            event.preventDefault();
+            event.stopPropagation();
+            if (disabled) {
+              return;
+            }
+            setVariablePickerTarget((current) =>
+              current?.stepId === stepId && current.fieldId === fieldId ? null : { stepId, fieldId },
+            );
+          }}
+        >
+          <Variable className="h-3.5 w-3.5" />
+        </button>
+        {isOpen ? (
+          <div className="absolute left-0 top-full z-10 mt-1 min-w-36 rounded border border-border bg-card p-1 shadow-md">
+            <div className="grid gap-1">
+              {shortcutItems.map((item) => (
+                <button
+                  key={item.key}
+                  type="button"
+                  className="rounded px-2 py-1 text-left text-[11px] text-card-foreground transition hover:bg-muted"
+                  onClick={(event) => {
+                    event.preventDefault();
+                    event.stopPropagation();
+                    insertInputValueShortcut(stepId, fieldId, item.token);
+                    setVariablePickerTarget(null);
+                  }}
+                >
+                  {item.label}
+                </button>
+              ))}
+            </div>
+          </div>
+        ) : null}
+      </div>
+    );
   };
 
   const updateFieldTransform = (
@@ -587,7 +745,39 @@ export default function FlowStepsBuilder({
                       .filter((field) => !(isDataSource && field.id === 'headerRow'));
                     if (step.type !== 'wait') {
                       return visibleFields.map((field) => {
-                        const useLabelWrapper = !(step.type === 'input' && field.id === 'value');
+                        const isSetVariableSourceMode =
+                          step.type === 'set-variable' && field.id === 'sourceMode';
+                        if (isSetVariableSourceMode) {
+                          const sourceModeValue = field.value === 'selector' ? 'selector' : 'value';
+                          return (
+                            <div key={field.id} className="grid gap-1">
+                              <SegmentedTabs
+                                value={sourceModeValue}
+                                options={[
+                                  {
+                                    value: 'value',
+                                    icon: <Keyboard className="h-3.5 w-3.5" />,
+                                    label: t('sidepanel_field_value', 'Value'),
+                                  },
+                                  {
+                                    value: 'selector',
+                                    icon: <Crosshair className="h-3.5 w-3.5" />,
+                                    label: t('sidepanel_field_selector', 'Selector'),
+                                  },
+                                ]}
+                                onChange={(value) => {
+                                  updateField(step.id, field.id, value);
+                                }}
+                              />
+                            </div>
+                          );
+                        }
+                        const useInputValueEditor = step.type === 'input' && field.id === 'value';
+                        const useSetVariableValueEditor = step.type === 'set-variable' && field.id === 'value';
+                        const usePopupMessageEditor = step.type === 'popup' && field.id === 'message';
+                        const useRuntimeValueEditor =
+                          useInputValueEditor || useSetVariableValueEditor || usePopupMessageEditor;
+                        const useLabelWrapper = !useRuntimeValueEditor;
                         const FieldWrapper = (useLabelWrapper ? 'label' : 'div') as 'label' | 'div';
                         return (
                         <FieldWrapper key={field.id} className="grid gap-1">
@@ -596,7 +786,7 @@ export default function FlowStepsBuilder({
                           </span>
                           <div className="flex min-w-0 items-center gap-2">
                             {(() => {
-                              if (step.type === 'input' && field.id === 'value') {
+                              if (useInputValueEditor) {
                                 const hasTransform = Boolean(
                                   field.transform?.mode === 'js' && field.transform.code.trim(),
                                 );
@@ -648,6 +838,7 @@ export default function FlowStepsBuilder({
                                             </button>
                                           );
                                         })}
+                                        {renderVariableShortcutButton(step.id, field.id)}
                                         <button
                                           type="button"
                                           className={`btn-icon h-7 w-7 ${hasTransform || transformEditorOpen ? 'bg-primary/15 text-primary' : ''}`}
@@ -740,11 +931,185 @@ export default function FlowStepsBuilder({
                                         <p className="text-[10px] text-muted-foreground">
                                           {t(
                                             'sidepanel_step_input_transform_hint',
-                                            'Use input, row, now, helpers and return the final string.',
+                                            'Use input, row, loop, vars, now, helpers and return the final string.',
                                           )}
                                         </p>
                                       </div>
                                     ) : null}
+                                  </div>
+                                );
+                              }
+                              if (useSetVariableValueEditor) {
+                                const hasTransform = Boolean(
+                                  field.transform?.mode === 'js' && field.transform.code.trim(),
+                                );
+                                const transformEditorOpen =
+                                  transformEditorTarget?.stepId === step.id &&
+                                  transformEditorTarget.fieldId === field.id;
+                                const transformConfig = ensureJsTransform(field.transform);
+                                const usingSelectorSource = getFieldValue(step, 'sourceMode') === 'selector';
+                                return (
+                                  <div className="grid w-full gap-1.5">
+                                    <input
+                                      ref={setFieldInputRef(step.id, field.id)}
+                                      data-flow-step-id={step.id}
+                                      data-flow-field-id={field.id}
+                                      className="input min-w-0"
+                                      type="text"
+                                      value={field.value}
+                                      onChange={(event) => updateField(step.id, field.id, event.target.value)}
+                                      placeholder={field.placeholder}
+                                      onFocus={() => setActiveFieldTarget({ stepId: step.id, fieldId: field.id })}
+                                      disabled={usingSelectorSource}
+                                    />
+                                    <div className="flex flex-wrap items-center gap-1">
+                                      {inputValueShortcuts.map((shortcut) => {
+                                        const Icon = shortcut.icon;
+                                        return (
+                                          <button
+                                            key={shortcut.id}
+                                            type="button"
+                                            className="btn-icon h-7 w-7"
+                                            title={shortcut.label}
+                                            aria-label={shortcut.label}
+                                            onClick={(event) => {
+                                              event.preventDefault();
+                                              event.stopPropagation();
+                                              insertInputValueShortcut(step.id, field.id, shortcut.token);
+                                            }}
+                                            disabled={usingSelectorSource}
+                                          >
+                                            <Icon className="h-3.5 w-3.5" />
+                                          </button>
+                                        );
+                                      })}
+                                      {renderVariableShortcutButton(step.id, field.id, {
+                                        disabled: usingSelectorSource,
+                                      })}
+                                      <button
+                                        type="button"
+                                        className={`btn-icon h-7 w-7 ${hasTransform || transformEditorOpen ? 'bg-primary/15 text-primary' : ''}`}
+                                        title={t('sidepanel_step_input_transform_edit', 'Edit JS transform')}
+                                        aria-label={t('sidepanel_step_input_transform_edit', 'Edit JS transform')}
+                                        onClick={(event) => {
+                                          event.preventDefault();
+                                          event.stopPropagation();
+                                          toggleTransformEditor(step.id, field.id);
+                                        }}
+                                      >
+                                        <Code2 className="h-3.5 w-3.5" />
+                                      </button>
+                                    </div>
+                                    {usingSelectorSource ? (
+                                      <p className="text-[10px] text-muted-foreground">
+                                        {t(
+                                          'sidepanel_step_set_variable_selector_hint',
+                                          'Use the tabs to switch between Value input and Selector source.',
+                                        )}
+                                      </p>
+                                    ) : null}
+                                    {transformEditorOpen ? (
+                                      <div className="grid gap-2 rounded-md border border-border bg-muted/30 p-2">
+                                        <label className="flex items-center gap-2 text-[11px] text-muted-foreground">
+                                          <input
+                                            type="checkbox"
+                                            className="h-3.5 w-3.5"
+                                            checked={transformConfig.enabled !== false}
+                                            onChange={(event) =>
+                                              updateFieldTransform(step.id, field.id, (current) => ({
+                                                ...ensureJsTransform(current),
+                                                enabled: event.target.checked,
+                                              }))
+                                            }
+                                          />
+                                          <span>
+                                            {t(
+                                              'sidepanel_step_input_transform_enabled',
+                                              'Enable JS transform at runtime',
+                                            )}
+                                          </span>
+                                        </label>
+                                        <div className="flex flex-wrap items-center gap-1">
+                                          {transformCodeShortcuts.map((shortcut) => {
+                                            const Icon = shortcut.icon;
+                                            return (
+                                              <button
+                                                key={shortcut.id}
+                                                type="button"
+                                                className="btn-icon h-7 w-7"
+                                                title={shortcut.label}
+                                                aria-label={shortcut.label}
+                                                onClick={(event) => {
+                                                  event.preventDefault();
+                                                  event.stopPropagation();
+                                                  applyTransformSnippet(step.id, field.id, shortcut.code);
+                                                }}
+                                              >
+                                                <Icon className="h-3.5 w-3.5" />
+                                              </button>
+                                            );
+                                          })}
+                                        </div>
+                                        <textarea
+                                          className="input h-24 min-w-0 font-mono text-[11px]"
+                                          value={transformConfig.code}
+                                          onChange={(event) =>
+                                            updateFieldTransform(step.id, field.id, (current) => ({
+                                              ...ensureJsTransform(current),
+                                              code: event.target.value,
+                                            }))
+                                          }
+                                          placeholder="return input;"
+                                        />
+                                        <label className="grid grid-cols-[auto,minmax(0,1fr)] items-center gap-2 text-[11px] text-muted-foreground">
+                                          <span>{t('sidepanel_step_input_transform_timeout', 'Timeout (ms)')}</span>
+                                          <input
+                                            className="input h-8 min-w-0"
+                                            type="number"
+                                            min={50}
+                                            max={5000}
+                                            value={String(transformConfig.timeoutMs ?? 300)}
+                                            onChange={(event) =>
+                                              updateFieldTransform(step.id, field.id, (current) => {
+                                                const parsed = Number.parseInt(event.target.value, 10);
+                                                const timeoutMs =
+                                                  Number.isFinite(parsed) && parsed > 0 ? parsed : 300;
+                                                return {
+                                                  ...ensureJsTransform(current),
+                                                  timeoutMs,
+                                                };
+                                              })
+                                            }
+                                          />
+                                        </label>
+                                        <p className="text-[10px] text-muted-foreground">
+                                          {t(
+                                            'sidepanel_step_input_transform_hint',
+                                            'Use input, row, loop, vars, now, helpers and return the final string.',
+                                          )}
+                                        </p>
+                                      </div>
+                                    ) : null}
+                                  </div>
+                                );
+                              }
+                              if (usePopupMessageEditor) {
+                                return (
+                                  <div className="grid w-full gap-1.5">
+                                    <input
+                                      ref={setFieldInputRef(step.id, field.id)}
+                                      data-flow-step-id={step.id}
+                                      data-flow-field-id={field.id}
+                                      className="input min-w-0"
+                                      type="text"
+                                      value={field.value}
+                                      onChange={(event) => updateField(step.id, field.id, event.target.value)}
+                                      placeholder={field.placeholder}
+                                      onFocus={() => setActiveFieldTarget({ stepId: step.id, fieldId: field.id })}
+                                    />
+                                    <div className="flex flex-wrap items-center gap-1">
+                                      {renderVariableShortcutButton(step.id, field.id)}
+                                    </div>
                                   </div>
                                 );
                               }
@@ -857,6 +1222,21 @@ export default function FlowStepsBuilder({
                     });
                     return rendered;
                   })()}
+                  {step.type === 'set-variable' ? (
+                    <div className="grid gap-1">
+                      <p className="text-[11px] text-muted-foreground">
+                        {t('sidepanel_step_set_variable_hint', 'Later steps can read this value with')}
+                        <span> </span>
+                        <code>{getVariableTokenPreview(step)}</code>.
+                      </p>
+                      <p className="text-[11px] text-muted-foreground">
+                        {t(
+                          'sidepanel_step_set_variable_selector_hint',
+                          'Use the tabs to switch between Value input and Selector source.',
+                        )}
+                      </p>
+                    </div>
+                  ) : null}
                   {isDataSource ? (
                     <div className="grid gap-2">
                       <label className="grid gap-1">
@@ -917,10 +1297,11 @@ export default function FlowStepsBuilder({
                               <button
                                 key={column}
                                 type="button"
-                                className="btn-ghost h-7 px-2 text-[10px]"
+                                className="btn-ghost h-7 gap-1 px-2 text-[10px]"
                                 onClick={() => insertColumnToken(column, step.id)}
                                 title={t('sidepanel_steps_insert_column', 'Insert {column}').replace('{column}', column)}
                               >
+                                <Plus className="h-3 w-3" />
                                 {column}
                               </button>
                             ))}
@@ -934,6 +1315,13 @@ export default function FlowStepsBuilder({
                           {t('sidepanel_steps_columns_hint', 'Click a column to create an Input step with')}
                           <span> </span>
                           <code>{'{{row.column}}'}</code>.
+                        </p>
+                        <p className="text-[11px] text-muted-foreground">
+                          {t('sidepanel_steps_row_index_hint', 'Use')}
+                          <span> </span>
+                          <code>{'{{row.index}}'}</code>
+                          <span> </span>
+                          {t('sidepanel_steps_row_index_hint_suffix', 'for the current 0-based row index.')}
                         </p>
                       </div>
                     </div>
@@ -973,6 +1361,15 @@ export default function FlowStepsBuilder({
                     </span>
                   )}
                 </div>
+                {isLoop ? (
+                  <p className="mt-2 text-[11px] text-muted-foreground">
+                    {t('sidepanel_step_loop_hint', 'Nested steps can use')}
+                    <span> </span>
+                    <code>{'{{loop.index}}'}</code>
+                    <span> </span>
+                    {t('sidepanel_step_loop_hint_suffix', 'for the current 0-based loop index.')}
+                  </p>
+                ) : null}
                 {!isCollapsed ? (
                   <div className="mt-2">
                     {renderStepList(step.children ?? [], depth + 1, {
@@ -1073,6 +1470,9 @@ export default function FlowStepsBuilder({
       <div className="flex items-center justify-between">
         <span className="text-xs font-semibold text-muted-foreground">
           {t('sidepanel_steps_title', 'Steps')}
+        </span>
+        <span className="badge-pill text-[10px]">
+          {t('sidepanel_steps_count', '{count} steps').replace('{count}', String(totalSteps))}
         </span>
       </div>
       <div className="max-h-[35.5vh] overflow-x-hidden overflow-y-auto pr-1" data-step-scroll>

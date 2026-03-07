@@ -1,4 +1,5 @@
 import { useEffect, useId, useRef } from 'react';
+import { AlertTriangle, Check, X } from 'lucide-react';
 import { t } from '../utils/i18n';
 
 type ConfirmDialogProps = {
@@ -8,6 +9,7 @@ type ConfirmDialogProps = {
   confirmLabel?: string;
   cancelLabel?: string;
   danger?: boolean;
+  zIndexBase?: number;
   onConfirm: () => void;
   onCancel: () => void;
 };
@@ -19,6 +21,7 @@ export default function ConfirmDialog({
   confirmLabel,
   cancelLabel,
   danger = false,
+  zIndexBase = 100,
   onConfirm,
   onCancel,
 }: ConfirmDialogProps) {
@@ -55,10 +58,11 @@ export default function ConfirmDialog({
       <button
         type="button"
         className="fixed inset-0 z-[90] bg-black/40"
+        style={{ zIndex: zIndexBase - 10 }}
         onClick={onCancel}
         aria-label={t('sidepanel_action_cancel', 'Cancel')}
       />
-      <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
+      <div className="fixed inset-0 flex items-center justify-center p-4" style={{ zIndex: zIndexBase }}>
         <div
           ref={panelRef}
           role="dialog"
@@ -75,14 +79,16 @@ export default function ConfirmDialog({
             {message}
           </p>
           <div className="mt-4 flex items-center justify-end gap-2">
-            <button type="button" className="btn-ghost h-8 px-3 text-xs" onClick={onCancel}>
+            <button type="button" className="btn-ghost h-8 gap-1 px-3 text-xs" onClick={onCancel}>
+              <X className="h-3.5 w-3.5" />
               {cancelLabel || t('sidepanel_action_cancel', 'Cancel')}
             </button>
             <button
               type="button"
-              className={`h-8 px-3 text-xs ${danger ? 'btn-icon-danger btn-ghost' : 'btn-primary'}`}
+              className={`h-8 gap-1 px-3 text-xs ${danger ? 'btn-icon-danger btn-ghost' : 'btn-primary'}`}
               onClick={onConfirm}
             >
+              {danger ? <AlertTriangle className="h-3.5 w-3.5" /> : <Check className="h-3.5 w-3.5" />}
               {confirmLabel || t('sidepanel_action_delete', 'Delete')}
             </button>
           </div>

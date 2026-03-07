@@ -1,3 +1,4 @@
+import { Check, ChevronRight } from 'lucide-react';
 import type { AppHeaderProps } from '../types';
 import TabBar from './TabBar';
 import { t } from '../utils/i18n';
@@ -36,9 +37,14 @@ export default function AppHeader({ title, context, actions, tabs, activeTabId, 
                 <button
                   key={action.label}
                   type="button"
-                  className={action.variant === 'primary' ? 'btn-primary' : 'btn-ghost'}
+                  className={(action.variant === 'primary' ? 'btn-primary' : 'btn-ghost') + ' gap-1'}
                   onClick={action.onClick}
                 >
+                  {action.variant === 'primary' ? (
+                    <Check className="h-3.5 w-3.5" />
+                  ) : (
+                    <ChevronRight className="h-3.5 w-3.5" />
+                  )}
                   {action.label}
                 </button>
               )

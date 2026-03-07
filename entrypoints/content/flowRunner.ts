@@ -579,6 +579,32 @@ const executePopup = async (payload: FlowRunExecuteStepPayload): Promise<FlowRun
   });
 };
 
+const executeRead = async (payload: FlowRunExecuteStepPayload): Promise<FlowRunExecuteResultPayload> => {
+  const selector = normalizeText(payload.selector);
+  if (!selector) {
+    return buildBaseResult(payload, { errorCode: 'missing-selector', error: 'Selector is required.' });
+  }
+  const timeoutMs = payload.timeoutMs ?? DEFAULT_ACTION_TIMEOUT_MS;
+  const pollIntervalMs = payload.pollIntervalMs ?? DEFAULT_POLL_INTERVAL_MS;
+  const queried = await waitForSelector(selector, timeoutMs, pollIntervalMs);
+  if (queried.errorCode) {
+    return buildBaseResult(payload, { errorCode: queried.errorCode, error: 'Selector is invalid.' });
+  }
+  if (!queried.element) {
+    return buildBaseResult(payload, { errorCode: 'selector-not-found', error: 'Element not found.' });
+  }
+  const actual = readElementValue(queried.element);
+  return buildBaseResult(payload, {
+    ok: true,
+    actual,
+    details: {
+      selector,
+      fieldName: getElementLabel(queried.element),
+      actual,
+    },
+  });
+};
+
 const evaluateConditionFromElement = (
   payload: FlowRunExecuteStepPayload,
   element: Element,
@@ -738,6 +764,7 @@ const executeByType: Record<
   click: executeClick,
   input: executeInput,
   popup: executePopup,
+  read: executeRead,
   wait: executeWait,
   assert: executeAssert,
   condition: executeCondition,

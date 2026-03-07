@@ -1,4 +1,5 @@
 import { normalizeFlowSteps } from './flowStepMigration';
+import { normalizeGlobalSettings, type GlobalSettings } from './globalSettings';
 import {
   buildDefaultSiteUrl,
   deriveSiteKey,
@@ -14,19 +15,21 @@ import {
   stableStringify,
 } from './siteDataUtils';
 
-const CANONICAL_EXPORT_VERSION = '1.0.2';
+const CANONICAL_EXPORT_VERSION = '1.0.3';
 export const EXPORT_JSON_VERSION = CANONICAL_EXPORT_VERSION;
-const COMPATIBLE_IMPORT_VERSIONS = new Set<string>([EXPORT_JSON_VERSION]);
+const COMPATIBLE_IMPORT_VERSIONS = new Set<string>(['1.0.2', EXPORT_JSON_VERSION]);
 
 type JsonRecord = Record<string, unknown>;
 
 export type ExportPayload = {
   version: typeof EXPORT_JSON_VERSION;
   sites: Record<string, StructuredSiteData>;
+  settings?: GlobalSettings;
 };
 
 export type BuildExportPayloadOptions = {
   redactLiteralInputs?: boolean;
+  settings?: GlobalSettings;
 };
 
 export type ImportSummary = {
@@ -40,6 +43,7 @@ export type ImportSummary = {
 
 export type ParsedImportPayload = {
   sites: Record<string, StructuredSiteData>;
+  settings?: GlobalSettings;
   summary: ImportSummary;
 };
 
@@ -410,10 +414,12 @@ const buildParsedResultFromSites = (
   sites: Record<string, StructuredSiteData>,
   sourceVersion: string,
   warnings: string[],
+  settings?: GlobalSettings,
 ): ParsedImportPayload => {
   const summary = countSitesData(sites);
   return {
     sites,
+    settings,
     summary: {
       sourceVersion,
       ...summary,
@@ -432,7 +438,8 @@ const parseVersionedPayload = (raw: JsonRecord): ParsedImportPayload => {
     warnings.push(`Imported unknown payload version "${version}" using compatibility normalization.`);
   }
   const sites = normalizeSitesObject(raw.sites);
-  return buildParsedResultFromSites(sites, version, warnings);
+  const settings = isRecord(raw.settings) ? normalizeGlobalSettings(raw.settings) : undefined;
+  return buildParsedResultFromSites(sites, version, warnings, settings);
 };
 
 const parseUnversionedSitesPayload = (raw: JsonRecord): ParsedImportPayload => {
@@ -440,9 +447,10 @@ const parseUnversionedSitesPayload = (raw: JsonRecord): ParsedImportPayload => {
     throw new Error('Invalid import payload: "sites" must be an object.');
   }
   const sites = normalizeSitesObject(raw.sites);
+  const settings = isRecord(raw.settings) ? normalizeGlobalSettings(raw.settings) : undefined;
   return buildParsedResultFromSites(sites, 'unversioned', [
     'Imported unversioned payload and normalized to canonical schema.',
-  ]);
+  ], settings);
 };
 
 const parseLegacyPayload = (raw: Record<string, unknown[]>): ParsedImportPayload => {
@@ -562,6 +570,7 @@ export const buildExportPayload = (
   return {
     version: EXPORT_JSON_VERSION,
     sites: exportSites,
+    settings: options?.settings ? normalizeGlobalSettings(options.settings) : undefined,
   };
 };
 

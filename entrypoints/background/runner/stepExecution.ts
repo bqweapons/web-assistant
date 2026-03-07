@@ -31,6 +31,7 @@ import {
   microYield,
   toNonNegativeInteger,
   truncateForLog,
+  type FlowRenderContext,
   type FlowRowContext,
 } from './tokenRenderer';
 
@@ -45,6 +46,7 @@ const STEP_RESULT_WAIT_GRACE_MS = 1_200;
 const STEP_RESULT_WAIT_MIN_MS = 1_000;
 const ENABLE_EVENT_DRIVEN_RECOVERY = true;
 const MAX_RUN_LOG_ENTRIES = 500;
+const VARIABLE_NAME_PATTERN = /^[A-Za-z_][0-9A-Za-z_]*$/;
 
 type FlowRunError = {
   code: string;
@@ -93,6 +95,7 @@ type FlowRunInternal = {
   lastStatusPushAt: number;
   logs: FlowRunLogEntry[];
   logSequence: number;
+  variables: Record<string, string>;
   statusTimer?: ReturnType<typeof setTimeout>;
   cleanupTimer?: ReturnType<typeof setTimeout>;
   inFlightAtomic?: InFlightAtomicStep;
@@ -118,7 +121,8 @@ const estimateFlowStep = (step: FlowStepData): number => {
     step.type === 'wait' ||
     step.type === 'assert' ||
     step.type === 'popup' ||
-    step.type === 'navigate'
+    step.type === 'navigate' ||
+    step.type === 'set-variable'
   ) {
     return 1;
   }
@@ -313,6 +317,7 @@ export class FlowRunnerManager {
       lastStatusPushAt: 0,
       logs: [],
       logSequence: 0,
+      variables: {},
     };
     this.runs.set(runId, run);
     this.activeRunByTab.set(tabId, runId);
@@ -539,6 +544,7 @@ export class FlowRunnerManager {
     }
     const isRetryableStep =
       inFlight.stepType === 'input' ||
+      inFlight.stepType === 'read' ||
       inFlight.stepType === 'wait' ||
       inFlight.stepType === 'assert' ||
       inFlight.stepType === 'condition' ||
@@ -603,6 +609,9 @@ export class FlowRunnerManager {
     if (stepType === 'popup') {
       return `Show popup "${truncateForLog(payload.message || '')}".`;
     }
+    if (stepType === 'read') {
+      return `Read value from "${truncateForLog(payload.selector || '')}".`;
+    }
     if (stepType === 'condition') {
       return `Check condition on "${truncateForLog(payload.selector || '')}".`;
     }
@@ -640,6 +649,9 @@ export class FlowRunnerManager {
     }
     if (stepType === 'popup') {
       return `Popup shown: "${truncateForLog(payload.message || details?.popupMessage || '')}".`;
+    }
+    if (stepType === 'read') {
+      return `Read completed from ${truncateForLog(payload.selector || '')}.`;
     }
     if (stepType === 'condition') {
       return result.conditionMatched ? 'Condition matched.' : 'Condition not matched.';
@@ -798,7 +810,7 @@ export class FlowRunnerManager {
     this.appendLog(run, 'info', 'Run started.');
     this.emitStatus(run, true);
     try {
-      await this.executeSteps(run, run.flow.steps);
+      await this.executeSteps(run, run.flow.steps, this.createRenderContext(run));
       if (run.cancelRequested) {
         this.finalizeRun(run, 'cancelled');
         return;
@@ -820,7 +832,32 @@ export class FlowRunnerManager {
     }
   }
 
-  private async executeSteps(run: FlowRunInternal, steps: FlowStepData[], row?: FlowRowContext) {
+  private createRenderContext(
+    run: FlowRunInternal,
+    context?: Partial<Omit<FlowRenderContext, 'variables'>>,
+  ): FlowRenderContext {
+    return {
+      row: context?.row,
+      loop: context?.loop,
+      variables: run.variables,
+    };
+  }
+
+  private withLoopContext(run: FlowRunInternal, context: FlowRenderContext, index: number): FlowRenderContext {
+    return this.createRenderContext(run, {
+      row: context.row,
+      loop: { index },
+    });
+  }
+
+  private withRowContext(run: FlowRunInternal, context: FlowRenderContext, row: FlowRowContext): FlowRenderContext {
+    return this.createRenderContext(run, {
+      row,
+      loop: context.loop,
+    });
+  }
+
+  private async executeSteps(run: FlowRunInternal, steps: FlowStepData[], context: FlowRenderContext) {
     for (const step of steps) {
       this.ensureRunHealthy(run);
       run.currentStepId = step.id;
@@ -829,38 +866,42 @@ export class FlowRunnerManager {
         stepType: step.type as FlowRunLogEntry['stepType'],
       });
       this.emitStatus(run, false);
-      await this.executeStep(run, step, row);
+      await this.executeStep(run, step, context);
     }
   }
 
-  private async executeStep(run: FlowRunInternal, step: FlowStepData, row?: FlowRowContext) {
+  private async executeStep(run: FlowRunInternal, step: FlowStepData, context: FlowRenderContext) {
     if (step.type === 'click') {
-      await this.executeAtomicStep(run, step, 'click', row);
+      await this.executeAtomicStep(run, step, 'click', context);
       return;
     }
     if (step.type === 'input') {
-      await this.executeAtomicStep(run, step, 'input', row);
+      await this.executeAtomicStep(run, step, 'input', context);
       return;
     }
     if (step.type === 'wait') {
-      await this.executeAtomicStep(run, step, 'wait', row);
+      await this.executeAtomicStep(run, step, 'wait', context);
       return;
     }
     if (step.type === 'assert') {
-      await this.executeAtomicStep(run, step, 'assert', row);
+      await this.executeAtomicStep(run, step, 'assert', context);
       return;
     }
     if (step.type === 'popup') {
-      await this.executeAtomicStep(run, step, 'popup', row);
+      await this.executeAtomicStep(run, step, 'popup', context);
       return;
     }
     if (step.type === 'navigate') {
-      await this.executeNavigateStep(run, step, row);
+      await this.executeNavigateStep(run, step, context);
       this.markStepCompleted(run);
       return;
     }
+    if (step.type === 'set-variable') {
+      await this.executeSetVariableStep(run, step, context);
+      return;
+    }
     if (step.type === 'loop') {
-      const iterationsValue = getRenderedStepFieldValue(step, 'iterations', row);
+      const iterationsValue = getRenderedStepFieldValue(step, 'iterations', context);
       const iterations = toNonNegativeInteger(iterationsValue, -1);
       if (iterations < 0) {
         throw new RunnerError('invalid-loop-iterations', 'Loop iterations must be a non-negative integer.');
@@ -876,45 +917,211 @@ export class FlowRunnerManager {
           stepId: step.id,
           stepType: 'loop',
         });
-        await this.executeSteps(run, children, row);
+        await this.executeSteps(run, children, this.withLoopContext(run, context, index));
       }
       return;
     }
     if (step.type === 'if-else') {
-      const condition = await this.executeConditionStep(run, step, row);
+      const condition = await this.executeConditionStep(run, step, context);
       const branches = selectIfElseBranches(step);
       this.appendLog(run, 'info', `If/Else branch: ${condition ? 'then' : 'else'}.`, {
         stepId: step.id,
         stepType: 'if-else',
       });
       if (condition) {
-        await this.executeSteps(run, branches.thenSteps, row);
+        await this.executeSteps(run, branches.thenSteps, context);
       } else {
-        await this.executeSteps(run, branches.elseSteps, row);
+        await this.executeSteps(run, branches.elseSteps, context);
       }
       return;
     }
     if (step.type === 'data-source') {
-      await this.executeDataSourceStep(run, step, row);
+      await this.executeDataSourceStep(run, step, context);
       return;
     }
     throw new RunnerError('unsupported-step-type', `Unsupported step type: ${step.type}`);
+  }
+
+  private async executeSetVariableStep(run: FlowRunInternal, step: FlowStepData, context: FlowRenderContext) {
+    const variableName = getStepFieldRawValue(step, 'name').trim();
+    if (!VARIABLE_NAME_PATTERN.test(variableName)) {
+      throw new RunnerError(
+        'invalid-variable-name',
+        'Variable name must start with a letter or underscore and contain only letters, numbers, or underscores.',
+        { phase: 'execute', recoverable: false },
+      );
+    }
+    this.appendLog(run, 'info', `Set variable "${truncateForLog(variableName)}".`, {
+      stepId: step.id,
+      stepType: 'set-variable',
+    });
+    let resolvedValue = '';
+    const selectorValue = getStepFieldRawValue(step, 'selector').trim();
+    const sourceModeRaw = getStepFieldRawValue(step, 'sourceMode').trim();
+    const sourceMode =
+      sourceModeRaw === 'selector' || sourceModeRaw === 'value'
+        ? sourceModeRaw
+        : selectorValue
+          ? 'selector'
+          : 'value';
+    if (sourceMode === 'selector') {
+      const readPayload = await this.buildReadPayload(run, step, context);
+      const result = await this.invokeContentStep(run, readPayload);
+      if (!result.ok) {
+        this.appendLog(
+          run,
+          'error',
+          `Variable read failed: ${result.error || result.errorCode || 'execution failed'}.`,
+          { stepId: step.id, stepType: 'set-variable' },
+        );
+        throw new RunnerError(
+          result.errorCode || 'step-execution-failed',
+          result.error || 'Step execution failed.',
+          { phase: 'execute', recoverable: false },
+        );
+      }
+      resolvedValue = result.actual || '';
+    } else {
+      resolvedValue = await this.resolveStepFieldValueWithVaultUnlock(
+        run,
+        step,
+        'value',
+        context,
+        'set-variable',
+      );
+    }
+    context.variables[variableName] = resolvedValue;
+    this.appendLog(run, 'success', `Variable "${truncateForLog(variableName)}" updated.`, {
+      stepId: step.id,
+      stepType: 'set-variable',
+    });
+    this.markStepCompleted(run);
+  }
+
+  private async buildReadPayload(
+    run: FlowRunInternal,
+    step: FlowStepData,
+    context: FlowRenderContext,
+  ): Promise<FlowRunExecuteStepPayload> {
+    const selector = await this.resolveStepFieldValueWithVaultUnlock(
+      run,
+      step,
+      'selector',
+      context,
+      'set-variable',
+    );
+    return {
+      runId: '',
+      requestId: '',
+      attempt: 0,
+      stepId: step.id,
+      stepType: 'read',
+      selector,
+      timeoutMs: STEP_ACTION_TIMEOUT_MS,
+      pollIntervalMs: CONDITION_POLL_INTERVAL_MS,
+    };
+  }
+
+  private async resolveStepFieldValueWithVaultUnlock(
+    run: FlowRunInternal,
+    step: FlowStepData,
+    fieldId: string,
+    context: FlowRenderContext,
+    stepType: FlowRunLogEntry['stepType'],
+  ) {
+    try {
+      return await this.resolveStepFieldValue(step, fieldId, context);
+    } catch (error) {
+      if (!(error instanceof RunnerError) || error.code !== 'secret-vault-locked') {
+        throw error;
+      }
+    }
+
+    let promptAttempt = 0;
+    let promptErrorMessage = '';
+    while (true) {
+      this.ensureRunHealthy(run);
+      promptAttempt += 1;
+      this.appendLog(run, 'info', 'Waiting for password vault unlock on page.', {
+        stepId: step.id,
+        stepType,
+      });
+      const promptResult = await this.requestVaultUnlockPromptOnPage(run, step, {
+        attempt: promptAttempt,
+        errorMessage: promptErrorMessage || undefined,
+      });
+
+      if (promptResult.action === 'cancel') {
+        this.appendLog(run, 'info', 'Vault unlock cancelled by user.', {
+          stepId: step.id,
+          stepType,
+        });
+        throw new RunnerError(
+          'secret-vault-unlock-cancelled',
+          'Password vault unlock was cancelled by the user.',
+          { phase: 'execute', recoverable: false },
+        );
+      }
+      if (promptResult.action === 'navigation') {
+        this.appendLog(run, 'info', 'Vault unlock prompt interrupted by navigation.', {
+          stepId: step.id,
+          stepType,
+        });
+        throw new RunnerError(
+          'secret-vault-unlock-interrupted',
+          'Password vault unlock was interrupted by navigation.',
+          { phase: 'execute', recoverable: true },
+        );
+      }
+
+      try {
+        await unlockSecretsVault(promptResult.password);
+        this.appendLog(run, 'success', 'Password vault unlocked. Continuing run.', {
+          stepId: step.id,
+          stepType,
+        });
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        if (/invalid master password/i.test(message)) {
+          promptErrorMessage = 'Invalid master password.';
+          continue;
+        }
+        if (/master password is required/i.test(message)) {
+          promptErrorMessage = 'Master password is required.';
+          continue;
+        }
+        throw new RunnerError('secret-vault-unlock-prompt-unavailable', message, {
+          phase: 'execute',
+          recoverable: false,
+        });
+      }
+
+      try {
+        return await this.resolveStepFieldValue(step, fieldId, context);
+      } catch (error) {
+        if (error instanceof RunnerError && error.code === 'secret-vault-locked') {
+          promptErrorMessage = 'Password vault is still locked. Please try again.';
+          continue;
+        }
+        throw error;
+      }
+    }
   }
 
   private async executeAtomicStep(
     run: FlowRunInternal,
     step: FlowStepData,
     stepType: Exclude<FlowRunAtomicStepType, 'condition'>,
-    row?: FlowRowContext,
+    context: FlowRenderContext,
   ) {
     let payload: FlowRunExecuteStepPayload;
     try {
-      payload = await this.buildAtomicPayload(step, stepType, row);
+      payload = await this.buildAtomicPayload(step, stepType, context);
     } catch (error) {
       if (!(error instanceof RunnerError) || error.code !== 'secret-vault-locked') {
         throw error;
       }
-      payload = await this.promptVaultUnlockAndRetry(run, step, stepType, row);
+      payload = await this.promptVaultUnlockAndRetry(run, step, stepType, context);
     }
     this.appendLog(run, 'info', this.formatAtomicStartMessage(stepType, payload), {
       stepId: step.id,
@@ -944,7 +1151,7 @@ export class FlowRunnerManager {
     run: FlowRunInternal,
     step: FlowStepData,
     stepType: Exclude<FlowRunAtomicStepType, 'condition'>,
-    row?: FlowRowContext,
+    context: FlowRenderContext,
   ): Promise<FlowRunExecuteStepPayload> {
     let promptAttempt = 0;
     let promptErrorMessage = '';
@@ -1006,7 +1213,7 @@ export class FlowRunnerManager {
       }
 
       try {
-        return await this.buildAtomicPayload(step, stepType, row);
+        return await this.buildAtomicPayload(step, stepType, context);
       } catch (error) {
         if (error instanceof RunnerError && error.code === 'secret-vault-locked') {
           promptErrorMessage = 'Password vault is still locked. Please try again.';
@@ -1069,8 +1276,8 @@ export class FlowRunnerManager {
     return response.data;
   }
 
-  private async executeConditionStep(run: FlowRunInternal, step: FlowStepData, row?: FlowRowContext) {
-    const payload = await this.buildAtomicPayload(step, 'condition', row);
+  private async executeConditionStep(run: FlowRunInternal, step: FlowStepData, context: FlowRenderContext) {
+    const payload = await this.buildAtomicPayload(step, 'condition', context);
     this.appendLog(run, 'info', this.formatAtomicStartMessage('condition', payload), {
       stepId: step.id,
       stepType: 'condition',
@@ -1096,8 +1303,8 @@ export class FlowRunnerManager {
     return Boolean(result.conditionMatched);
   }
 
-  private async resolveStepFieldValue(step: FlowStepData, fieldId: string, row?: FlowRowContext) {
-    const renderedValue = getRenderedStepFieldValue(step, fieldId, row);
+  private async resolveStepFieldValue(step: FlowStepData, fieldId: string, context: FlowRenderContext) {
+    const renderedValue = getRenderedStepFieldValue(step, fieldId, context);
     let resolvedValue = renderedValue;
     try {
       resolvedValue = await resolveSecretTokens(renderedValue);
@@ -1126,7 +1333,9 @@ export class FlowRunnerManager {
       return await this.jsTransformExecutor.run({
         code,
         value: resolvedValue,
-        row,
+        row: context.row,
+        loop: context.loop,
+        variables: context.variables,
         timeoutMs: field.transform.timeoutMs,
       });
     } catch (error) {
@@ -1138,7 +1347,7 @@ export class FlowRunnerManager {
   private async buildAtomicPayload(
     step: FlowStepData,
     stepType: FlowRunAtomicStepType,
-    row?: FlowRowContext,
+    context: FlowRenderContext,
   ): Promise<FlowRunExecuteStepPayload> {
     const payload: FlowRunExecuteStepPayload = {
       runId: '',
@@ -1151,16 +1360,16 @@ export class FlowRunnerManager {
     };
 
     if (stepType === 'click') {
-      payload.selector = await this.resolveStepFieldValue(step, 'selector', row);
+      payload.selector = await this.resolveStepFieldValue(step, 'selector', context);
     } else if (stepType === 'input') {
-      const rawValue = getRenderedStepFieldValue(step, 'value', row);
-      payload.selector = await this.resolveStepFieldValue(step, 'selector', row);
-      payload.value = await this.resolveStepFieldValue(step, 'value', row);
+      const rawValue = getRenderedStepFieldValue(step, 'value', context);
+      payload.selector = await this.resolveStepFieldValue(step, 'selector', context);
+      payload.value = await this.resolveStepFieldValue(step, 'value', context);
       payload.valueSource = isSecretTokenValue(rawValue) ? 'secret' : 'literal';
     } else if (stepType === 'popup') {
-      payload.message = await this.resolveStepFieldValue(step, 'message', row);
+      payload.message = await this.resolveStepFieldValue(step, 'message', context);
     } else if (stepType === 'wait') {
-      const modeValue = await this.resolveStepFieldValue(step, 'mode', row);
+      const modeValue = await this.resolveStepFieldValue(step, 'mode', context);
       const mode =
         modeValue === 'condition' ||
         modeValue === 'appear' ||
@@ -1176,25 +1385,25 @@ export class FlowRunnerManager {
       }
       payload.mode = mode;
       if (mode === 'time') {
-        const durationValue = await this.resolveStepFieldValue(step, 'duration', row);
+        const durationValue = await this.resolveStepFieldValue(step, 'duration', context);
         payload.durationMs = toNonNegativeInteger(durationValue, 0);
       } else if (mode === 'condition') {
         payload.timeoutMs = WAIT_SELECTOR_TIMEOUT_MS;
-        payload.selector = await this.resolveStepFieldValue(step, 'selector', row);
-        const operator = await this.resolveStepFieldValue(step, 'operator', row);
+        payload.selector = await this.resolveStepFieldValue(step, 'selector', context);
+        const operator = await this.resolveStepFieldValue(step, 'operator', context);
         payload.operator =
           operator === 'equals' || operator === 'greater' || operator === 'less' ? operator : 'contains';
-        payload.expected = await this.resolveStepFieldValue(step, 'expected', row);
+        payload.expected = await this.resolveStepFieldValue(step, 'expected', context);
       } else {
         payload.timeoutMs = WAIT_SELECTOR_TIMEOUT_MS;
-        payload.selector = await this.resolveStepFieldValue(step, 'selector', row);
+        payload.selector = await this.resolveStepFieldValue(step, 'selector', context);
       }
     } else if (stepType === 'assert' || stepType === 'condition') {
-      payload.selector = await this.resolveStepFieldValue(step, 'selector', row);
-      const operator = await this.resolveStepFieldValue(step, 'operator', row);
+      payload.selector = await this.resolveStepFieldValue(step, 'selector', context);
+      const operator = await this.resolveStepFieldValue(step, 'operator', context);
       payload.operator =
         operator === 'equals' || operator === 'greater' || operator === 'less' ? operator : 'contains';
-      payload.expected = await this.resolveStepFieldValue(step, 'expected', row);
+      payload.expected = await this.resolveStepFieldValue(step, 'expected', context);
     }
 
     return payload;
@@ -1427,8 +1636,8 @@ export class FlowRunnerManager {
     });
   }
 
-  private async executeNavigateStep(run: FlowRunInternal, step: FlowStepData, row?: FlowRowContext) {
-    const targetValue = getRenderedStepFieldValue(step, 'url', row).trim();
+  private async executeNavigateStep(run: FlowRunInternal, step: FlowStepData, context: FlowRenderContext) {
+    const targetValue = getRenderedStepFieldValue(step, 'url', context).trim();
     if (!targetValue) {
       throw new RunnerError('navigate-url-missing', 'Navigate step URL is required.', {
         phase: 'navigate',
@@ -1496,7 +1705,7 @@ export class FlowRunnerManager {
     this.ensureRunHealthy(run);
   }
 
-  private async executeDataSourceStep(run: FlowRunInternal, step: FlowStepData, row?: FlowRowContext) {
+  private async executeDataSourceStep(run: FlowRunInternal, step: FlowStepData, context: FlowRenderContext) {
     const children = Array.isArray(step.children) ? step.children : [];
     const selectedInput = run.dataSourceInputs[step.id];
     if (!selectedInput || !selectedInput.rawText.trim()) {
@@ -1533,10 +1742,11 @@ export class FlowRunnerManager {
       run.progress.totalSteps = Math.max(run.progress.completedSteps, run.progress.totalSteps + delta);
       this.emitStatus(run, false);
     }
-    for (const currentRow of parsed.rows) {
+    for (let index = 0; index < parsed.rows.length; index += 1) {
       this.ensureRunHealthy(run);
-      const mergedRow = row ? { ...row, ...currentRow } : currentRow;
-      await this.executeSteps(run, children, mergedRow);
+      const currentRow = parsed.rows[index];
+      const mergedRow = { ...(context.row ?? {}), ...currentRow, index: String(index) };
+      await this.executeSteps(run, children, this.withRowContext(run, context, mergedRow));
       await microYield();
     }
   }
