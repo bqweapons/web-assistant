@@ -1,85 +1,872 @@
 <!doctype html>
 <html lang="ja">
+
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Ladybird Docs（日本語）</title>
+  <title>Ladybird ヘルプ</title>
   <style>
-    :root { --bg:#f7fafc; --card:#fff; --ink:#0f172a; --muted:#475569; --line:#e2e8f0; --accent:#1d4ed8; --soft:#eff6ff; --tag:#ecfeff; }
-    * { box-sizing: border-box; }
-    body { margin:0; background:linear-gradient(180deg,#f8fafc 0%,#eef2ff 100%); color:var(--ink); font:14px/1.6 "Noto Sans JP","Segoe UI",system-ui,sans-serif; }
-    .wrap { max-width:1080px; margin:0 auto; padding:24px 16px 48px; }
-    .hero,.card { background:var(--card); border:1px solid var(--line); border-radius:16px; box-shadow:0 12px 32px rgba(15,23,42,.06); }
-    .hero { padding:24px; margin-bottom:16px; } h1 { margin:0 0 8px; font-size:28px; line-height:1.2; } h2 { margin:0 0 10px; font-size:20px; } h3 { margin:0 0 8px; font-size:16px; }
-    p { margin:0; color:var(--muted); } .langs { margin-top:12px; display:flex; gap:8px; flex-wrap:wrap; }
-    .langs a,.quick a { text-decoration:none; color:var(--accent); border:1px solid #bfdbfe; background:var(--soft); border-radius:999px; padding:6px 10px; font-weight:600; display:inline-flex; align-items:center; gap:6px; }
-    .quick { display:grid; grid-template-columns:repeat(auto-fit,minmax(220px,1fr)); gap:12px; margin-bottom:16px; } .quick a { border-radius:12px; padding:12px; justify-content:center; }
-    .card { padding:18px; } .grid { display:grid; gap:16px; } .groups { display:grid; grid-template-columns:repeat(auto-fit,minmax(280px,1fr)); gap:12px; }
-    .group { border:1px solid var(--line); border-radius:12px; padding:14px; background:#fff; }
-    .links { margin-top:10px; display:grid; gap:6px; } .links a { color:var(--accent); text-decoration:none; font-weight:600; }
-    .tags { margin-top:10px; display:flex; flex-wrap:wrap; gap:6px; } .tag { font-size:12px; border-radius:999px; padding:3px 8px; border:1px solid #bae6fd; background:var(--tag); color:#0f766e; }
-    .assets { display:grid; grid-template-columns:repeat(auto-fit,minmax(240px,1fr)); gap:10px; } .asset { border:1px solid var(--line); border-radius:12px; padding:12px; background:#fff; } .asset a { color:var(--accent); font-weight:600; text-decoration:none; }
-    footer { margin-top:16px; color:var(--muted); font-size:12px; }
+    :root {
+      --bg: #f4efe6;
+      --card: rgba(255, 255, 255, .92);
+      --ink: #1f2937;
+      --muted: #5f6b7a;
+      --line: rgba(148, 163, 184, .28);
+      --accent: #0f766e;
+      --accent-strong: #115e59;
+      --accent-soft: rgba(15, 118, 110, .1);
+      --warm: #b45309;
+      --warm-soft: rgba(180, 83, 9, .12);
+      --shadow: 0 18px 44px rgba(31, 41, 55, .09);
+      --radius-xl: 28px;
+      --radius-lg: 20px;
+      --radius-md: 16px;
+      --font: "Noto Sans JP", "Hiragino Sans", "Yu Gothic UI", sans-serif
+    }
+
+    * {
+      box-sizing: border-box
+    }
+
+    html {
+      scroll-behavior: smooth
+    }
+
+    body {
+      margin: 0;
+      color: var(--ink);
+      background: radial-gradient(circle at top left, rgba(15, 118, 110, .1), transparent 30%), radial-gradient(circle at top right, rgba(180, 83, 9, .12), transparent 28%), linear-gradient(180deg, var(--bg) 0%, #f9f7f2 46%, #fbfaf8 100%);
+      font: 15px/1.8 var(--font)
+    }
+
+    a {
+      color: inherit
+    }
+
+    h1,
+    h2,
+    h3,
+    p {
+      margin: 0
+    }
+
+    .wrap {
+      width: min(1120px, calc(100% - 32px));
+      margin: 0 auto;
+      padding: 28px 0 56px
+    }
+
+    .hero,
+    .section-card,
+    .anchor-nav,
+    .step-card,
+    .capability-card,
+    .feature-card,
+    .scenario-card,
+    .security-card,
+    .faq-item,
+    .resource-card {
+      border: 1px solid var(--line);
+      background: var(--card);
+      box-shadow: var(--shadow);
+      backdrop-filter: blur(14px)
+    }
+
+    .hero {
+      position: relative;
+      overflow: hidden;
+      border-radius: var(--radius-xl);
+      padding: 32px
+    }
+
+    .hero::after {
+      content: "";
+      position: absolute;
+      inset: auto -80px -80px auto;
+      width: 220px;
+      height: 220px;
+      border-radius: 50%;
+      background: radial-gradient(circle, rgba(15, 118, 110, .14), transparent 70%);
+      pointer-events: none
+    }
+
+    .eyebrow {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 7px 12px;
+      border-radius: 999px;
+      background: var(--accent-soft);
+      color: var(--accent-strong);
+      font-size: 12px;
+      font-weight: 700;
+      letter-spacing: .08em;
+      text-transform: uppercase
+    }
+
+    h1 {
+      max-width: 760px;
+      margin-top: 18px;
+      font-size: clamp(2.1rem, 4vw, 3.7rem);
+      line-height: 1.14;
+      letter-spacing: -.03em
+    }
+
+    .hero p {
+      max-width: 760px;
+      margin-top: 14px;
+      color: var(--muted);
+      font-size: 1.02rem
+    }
+
+    .button-row,
+    .lang-switch,
+    .hero-links,
+    .pill-row,
+    .anchor-links,
+    .resource-links {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px
+    }
+
+    .button-row {
+      margin-top: 24px
+    }
+
+    .btn,
+    .lang-switch a,
+    .anchor-links a,
+    .resource-links a {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 42px;
+      padding: 0 16px;
+      border-radius: 999px;
+      border: 1px solid transparent;
+      text-decoration: none;
+      font-weight: 700;
+      transition: transform .16s ease, border-color .16s ease, background .16s ease
+    }
+
+    .btn:hover,
+    .lang-switch a:hover,
+    .anchor-links a:hover,
+    .resource-links a:hover {
+      transform: translateY(-1px)
+    }
+
+    .btn-primary {
+      background: var(--accent);
+      color: #fff
+    }
+
+    .btn-secondary {
+      border-color: rgba(15, 118, 110, .22);
+      background: rgba(255, 255, 255, .78);
+      color: var(--accent-strong)
+    }
+
+    .hero-links {
+      margin-top: 16px;
+      color: var(--muted);
+      font-size: .95rem
+    }
+
+    .hero-links a {
+      color: var(--accent-strong);
+      text-decoration: none;
+      font-weight: 600
+    }
+
+    .pill-row {
+      margin-top: 20px
+    }
+
+    .pill {
+      display: inline-flex;
+      align-items: center;
+      min-height: 32px;
+      padding: 0 12px;
+      border-radius: 999px;
+      background: rgba(255, 255, 255, .82);
+      border: 1px solid var(--line);
+      color: var(--muted);
+      font-size: 13px;
+      font-weight: 600
+    }
+
+    .lang-switch {
+      margin-top: 24px
+    }
+
+    .lang-switch a {
+      border-color: var(--line);
+      background: rgba(255, 255, 255, .72);
+      color: var(--muted);
+      min-height: 38px;
+      padding: 0 14px
+    }
+
+    .lang-switch a.active {
+      background: var(--accent-soft);
+      border-color: rgba(15, 118, 110, .18);
+      color: var(--accent-strong)
+    }
+
+    .anchor-nav {
+      position: sticky;
+      top: 12px;
+      z-index: 10;
+      margin-top: 18px;
+      border-radius: 18px;
+      padding: 14px
+    }
+
+    .anchor-links a {
+      min-height: 38px;
+      padding: 0 14px;
+      border-color: var(--line);
+      background: rgba(255, 255, 255, .72);
+      color: var(--muted);
+      font-size: 14px
+    }
+
+    main {
+      margin-top: 18px;
+      display: grid;
+      gap: 18px
+    }
+
+    .section-card {
+      border-radius: var(--radius-lg);
+      padding: 28px
+    }
+
+    .section-head {
+      display: grid;
+      gap: 10px;
+      margin-bottom: 20px
+    }
+
+    .section-kicker {
+      color: var(--warm);
+      font-size: 12px;
+      font-weight: 800;
+      letter-spacing: .08em;
+      text-transform: uppercase
+    }
+
+    h2 {
+      font-size: clamp(1.55rem, 2vw, 2.2rem);
+      line-height: 1.2;
+      letter-spacing: -.02em
+    }
+
+    .section-head p {
+      max-width: 780px;
+      color: var(--muted)
+    }
+
+    .steps,
+    .capability-grid,
+    .feature-grid,
+    .scenario-grid,
+    .security-grid,
+    .resources-grid {
+      display: grid;
+      gap: 16px
+    }
+
+    .steps {
+      grid-template-columns: repeat(2, minmax(0, 1fr))
+    }
+
+    .step-card,
+    .feature-card {
+      border-radius: var(--radius-md);
+      padding: 18px
+    }
+
+    .step-card {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) 220px;
+      gap: 16px
+    }
+    .step-copy{
+      grid-template-rows: 30px 40px;
+    }
+    .step-copy,
+    .feature-copy,
+    .capability-card,
+    .scenario-card,
+    .security-card,
+    .resource-card {
+      display: grid;
+      gap: 12px
+    }
+
+    .step-no {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 34px;
+      height: 34px;
+      border-radius: 50%;
+      background: var(--accent-soft);
+      color: var(--accent-strong);
+      font-weight: 800
+    }
+
+    .step-copy h3,
+    .capability-card h3,
+    .feature-copy h3,
+    .scenario-card h3,
+    .security-card h3,
+    .resource-card h3 {
+      font-size: 1.05rem;
+      line-height: 1.4
+    }
+
+    .step-copy p,
+    .capability-card p,
+    .feature-copy p,
+    .scenario-card p,
+    .security-card p,
+    .resource-card p,
+    .reminder {
+      color: var(--muted)
+    }
+
+    .shot {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 164px;
+      /* padding: 18px; */
+      border: 1px dashed rgba(15, 118, 110, .32);
+      border-radius: 14px;
+      background: linear-gradient(180deg, rgba(15, 118, 110, .06), rgba(255, 255, 255, .9)), repeating-linear-gradient(-45deg, rgba(15, 118, 110, .05), rgba(15, 118, 110, .05) 12px, rgba(255, 255, 255, .76) 12px, rgba(255, 255, 255, .76) 24px);
+      text-align: center;
+      color: var(--accent-strong);
+      font-size: 13px;
+      font-weight: 700
+    }
+
+    .capability-grid {
+      grid-template-columns: repeat(5, minmax(0, 1fr))
+    }
+
+    .capability-card,
+    .scenario-card,
+    .security-card,
+    .resource-card,
+    .faq-item {
+      border-radius: var(--radius-md);
+      padding: 18px
+    }
+
+    .capability-card {
+      min-height: 204px
+    }
+
+    .feature-grid {
+      grid-template-columns: repeat(2, minmax(0, 1fr))
+    }
+
+    .feature-card {
+      display: grid;
+      gap: 16px;
+      grid-template-columns: minmax(0, 1fr) 210px
+    }
+
+    .tag {
+      display: inline-flex;
+      align-items: center;
+      min-height: 30px;
+      width: fit-content;
+      padding: 0 10px;
+      border-radius: 999px;
+      background: var(--warm-soft);
+      color: var(--warm);
+      font-size: 12px;
+      font-weight: 700
+    }
+
+    .feature-list {
+      margin: 0;
+      padding: 0;
+      list-style: none;
+      display: grid;
+      gap: 8px
+    }
+
+    .feature-list li {
+      position: relative;
+      padding-left: 16px;
+      color: var(--ink)
+    }
+
+    .feature-list li::before {
+      content: "";
+      position: absolute;
+      left: 0;
+      top: 12px;
+      width: 7px;
+      height: 7px;
+      border-radius: 50%;
+      background: var(--accent)
+    }
+
+    .reminder {
+      padding: 12px 14px;
+      border-radius: 14px;
+      background: rgba(15, 118, 110, .06);
+      border: 1px solid rgba(15, 118, 110, .14);
+      font-size: 13px
+    }
+
+    .scenario-grid,
+    .security-grid,
+    .resources-grid {
+      grid-template-columns: repeat(2, minmax(0, 1fr))
+    }
+
+    .label {
+      color: var(--warm);
+      font-size: 12px;
+      font-weight: 800;
+      letter-spacing: .05em;
+      text-transform: uppercase
+    }
+
+    .faq-stack {
+      display: grid;
+      gap: 12px
+    }
+
+    .faq-item summary {
+      cursor: pointer;
+      list-style: none;
+      font-weight: 700;
+      font-size: 1rem
+    }
+
+    .faq-item summary::-webkit-details-marker {
+      display: none
+    }
+
+    .faq-item p {
+      margin-top: 12px;
+      color: var(--muted)
+    }
+
+    .resource-links a {
+      min-height: 38px;
+      padding: 0 14px;
+      border-color: rgba(15, 118, 110, .16);
+      background: rgba(15, 118, 110, .06);
+      color: var(--accent-strong);
+      font-size: 14px
+    }
+
+    footer {
+      margin-top: 18px;
+      padding: 0 4px;
+      color: var(--muted);
+      font-size: 13px;
+      text-align: center
+    }
+
+    @media (max-width:1080px) {
+      .capability-grid {
+        grid-template-columns: repeat(3, minmax(0, 1fr))
+      }
+    }
+
+    @media (max-width:860px) {
+      .wrap {
+        width: min(100% - 20px, 1120px);
+        padding-top: 20px;
+        padding-bottom: 40px
+      }
+
+      .hero,
+      .section-card {
+        padding: 22px
+      }
+
+      .steps,
+      .feature-grid,
+      .scenario-grid,
+      .security-grid,
+      .resources-grid {
+        grid-template-columns: 1fr
+      }
+
+      .step-card,
+      .feature-card {
+        grid-template-columns: 1fr
+      }
+
+      .capability-grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr))
+      }
+
+      .anchor-nav {
+        position: static
+      }
+    }
+
+    @media (max-width:560px) {
+      body {
+        font-size: 14px
+      }
+
+      .hero,
+      .section-card {
+        padding: 20px
+      }
+
+      .capability-grid {
+        grid-template-columns: 1fr
+      }
+
+      .button-row .btn,
+      .anchor-links a,
+      .lang-switch a,
+      .resource-links a {
+        width: 100%
+      }
+    }
   </style>
 </head>
+
 <body>
   <div class="wrap">
-    <section class="hero">
-      <h1>Ladybird Docs</h1>
-      <p>テストページ、テスト計画ドキュメント、デモ素材、プライバシーポリシーの入口ページです。</p>
-      <div class="langs">
-        <a href="./index.html">English</a>
-        <a href="./index.ja.html">日本語</a>
-        <a href="./index.zh-CN.html">简体中文</a>
-      </div>
-    </section>
-
-    <section class="quick">
-      <a href="./test-pages/index.ja.html">テストページ一覧</a>
-      <a href="./testing/screen-test-matrix.ja.md">画面テストマトリクス（MD）</a>
-      <a href="./testing/test-checklist.ja.md">テストチェックリスト（MD）</a>
-      <a href="./PRIVACY-POLICY.ja.md">プライバシーポリシー（MD）</a>
-    </section>
-
-    <section class="card grid">
-      <h2>テストページ</h2>
-      <div class="groups">
-        <div class="group">
-          <h3>Basic Playground</h3>
-          <p>基本的な要素注入、非表示、popup、input、ページ遷移を2ページ構成で確認します。</p>
-          <div class="links">
-            <a href="./test-pages/basic/test-page.html">test-page.html を開く</a>
-            <a href="./test-pages/basic/test-page2.html">test-page2.html を開く</a>
-          </div>
-          <div class="tags"><span class="tag">elements</span><span class="tag">hidden</span><span class="tag">popup</span><span class="tag">navigate</span></div>
+    <header class="hero">
+      <span class="eyebrow">Chrome Extension Help</span>
+      <h1>コードを書かずに、よく使うWebページを使いやすく整えて、定型操作を自動化できます。</h1>
+      <p>Ladybird は、同じWeb作業を何度も繰り返す人、ページ上の不要な表示を減らしたい人、よく使うサイトに自分用の近道を置きたい人向けの拡張機能です。</p>
+      <div class="button-row"><a class="btn btn-primary" href="#quick-start">まずはクイックスタート</a><a class="btn btn-secondary"
+          href="#core-features">主な機能を見る</a></div>
+      <div class="hero-links"><span>先に公開ページやポリシーを見たい場合:</span><a
+          href="https://chromewebstore.google.com/detail/ladybird-no-code-buttons/nefpepdpcjejamkgpndlfehkffkfgbpe"
+          target="_blank" rel="noreferrer">Chrome Web Store</a><span>·</span><a
+          href="./PRIVACY-POLICY.ja.md">プライバシーポリシー</a></div>
+      <div class="pill-row"><span class="pill">Elements</span><span class="pill">Flows</span><span class="pill">Hidden
+          Rules</span><span class="pill">Password Vault</span><span class="pill">Import / Export</span></div>
+      <div class="lang-switch"><a href="./index.html">English</a><a class="active" href="./index.ja.html">日本語</a><a
+          href="./index.zh-CN.html">简体中文</a></div>
+    </header>
+    <nav class="anchor-nav" aria-label="Page sections">
+      <div class="anchor-links"><a href="#quick-start">クイックスタート</a><a href="#outcomes">できること</a><a
+          href="#core-features">主な機能</a><a href="#scenarios">よくある使い方</a><a href="#security">安全性と制限</a><a
+          href="#faq">よくある質問</a><a href="#resources">追加リソース</a></div>
+    </nav>
+    <main>
+      <section class="section-card" id="quick-start">
+        <div class="section-head"><span class="section-kicker">Quick Start</span>
+          <h2>最初はこの4ステップだけ覚えれば十分です。</h2>
+          <p>基本の流れはいつも同じです。対象ページを開き、サイドパネルを開き、必要な設定を追加し、保存してページ上で結果を確認します。</p>
         </div>
-        <div class="group">
-          <h3>Data Source Flow</h3>
-          <p>Screen A と Screen B を使って、フォーム入力と送信結果のフローを検証します。</p>
-          <div class="links">
-            <a href="./test-pages/data-source/datasource-form-a.html">Screen A を開く</a>
-            <a href="./test-pages/data-source/datasource-form-b.html">Screen B を開く</a>
-            <a href="./assets/data/datasource-form-data.csv">サンプル CSV を開く</a>
-          </div>
-          <div class="tags"><span class="tag">input</span><span class="tag">form-submit</span><span class="tag">date</span><span class="tag">number</span></div>
+        <div class="steps">
+          <article class="step-card">
+            <div class="step-copy"><span class="step-no">1</span>
+              <h3>変更したいWebページを開きます。</h3>
+              <p>ボタンを追加したいページ、フローを動かしたいページ、非表示ルールを設定したいページを実際に開いた状態で使い始めます。</p>
+            </div>
+          </article>
+          <article class="step-card">
+            <div class="step-copy"><span class="step-no">2</span>
+              <h3>Ladybird のサイドパネルを開きます。</h3>
+              <p>ページを見ながら、Elements、Flows、Hidden、Overview、Settings の各タブを横に並べて操作できます。</p>
+            </div>
+            <div class="shot"><img src="./assets/ladybrid_home.png" style="width: 100%;"/></div>
+          </article>
+          <article class="step-card">
+            <div class="step-copy"><span class="step-no">3</span>
+              <h3>目的に合ったタブで要素、フロー、非表示ルールを追加します。</h3>
+              <p>ページ上に何か置きたいなら Elements、手順を自動化したいなら Flows、ただ消したいだけなら Hidden を使います。</p>
+            </div>
+            <div class="shot"><img src="./assets/add_element.png" style="width: 100%;"/></div>
+          </article>
+          <article class="step-card">
+            <div class="step-copy"><span class="step-no">4</span>
+              <h3>保存して、ページ表示またはフロー実行で結果を確認します。</h3>
+              <p>保存後は新しいUIがページに出るか、非表示ルールが効くか、フローが実行できるかをその場で確認できます。</p>
+            </div>
+            <div class="shot"><img src="./assets/edit_element.png" style="width: 100%;"/></div>
+          </article>
         </div>
-      </div>
-    </section>
-
-    <section class="card grid" style="margin-top:16px;">
-      <h2>デモ素材（参照用）</h2>
-      <p>以下は説明用の画像/GIFであり、実行可能なテストページではありません。</p>
-      <div class="assets">
-        <div class="asset"><a href="./assets/demos/Overview.png">Overview.png</a></div>
-        <div class="asset"><a href="./assets/demos/add%20button.gif">add button.gif</a></div>
-        <div class="asset"><a href="./assets/demos/add%20Action.gif">add Action.gif</a></div>
-        <div class="asset"><a href="./assets/demos/add%20area.gif">add area.gif</a></div>
-        <div class="asset"><a href="./assets/demos/move%20button.gif">move button.gif</a></div>
-        <div class="asset"><a href="./assets/demos/button%20sample.gif">button sample.gif</a></div>
-      </div>
-    </section>
-
-    <footer>Ladybird docs portal（日本語）</footer>
+      </section>
+      <section class="section-card" id="outcomes">
+        <div class="section-head"><span class="section-kicker">What You Can Do</span>
+          <h2>まずは専門用語ではなく、得られる結果で考えるのが近道です。</h2>
+          <p>Ladybird は「ページ上で何を実現したいか」が決まると、どの機能を使うべきかがすぐ分かります。</p>
+        </div>
+        <div class="capability-grid">
+          <article class="capability-card">
+            <h3>ページにボタン、リンク、ツールチップ、エリアを追加できます。</h3>
+            <p>よく使う画面に自分専用の近道や案内を重ねて置けます。</p>
+          </article>
+          <article class="capability-card">
+            <h3>繰り返しのクリックや入力をフローとして保存できます。</h3>
+            <p>毎回同じ手順をたどる作業を、再利用できる手順にまとめられます。</p>
+          </article>
+          <article class="capability-card">
+            <h3>邪魔な表示やよくある広告を隠せます。</h3>
+            <p>バナー、サイドバー、繰り返し出る案内などを見えなくできます。</p>
+          </article>
+          <article class="capability-card">
+            <h3>Password Vault でパスワードを安全に使い回せます。</h3>
+            <p>フロー内に平文で置かず、保存済みパスワードを入力ステップに紐づけられます。</p>
+          </article>
+          <article class="capability-card">
+            <h3>設定をエクスポートして、別PCや他の人に渡せます。</h3>
+            <p>保存したサイト設定をバックアップしたり、移行したりしやすくなります。</p>
+          </article>
+        </div>
+      </section>
+      <section class="section-card" id="core-features">
+        <div class="section-head"><span class="section-kicker">Core Features</span>
+          <h2>各タブには役割がはっきりあります。</h2>
+          <p>最初から全部を使う必要はありません。今の課題に合うタブから始めて、必要になったら別の機能を足していくのが分かりやすい使い方です。</p>
+        </div>
+        <div class="feature-grid">
+          <article class="feature-card">
+            <div class="feature-copy"><span class="tag">Elements</span>
+              <h3>今見ているページに、見える補助UIを置けます。</h3>
+              <p>ボタン、リンク、ツールチップ、エリアを「ここに欲しい」という位置に置きたい時に向いています。</p>
+              <ul class="feature-list">
+                <li>4種類の要素を追加できます: button、link、tooltip、area。</li>
+                <li>ページ上で位置を選びながら配置できるので、置き場所を想像だけで決めなくて済みます。</li>
+                <li>ボタンに URL、要素操作、保存済みフローを割り当てられます。</li>
+              </ul>
+              <p class="reminder">使う時のポイント: 位置が安定している場所を選ぶと、サイト更新後も崩れにくくなります。</p>
+            </div>
+            <div class="shot"><img src="./assets/edit_element_box.png" style="width: 100%;"/></div>
+          </article>
+          <article class="feature-card">
+            <div class="feature-copy"><span class="tag">Flows</span>
+              <h3>繰り返し作業を、あとでまた実行できる手順として保存できます。</h3>
+              <p>クリック、入力、待機、分岐、確認、複数ステップの操作をまとめたい時に向いています。</p>
+              <ul class="feature-list">
+                <li>click、input、wait、navigate、popup、assert、条件分岐、ループ、変数、データソースなどを組み合わせられます。</li>
+                <li>ページ操作を記録して下書きを作り、あとから手順を編集できます。</li>
+                <li>実行中の状態、現在のステップ、ログを見ながら動作確認できます。</li>
+              </ul>
+              <p class="reminder">使う時のポイント: ページ構造が変わりやすいサイトでは、保存後にセレクタ調整が必要になることがあります。</p>
+            </div>
+            <div class="shot"><img src="./assets/edit_flow_box.png" style="width: 100%;"/></div>
+          </article>
+          <article class="feature-card">
+            <div class="feature-copy"><span class="tag">Hidden</span>
+              <h3>見たくない部分だけをページから消せます。</h3>
+              <p>バナー、繰り返し出る案内、サイドエリア、邪魔なブロックを片付けたい時に向いています。</p>
+              <ul class="feature-list">
+                <li>要素ピッカーで現在サイト用の手動非表示ルールを作れます。</li>
+                <li>削除せずに、ルールごとに一時停止と再有効化ができます。</li>
+                <li>内蔵の自動広告非表示は、手動ルールとは別のグローバル機能として使えます。</li>
+              </ul>
+              <p class="reminder">使う時のポイント: 手動ルールはサイト単位、自動広告非表示は全体設定です。役割は別です。</p>
+            </div>
+            <div class="shot"><img src="./assets/hidden_page.png" style="width: 100%;"/></div>
+          </article>
+          <article class="feature-card">
+            <div class="feature-copy"><span class="tag">Overview</span>
+              <h3>どのサイトに何を保存しているかを一覧できます。</h3>
+              <p>整理前の確認、エクスポート前の棚卸し、削除前の確認に向いています。</p>
+              <ul class="feature-list">
+                <li>サイトごとの elements、flows、hidden の件数を確認できます。</li>
+                <li>保存量の多いサイトをすぐ見つけられます。</li>
+                <li>特定サイトの保存データをまとめて削除できます。</li>
+              </ul>
+              <p class="reminder">使う時のポイント: インポートや削除の前に、まず Overview で全体像を見ておくと安全です。</p>
+            </div>
+            <div class="shot"><img src="./assets/overview_page.png" style="width: 100%;"/></div>
+          </article>
+          <article class="feature-card">
+            <div class="feature-copy"><span class="tag">Password Vault</span>
+              <h3>パスワードを平文フローから分離して扱えます。</h3>
+              <p>ログインや安全な入力を自動化したいが、値をそのままフローに残したくない時に向いています。</p>
+              <ul class="feature-list">
+                <li>ローカルの Vault パスワードを作り、名前付きパスワードを保存できます。</li>
+                <li>入力ステップに保存済みパスワードを紐づけて再利用できます。</li>
+                <li>実行中に Vault を解除して、その時点のステップから続行できます。</li>
+              </ul>
+              <p class="reminder">使う時のポイント: Vault パスワードを忘れると復元できません。必要ならリセットして再登録が必要です。</p>
+            </div>
+            <div class="shot"><img src="./assets/vailt_password.png" style="width: 100%;"/></div>
+          </article>
+          <article class="feature-card">
+            <div class="feature-copy"><span class="tag">Settings</span>
+              <h3>言語、バックアップ、共有、移行をまとめて管理できます。</h3>
+              <p>別PCへの移行、設定共有、サイドパネル言語の変更をしたい時に向いています。</p>
+              <ul class="feature-list">
+                <li>保存済み設定を JSON としてインポート、エクスポートできます。</li>
+                <li>必要に応じて Password Vault データも含めて移行できます。</li>
+                <li>サイドパネル言語の切り替えや、ストアリンクのコピーもできます。</li>
+              </ul>
+              <p class="reminder">使う時のポイント: エクスポートしたファイル、とくに Vault を含むものは自分で安全に保管してください。</p>
+            </div>
+            <div class="shot"><img src="./assets/settings_page.png" style="width: 100%;"/></div>
+          </article>
+        </div>
+      </section>
+      <section class="section-card" id="scenarios">
+        <div class="section-head"><span class="section-kicker">Typical Scenarios</span>
+          <h2>Ladybird が得意なのは、こういう「毎日の小さな面倒」です。</h2>
+          <p>それぞれの例を「困りごと → Ladybird でどうするか → どう楽になるか」で見てください。</p>
+        </div>
+        <div class="scenario-grid">
+          <article class="scenario-card">
+            <h3>社内ダッシュボードに、よく使うレポートへの近道を置く</h3>
+            <div>
+              <div class="label">困りごと</div>
+              <p>同じ管理画面から毎回いくつかの階層を辿ってレポートを開いている。</p>
+            </div>
+            <div>
+              <div class="label">Ladybird でのやり方</div>
+              <p>Elements でボタンやリンクを追加し、今使っている画面に近道を直接置く。</p>
+            </div>
+            <div>
+              <div class="label">結果</div>
+              <p>いつもの画面から1クリックで目的ページへ移動できるようになります。</p>
+            </div>
+          </article>
+          <article class="scenario-card">
+            <h3>繰り返すフォーム入力をフローで実行する</h3>
+            <div>
+              <div class="label">困りごと</div>
+              <p>同じような入力やボタン操作を、複数画面にまたがって何度も繰り返している。</p>
+            </div>
+            <div>
+              <div class="label">Ladybird でのやり方</div>
+              <p>Flows で click、input、wait、必要ならデータソースを組み合わせた手順を作る。</p>
+            </div>
+            <div>
+              <div class="label">結果</div>
+              <p>毎回の定型作業が「保存済みの手順を実行する作業」に変わります。</p>
+            </div>
+          </article>
+          <article class="scenario-card">
+            <h3>ログイン処理を Password Vault と組み合わせて使う</h3>
+            <div>
+              <div class="label">困りごと</div>
+              <p>ログイン自動化はしたいが、パスワードをそのままフローに書きたくない。</p>
+            </div>
+            <div>
+              <div class="label">Ladybird でのやり方</div>
+              <p>Password Vault に一度保存し、その名前を入力ステップに紐づける。</p>
+            </div>
+            <div>
+              <div class="label">結果</div>
+              <p>再利用の便利さを保ちながら、平文のまま置いておく状態を避けられます。</p>
+            </div>
+          </article>
+          <article class="scenario-card">
+            <h3>バナー、サイドバー、繰り返し出る案内を消す</h3>
+            <div>
+              <div class="label">困りごと</div>
+              <p>ページ自体は使えるが、ノイズが多くて作業エリアが見づらい。</p>
+            </div>
+            <div>
+              <div class="label">Ladybird でのやり方</div>
+              <p>Hidden で邪魔な部分のルールを追加し、必要なら自動広告非表示も別で有効化する。</p>
+            </div>
+            <div>
+              <div class="label">結果</div>
+              <p>必要な情報だけが残り、落ち着いたレイアウトで作業しやすくなります。</p>
+            </div>
+          </article>
+        </div>
+      </section>
+      <section class="section-card" id="security">
+        <div class="section-head"><span class="section-kicker">Safety &amp; Limits</span>
+          <h2>ローカルに残るものと、うまくいかない可能性がある場面を先に知っておく</h2>
+          <p>Ladybird は仕組みを隠さず、実用性を優先しています。注意点の多くはクラウド処理ではなく、対象サイト側の変化にあります。</p>
+        </div>
+        <div class="security-grid">
+          <article class="security-card">
+            <h3>保存設定は基本的にローカルに残ります。</h3>
+            <p>Elements、Flows、Hidden、関連設定は、自分でエクスポートしない限りブラウザ内に保存されます。</p>
+          </article>
+          <article class="security-card">
+            <h3>Password Vault はローカル暗号化データとして扱われます。</h3>
+            <p>通常のフローテキストと同じ扱いにはせず、パスワード専用の保存経路として分けられています。</p>
+          </article>
+          <article class="security-card">
+            <h3>エクスポートしたファイルの保管は自分の責任です。</h3>
+            <p>とくに Vault データを含めた場合は、そのファイル自体を安全に保管する必要があります。</p>
+          </article>
+          <article class="security-card">
+            <h3>サイトによっては安定しにくいことがあります。</h3>
+            <p>DOM 変更が多いページ、厳しい CSP、クロスオリジン iframe を含むページでは、配置や自動化が不安定になる場合があります。</p>
+          </article>
+          <article class="security-card">
+            <h3>フロー成功はページ状態にも左右されます。</h3>
+            <p>ページ構成や読み込み順が変わると、保存済みの対象が見つからず、実行が止まったり失敗したりすることがあります。</p>
+          </article>
+        </div>
+      </section>
+      <section class="section-card" id="faq">
+        <div class="section-head"><span class="section-kicker">FAQ</span>
+          <h2>初めて使う時によく出る質問</h2>
+        </div>
+        <div class="faq-stack">
+          <details class="faq-item">
+            <summary>Elements と Flows、最初はどちらから始めるべきですか?</summary>
+            <p>ページに見えるものを置きたいなら Elements、複数手順の自動化が目的なら Flows から始めるのが分かりやすいです。</p>
+          </details>
+          <details class="faq-item">
+            <summary>フローが実行できないことがあるのはなぜですか?</summary>
+            <p>ページ構成が変わった、読み込み状況が違う、保存した対象が今の画面に存在しない、といった理由が多いです。</p>
+          </details>
+          <details class="faq-item">
+            <summary>なぜパスワードを平文のままフロー入力に保存できないのですか?</summary>
+            <p>パスワードは通常入力と分けて扱う方が安全なので、Ladybird は Password Vault を使う流れを優先しています。</p>
+          </details>
+          <details class="faq-item">
+            <summary>サイト更新後にルールが効かなくなったのはなぜですか?</summary>
+            <p>サイト側の構造や位置が変わると、以前保存した対象が一致しなくなることがあります。その場合は再選択や編集が必要です。</p>
+          </details>
+          <details class="faq-item">
+            <summary>別のPCへ設定を移すにはどうすればよいですか?</summary>
+            <p>Settings で JSON をエクスポートし、移行先でインポートします。パスワードも必要なら Vault データを含めて移行してください。</p>
+          </details>
+          <details class="faq-item">
+            <summary>Password Vault のパスワードを忘れたらどうなりますか?</summary>
+            <p>そのままでは復元できません。Vault をリセットし、必要なパスワードや紐づけを再設定する必要があります。</p>
+          </details>
+        </div>
+      </section>
+      <section class="section-card" id="resources">
+        <div class="section-head"><span class="section-kicker">More Resources</span>
+          <h2>詳細資料、公開ページ、テスト用リンク</h2>
+        </div>
+        <div class="resources-grid">
+          <article class="resource-card">
+            <h3>公開ページとポリシー</h3>
+            <p>ストア掲載内容、共有用リンク、プライバシー情報が必要な時はこちらを使います。</p>
+            <div class="resource-links"><a
+                href="https://chromewebstore.google.com/detail/ladybird-no-code-buttons/nefpepdpcjejamkgpndlfehkffkfgbpe"
+                target="_blank" rel="noreferrer">Chrome Web Store</a><a href="./PRIVACY-POLICY.ja.md">プライバシーポリシー</a>
+            </div>
+          </article>
+          <article class="resource-card">
+            <h3>テストページ</h3>
+            <p>Elements、Hidden、Flows、データソース挙動を安全に試したい時に使えるページです。</p>
+            <div class="resource-links"><a href="./test-pages/index.ja.html">テストページ一覧</a><a
+                href="./test-pages/basic/test-page.html">Basic Playground</a><a
+                href="./test-pages/data-source/datasource-form-a.html">Data Source Demo</a></div>
+          </article>
+        </div>
+      </section>
+    </main>
+    <footer>Ladybird ヘルプホーム。スクリーンショット差し替え枠は、あとで現行UIの画像に置き換えてください。</footer>
   </div>
 </body>
+
 </html>

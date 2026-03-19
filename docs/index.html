@@ -1,144 +1,906 @@
 <!doctype html>
 <html lang="en">
+
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Ladybird Docs</title>
+  <title>Ladybird Help</title>
   <style>
     :root {
-      --bg: #f7fafc;
-      --card: #ffffff;
-      --ink: #0f172a;
-      --muted: #475569;
-      --line: #e2e8f0;
-      --accent: #1d4ed8;
-      --soft: #eff6ff;
-      --tag: #ecfeff;
+      --bg: #f4efe6;
+      --card: rgba(255, 255, 255, .92);
+      --ink: #1f2937;
+      --muted: #5f6b7a;
+      --line: rgba(148, 163, 184, .28);
+      --accent: #0f766e;
+      --accent-strong: #115e59;
+      --accent-soft: rgba(15, 118, 110, .1);
+      --warm: #b45309;
+      --warm-soft: rgba(180, 83, 9, .12);
+      --shadow: 0 18px 44px rgba(31, 41, 55, .09);
+      --radius-xl: 28px;
+      --radius-lg: 20px;
+      --radius-md: 16px;
+      --font: "Segoe UI", "Inter", system-ui, sans-serif
     }
-    * { box-sizing: border-box; }
+
+    * {
+      box-sizing: border-box
+    }
+
+    html {
+      scroll-behavior: smooth
+    }
+
     body {
       margin: 0;
-      background: linear-gradient(180deg, #f8fafc 0%, #eef2ff 100%);
       color: var(--ink);
-      font: 14px/1.6 "Segoe UI", system-ui, sans-serif;
+      background: radial-gradient(circle at top left, rgba(15, 118, 110, .1), transparent 30%), radial-gradient(circle at top right, rgba(180, 83, 9, .12), transparent 28%), linear-gradient(180deg, var(--bg) 0%, #f9f7f2 46%, #fbfaf8 100%);
+      font: 15px/1.7 var(--font)
     }
-    .wrap { max-width: 1080px; margin: 0 auto; padding: 24px 16px 48px; }
-    .hero, .card {
-      background: var(--card);
+
+    a {
+      color: inherit
+    }
+
+    h1,
+    h2,
+    h3,
+    p {
+      margin: 0
+    }
+
+    .wrap {
+      width: min(1120px, calc(100% - 32px));
+      margin: 0 auto;
+      padding: 28px 0 56px
+    }
+
+    .hero,
+    .section-card,
+    .anchor-nav,
+    .step-card,
+    .capability-card,
+    .feature-card,
+    .scenario-card,
+    .security-card,
+    .faq-item,
+    .resource-card {
       border: 1px solid var(--line);
-      border-radius: 16px;
-      box-shadow: 0 12px 32px rgba(15, 23, 42, 0.06);
+      background: var(--card);
+      box-shadow: var(--shadow);
+      backdrop-filter: blur(14px)
     }
-    .hero { padding: 24px; margin-bottom: 16px; }
-    h1 { margin: 0 0 8px; font-size: 28px; line-height: 1.2; }
-    h2 { margin: 0 0 10px; font-size: 20px; }
-    h3 { margin: 0 0 8px; font-size: 16px; }
-    p { margin: 0; color: var(--muted); }
-    .langs { margin-top: 12px; display: flex; gap: 8px; flex-wrap: wrap; }
-    .langs a, .quick a, .backlink {
-      text-decoration: none; color: var(--accent);
-      border: 1px solid #bfdbfe; background: var(--soft);
-      border-radius: 999px; padding: 6px 10px; font-weight: 600;
-      display: inline-flex; align-items: center; gap: 6px;
+
+    .hero {
+      position: relative;
+      overflow: hidden;
+      border-radius: var(--radius-xl);
+      padding: 32px
     }
-    .grid { display: grid; gap: 16px; }
-    .quick {
-      display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-      gap: 12px; margin-bottom: 16px;
+
+    .hero::after {
+      content: "";
+      position: absolute;
+      inset: auto -80px -80px auto;
+      width: 220px;
+      height: 220px;
+      border-radius: 50%;
+      background: radial-gradient(circle, rgba(15, 118, 110, .14), transparent 70%);
+      pointer-events: none
     }
-    .quick a { border-radius: 12px; padding: 12px; justify-content: center; }
-    .card { padding: 18px; }
-    .groups { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 12px; }
-    .group {
-      border: 1px solid var(--line); border-radius: 12px; padding: 14px; background: #fff;
+
+    .eyebrow {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 7px 12px;
+      border-radius: 999px;
+      background: var(--accent-soft);
+      color: var(--accent-strong);
+      font-size: 12px;
+      font-weight: 700;
+      letter-spacing: .08em;
+      text-transform: uppercase
     }
-    .links { margin-top: 10px; display: grid; gap: 6px; }
-    .links a { color: var(--accent); text-decoration: none; font-weight: 600; }
-    .tags { margin-top: 10px; display: flex; flex-wrap: wrap; gap: 6px; }
+
+    h1 {
+      max-width: 760px;
+      margin-top: 18px;
+      font-size: clamp(2.2rem, 4vw, 4rem);
+      line-height: 1.08;
+      letter-spacing: -.03em
+    }
+
+    .hero p {
+      max-width: 720px;
+      margin-top: 14px;
+      color: var(--muted);
+      font-size: 1.05rem
+    }
+
+    .button-row,
+    .lang-switch,
+    .hero-links,
+    .pill-row,
+    .anchor-links,
+    .resource-links {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px
+    }
+
+    .button-row {
+      margin-top: 24px
+    }
+
+    .btn,
+    .lang-switch a,
+    .anchor-links a,
+    .resource-links a {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 42px;
+      padding: 0 16px;
+      border-radius: 999px;
+      border: 1px solid transparent;
+      text-decoration: none;
+      font-weight: 700;
+      transition: transform .16s ease, border-color .16s ease, background .16s ease
+    }
+
+    .btn:hover,
+    .lang-switch a:hover,
+    .anchor-links a:hover,
+    .resource-links a:hover {
+      transform: translateY(-1px)
+    }
+
+    .btn-primary {
+      background: var(--accent);
+      color: #fff
+    }
+
+    .btn-secondary {
+      border-color: rgba(15, 118, 110, .22);
+      background: rgba(255, 255, 255, .78);
+      color: var(--accent-strong)
+    }
+
+    .hero-links {
+      margin-top: 16px;
+      color: var(--muted);
+      font-size: .95rem
+    }
+
+    .hero-links a {
+      color: var(--accent-strong);
+      text-decoration: none;
+      font-weight: 600
+    }
+
+    .pill-row {
+      margin-top: 20px
+    }
+
+    .pill {
+      display: inline-flex;
+      align-items: center;
+      min-height: 32px;
+      padding: 0 12px;
+      border-radius: 999px;
+      background: rgba(255, 255, 255, .82);
+      border: 1px solid var(--line);
+      color: var(--muted);
+      font-size: 13px;
+      font-weight: 600
+    }
+
+    .lang-switch {
+      margin-top: 24px
+    }
+
+    .lang-switch a {
+      border-color: var(--line);
+      background: rgba(255, 255, 255, .72);
+      color: var(--muted);
+      min-height: 38px;
+      padding: 0 14px
+    }
+
+    .lang-switch a.active {
+      background: var(--accent-soft);
+      border-color: rgba(15, 118, 110, .18);
+      color: var(--accent-strong)
+    }
+
+    .anchor-nav {
+      position: sticky;
+      top: 12px;
+      z-index: 10;
+      margin-top: 18px;
+      border-radius: 18px;
+      padding: 14px
+    }
+
+    .anchor-links a {
+      min-height: 38px;
+      padding: 0 14px;
+      border-color: var(--line);
+      background: rgba(255, 255, 255, .72);
+      color: var(--muted);
+      font-size: 14px
+    }
+
+    main {
+      margin-top: 18px;
+      display: grid;
+      gap: 18px
+    }
+
+    .section-card {
+      border-radius: var(--radius-lg);
+      padding: 28px
+    }
+
+    .section-head {
+      display: grid;
+      gap: 10px;
+      margin-bottom: 20px
+    }
+
+    .section-kicker {
+      color: var(--warm);
+      font-size: 12px;
+      font-weight: 800;
+      letter-spacing: .08em;
+      text-transform: uppercase
+    }
+
+    h2 {
+      font-size: clamp(1.55rem, 2vw, 2.2rem);
+      line-height: 1.15;
+      letter-spacing: -.02em
+    }
+
+    .section-head p {
+      max-width: 760px;
+      color: var(--muted)
+    }
+
+    .steps,
+    .capability-grid,
+    .feature-grid,
+    .scenario-grid,
+    .security-grid,
+    .resources-grid {
+      display: grid;
+      gap: 16px
+    }
+
+    .steps {
+      grid-template-columns: repeat(2, minmax(0, 1fr))
+    }
+
+    .step-card,
+    .feature-card {
+      border-radius: var(--radius-md);
+      padding: 18px
+    }
+
+    .step-card {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) 220px;
+      gap: 16px
+    }
+    .step-copy{
+      grid-template-rows: 30px 40px;
+    }
+    .step-copy,
+    .feature-copy,
+    .capability-card,
+    .scenario-card,
+    .security-card,
+    .resource-card {
+      display: grid;
+      gap: 12px
+    }
+
+    .step-no {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 34px;
+      height: 34px;
+      border-radius: 50%;
+      background: var(--accent-soft);
+      color: var(--accent-strong);
+      font-weight: 800
+    }
+
+    .step-copy h3,
+    .capability-card h3,
+    .feature-copy h3,
+    .scenario-card h3,
+    .security-card h3,
+    .resource-card h3 {
+      font-size: 1.05rem;
+      line-height: 1.3
+    }
+
+    .step-copy p,
+    .capability-card p,
+    .feature-copy p,
+    .scenario-card p,
+    .security-card p,
+    .resource-card p,
+    .reminder {
+      color: var(--muted)
+    }
+
+    .shot {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 164px;
+      /* padding: 18px; */
+      border: 1px dashed rgba(15, 118, 110, .32);
+      border-radius: 14px;
+      background: linear-gradient(180deg, rgba(15, 118, 110, .06), rgba(255, 255, 255, .9)), repeating-linear-gradient(-45deg, rgba(15, 118, 110, .05), rgba(15, 118, 110, .05) 12px, rgba(255, 255, 255, .76) 12px, rgba(255, 255, 255, .76) 24px);
+      text-align: center;
+      color: var(--accent-strong);
+      font-size: 13px;
+      font-weight: 700
+    }
+
+    .capability-grid {
+      grid-template-columns: repeat(5, minmax(0, 1fr))
+    }
+
+    .capability-card,
+    .scenario-card,
+    .security-card,
+    .resource-card,
+    .faq-item {
+      border-radius: var(--radius-md);
+      padding: 18px
+    }
+
+    .capability-card {
+      min-height: 192px
+    }
+
+    .feature-grid {
+      grid-template-columns: repeat(2, minmax(0, 1fr))
+    }
+
+    .feature-card {
+      display: grid;
+      gap: 16px;
+      grid-template-columns: minmax(0, 1fr) 210px
+    }
+
     .tag {
-      font-size: 12px; border-radius: 999px; padding: 3px 8px;
-      border: 1px solid #bae6fd; background: var(--tag); color: #0f766e;
+      display: inline-flex;
+      align-items: center;
+      min-height: 30px;
+      width: fit-content;
+      padding: 0 10px;
+      border-radius: 999px;
+      background: var(--warm-soft);
+      color: var(--warm);
+      font-size: 12px;
+      font-weight: 700
     }
-    .assets { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 10px; }
-    .asset {
-      border: 1px solid var(--line); border-radius: 12px; padding: 12px; background: #fff;
+
+    .feature-list {
+      margin: 0;
+      padding: 0;
+      list-style: none;
+      display: grid;
+      gap: 8px
     }
-    .asset a { color: var(--accent); font-weight: 600; text-decoration: none; }
-    footer { margin-top: 16px; color: var(--muted); font-size: 12px; }
+
+    .feature-list li {
+      position: relative;
+      padding-left: 16px;
+      color: var(--ink)
+    }
+
+    .feature-list li::before {
+      content: "";
+      position: absolute;
+      left: 0;
+      top: 11px;
+      width: 7px;
+      height: 7px;
+      border-radius: 50%;
+      background: var(--accent)
+    }
+
+    .reminder {
+      padding: 12px 14px;
+      border-radius: 14px;
+      background: rgba(15, 118, 110, .06);
+      border: 1px solid rgba(15, 118, 110, .14);
+      font-size: 13px
+    }
+
+    .scenario-grid,
+    .security-grid,
+    .resources-grid {
+      grid-template-columns: repeat(2, minmax(0, 1fr))
+    }
+
+    .label {
+      color: var(--warm);
+      font-size: 12px;
+      font-weight: 800;
+      letter-spacing: .05em;
+      text-transform: uppercase
+    }
+
+    .faq-stack {
+      display: grid;
+      gap: 12px
+    }
+
+    .faq-item summary {
+      cursor: pointer;
+      list-style: none;
+      font-weight: 700;
+      font-size: 1rem
+    }
+
+    .faq-item summary::-webkit-details-marker {
+      display: none
+    }
+
+    .faq-item p {
+      margin-top: 12px;
+      color: var(--muted)
+    }
+
+    .resource-links a {
+      min-height: 38px;
+      padding: 0 14px;
+      border-color: rgba(15, 118, 110, .16);
+      background: rgba(15, 118, 110, .06);
+      color: var(--accent-strong);
+      font-size: 14px
+    }
+
+    footer {
+      margin-top: 18px;
+      padding: 0 4px;
+      color: var(--muted);
+      font-size: 13px;
+      text-align: center
+    }
+
+    @media (max-width:1080px) {
+      .capability-grid {
+        grid-template-columns: repeat(3, minmax(0, 1fr))
+      }
+    }
+
+    @media (max-width:860px) {
+      .wrap {
+        width: min(100% - 20px, 1120px);
+        padding-top: 20px;
+        padding-bottom: 40px
+      }
+
+      .hero,
+      .section-card {
+        padding: 22px
+      }
+
+      .steps,
+      .feature-grid,
+      .scenario-grid,
+      .security-grid,
+      .resources-grid {
+        grid-template-columns: 1fr
+      }
+
+      .step-card,
+      .feature-card {
+        grid-template-columns: 1fr
+      }
+
+      .capability-grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr))
+      }
+
+      .anchor-nav {
+        position: static
+      }
+    }
+
+    @media (max-width:560px) {
+      body {
+        font-size: 14px
+      }
+
+      .hero,
+      .section-card {
+        padding: 20px
+      }
+
+      .capability-grid {
+        grid-template-columns: 1fr
+      }
+
+      .button-row .btn,
+      .anchor-links a,
+      .lang-switch a,
+      .resource-links a {
+        width: 100%
+      }
+    }
   </style>
 </head>
+
 <body>
   <div class="wrap">
-    <section class="hero">
-      <h1>Ladybird Docs</h1>
-      <p>Documentation hub for test pages, test planning documents, demo assets, and privacy policy.</p>
-      <div class="langs">
-        <a href="./index.html">English</a>
-        <a href="./index.ja.html">日本語</a>
-        <a href="./index.zh-CN.html">简体中文</a>
+    <header class="hero">
+      <span class="eyebrow">Chrome Extension Help</span>
+      <h1>Customize websites and automate routine clicks without writing code.</h1>
+      <p>Ladybird is for people who repeat the same web tasks, want cleaner pages, or need faster shortcuts inside
+        websites they use every day.</p>
+      <div class="button-row">
+        <a class="btn btn-primary" href="#quick-start">Start with Quick Start</a>
+        <a class="btn btn-secondary" href="#core-features">Explore Core Features</a>
       </div>
-    </section>
-
-    <section class="quick">
-      <a href="./test-pages/index.html">Test Pages</a>
-      <a href="./testing/screen-test-matrix.md">Screen Test Matrix (MD)</a>
-      <a href="./testing/test-checklist.md">Test Checklist (MD)</a>
-      <a href="./PRIVACY-POLICY.md">Privacy Policy (MD)</a>
-    </section>
-
-    <section class="card grid">
-      <h2>Test Pages</h2>
-      <div class="groups">
-        <div class="group">
-          <h3>Basic Playground</h3>
-          <p>Basic injection, hidden rules, popup, input, and navigation tests across two simple pages.</p>
-          <div class="links">
-            <a href="./test-pages/basic/test-page.html">Open test-page.html</a>
-            <a href="./test-pages/basic/test-page2.html">Open test-page2.html</a>
-          </div>
-          <div class="tags">
-            <span class="tag">elements</span>
-            <span class="tag">hidden</span>
-            <span class="tag">popup</span>
-            <span class="tag">navigate</span>
-          </div>
+      <div class="hero-links">
+        <span>Need the store page or policy first?</span>
+        <a href="https://chromewebstore.google.com/detail/ladybird-no-code-buttons/nefpepdpcjejamkgpndlfehkffkfgbpe"
+          target="_blank" rel="noreferrer">Chrome Web Store</a>
+        <span>·</span>
+        <a href="./PRIVACY-POLICY.md">Privacy Policy</a>
+      </div>
+      <div class="pill-row"><span class="pill">Elements</span><span class="pill">Flows</span><span class="pill">Hidden
+          Rules</span><span class="pill">Password Vault</span><span class="pill">Import / Export</span></div>
+      <div class="lang-switch"><a class="active" href="./index.html">English</a><a href="./index.ja.html">日本語</a><a
+          href="./index.zh-CN.html">简体中文</a></div>
+    </header>
+    <nav class="anchor-nav" aria-label="Page sections">
+      <div class="anchor-links"><a href="#quick-start">Quick Start</a><a href="#outcomes">What You Can Do</a><a
+          href="#core-features">Core Features</a><a href="#scenarios">Typical Scenarios</a><a href="#security">Safety
+          &amp; Limits</a><a href="#faq">FAQ</a><a href="#resources">More Resources</a></div>
+    </nav>
+    <main>
+      <section class="section-card" id="quick-start">
+        <div class="section-head"><span class="section-kicker">Quick Start</span>
+          <h2>Follow these four steps the first time you use Ladybird.</h2>
+          <p>If you only remember one workflow, remember this: open the site, open the side panel, add what you need,
+            then save and check the result on the page.</p>
         </div>
-
-        <div class="group">
-          <h3>Data Source Flow</h3>
-          <p>Form-fill and submit flow between Screen A and Screen B with realistic field types.</p>
-          <div class="links">
-            <a href="./test-pages/data-source/datasource-form-a.html">Open Screen A</a>
-            <a href="./test-pages/data-source/datasource-form-b.html">Open Screen B</a>
-            <a href="./assets/data/datasource-form-data.csv">Open sample CSV</a>
-          </div>
-          <div class="tags">
-            <span class="tag">input</span>
-            <span class="tag">form-submit</span>
-            <span class="tag">date</span>
-            <span class="tag">number</span>
-          </div>
+        <div class="steps">
+          <article class="step-card">
+            <div class="step-copy"><span class="step-no">1</span>
+              <h3>Open the webpage you want to change.</h3>
+              <p>Go to the actual page where you want a shortcut button, an automated flow, or a hidden rule. Ladybird
+                works against the page you currently have open.</p>
+            </div>
+          </article>
+          <article class="step-card">
+            <div class="step-copy"><span class="step-no">2</span>
+              <h3>Open the Ladybird side panel.</h3>
+              <p>Use the extension side panel so you can see the tabs for Elements, Flows, Hidden, Overview, and
+                Settings while keeping the page visible beside it.</p>
+            </div>
+            <div class="shot"><img src="./assets/ladybrid_home.png" style="width: 100%;"/></div>
+          </article>
+          <article class="step-card">
+            <div class="step-copy"><span class="step-no">3</span>
+              <h3>Add an element, a flow, or a hidden rule from the right tab.</h3>
+              <p>Use Elements for things you want to place on the page, Flows for multi-step actions, and Hidden when
+                you simply want something to disappear.</p>
+            </div>
+            <div class="shot"><img src="./assets/add_element.png" style="width: 100%;"/></div>
+          </article>
+          <article class="step-card">
+            <div class="step-copy"><span class="step-no">4</span>
+              <h3>Save, then check the page or run the flow.</h3>
+              <p>After saving, your new UI should appear on the page, your hidden rule should take effect, or your flow
+                should be ready to run from the list.</p>
+            </div>
+            <div class="shot"><img src="./assets/edit_element.png" style="width: 100%;"/></div>
+          </article>
         </div>
-
-      </div>
-    </section>
-
-    <section class="card grid" style="margin-top:16px;">
-      <h2>Demo Assets (Reference Only)</h2>
-      <p>These files are visual references and demo captures, not executable test pages.</p>
-      <div class="assets">
-        <div class="asset"><a href="./assets/demos/Overview.png">Overview.png</a></div>
-        <div class="asset"><a href="./assets/demos/add%20button.gif">add button.gif</a></div>
-        <div class="asset"><a href="./assets/demos/add%20Action.gif">add Action.gif</a></div>
-        <div class="asset"><a href="./assets/demos/add%20area.gif">add area.gif</a></div>
-        <div class="asset"><a href="./assets/demos/move%20button.gif">move button.gif</a></div>
-        <div class="asset"><a href="./assets/demos/button%20sample.gif">button sample.gif</a></div>
-      </div>
-    </section>
-
-    <footer>
-      Ladybird docs portal (English). Use the language links above for Japanese and Simplified Chinese versions.
+      </section>
+      <section class="section-card" id="outcomes">
+        <div class="section-head"><span class="section-kicker">What You Can Do</span>
+          <h2>Think in outcomes first, not in technical terms.</h2>
+          <p>Ladybird is easier to learn when you start with the result you want to see on the page.</p>
+        </div>
+        <div class="capability-grid">
+          <article class="capability-card">
+            <h3>Add buttons, links, tooltips, and areas to a page.</h3>
+            <p>Place your own quick actions on top of sites you use often, without rebuilding the site itself.</p>
+          </article>
+          <article class="capability-card">
+            <h3>Turn repeated clicks and typing into a reusable flow.</h3>
+            <p>Save common page actions so you do not have to repeat the same sequence every time.</p>
+          </article>
+          <article class="capability-card">
+            <h3>Hide distracting sections and common ads.</h3>
+            <p>Remove banners, sidebars, repeated notices, or noisy blocks that get in your way.</p>
+          </article>
+          <article class="capability-card">
+            <h3>Reuse passwords safely through the Password Vault.</h3>
+            <p>Bind saved passwords to flow steps instead of leaving plain text in your automation setup.</p>
+          </article>
+          <article class="capability-card">
+            <h3>Move or share your setup with import and export.</h3>
+            <p>Back up your saved sites, carry them to another machine, or send a configuration to teammates.</p>
+          </article>
+        </div>
+      </section>
+      <section class="section-card" id="core-features">
+        <div class="section-head"><span class="section-kicker">Core Features</span>
+          <h2>Each tab has a clear job inside the workflow.</h2>
+          <p>Start simple. Use one tab for the immediate problem, then combine features only when you need more.</p>
+        </div>
+        <div class="feature-grid">
+          <article class="feature-card">
+            <div class="feature-copy"><span class="tag">Elements</span>
+              <h3>Place visible helpers directly on the current page.</h3>
+              <p>Best when you want a button, link, tooltip, or area to appear exactly where you need it.</p>
+              <ul class="feature-list">
+                <li>Add four element types: button, link, tooltip, and area.</li>
+                <li>Pick a position on the page instead of guessing where it should go.</li>
+                <li>Connect a button to a URL, selector action, or saved flow.</li>
+              </ul>
+              <p class="reminder">Reminder: start with a stable page location so your element is easier to keep working
+                after site updates.</p>
+            </div>
+            <div class="shot"><img src="./assets/edit_element_box.png" style="width: 100%;"/></div>
+          </article>
+          <article class="feature-card">
+            <div class="feature-copy"><span class="tag">Flows</span>
+              <h3>Save repeated page work as a flow you can run again.</h3>
+              <p>Best for clicks, typing, waiting, branching, confirmations, or multi-step actions that happen often.
+              </p>
+              <ul class="feature-list">
+                <li>Build steps for click, input, wait, navigate, popup, assertions, conditions, loops, variables, and
+                  data sources.</li>
+                <li>Record page actions to create a draft, then edit the steps later.</li>
+                <li>Run a flow from the list and watch status, current step, and execution logs.</li>
+              </ul>
+              <p class="reminder">Reminder: if a page changes often, flows may need selector updates before they run
+                cleanly again.</p>
+            </div>
+            <div class="shot"><img src="./assets/edit_flow_box.png" style="width: 100%;"/></div>
+          </article>
+          <article class="feature-card">
+            <div class="feature-copy"><span class="tag">Hidden</span>
+              <h3>Remove the parts of a site you do not want to keep seeing.</h3>
+              <p>Best for banners, repeated prompts, side sections, and clutter that makes a page harder to use.</p>
+              <ul class="feature-list">
+                <li>Create manual hidden rules for the current site with the element picker.</li>
+                <li>Pause or enable individual rules without deleting them.</li>
+                <li>Use the built-in automatic ad blocking toggle separately from your own rules.</li>
+              </ul>
+              <p class="reminder">Reminder: manual hidden rules belong to a site, while automatic ad blocking is a
+                separate global switch.</p>
+            </div>
+            <div class="shot"><img src="./assets/hidden_page.png" style="width: 100%;"/></div>
+          </article>
+          <article class="feature-card">
+            <div class="feature-copy"><span class="tag">Overview</span>
+              <h3>See what you have already saved for each site.</h3>
+              <p>Best when you want a quick inventory before cleanup, export, or troubleshooting.</p>
+              <ul class="feature-list">
+                <li>Review how many elements, flows, and hidden rules exist per site.</li>
+                <li>Spot which sites have the most saved customization.</li>
+                <li>Delete all saved data for one site when you want a clean reset.</li>
+              </ul>
+              <p class="reminder">Reminder: Overview is the fastest place to understand your saved footprint before
+                importing or deleting anything.</p>
+            </div>
+            <div class="shot"><img src="./assets/overview_page.png" style="width: 100%;"/></div>
+          </article>
+          <article class="feature-card">
+            <div class="feature-copy"><span class="tag">Password Vault</span>
+              <h3>Keep saved passwords out of plain-text flow steps.</h3>
+              <p>Best for login or secure input steps where you want reuse without exposing the value inside the flow.
+              </p>
+              <ul class="feature-list">
+                <li>Create a local vault password, then add named password entries.</li>
+                <li>Bind a saved password to a flow step instead of typing the value directly.</li>
+                <li>Unlock the vault during a run and continue from the current step, even from the page prompt.</li>
+              </ul>
+              <p class="reminder">Reminder: if you forget the vault password, the stored vault data cannot be recovered
+                and must be reset.</p>
+            </div>
+            <div class="shot"><img src="./assets/vailt_password.png" style="width: 100%;"/></div>
+          </article>
+          <article class="feature-card">
+            <div class="feature-copy"><span class="tag">Settings</span>
+              <h3>Control language, backups, sharing, and data transfer.</h3>
+              <p>Best when you are moving devices, sharing a setup, or adjusting the side panel language.</p>
+              <ul class="feature-list">
+                <li>Import and export saved configuration as JSON.</li>
+                <li>Optionally include Password Vault data during export and import.</li>
+                <li>Switch the side panel language and open or copy the store link.</li>
+              </ul>
+              <p class="reminder">Reminder: exported files are your responsibility to store safely, especially if they
+                include vault data.</p>
+            </div>
+            <div class="shot"><img src="./assets/settings_page.png" style="width: 100%;"/></div>
+          </article>
+        </div>
+      </section>
+      <section class="section-card" id="scenarios">
+        <div class="section-head"><span class="section-kicker">Typical Scenarios</span>
+          <h2>These are the kinds of problems Ladybird is good at solving.</h2>
+          <p>Each example below follows the same pattern: what hurts now, how Ladybird helps, and what you get back.</p>
+        </div>
+        <div class="scenario-grid">
+          <article class="scenario-card">
+            <h3>Add quick-report buttons to an internal dashboard.</h3>
+            <div>
+              <div class="label">Problem</div>
+              <p>You keep opening the same report pages through several clicks inside a busy back-office tool.</p>
+            </div>
+            <div>
+              <div class="label">Ladybird</div>
+              <p>Create page buttons or links in Elements so the shortcuts live exactly where you work.</p>
+            </div>
+            <div>
+              <div class="label">Result</div>
+              <p>Your most-used destinations become one click away on the page you already have open.</p>
+            </div>
+          </article>
+          <article class="scenario-card">
+            <h3>Turn repeated form entry into a runnable flow.</h3>
+            <div>
+              <div class="label">Problem</div>
+              <p>You enter the same fields again and again across a form or a sequence of screens.</p>
+            </div>
+            <div>
+              <div class="label">Ladybird</div>
+              <p>Build a flow with click, input, wait, and optional data-source steps so the sequence is reusable.</p>
+            </div>
+            <div>
+              <div class="label">Result</div>
+              <p>The routine turns into a saved process that is faster to repeat and easier to standardize.</p>
+            </div>
+          </article>
+          <article class="scenario-card">
+            <h3>Bind login steps to the Password Vault instead of typing passwords into flows.</h3>
+            <div>
+              <div class="label">Problem</div>
+              <p>You want login automation, but keeping a password directly inside the flow is a bad habit.</p>
+            </div>
+            <div>
+              <div class="label">Ladybird</div>
+              <p>Save the password once in the Password Vault, then bind that entry to the input step.</p>
+            </div>
+            <div>
+              <div class="label">Result</div>
+              <p>You keep the convenience of reuse without leaving the secret as plain text in your flow setup.</p>
+            </div>
+          </article>
+          <article class="scenario-card">
+            <h3>Remove banners, side panels, and repeated notices from a noisy page.</h3>
+            <div>
+              <div class="label">Problem</div>
+              <p>The page is technically usable, but banners and repeated blocks make the work area harder to read.</p>
+            </div>
+            <div>
+              <div class="label">Ladybird</div>
+              <p>Create a hidden rule for the distracting area and keep automatic ad blocking separate for global use.
+              </p>
+            </div>
+            <div>
+              <div class="label">Result</div>
+              <p>You get a calmer page layout that keeps the useful content visible and the noise out of the way.</p>
+            </div>
+          </article>
+        </div>
+      </section>
+      <section class="section-card" id="security">
+        <div class="section-head"><span class="section-kicker">Safety &amp; Limits</span>
+          <h2>What stays local, and what can still go wrong.</h2>
+          <p>Ladybird aims to be practical and transparent. The key limits come from websites changing under you, not
+            from hidden cloud processing.</p>
+        </div>
+        <div class="security-grid">
+          <article class="security-card">
+            <h3>Your saved setup stays local by default.</h3>
+            <p>Elements, flows, hidden rules, and related settings are stored locally in the browser unless you export
+              them yourself.</p>
+          </article>
+          <article class="security-card">
+            <h3>Password Vault data is stored as local encrypted data.</h3>
+            <p>The vault is designed so passwords are not handled like normal plain-text flow values.</p>
+          </article>
+          <article class="security-card">
+            <h3>Exported files need your own care.</h3>
+            <p>If you export configuration, especially with vault data included, you are responsible for keeping that
+              file secure.</p>
+          </article>
+          <article class="security-card">
+            <h3>Some sites can be unstable targets.</h3>
+            <p>Pages with frequent DOM changes, strict CSP policies, or cross-origin iframes may reduce placement or
+              automation reliability.</p>
+          </article>
+          <article class="security-card">
+            <h3>Flow success still depends on the page state.</h3>
+            <p>If the page changes, loads slowly, or the selector is no longer correct, the run may pause, fail, or need
+              updates.</p>
+          </article>
+        </div>
+      </section>
+      <section class="section-card" id="faq">
+        <div class="section-head"><span class="section-kicker">FAQ</span>
+          <h2>Common questions from first-time users.</h2>
+        </div>
+        <div class="faq-stack">
+          <details class="faq-item">
+            <summary>Should I start with Elements or Flows?</summary>
+            <p>Start with Elements when you want to place something visible on the page. Start with Flows when the real
+              goal is to automate several actions in sequence.</p>
+          </details>
+          <details class="faq-item">
+            <summary>Why does a flow sometimes fail to run?</summary>
+            <p>Usually because the page changed, loaded differently, or a saved selector no longer matches the current
+              screen. Running depends on the page being in the expected state.</p>
+          </details>
+          <details class="faq-item">
+            <summary>Why can’t I save a password directly as plain text in a password input flow step?</summary>
+            <p>Ladybird is designed to push password use toward the Password Vault instead, so secrets are handled
+              separately from normal flow text.</p>
+          </details>
+          <details class="faq-item">
+            <summary>Why did my rule stop working after the site changed?</summary>
+            <p>Website updates can change structure, labels, or placement. When that happens, the saved target may need
+              to be picked again or edited.</p>
+          </details>
+          <details class="faq-item">
+            <summary>How do I move my setup to another computer?</summary>
+            <p>Use Settings to export your data as JSON, then import that file on the other machine. If you also need
+              passwords, include the vault data during export and import it with the correct vault password.</p>
+          </details>
+          <details class="faq-item">
+            <summary>What happens if I forget the Password Vault password?</summary>
+            <p>The vault cannot be recovered without that password. You will need to reset the vault and then bind the
+              affected flow steps again.</p>
+          </details>
+        </div>
+      </section>
+      <section class="section-card" id="resources">
+        <div class="section-head"><span class="section-kicker">More Resources</span>
+          <h2>Advanced links, references, and testing pages.</h2>
+        </div>
+        <div class="resources-grid">
+          <article class="resource-card">
+            <h3>Privacy and Store</h3>
+            <p>Use these when you need the public listing, policy details, or a link to share with teammates.</p>
+            <div class="resource-links"><a
+                href="https://chromewebstore.google.com/detail/ladybird-no-code-buttons/nefpepdpcjejamkgpndlfehkffkfgbpe"
+                target="_blank" rel="noreferrer">Chrome Web Store</a><a href="./PRIVACY-POLICY.md">Privacy Policy</a>
+            </div>
+          </article>
+          <article class="resource-card">
+            <h3>Testing Pages</h3>
+            <p>Open these pages if you want a safe place to try elements, hidden rules, flows, and data-source behavior.
+            </p>
+            <div class="resource-links"><a href="./test-pages/index.html">Test Pages</a><a
+                href="./test-pages/basic/test-page.html">Basic Playground</a><a
+                href="./test-pages/data-source/datasource-form-a.html">Data Source Demo</a></div>
+          </article>
+        </div>
+      </section>
+    </main>
+    <footer>Ladybird help home. Replace the screenshot placeholders later with your own captures from the current UI.
     </footer>
   </div>
 </body>
+
 </html>

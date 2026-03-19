@@ -5,7 +5,8 @@ import path from 'node:path';
 import process from 'node:process';
 import { fileURLToPath } from 'node:url';
 
-const HOST = '127.0.0.1';
+const LISTEN_HOST = '0.0.0.0';
+const DEFAULT_HOST = '127.0.0.1';
 const DEFAULT_PORT = 4173;
 const DEFAULT_DOC_PATH = '/index.html';
 const SCRIPT_DIR = path.dirname(fileURLToPath(import.meta.url));
@@ -46,7 +47,7 @@ const resolveFilePath = (requestPathname) => {
 
 const createDocsServer = async (startPort = DEFAULT_PORT) => {
   const server = createServer(async (req, res) => {
-    const url = new URL(req.url || '/', `http://${HOST}:${startPort}`);
+    const url = new URL(req.url || '/', `http://${DEFAULT_HOST}:${startPort}`);
     const filePath = resolveFilePath(url.pathname);
     if (!filePath) {
       res.writeHead(403, { 'Content-Type': 'text/plain; charset=utf-8' });
@@ -78,7 +79,7 @@ const createDocsServer = async (startPort = DEFAULT_PORT) => {
   const listen = (port) =>
     new Promise((resolve, reject) => {
       server.once('error', reject);
-      server.listen(port, HOST, () => {
+      server.listen(port, LISTEN_HOST, () => {
         server.off('error', reject);
         resolve(port);
       });
@@ -103,11 +104,11 @@ const createDocsServer = async (startPort = DEFAULT_PORT) => {
 const main = async () => {
   const { server, port } = await createDocsServer(DEFAULT_PORT);
   console.log(`[docs] serving ${DOCS_ROOT}`);
-  console.log(`[docs] http://${HOST}:${port}${DEFAULT_DOC_PATH} (default)`);
-  console.log(`[docs] http://${HOST}:${port}/test-pages/data-source/datasource-form-a.html`);
-  console.log(`[docs] http://${HOST}:${port}/test-pages/data-source/datasource-form-b.html`);
+  console.log(`[docs] http://${DEFAULT_HOST}:${port}${DEFAULT_DOC_PATH} (default)`);
+  console.log(`[docs] http://${DEFAULT_HOST}:${port}/test-pages/data-source/datasource-form-a.html`);
+  console.log(`[docs] http://${DEFAULT_HOST}:${port}/test-pages/data-source/datasource-form-b.html`);
 
-  const defaultDocsUrl = `http://${HOST}:${port}${DEFAULT_DOC_PATH}`;
+  const defaultDocsUrl = `http://${DEFAULT_HOST}:${port}${DEFAULT_DOC_PATH}`;
   const wxtEnv = {
     ...process.env,
     WXT_DEV_START_URL: defaultDocsUrl,
