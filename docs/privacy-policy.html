@@ -1,0 +1,90 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Ladybird Privacy Policy</title>
+  <style>
+    :root{--bg:#f4efe6;--card:rgba(255,255,255,.94);--ink:#1f2937;--muted:#5f6b7a;--line:rgba(148,163,184,.28);--accent:#0f766e;--accent-strong:#115e59;--accent-soft:rgba(15,118,110,.1);--shadow:0 18px 44px rgba(31,41,55,.09);--radius-xl:28px;--radius-lg:20px;--font:"Segoe UI","Inter",system-ui,sans-serif}
+    *{box-sizing:border-box}body{margin:0;color:var(--ink);background:radial-gradient(circle at top left,rgba(15,118,110,.1),transparent 30%),radial-gradient(circle at top right,rgba(180,83,9,.12),transparent 28%),linear-gradient(180deg,var(--bg) 0%,#f9f7f2 46%,#fbfaf8 100%);font:15px/1.75 var(--font)}a{color:inherit}h1,h2,h3,p,ul{margin:0}
+    .wrap{width:min(980px,calc(100% - 32px));margin:0 auto;padding:28px 0 48px}.hero,.card{border:1px solid var(--line);background:var(--card);box-shadow:var(--shadow);backdrop-filter:blur(14px)}.hero{border-radius:var(--radius-xl);padding:28px}.hero-brand{display:flex;align-items:center;gap:14px;margin-bottom:8px}.hero-logo{width:56px;height:56px;flex:0 0 56px;border-radius:16px;box-shadow:0 10px 24px rgba(31,41,55,.12)}.eyebrow{display:inline-flex;align-items:center;min-height:32px;padding:0 12px;border-radius:999px;background:var(--accent-soft);color:var(--accent-strong);font-size:12px;font-weight:700;letter-spacing:.08em;text-transform:uppercase}h1{margin-top:12px;font-size:clamp(2rem,4vw,3.2rem);line-height:1.1;letter-spacing:-.03em}.hero p{margin-top:12px;color:var(--muted);max-width:760px}.meta,.lang-switch,.nav-row{display:flex;flex-wrap:wrap;gap:10px;margin-top:18px}.meta span,.lang-switch a,.nav-row a{display:inline-flex;align-items:center;justify-content:center;min-height:38px;padding:0 14px;border-radius:999px;border:1px solid var(--line);background:rgba(255,255,255,.72);text-decoration:none;font-weight:600}.lang-switch a.active{background:var(--accent-soft);border-color:rgba(15,118,110,.18);color:var(--accent-strong)}.card{border-radius:var(--radius-lg);padding:24px;margin-top:18px}.card h2{font-size:1.5rem;line-height:1.2;margin-bottom:12px}.stack{display:grid;gap:18px}.section{display:grid;gap:10px;padding-top:18px;border-top:1px solid var(--line)}.section:first-child{padding-top:0;border-top:0}.section h3{font-size:1.05rem}ul{padding-left:20px;color:var(--muted)}p{color:var(--muted)}footer{margin-top:18px;text-align:center;color:var(--muted);font-size:13px}@media (max-width:560px){.wrap{width:min(100% - 20px,980px);padding-top:20px}.hero,.card{padding:20px}.hero-brand{gap:12px}.hero-logo{width:48px;height:48px;flex-basis:48px}.lang-switch a,.nav-row a{width:100%}}
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <header class="hero">
+      <div class="hero-brand">
+        <img class="hero-logo" src="../public/icon/128.png" alt="Ladybird logo">
+        <span class="eyebrow">Privacy Policy</span>
+      </div>
+      <h1>Ladybird Privacy Policy</h1>
+      <p>Ladybird is designed to keep your configuration local. This page explains what the extension stores, what it does not collect, and what you should know when exporting data.</p>
+      <div class="meta">
+        <span>Last updated: 2026-02-26</span>
+      </div>
+      <div class="lang-switch">
+        <a class="active" href="./privacy-policy.html">English</a>
+        <a href="./privacy-policy.ja.html">日本語</a>
+        <a href="./privacy-policy.zh-CN.html">简体中文</a>
+      </div>
+      <div class="nav-row">
+        <a href="./index.html">Back to Help Home</a>
+        <a href="https://chromewebstore.google.com/detail/ladybird-no-code-buttons/nefpepdpcjejamkgpndlfehkffkfgbpe" target="_blank" rel="noreferrer">Chrome Web Store</a>
+      </div>
+    </header>
+    <main class="card">
+      <h2>Summary</h2>
+      <div class="stack">
+        <section class="section">
+          <ul>
+            <li>We do not collect, sell, or share personal data.</li>
+            <li>Configuration data is stored locally in <code>chrome.storage.local</code>.</li>
+            <li>Password Vault data is encrypted locally and only decrypted when you unlock the vault.</li>
+            <li>The extension does not upload your data to Ladybird servers. There is no telemetry backend.</li>
+          </ul>
+        </section>
+        <section class="section">
+          <h3>1. Data collection</h3>
+          <p>Ladybird does not collect analytics, telemetry, or usage data.</p>
+        </section>
+        <section class="section">
+          <h3>2. Local storage</h3>
+          <ul>
+            <li>Extension configuration and saved elements or flows are stored locally in <code>chrome.storage.local</code>.</li>
+            <li>Password Vault data is stored locally in encrypted form.</li>
+          </ul>
+        </section>
+        <section class="section">
+          <h3>3. Export and import</h3>
+          <ul>
+            <li>If you choose to export your data, a JSON file is generated locally on your device.</li>
+            <li>Export can optionally include Password Vault data after vault-password confirmation.</li>
+            <li>You are responsible for handling exported files securely.</li>
+          </ul>
+        </section>
+        <section class="section">
+          <h3>4. Permissions</h3>
+          <p>Permissions are used to render user-defined UI on pages, operate the side panel, and run user-triggered automation flows.</p>
+        </section>
+        <section class="section">
+          <h3>5. Third parties</h3>
+          <p>Ladybird does not sell or share your data with third parties.</p>
+        </section>
+        <section class="section">
+          <h3>6. Security notes</h3>
+          <ul>
+            <li>The extension uses packaged code only. It does not execute remote code.</li>
+            <li>Password Vault prompts and flow logs are designed to avoid storing or logging plain-text vault passwords.</li>
+            <li>If you forget the vault password, vault contents cannot be recovered and must be reset.</li>
+          </ul>
+        </section>
+        <section class="section">
+          <h3>7. Contact</h3>
+          <p>For privacy-related questions, please open an issue in this repository.</p>
+        </section>
+      </div>
+    </main>
+    <footer>Ladybird privacy policy page.</footer>
+  </div>
+</body>
+</html>
