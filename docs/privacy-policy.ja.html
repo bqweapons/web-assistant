@@ -1,0 +1,90 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Ladybird プライバシーポリシー</title>
+  <style>
+    :root{--bg:#f4efe6;--card:rgba(255,255,255,.94);--ink:#1f2937;--muted:#5f6b7a;--line:rgba(148,163,184,.28);--accent:#0f766e;--accent-strong:#115e59;--accent-soft:rgba(15,118,110,.1);--shadow:0 18px 44px rgba(31,41,55,.09);--radius-xl:28px;--radius-lg:20px;--font:"Noto Sans JP","Hiragino Sans","Yu Gothic UI",sans-serif}
+    *{box-sizing:border-box}body{margin:0;color:var(--ink);background:radial-gradient(circle at top left,rgba(15,118,110,.1),transparent 30%),radial-gradient(circle at top right,rgba(180,83,9,.12),transparent 28%),linear-gradient(180deg,var(--bg) 0%,#f9f7f2 46%,#fbfaf8 100%);font:15px/1.8 var(--font)}a{color:inherit}h1,h2,h3,p,ul{margin:0}
+    .wrap{width:min(980px,calc(100% - 32px));margin:0 auto;padding:28px 0 48px}.hero,.card{border:1px solid var(--line);background:var(--card);box-shadow:var(--shadow);backdrop-filter:blur(14px)}.hero{border-radius:var(--radius-xl);padding:28px}.hero-brand{display:flex;align-items:center;gap:14px;margin-bottom:8px}.hero-logo{width:56px;height:56px;flex:0 0 56px;border-radius:16px;box-shadow:0 10px 24px rgba(31,41,55,.12)}.eyebrow{display:inline-flex;align-items:center;min-height:32px;padding:0 12px;border-radius:999px;background:var(--accent-soft);color:var(--accent-strong);font-size:12px;font-weight:700;letter-spacing:.08em;text-transform:uppercase}h1{margin-top:12px;font-size:clamp(2rem,4vw,3.2rem);line-height:1.1;letter-spacing:-.03em}.hero p{margin-top:12px;color:var(--muted);max-width:760px}.meta,.lang-switch,.nav-row{display:flex;flex-wrap:wrap;gap:10px;margin-top:18px}.meta span,.lang-switch a,.nav-row a{display:inline-flex;align-items:center;justify-content:center;min-height:38px;padding:0 14px;border-radius:999px;border:1px solid var(--line);background:rgba(255,255,255,.72);text-decoration:none;font-weight:600}.lang-switch a.active{background:var(--accent-soft);border-color:rgba(15,118,110,.18);color:var(--accent-strong)}.card{border-radius:var(--radius-lg);padding:24px;margin-top:18px}.card h2{font-size:1.5rem;line-height:1.2;margin-bottom:12px}.stack{display:grid;gap:18px}.section{display:grid;gap:10px;padding-top:18px;border-top:1px solid var(--line)}.section:first-child{padding-top:0;border-top:0}.section h3{font-size:1.05rem}ul{padding-left:20px;color:var(--muted)}p{color:var(--muted)}footer{margin-top:18px;text-align:center;color:var(--muted);font-size:13px}@media (max-width:560px){.wrap{width:min(100% - 20px,980px);padding-top:20px}.hero,.card{padding:20px}.hero-brand{gap:12px}.hero-logo{width:48px;height:48px;flex-basis:48px}.lang-switch a,.nav-row a{width:100%}}
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <header class="hero">
+      <div class="hero-brand">
+        <img class="hero-logo" src="../public/icon/128.png" alt="Ladybird ロゴ">
+        <span class="eyebrow">Privacy Policy</span>
+      </div>
+      <h1>Ladybird プライバシーポリシー</h1>
+      <p>Ladybird は設定をローカルに保持する前提で設計されています。このページでは、何を保存し、何を収集せず、データをエクスポートする時に何を理解しておくべきかを説明します。</p>
+      <div class="meta">
+        <span>最終更新日: 2026-02-26</span>
+      </div>
+      <div class="lang-switch">
+        <a href="./privacy-policy.html">English</a>
+        <a class="active" href="./privacy-policy.ja.html">日本語</a>
+        <a href="./privacy-policy.zh-CN.html">简体中文</a>
+      </div>
+      <div class="nav-row">
+        <a href="./index.ja.html">ヘルプトップへ戻る</a>
+        <a href="https://chromewebstore.google.com/detail/ladybird-no-code-buttons/nefpepdpcjejamkgpndlfehkffkfgbpe" target="_blank" rel="noreferrer">Chrome Web Store</a>
+      </div>
+    </header>
+    <main class="card">
+      <h2>概要</h2>
+      <div class="stack">
+        <section class="section">
+          <ul>
+            <li>個人データを収集、販売、共有しません。</li>
+            <li>設定データは <code>chrome.storage.local</code> にローカル保存されます。</li>
+            <li>Password Vault のデータはローカルで暗号化され、解錠時にのみ復号されます。</li>
+            <li>拡張機能は Ladybird のサーバーへデータを送信しません。テレメトリ基盤もありません。</li>
+          </ul>
+        </section>
+        <section class="section">
+          <h3>1. データ収集</h3>
+          <p>Ladybird は分析、テレメトリ、利用状況データを収集しません。</p>
+        </section>
+        <section class="section">
+          <h3>2. ローカル保存</h3>
+          <ul>
+            <li>拡張機能の設定および保存済み要素やフローは <code>chrome.storage.local</code> にローカル保存されます。</li>
+            <li>Password Vault データは暗号化された状態でローカル保存されます。</li>
+          </ul>
+        </section>
+        <section class="section">
+          <h3>3. エクスポートとインポート</h3>
+          <ul>
+            <li>データをエクスポートすると、JSON ファイルは端末上にローカル生成されます。</li>
+            <li>エクスポート時は、保管庫パスワード確認後に Password Vault データを含めることができます。</li>
+            <li>エクスポートしたファイルの安全な管理はユーザーの責任です。</li>
+          </ul>
+        </section>
+        <section class="section">
+          <h3>4. 権限</h3>
+          <p>権限は、ユーザー定義 UI の表示、サイドパネル操作、ユーザーが開始した自動化フローの実行のために使用されます。</p>
+        </section>
+        <section class="section">
+          <h3>5. 第三者提供</h3>
+          <p>Ladybird はデータを第三者へ販売、共有しません。</p>
+        </section>
+        <section class="section">
+          <h3>6. セキュリティに関する注意</h3>
+          <ul>
+            <li>拡張機能はパッケージ化されたコードのみを実行します。リモートコード実行は行いません。</li>
+            <li>Password Vault の解錠プロンプトやフローログでは、保管庫パスワードの平文保存やログ出力を避ける設計になっています。</li>
+            <li>保管庫パスワードを忘れた場合、内容は復元できず、リセットが必要です。</li>
+          </ul>
+        </section>
+        <section class="section">
+          <h3>7. 問い合わせ</h3>
+          <p>プライバシーに関する問い合わせは、このリポジトリの Issue を利用してください。</p>
+        </section>
+      </div>
+    </main>
+    <footer>Ladybird プライバシーポリシーページ。</footer>
+  </div>
+</body>
+</html>
