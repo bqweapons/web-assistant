@@ -107,6 +107,27 @@ const resolveTarget = (target: EventTarget | null) => {
   return target instanceof Element ? target : null;
 };
 
+// 2.3 — Treat autocomplete-tagged sensitive fields as 'password' for
+// recording purposes. Mirrors isSensitiveInputElement in flowRunner.ts
+// (batch 5 / 1.6) so the two surfaces agree on what counts as sensitive.
+// Catches real-world cases where type='text' with a "show password" toggle
+// still carries autocomplete='current-password' / 'new-password', plus
+// credit-card and OTP fields that are NOT type='password'. Limits mirror
+// 1.6: selector-based heuristics (#password, [name*="password"]) are
+// intentionally NOT used; element-level autocomplete is authoritative.
+const hasSensitiveAutocomplete = (element: HTMLInputElement): boolean => {
+  const autocomplete = (element.autocomplete || '').toLowerCase();
+  if (!autocomplete) {
+    return false;
+  }
+  return (
+    autocomplete.includes('password') ||
+    autocomplete.includes('cc-number') ||
+    autocomplete.includes('cc-csc') ||
+    autocomplete.includes('one-time-code')
+  );
+};
+
 const getInputKind = (element: Element): InputKind | null => {
   if (element instanceof HTMLElement && element.isContentEditable) {
     return 'contenteditable';
@@ -126,6 +147,9 @@ const getInputKind = (element: Element): InputKind | null => {
     return null;
   }
   if (type === 'password') {
+    return 'password';
+  }
+  if (element instanceof HTMLInputElement && hasSensitiveAutocomplete(element)) {
     return 'password';
   }
   return 'text';

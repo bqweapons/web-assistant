@@ -229,4 +229,10 @@ export const bootstrapBackground = () => {
       })();
     });
   }
+
+  if (tabsApi?.onRemoved) {
+    tabsApi.onRemoved.addListener((tabId) => {
+      flowRunnerManager.onTabRemoved(tabId);
+    });
+  }
 };

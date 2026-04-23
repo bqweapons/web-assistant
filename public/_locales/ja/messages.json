@@ -1238,6 +1238,21 @@
   "sidepanel_settings_import_vault_password_prompt_unlock": {
     "message": "このファイルにはパスワード保管庫データが含まれています。保存済みパスワードをインポートするには、保管庫のパスワードを入力してください。"
   },
+  "sidepanel_settings_vault_prompt_title_export": {
+    "message": "保管庫パスワードを含める"
+  },
+  "sidepanel_settings_vault_prompt_title_create": {
+    "message": "保管庫パスワードを作成"
+  },
+  "sidepanel_settings_vault_prompt_title_unlock": {
+    "message": "パスワード保管庫をアンロック"
+  },
+  "sidepanel_settings_vault_prompt_placeholder": {
+    "message": "保管庫パスワード"
+  },
+  "sidepanel_settings_vault_prompt_submit": {
+    "message": "続行"
+  },
   "sidepanel_settings_import_vault_skipped_no_password": {
     "message": "パスワード保管庫のインポートをスキップしました（保管庫のパスワードが入力されませんでした）。"
   },

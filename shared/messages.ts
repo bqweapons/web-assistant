@@ -227,7 +227,16 @@ export type FlowRunExecuteResultPayload = {
   stepId: string;
   stepType: FlowRunAtomicStepType;
   conditionMatched?: boolean;
+  // 1.6 taint signalling:
+  // - `read` step: `actual` IS returned (user may legitimately want the value
+  //   flowing into a subsequent step); `sensitive: true` marks it so the
+  //   runner must add the resulting variable to `taintedVariables`.
+  // - `condition`/`assert`/`wait-condition`: comparison happens in the
+  //   content script; `actual` is OMITTED (undefined) when `sensitive: true`
+  //   because nothing downstream needs it and keeping it would only add a
+  //   leak surface. `conditionMatched` stays complete.
   actual?: string;
+  sensitive?: boolean;
   details?: FlowRunExecutionDetails;
   error?: string;
   errorCode?: string;

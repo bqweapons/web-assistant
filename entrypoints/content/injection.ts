@@ -1586,7 +1586,9 @@ const injectElement = (element: StructuredElementRecord) => {
 
   const siteKey = normalizeSiteKey(deriveSiteKey(element.context.siteKey || ''));
   const currentSite = normalizeSiteKey(window.location.host || '');
-  if (siteKey && currentSite && siteKey !== currentSite && !currentSite.endsWith(siteKey)) {
+  // Match on dot boundary so "evil-google.com" does not satisfy siteKey "google.com".
+  const isSubdomainOf = siteKey && currentSite.endsWith(`.${siteKey}`);
+  if (siteKey && currentSite && siteKey !== currentSite && !isSubdomainOf) {
     pendingPlacementById.delete(element.id);
     return { ok: false, error: 'site-mismatch' };
   }

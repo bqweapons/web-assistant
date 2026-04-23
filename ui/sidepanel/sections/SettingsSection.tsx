@@ -1,6 +1,7 @@
 import { useRef, useState, type ChangeEvent } from 'react';
 import { Copy, Download, ExternalLink, Languages, Share2, Upload } from 'lucide-react';
 import Card from '../components/Card';
+import PasswordPromptDialog from '../components/PasswordPromptDialog';
 import PasswordVaultManager from '../components/PasswordVaultManager';
 import { LOCALE_OPTIONS, SupportedLocale, getLocaleLabel, setLocale, t, useLocale } from '../utils/i18n';
 import { getGlobalSettings, setGlobalSettings } from '../../../shared/globalSettings';
@@ -16,6 +17,13 @@ import {
 const isRecord = (value: unknown): value is Record<string, unknown> =>
   Boolean(value) && typeof value === 'object' && !Array.isArray(value);
 
+type VaultPasswordPromptRequest = {
+  title: string;
+  message: string;
+  submitLabel: string;
+  resolve: (value: string | null) => void;
+};
+
 export default function SettingsSection() {
   const locale = useLocale();
   const localeLabel = getLocaleLabel(locale);
@@ -23,6 +31,24 @@ export default function SettingsSection() {
   const [isImporting, setIsImporting] = useState(false);
   const [isExporting, setIsExporting] = useState(false);
   const [feedback, setFeedback] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
+  const [vaultPasswordPrompt, setVaultPasswordPrompt] =
+    useState<VaultPasswordPromptRequest | null>(null);
+
+  const promptVaultPassword = (config: {
+    title: string;
+    message: string;
+    submitLabel: string;
+  }): Promise<string | null> =>
+    new Promise((resolve) => {
+      setVaultPasswordPrompt({ ...config, resolve });
+    });
+
+  const resolveVaultPasswordPrompt = (value: string | null) => {
+    setVaultPasswordPrompt((current) => {
+      current?.resolve(value);
+      return null;
+    });
+  };
   const storeUrl = chrome?.runtime?.id
     ? `https://chromewebstore.google.com/detail/${chrome.runtime.id}`
     : 'https://chromewebstore.google.com/';
@@ -72,13 +98,14 @@ export default function SettingsSection() {
           ),
         );
         if (includeVaultPasswords) {
-          const vaultPassword = window.prompt(
-            t(
+          const vaultPassword = await promptVaultPassword({
+            title: t('sidepanel_settings_vault_prompt_title_export', 'Include vault passwords'),
+            message: t(
               'sidepanel_settings_export_vault_password_prompt',
               'Enter your vault password to include saved passwords in the export.',
             ),
-            '',
-          );
+            submitLabel: t('sidepanel_settings_vault_prompt_submit', 'Continue'),
+          });
           if (vaultPassword === null) {
             setIsExporting(false);
             return;
@@ -161,13 +188,14 @@ export default function SettingsSection() {
             ),
           );
           if (shouldCreateVault) {
-            vaultPassword = window.prompt(
-              t(
+            vaultPassword = await promptVaultPassword({
+              title: t('sidepanel_settings_vault_prompt_title_create', 'Create vault password'),
+              message: t(
                 'sidepanel_settings_import_vault_password_prompt_create',
                 'Create a vault password (used to lock/unlock the imported password vault).',
               ),
-              '',
-            );
+              submitLabel: t('sidepanel_settings_vault_prompt_submit', 'Continue'),
+            });
             if (!vaultPassword) {
               secretImportSkippedReason = t(
                 'sidepanel_settings_import_vault_skipped_no_password',
@@ -181,13 +209,14 @@ export default function SettingsSection() {
             );
           }
         } else {
-          vaultPassword = window.prompt(
-            t(
+          vaultPassword = await promptVaultPassword({
+            title: t('sidepanel_settings_vault_prompt_title_unlock', 'Unlock password vault'),
+            message: t(
               'sidepanel_settings_import_vault_password_prompt_unlock',
               'This file contains password vault data. Enter your vault password to import saved passwords.',
             ),
-            '',
-          );
+            submitLabel: t('sidepanel_settings_vault_prompt_submit', 'Continue'),
+          });
           if (!vaultPassword) {
             secretImportSkippedReason = t(
               'sidepanel_settings_import_vault_skipped_no_password',
@@ -424,6 +453,14 @@ export default function SettingsSection() {
           </div>
         </div>
       </Card>
+      <PasswordPromptDialog
+        open={Boolean(vaultPasswordPrompt)}
+        title={vaultPasswordPrompt?.title ?? ''}
+        message={vaultPasswordPrompt?.message ?? ''}
+        submitLabel={vaultPasswordPrompt?.submitLabel}
+        onSubmit={(value) => resolveVaultPasswordPrompt(value)}
+        onCancel={() => resolveVaultPasswordPrompt(null)}
+      />
     </section>
   );
 }

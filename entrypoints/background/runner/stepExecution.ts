@@ -23,7 +23,7 @@ import {
 import { TabBridge } from '../runtime/tabBridge';
 import { parseDataSourceRows } from './dataSource';
 import { JsTransformExecutor } from './jsTransformExecutor';
-import { isSecretTokenValue, resolveSecretTokens, unlockSecretsVault } from '../../../shared/secrets';
+import { resolveSecretTokens, unlockSecretsVault } from '../../../shared/secrets';
 import {
   getRenderedStepFieldValue,
   getStepField,
@@ -46,6 +46,14 @@ const STEP_RESULT_WAIT_GRACE_MS = 1_200;
 const STEP_RESULT_WAIT_MIN_MS = 1_000;
 const ENABLE_EVENT_DRIVEN_RECOVERY = true;
 const MAX_RUN_LOG_ENTRIES = 500;
+// Runtime ceilings. Per AGENTS.md §7 this file is the source of truth for
+// these caps. They're intentionally conservative — large enough for realistic
+// flows, small enough that a misconfigured / malicious flow is bounded.
+// If any of these need to be user-configurable, expose them through
+// globalSettings and respect both the setting and the hard ceiling here.
+const MAX_TOTAL_STEPS_EXECUTED = 10_000;
+const MAX_LOOP_ITERATIONS = 5_000;
+const MAX_RUN_DURATION_MS = 10 * 60 * 1000;
 const VARIABLE_NAME_PATTERN = /^[A-Za-z_][0-9A-Za-z_]*$/;
 
 type FlowRunError = {
@@ -96,9 +104,62 @@ type FlowRunInternal = {
   logs: FlowRunLogEntry[];
   logSequence: number;
   variables: Record<string, string>;
+  // 1.5 taint tracking. Contains variable names whose current value is
+  // secret-derived (from {{secret.*}} resolution, from a JS transform whose
+  // input was tainted, or from an executeRead on a sensitive DOM element).
+  // `set-variable` mutates this Set — add on tainted assignment, delete on
+  // explicit clean assignment. `toStatusPayload` does NOT broadcast
+  // `variables`, so leakage only needs to be guarded on log/payload sinks.
+  taintedVariables: Set<string>;
+  executedStepCount: number;
   statusTimer?: ReturnType<typeof setTimeout>;
   cleanupTimer?: ReturnType<typeof setTimeout>;
   inFlightAtomic?: InFlightAtomicStep;
+};
+
+// 1.5 — Result of resolving one step field. `tainted=true` means the value
+// is secret-derived (via {{secret.*}}, {{var.X}} where X is tainted, OR via
+// a JS transform whose input was tainted). Runner-internal ONLY — never
+// cross a messaging boundary as this wrapper.
+type ResolvedFieldValue = {
+  value: string;
+  tainted: boolean;
+};
+
+// 1.5 — Parallel struct so taintedFields never rides inside the payload
+// itself. The payload crosses `runtime.sendMessage` to the content script;
+// a taint flag hitching on the payload (even with an underscore prefix)
+// is one `delete` away from leaking. Literal union keeps the set tight:
+// adding a new taint-carrying payload field is a compile error until you
+// opt it in here.
+type TaintedPayloadField = 'value' | 'expected' | 'message' | 'selector';
+type BuiltAtomicPayload = {
+  payload: FlowRunExecuteStepPayload;
+  taintedFields: Set<TaintedPayloadField>;
+};
+
+const REDACTED_PLACEHOLDER = '[REDACTED]';
+const redactIfTainted = (value: string | undefined, tainted: boolean) =>
+  tainted ? REDACTED_PLACEHOLDER : value ?? '';
+
+// 1.5 — Broad detection: whole-value match (isSecretTokenValue) is too
+// narrow; a field like "prefix-{{secret.X}}-suffix" still leaks after
+// resolution. This scans for any secret token anywhere in the raw field.
+const SECRET_TOKEN_ANYWHERE = /\{\{\s*secret\.[^{}]+\s*\}\}/;
+const VARIABLE_TOKEN_ANYWHERE = /\{\{\s*var\.([A-Za-z_][0-9A-Za-z_]*)\s*\}\}/g;
+const isRawFieldTainted = (rawValue: string, taintedVariables: Set<string>) => {
+  if (!rawValue) {
+    return false;
+  }
+  if (SECRET_TOKEN_ANYWHERE.test(rawValue)) {
+    return true;
+  }
+  for (const match of rawValue.matchAll(VARIABLE_TOKEN_ANYWHERE)) {
+    if (taintedVariables.has(match[1])) {
+      return true;
+    }
+  }
+  return false;
 };
 
 export class RunnerError extends Error {
@@ -318,6 +379,8 @@ export class FlowRunnerManager {
       logs: [],
       logSequence: 0,
       variables: {},
+      taintedVariables: new Set(),
+      executedStepCount: 0,
     };
     this.runs.set(runId, run);
     this.activeRunByTab.set(tabId, runId);
@@ -332,16 +395,19 @@ export class FlowRunnerManager {
     if (!run) {
       throw new RunnerError('run-not-found', 'Run not found.');
     }
-    if (run.state === 'succeeded' || run.state === 'failed' || run.state === 'cancelled') {
+    if (this.isRunFinalized(run)) {
       return { runId };
     }
+    // Route through finalizeRun so releaseActiveRun + scheduleCleanup run
+    // exactly once. Pre-idempotency, stop() used to do a half-inline finalize
+    // and rely on executeRun's catch (awoken by cancelPendingRequests) to call
+    // finalizeRun a second time for the cleanup. With finalizeRun now
+    // idempotent, that second call is a no-op — so stop() must drive the
+    // terminal path itself. cancelRequested stays set so the awoken catch
+    // still takes the 'cancelled' branch (its finalizeRun call is guarded).
     run.cancelRequested = true;
-    run.state = 'cancelled';
-    run.endedAt = Date.now();
-    this.clearInFlightAtomic(run);
-    this.cancelPendingRequests(run.runId, new RunnerError('cancelled', 'Run cancelled.'));
     this.appendLog(run, 'info', 'Stop requested.');
-    this.emitStatus(run, true);
+    this.finalizeRun(run, 'cancelled');
     return { runId };
   }
 
@@ -365,6 +431,28 @@ export class FlowRunnerManager {
       this.updateRunActiveUrl(run, tab.url);
     }
     this.tryRecoverInFlightStep(run, 'tab-updated');
+  }
+
+  // Tab closed mid-run. Without this path, the run sits in activeRunByTab
+  // forever, inFlightAtomic never resolves, and the next start() fails with
+  // "runner-busy" until the 60s step-dispatch timeout eventually fires.
+  // finalizeRun already clears inFlight, cancels pending requests, releases
+  // activeRunByTab, and schedules cleanup — we just drive it from here.
+  // Do NOT set cancelRequested: this is a runtime failure (tab closed),
+  // not a user-requested cancel. finalizeRun's idempotency guard + the
+  // executeRun catch are what keep the "tab-closed" error code from being
+  // overwritten when cancelPendingRequests rejects the awaiting coroutine.
+  onTabRemoved(tabId: number) {
+    const run = this.getRunByTab(tabId);
+    if (!run || this.isRunFinalized(run)) {
+      return;
+    }
+    this.finalizeRun(run, 'failed', {
+      code: 'tab-closed',
+      message: 'The tab running this flow was closed.',
+      phase: 'execute',
+      recoverable: false,
+    });
   }
 
   onStepResult(payload: FlowRunExecuteResultPayload) {
@@ -584,7 +672,18 @@ export class FlowRunnerManager {
     this.emitStatus(run, options?.forceStatus === true);
   }
 
-  private formatAtomicStartMessage(stepType: FlowRunAtomicStepType, payload: FlowRunExecuteStepPayload) {
+  // 1.5 — taintedFields redacts expected/message when they're secret-derived.
+  // selector is intentionally NOT redacted even when tainted: it's a DOM
+  // query string, users need it in logs to debug, and while a secret-in-
+  // selector is unusual it's not the same leak severity as printing a
+  // password in plaintext. Revisit if real attack scenarios surface.
+  private formatAtomicStartMessage(
+    stepType: FlowRunAtomicStepType,
+    payload: FlowRunExecuteStepPayload,
+    taintedFields: Set<TaintedPayloadField>,
+  ) {
+    const safeExpected = truncateForLog(redactIfTainted(payload.expected, taintedFields.has('expected')));
+    const safeMessage = truncateForLog(redactIfTainted(payload.message, taintedFields.has('message')));
     if (stepType === 'click') {
       return `Click selector "${truncateForLog(payload.selector || '')}".`;
     }
@@ -601,13 +700,13 @@ export class FlowRunnerManager {
       if (payload.mode === 'disappear') {
         return `Wait for "${truncateForLog(payload.selector || '')}" to disappear.`;
       }
-      return `Wait until "${truncateForLog(payload.selector || '')}" ${payload.operator || 'contains'} "${truncateForLog(payload.expected || '')}".`;
+      return `Wait until "${truncateForLog(payload.selector || '')}" ${payload.operator || 'contains'} "${safeExpected}".`;
     }
     if (stepType === 'assert') {
-      return `Assert "${truncateForLog(payload.selector || '')}" ${payload.operator || 'contains'} "${truncateForLog(payload.expected || '')}".`;
+      return `Assert "${truncateForLog(payload.selector || '')}" ${payload.operator || 'contains'} "${safeExpected}".`;
     }
     if (stepType === 'popup') {
-      return `Show popup "${truncateForLog(payload.message || '')}".`;
+      return `Show popup "${safeMessage}".`;
     }
     if (stepType === 'read') {
       return `Read value from "${truncateForLog(payload.selector || '')}".`;
@@ -618,10 +717,33 @@ export class FlowRunnerManager {
     return `Execute ${stepType} step.`;
   }
 
+  // 1.5 — Narrowed result type. `actual` and `sensitive` are deliberately
+  // absent from the type signature so any attempt to inline them into a
+  // success-log message is a compile error. `details.actual` is also
+  // stripped via the Omit override. If a formatter needs richer info,
+  // update the pick set here after reviewing the leak surface.
+  // taintedFields mirrors the startMessage contract: popup.message is
+  // echoed back by content as details.popupMessage, so the 'message' taint
+  // flag must redact both.
   private formatAtomicSuccessMessage(
     stepType: FlowRunAtomicStepType,
     payload: FlowRunExecuteStepPayload,
-    result: FlowRunExecuteResultPayload,
+    result: {
+      ok: FlowRunExecuteResultPayload['ok'];
+      conditionMatched?: FlowRunExecuteResultPayload['conditionMatched'];
+      // `expected` is also omitted: the content script echoes payload.expected
+      // back into details.expected verbatim, so it inherits the full taint of
+      // the original payload but has no separate redaction path. A future
+      // formatter that wants to show "expected X, got Y" must go through
+      // `payload.expected` + taintedFields check, not this echo. `popupMessage`
+      // intentionally stays — it's consumed as a fallback and is redacted
+      // manually via `taintedFields.has('message')`; a future cleanup could
+      // fold it into this Omit and re-extract purely from payload.message.
+      details?: Omit<NonNullable<FlowRunExecuteResultPayload['details']>, 'actual' | 'expected'>;
+      error?: FlowRunExecuteResultPayload['error'];
+      errorCode?: FlowRunExecuteResultPayload['errorCode'];
+    },
+    taintedFields: Set<TaintedPayloadField>,
   ) {
     const details = result.details;
     if (stepType === 'click') {
@@ -648,7 +770,8 @@ export class FlowRunnerManager {
       return `Assertion passed on ${truncateForLog(payload.selector || '')}.`;
     }
     if (stepType === 'popup') {
-      return `Popup shown: "${truncateForLog(payload.message || details?.popupMessage || '')}".`;
+      const rawMessage = payload.message || details?.popupMessage || '';
+      return `Popup shown: "${truncateForLog(redactIfTainted(rawMessage, taintedFields.has('message')))}".`;
     }
     if (stepType === 'read') {
       return `Read completed from ${truncateForLog(payload.selector || '')}.`;
@@ -674,6 +797,18 @@ export class FlowRunnerManager {
     this.emitStatus(run, false);
   }
 
+  // 1.5 TAINT BOUNDARY — this is the one structure that crosses from runner
+  // memory to the sidepanel via runtime.sendMessage. Adding fields here that
+  // could carry secret-derived material (notably: `variables`,
+  // `taintedVariables`, any resolved field value, any content-script result
+  // payload with `actual`) undoes the redaction work done in formatters.
+  // If you need to add something, verify:
+  //   1) is the value ever secret-derived? (check resolveStepFieldValue paths)
+  //   2) if yes, does it get redacted before inclusion here?
+  // Current fields are all either structural (ids, state, progress) or
+  // already-redacted (logs: messages are formatted via
+  // formatAtomicStartMessage / formatAtomicSuccessMessage which honor the
+  // taint set).
   private toStatusPayload(run: FlowRunInternal): FlowRunStatusPayload {
     return {
       runId: run.runId,
@@ -771,9 +906,33 @@ export class FlowRunnerManager {
     if (run.state === 'failed') {
       throw new RunnerError(run.error?.code || 'run-failed', run.error?.message || 'Run failed.');
     }
+    if (Date.now() - run.startedAt > MAX_RUN_DURATION_MS) {
+      throw new RunnerError(
+        'run-duration-exceeded',
+        `Run exceeded the ${Math.round(MAX_RUN_DURATION_MS / 1000)}s duration cap.`,
+        { phase: 'execute', recoverable: false },
+      );
+    }
+    if (run.executedStepCount > MAX_TOTAL_STEPS_EXECUTED) {
+      throw new RunnerError(
+        'run-step-count-exceeded',
+        `Run exceeded the ${MAX_TOTAL_STEPS_EXECUTED} total-step cap.`,
+        { phase: 'execute', recoverable: false },
+      );
+    }
   }
 
   private finalizeRun(run: FlowRunInternal, state: FlowRunState, error?: FlowRunError) {
+    // Idempotent by design. Multiple code paths can race to finalize a run —
+    // e.g. onTabRemoved drives finalizeRun(failed, 'tab-closed') while the
+    // executeRun coroutine is awaiting a pending request that our own
+    // cancelPendingRequests then rejects, waking its catch. Without this
+    // guard the later caller overwrites run.state / run.error and destroys
+    // the first caller's error code (observed: 'tab-closed' → 'cancelled' or
+    // 'run-finalized'). First finalize wins.
+    if (this.isRunFinalized(run)) {
+      return;
+    }
     run.state = state;
     run.error = error;
     run.endedAt = Date.now();
@@ -871,6 +1030,8 @@ export class FlowRunnerManager {
   }
 
   private async executeStep(run: FlowRunInternal, step: FlowStepData, context: FlowRenderContext) {
+    run.executedStepCount += 1;
+    this.ensureRunHealthy(run);
     if (step.type === 'click') {
       await this.executeAtomicStep(run, step, 'click', context);
       return;
@@ -905,6 +1066,13 @@ export class FlowRunnerManager {
       const iterations = toNonNegativeInteger(iterationsValue, -1);
       if (iterations < 0) {
         throw new RunnerError('invalid-loop-iterations', 'Loop iterations must be a non-negative integer.');
+      }
+      if (iterations > MAX_LOOP_ITERATIONS) {
+        throw new RunnerError(
+          'loop-iterations-exceeded',
+          `Loop iterations ${iterations} exceeds the cap of ${MAX_LOOP_ITERATIONS}.`,
+          { phase: 'execute', recoverable: false },
+        );
       }
       this.appendLog(run, 'info', `Loop iterations: ${iterations}.`, {
         stepId: step.id,
@@ -956,6 +1124,10 @@ export class FlowRunnerManager {
       stepType: 'set-variable',
     });
     let resolvedValue = '';
+    // 1.5 — track whether the assigned value is secret-derived. Set=add,
+    // clean=delete. Self-assignment of a tainted var ({{var.x}} → x) is
+    // naturally sound: resolve → tainted=true → add (no-op since already in set).
+    let assignedTainted = false;
     const selectorValue = getStepFieldRawValue(step, 'selector').trim();
     const sourceModeRaw = getStepFieldRawValue(step, 'sourceMode').trim();
     const sourceMode =
@@ -965,8 +1137,8 @@ export class FlowRunnerManager {
           ? 'selector'
           : 'value';
     if (sourceMode === 'selector') {
-      const readPayload = await this.buildReadPayload(run, step, context);
-      const result = await this.invokeContentStep(run, readPayload);
+      const readBuilt = await this.buildReadPayload(run, step, context);
+      const result = await this.invokeContentStep(run, readBuilt.payload);
       if (!result.ok) {
         this.appendLog(
           run,
@@ -981,16 +1153,27 @@ export class FlowRunnerManager {
         );
       }
       resolvedValue = result.actual || '';
+      // 1.6 — DOM read of a sensitive field (password/cc/OTP) taints the
+      // destination variable. Also taint if the resolved selector itself
+      // came from a tainted source (unusual but possible via {{var.X}}).
+      assignedTainted = Boolean(result.sensitive) || readBuilt.taintedFields.has('selector');
     } else {
-      resolvedValue = await this.resolveStepFieldValueWithVaultUnlock(
+      const resolved = await this.resolveStepFieldValueWithVaultUnlock(
         run,
         step,
         'value',
         context,
         'set-variable',
       );
+      resolvedValue = resolved.value;
+      assignedTainted = resolved.tainted;
     }
     context.variables[variableName] = resolvedValue;
+    if (assignedTainted) {
+      run.taintedVariables.add(variableName);
+    } else {
+      run.taintedVariables.delete(variableName);
+    }
     this.appendLog(run, 'success', `Variable "${truncateForLog(variableName)}" updated.`, {
       stepId: step.id,
       stepType: 'set-variable',
@@ -1002,23 +1185,30 @@ export class FlowRunnerManager {
     run: FlowRunInternal,
     step: FlowStepData,
     context: FlowRenderContext,
-  ): Promise<FlowRunExecuteStepPayload> {
-    const selector = await this.resolveStepFieldValueWithVaultUnlock(
+  ): Promise<BuiltAtomicPayload> {
+    const resolvedSelector = await this.resolveStepFieldValueWithVaultUnlock(
       run,
       step,
       'selector',
       context,
       'set-variable',
     );
+    const taintedFields = new Set<TaintedPayloadField>();
+    if (resolvedSelector.tainted) {
+      taintedFields.add('selector');
+    }
     return {
-      runId: '',
-      requestId: '',
-      attempt: 0,
-      stepId: step.id,
-      stepType: 'read',
-      selector,
-      timeoutMs: STEP_ACTION_TIMEOUT_MS,
-      pollIntervalMs: CONDITION_POLL_INTERVAL_MS,
+      payload: {
+        runId: '',
+        requestId: '',
+        attempt: 0,
+        stepId: step.id,
+        stepType: 'read',
+        selector: resolvedSelector.value,
+        timeoutMs: STEP_ACTION_TIMEOUT_MS,
+        pollIntervalMs: CONDITION_POLL_INTERVAL_MS,
+      },
+      taintedFields,
     };
   }
 
@@ -1028,9 +1218,9 @@ export class FlowRunnerManager {
     fieldId: string,
     context: FlowRenderContext,
     stepType: FlowRunLogEntry['stepType'],
-  ) {
+  ): Promise<ResolvedFieldValue> {
     try {
-      return await this.resolveStepFieldValue(step, fieldId, context);
+      return await this.resolveStepFieldValue(run, step, fieldId, context);
     } catch (error) {
       if (!(error instanceof RunnerError) || error.code !== 'secret-vault-locked') {
         throw error;
@@ -1097,7 +1287,7 @@ export class FlowRunnerManager {
       }
 
       try {
-        return await this.resolveStepFieldValue(step, fieldId, context);
+        return await this.resolveStepFieldValue(run, step, fieldId, context);
       } catch (error) {
         if (error instanceof RunnerError && error.code === 'secret-vault-locked') {
           promptErrorMessage = 'Password vault is still locked. Please try again.';
@@ -1114,20 +1304,20 @@ export class FlowRunnerManager {
     stepType: Exclude<FlowRunAtomicStepType, 'condition'>,
     context: FlowRenderContext,
   ) {
-    let payload: FlowRunExecuteStepPayload;
+    let built: BuiltAtomicPayload;
     try {
-      payload = await this.buildAtomicPayload(step, stepType, context);
+      built = await this.buildAtomicPayload(run, step, stepType, context);
     } catch (error) {
       if (!(error instanceof RunnerError) || error.code !== 'secret-vault-locked') {
         throw error;
       }
-      payload = await this.promptVaultUnlockAndRetry(run, step, stepType, context);
+      built = await this.promptVaultUnlockAndRetry(run, step, stepType, context);
     }
-    this.appendLog(run, 'info', this.formatAtomicStartMessage(stepType, payload), {
+    this.appendLog(run, 'info', this.formatAtomicStartMessage(stepType, built.payload, built.taintedFields), {
       stepId: step.id,
       stepType,
     });
-    const result = await this.invokeContentStep(run, payload);
+    const result = await this.invokeContentStep(run, built.payload);
     if (!result.ok) {
       this.appendLog(
         run,
@@ -1140,7 +1330,7 @@ export class FlowRunnerManager {
         recoverable: false,
       });
     }
-    this.appendLog(run, 'success', this.formatAtomicSuccessMessage(stepType, payload, result), {
+    this.appendLog(run, 'success', this.formatAtomicSuccessMessage(stepType, built.payload, result, built.taintedFields), {
       stepId: step.id,
       stepType,
     });
@@ -1152,7 +1342,7 @@ export class FlowRunnerManager {
     step: FlowStepData,
     stepType: Exclude<FlowRunAtomicStepType, 'condition'>,
     context: FlowRenderContext,
-  ): Promise<FlowRunExecuteStepPayload> {
+  ): Promise<BuiltAtomicPayload> {
     let promptAttempt = 0;
     let promptErrorMessage = '';
     while (true) {
@@ -1213,7 +1403,7 @@ export class FlowRunnerManager {
       }
 
       try {
-        return await this.buildAtomicPayload(step, stepType, context);
+        return await this.buildAtomicPayload(run, step, stepType, context);
       } catch (error) {
         if (error instanceof RunnerError && error.code === 'secret-vault-locked') {
           promptErrorMessage = 'Password vault is still locked. Please try again.';
@@ -1277,12 +1467,17 @@ export class FlowRunnerManager {
   }
 
   private async executeConditionStep(run: FlowRunInternal, step: FlowStepData, context: FlowRenderContext) {
-    const payload = await this.buildAtomicPayload(step, 'condition', context);
-    this.appendLog(run, 'info', this.formatAtomicStartMessage('condition', payload), {
+    // NOTE: condition path currently does NOT go through promptVaultUnlockAndRetry.
+    // That gap (if a secret token resolves during condition build and the vault
+    // is locked, the condition fails hard instead of prompting unlock) is a
+    // pre-existing issue flagged in the original review; intentionally not
+    // changed in batch 5 to avoid conflating fixes. Separate ticket.
+    const built = await this.buildAtomicPayload(run, step, 'condition', context);
+    this.appendLog(run, 'info', this.formatAtomicStartMessage('condition', built.payload, built.taintedFields), {
       stepId: step.id,
       stepType: 'condition',
     });
-    const result = await this.invokeContentStep(run, payload);
+    const result = await this.invokeContentStep(run, built.payload);
     if (!result.ok) {
       this.appendLog(
         run,
@@ -1295,7 +1490,7 @@ export class FlowRunnerManager {
         recoverable: false,
       });
     }
-    this.appendLog(run, 'success', this.formatAtomicSuccessMessage('condition', payload, result), {
+    this.appendLog(run, 'success', this.formatAtomicSuccessMessage('condition', built.payload, result, built.taintedFields), {
       stepId: step.id,
       stepType: 'condition',
     });
@@ -1303,7 +1498,22 @@ export class FlowRunnerManager {
     return Boolean(result.conditionMatched);
   }
 
-  private async resolveStepFieldValue(step: FlowStepData, fieldId: string, context: FlowRenderContext) {
+  // 1.5 — returns the resolved string AND whether it is secret-derived.
+  // Taint sources: raw field text contains any `{{secret.X}}`, raw field
+  // text contains `{{var.Y}}` where Y is in run.taintedVariables, OR the
+  // field has a JS transform whose input was tainted.
+  // Declassify is intentionally NOT exposed here — if we ever want it, it
+  // should be a standalone `declassify` step type so the sidepanel can
+  // audit it; a flag hidden inside a JS transform config would be too easy
+  // to miss.
+  private async resolveStepFieldValue(
+    run: FlowRunInternal,
+    step: FlowStepData,
+    fieldId: string,
+    context: FlowRenderContext,
+  ): Promise<ResolvedFieldValue> {
+    const rawValue = getStepFieldRawValue(step, fieldId);
+    const inputTainted = isRawFieldTainted(rawValue, run.taintedVariables);
     const renderedValue = getRenderedStepFieldValue(step, fieldId, context);
     let resolvedValue = renderedValue;
     try {
@@ -1319,25 +1529,42 @@ export class FlowRunnerManager {
       throw new RunnerError(errorCode, `Secret resolution failed for ${fieldId}: ${errorMessage}`);
     }
     const field = getStepField(step, fieldId);
-    if (!field?.transform || field.transform.mode !== 'js') {
-      return resolvedValue;
-    }
-    if (field.transform.enabled === false) {
-      return resolvedValue;
-    }
-    const code = field.transform.code.trim();
-    if (!code) {
-      return resolvedValue;
+    const noTransform =
+      !field?.transform ||
+      field.transform.mode !== 'js' ||
+      field.transform.enabled === false ||
+      !field.transform.code.trim();
+    if (noTransform) {
+      return { value: resolvedValue, tainted: inputTainted };
     }
     try {
-      return await this.jsTransformExecutor.run({
-        code,
+      // Second taint channel (beyond the raw field's {{var.X}} / {{secret.X}}
+      // tokens): the transform's sandbox gets `variables` directly. Code like
+      // `return variables.x` would extract a tainted var's plaintext without
+      // any token appearing in the raw field — isRawFieldTainted would see
+      // nothing and the output would be released as untainted. Replace
+      // tainted entries with [REDACTED] before handing the map to the
+      // sandbox. User code still gets something readable (not undefined,
+      // so conditionals on variables.x won't crash), but never the plaintext.
+      // row/loop are not taint sources and pass through untouched.
+      const sandboxVariables: Record<string, string> = {};
+      for (const [name, value] of Object.entries(context.variables)) {
+        sandboxVariables[name] = run.taintedVariables.has(name)
+          ? REDACTED_PLACEHOLDER
+          : value;
+      }
+      const transformed = await this.jsTransformExecutor.run({
+        code: field!.transform!.code.trim(),
         value: resolvedValue,
         row: context.row,
         loop: context.loop,
-        variables: context.variables,
-        timeoutMs: field.transform.timeoutMs,
+        variables: sandboxVariables,
+        timeoutMs: field!.transform!.timeoutMs,
       });
+      // Strictest propagation: transform preserves taint. Cannot prove the
+      // user's transform stripped the secret (e.g. `return input.slice(0,4)`
+      // still leaks 4 chars). Declassify → standalone step, out of scope.
+      return { value: transformed, tainted: inputTainted };
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : String(error);
       throw new RunnerError('input-transform-error', `JS transform failed for ${fieldId}: ${errorMessage}`);
@@ -1345,10 +1572,11 @@ export class FlowRunnerManager {
   }
 
   private async buildAtomicPayload(
+    run: FlowRunInternal,
     step: FlowStepData,
     stepType: FlowRunAtomicStepType,
     context: FlowRenderContext,
-  ): Promise<FlowRunExecuteStepPayload> {
+  ): Promise<BuiltAtomicPayload> {
     const payload: FlowRunExecuteStepPayload = {
       runId: '',
       requestId: '',
@@ -1358,18 +1586,39 @@ export class FlowRunnerManager {
       timeoutMs: STEP_ACTION_TIMEOUT_MS,
       pollIntervalMs: CONDITION_POLL_INTERVAL_MS,
     };
+    const taintedFields = new Set<TaintedPayloadField>();
+    const assign = (field: TaintedPayloadField, resolved: ResolvedFieldValue) => {
+      if (resolved.tainted) {
+        taintedFields.add(field);
+      }
+      return resolved.value;
+    };
 
     if (stepType === 'click') {
-      payload.selector = await this.resolveStepFieldValue(step, 'selector', context);
+      payload.selector = assign('selector', await this.resolveStepFieldValue(run, step, 'selector', context));
     } else if (stepType === 'input') {
-      const rawValue = getRenderedStepFieldValue(step, 'value', context);
-      payload.selector = await this.resolveStepFieldValue(step, 'selector', context);
-      payload.value = await this.resolveStepFieldValue(step, 'value', context);
-      payload.valueSource = isSecretTokenValue(rawValue) ? 'secret' : 'literal';
+      payload.selector = assign('selector', await this.resolveStepFieldValue(run, step, 'selector', context));
+      const resolvedInputValue = await this.resolveStepFieldValue(run, step, 'value', context);
+      payload.value = assign('value', resolvedInputValue);
+      // 1.5/1.6 — `valueSource: 'secret'` must reflect the full taint story,
+      // not only the narrow raw-token match. The content-side password gate
+      // is `valueSource !== 'secret' && !isSecretTokenValue(nextValue)`; if
+      // we only set 'secret' on exact `{{secret.X}}` raw match, these legit
+      // flows all hit password-literal-blocked:
+      //   - `{{var.X}}` where X is a tainted variable (e.g. set-variable
+      //     from a secret, or from an executeRead on a sensitive DOM field)
+      //   - JS transform whose input was secret-derived
+      //   - composed templates like `prefix-{{secret.Y}}-suffix`
+      // resolved.tainted is the authoritative taint flag — use it.
+      payload.valueSource = resolvedInputValue.tainted ? 'secret' : 'literal';
     } else if (stepType === 'popup') {
-      payload.message = await this.resolveStepFieldValue(step, 'message', context);
+      payload.message = assign('message', await this.resolveStepFieldValue(run, step, 'message', context));
     } else if (stepType === 'wait') {
-      const modeValue = await this.resolveStepFieldValue(step, 'mode', context);
+      // Mode / operator / duration are structural; they don't carry taint
+      // semantics and structurally shouldn't be secret-derived. We don't
+      // pipe them through the taint tracker.
+      const modeResolved = await this.resolveStepFieldValue(run, step, 'mode', context);
+      const modeValue = modeResolved.value;
       const mode =
         modeValue === 'condition' ||
         modeValue === 'appear' ||
@@ -1385,28 +1634,30 @@ export class FlowRunnerManager {
       }
       payload.mode = mode;
       if (mode === 'time') {
-        const durationValue = await this.resolveStepFieldValue(step, 'duration', context);
-        payload.durationMs = toNonNegativeInteger(durationValue, 0);
+        const durationResolved = await this.resolveStepFieldValue(run, step, 'duration', context);
+        payload.durationMs = toNonNegativeInteger(durationResolved.value, 0);
       } else if (mode === 'condition') {
         payload.timeoutMs = WAIT_SELECTOR_TIMEOUT_MS;
-        payload.selector = await this.resolveStepFieldValue(step, 'selector', context);
-        const operator = await this.resolveStepFieldValue(step, 'operator', context);
+        payload.selector = assign('selector', await this.resolveStepFieldValue(run, step, 'selector', context));
+        const operatorResolved = await this.resolveStepFieldValue(run, step, 'operator', context);
+        const operator = operatorResolved.value;
         payload.operator =
           operator === 'equals' || operator === 'greater' || operator === 'less' ? operator : 'contains';
-        payload.expected = await this.resolveStepFieldValue(step, 'expected', context);
+        payload.expected = assign('expected', await this.resolveStepFieldValue(run, step, 'expected', context));
       } else {
         payload.timeoutMs = WAIT_SELECTOR_TIMEOUT_MS;
-        payload.selector = await this.resolveStepFieldValue(step, 'selector', context);
+        payload.selector = assign('selector', await this.resolveStepFieldValue(run, step, 'selector', context));
       }
     } else if (stepType === 'assert' || stepType === 'condition') {
-      payload.selector = await this.resolveStepFieldValue(step, 'selector', context);
-      const operator = await this.resolveStepFieldValue(step, 'operator', context);
+      payload.selector = assign('selector', await this.resolveStepFieldValue(run, step, 'selector', context));
+      const operatorResolved = await this.resolveStepFieldValue(run, step, 'operator', context);
+      const operator = operatorResolved.value;
       payload.operator =
         operator === 'equals' || operator === 'greater' || operator === 'less' ? operator : 'contains';
-      payload.expected = await this.resolveStepFieldValue(step, 'expected', context);
+      payload.expected = assign('expected', await this.resolveStepFieldValue(run, step, 'expected', context));
     }
 
-    return payload;
+    return { payload, taintedFields };
   }
 
   private async invokeContentStep(
@@ -1646,15 +1897,29 @@ export class FlowRunnerManager {
     }
     const tab = await this.tabBridge.getTabById(run.tabId);
     const baseUrl = run.activeUrl || tab?.url || '';
-    let absoluteUrl = '';
+    let parsed: URL;
     try {
-      absoluteUrl = new URL(targetValue, baseUrl || `https://${run.siteKey}`).toString();
+      parsed = new URL(targetValue, baseUrl || `https://${run.siteKey}`);
     } catch {
       throw new RunnerError('navigate-url-invalid', `Invalid navigate URL: ${targetValue}`, {
         phase: 'navigate',
         recoverable: false,
       });
     }
+    // 2.1 — Explicit scheme allowlist. Without this, `javascript:`, `data:`,
+    // `blob:`, `file:`, `chrome-extension:` etc. parse successfully; they
+    // would typically fail the cross-site check below (deriveSiteKeyFromUrl
+    // returns '' for non-http schemes) but that was defense-by-accident.
+    // Make the intent explicit so future changes to deriveSiteKeyFromUrl
+    // don't silently re-open this gap.
+    if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
+      throw new RunnerError(
+        'navigate-unsupported-scheme',
+        `Navigate URL scheme "${parsed.protocol}" is not allowed.`,
+        { phase: 'navigate', recoverable: false },
+      );
+    }
+    const absoluteUrl = parsed.toString();
     this.appendLog(run, 'info', `Navigate to ${truncateForLog(absoluteUrl)}.`, {
       stepId: step.id,
       stepType: 'navigate',
@@ -1733,6 +1998,13 @@ export class FlowRunnerManager {
       rawText: selectedInput.rawText,
       fileType: selectedInput.fileType,
     });
+    if (parsed.rows.length > MAX_LOOP_ITERATIONS) {
+      throw new RunnerError(
+        'data-source-rows-exceeded',
+        `Data-source rows ${parsed.rows.length} exceeds the iteration cap of ${MAX_LOOP_ITERATIONS}.`,
+        { phase: 'execute', recoverable: false },
+      );
+    }
     this.appendLog(run, 'info', `Data source rows: ${parsed.rows.length}.`, {
       stepId: step.id,
       stepType: 'data-source',

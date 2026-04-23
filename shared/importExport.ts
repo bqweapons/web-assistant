@@ -497,7 +497,29 @@ const mergeById = <T>(currentList: T[], incomingList: T[]) => {
     return parseTimestamp(value.updatedAt, 0);
   };
 
-  incomingList.forEach((item) => {
+  // Cap incoming `updatedAt` at "now". Clamp must happen on the item we
+  // actually store, not only on the comparison value — otherwise a crafted
+  // `updatedAt: MAX_SAFE_INTEGER` could (a) still win its first overwrite
+  // against any local item and (b) poison local state so legitimate future
+  // imports can never replace it (their clamped "now" would lose against the
+  // stored giant timestamp). Shallow-copying the record with a clamped
+  // `updatedAt` fixes both: the attacker's first overwrite still happens in
+  // the "tie with now" case, but subsequent imports can replace it normally.
+  const mergeTimestampCeiling = Date.now();
+  const clampItemUpdatedAt = (item: T): T => {
+    if (!isRecord(item)) {
+      return item;
+    }
+    const record = item as Record<string, unknown>;
+    const ts = parseTimestamp(record.updatedAt, 0);
+    if (ts <= mergeTimestampCeiling) {
+      return item;
+    }
+    return { ...record, updatedAt: mergeTimestampCeiling } as unknown as T;
+  };
+
+  incomingList.forEach((rawItem) => {
+    const item = clampItemUpdatedAt(rawItem);
     const id = getItemId(item);
     if (id && idToIndex.has(id)) {
       const currentIndex = idToIndex.get(id) as number;
@@ -574,15 +596,40 @@ export const buildExportPayload = (
   };
 };
 
+// Defense-in-depth: strip keys that would let a crafted import file mutate
+// prototypes when downstream code does bracket assignment with user keys.
+// `JSON.parse` in modern V8 already promotes `__proto__` to an own property
+// (non-mutating), but sanitizing here also protects any caller that parses JSON
+// via a different tool, and hardens future edits against the `obj[userKey] = v`
+// pattern. Cost: one deep copy per import (imports are rare and small).
+const DANGEROUS_KEYS = new Set(['__proto__', 'constructor', 'prototype']);
+const stripDangerousKeys = (value: unknown): unknown => {
+  if (Array.isArray(value)) {
+    return value.map(stripDangerousKeys);
+  }
+  if (!isRecord(value)) {
+    return value;
+  }
+  const next: Record<string, unknown> = {};
+  for (const key of Object.keys(value)) {
+    if (DANGEROUS_KEYS.has(key)) {
+      continue;
+    }
+    next[key] = stripDangerousKeys((value as Record<string, unknown>)[key]);
+  }
+  return next;
+};
+
 export const parseImportPayload = (raw: unknown): ParsedImportPayload => {
-  if (isRecord(raw) && typeof raw.version !== 'undefined') {
-    return parseVersionedPayload(raw);
+  const sanitized = stripDangerousKeys(raw);
+  if (isRecord(sanitized) && typeof sanitized.version !== 'undefined') {
+    return parseVersionedPayload(sanitized);
   }
-  if (isRecord(raw) && isRecord(raw.sites)) {
-    return parseUnversionedSitesPayload(raw);
+  if (isRecord(sanitized) && isRecord(sanitized.sites)) {
+    return parseUnversionedSitesPayload(sanitized);
   }
-  if (isLegacyPayload(raw)) {
-    return parseLegacyPayload(raw);
+  if (isLegacyPayload(sanitized)) {
+    return parseLegacyPayload(sanitized);
   }
   throw new Error('Invalid import payload format.');
 };

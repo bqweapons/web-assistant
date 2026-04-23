@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type ReactNode } from 'react';
+import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
 import {
   Crosshair,
   ChevronRight,
@@ -210,10 +210,23 @@ export default function FlowStepsBuilder({
         context: StepTreeContext;
       }
   >(null);
-  const syncingFromPropsRef = useRef(false);
-  const initializedRef = useRef(false);
   const onChangeRef = useRef(onChange);
   const appliedResetKeyRef = useRef<string | number | symbol>(Symbol('initial-reset'));
+  const draftStepsRef = useRef<StepData[]>(draftSteps);
+  draftStepsRef.current = draftSteps;
+  const commitSteps = useCallback(
+    (updater: (prev: StepData[]) => StepData[]) => {
+      const prev = draftStepsRef.current;
+      const next = updater(prev);
+      if (next === prev) {
+        return;
+      }
+      draftStepsRef.current = next;
+      setDraftSteps(next);
+      onChangeRef.current?.(next);
+    },
+    [],
+  );
   const setFieldInputRef =
     (_stepId: string, _fieldId: string) => (_node: HTMLInputElement | HTMLTextAreaElement | null) => undefined;
   const templateOptions = { waitModes, conditionOperators };
@@ -261,39 +274,38 @@ export default function FlowStepsBuilder({
     onChangeRef.current = onChange;
   }, [onChange]);
 
+  // External steps prop changes (e.g. recorder appending steps while drawer is open).
+  // Skip when the prop matches our own latest commit — that's just our onChange round-trip.
   useEffect(() => {
-    if (typeof resetKey !== 'undefined') {
-      if (appliedResetKeyRef.current !== resetKey) {
-        appliedResetKeyRef.current = resetKey;
-      }
+    if (steps === draftStepsRef.current) {
+      return;
     }
-    syncingFromPropsRef.current = true;
+    draftStepsRef.current = steps;
     setDraftSteps(steps);
-    setActiveStepId((prev) => {
-      if (prev && findStepById(steps, prev)) {
-        return prev;
-      }
-      return '';
-    });
+    setActiveStepId((prev) => (prev && findStepById(steps, prev) ? prev : ''));
+  }, [steps]);
+
+  // Fresh open (new flow / switched site) resets editor UI state.
+  useEffect(() => {
+    if (typeof resetKey === 'undefined') {
+      return;
+    }
+    if (appliedResetKeyRef.current === resetKey) {
+      return;
+    }
+    appliedResetKeyRef.current = resetKey;
+    setActiveStepId('');
+    setActiveFieldTarget(null);
     setTransformEditorTarget(null);
     setVariablePickerTarget(null);
-  }, [resetKey, steps]);
-
-  useEffect(() => {
-    if (!initializedRef.current) {
-      initializedRef.current = true;
-      syncingFromPropsRef.current = false;
-      return;
-    }
-    if (syncingFromPropsRef.current) {
-      syncingFromPropsRef.current = false;
-      return;
-    }
-    onChangeRef.current?.(draftSteps);
-  }, [draftSteps]);
+    setInputValueModes({});
+    setCollapsedSteps({});
+    setCollapsedBranches({});
+    setDragState(null);
+  }, [resetKey]);
 
   const updateField = (stepId: string, fieldId: string, value: string) => {
-    setDraftSteps((prev) =>
+    commitSteps((prev) =>
       updateSteps(prev, stepId, (step) => {
         let nextFields = step.fields.map((field) =>
           field.id === fieldId ? { ...field, value } : field,
@@ -352,11 +364,11 @@ export default function FlowStepsBuilder({
   ) => {
     const newStep = createStepTemplate(type, templateOptions);
     if (target.scope === 'root') {
-      setDraftSteps((prev) => [...prev, newStep]);
+      commitSteps((prev) => [...prev, newStep]);
       setActiveStepId(newStep.id);
       return;
     }
-    setDraftSteps((prev) =>
+    commitSteps((prev) =>
       updateSteps(prev, target.stepId, (step) => {
         if (target.scope === 'children') {
           const nextChildren = [...(step.children ?? []), newStep];
@@ -379,16 +391,9 @@ export default function FlowStepsBuilder({
   };
 
   const handleDeleteStep = (stepId: string) => {
-    setDraftSteps((prev) => {
-      const next = removeStepById(prev, stepId);
-      setActiveStepId((current) => {
-        if (current && findStepById(next, current)) {
-          return current;
-        }
-        return '';
-      });
-      return next;
-    });
+    commitSteps((prev) => removeStepById(prev, stepId));
+    const nextSteps = draftStepsRef.current;
+    setActiveStepId((current) => (current && findStepById(nextSteps, current) ? current : ''));
     setTransformEditorTarget((prev) => (prev?.stepId === stepId ? null : prev));
     setVariablePickerTarget((prev) => (prev?.stepId === stepId ? null : prev));
   };
@@ -413,7 +418,7 @@ export default function FlowStepsBuilder({
     }
     if (fallbackStepId) {
       const newStep = createInputStepWithValue(token, templateOptions);
-      setDraftSteps((prev) => {
+      commitSteps((prev) => {
         if (!findStepById(prev, fallbackStepId)) {
           return prev;
         }
@@ -430,14 +435,12 @@ export default function FlowStepsBuilder({
       setActiveFieldTarget(null);
       return;
     }
-    setDraftSteps((prev) => {
-      const target = activeFieldTarget;
-      if (!target) {
-        return prev;
-      }
-      setActiveFieldTarget(target);
-      setActiveStepId(target.stepId);
-      return updateSteps(prev, target.stepId, (step) => {
+    const target = activeFieldTarget;
+    if (!target) {
+      return;
+    }
+    commitSteps((prev) =>
+      updateSteps(prev, target.stepId, (step) => {
         const nextFields = step.fields.map((field) => {
           if (field.id !== target.fieldId) {
             return field;
@@ -447,12 +450,13 @@ export default function FlowStepsBuilder({
         });
         const nextStep = { ...step, fields: nextFields };
         return { ...nextStep, summary: summarizeStep(nextStep) };
-      });
-    });
+      }),
+    );
+    setActiveStepId(target.stepId);
   };
 
   const insertInputValueShortcut = (stepId: string, fieldId: string, token: string) => {
-    setDraftSteps((prev) =>
+    commitSteps((prev) =>
       updateSteps(prev, stepId, (step) => {
         const nextFields = step.fields.map((field) => {
           if (field.id !== fieldId) {
@@ -554,7 +558,7 @@ export default function FlowStepsBuilder({
       current: NonNullable<StepField['transform']> | undefined,
     ) => StepField['transform'] | undefined,
   ) => {
-    setDraftSteps((prev) =>
+    commitSteps((prev) =>
       updateSteps(prev, stepId, (step) => {
         const nextFields = step.fields.map((field) => {
           if (field.id !== fieldId) {
@@ -611,7 +615,7 @@ export default function FlowStepsBuilder({
     const reader = new FileReader();
     reader.onload = () => {
       const text = typeof reader.result === 'string' ? reader.result : '';
-      setDraftSteps((prev) => {
+      commitSteps((prev) => {
         const step = findStepById(prev, stepId);
         if (!step) {
           return prev;
@@ -663,7 +667,7 @@ export default function FlowStepsBuilder({
           if (!dragState || !listContext || !canDropHere || dragState.stepId === step.id) {
             return;
           }
-          setDraftSteps((prev) => reorderWithinContext(prev, listContext, dragState.stepId, step.id));
+          commitSteps((prev) => reorderWithinContext(prev, listContext, dragState.stepId, step.id));
           setDragState(null);
         };
         return (
@@ -1456,7 +1460,7 @@ export default function FlowStepsBuilder({
             if (!dragState || !dropContext) {
               return;
             }
-            setDraftSteps((prev) => reorderWithinContext(prev, dropContext, dragState.stepId));
+            commitSteps((prev) => reorderWithinContext(prev, dropContext, dragState.stepId));
             setDragState(null);
           }}
         />

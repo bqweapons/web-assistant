@@ -1238,6 +1238,21 @@
   "sidepanel_settings_import_vault_password_prompt_unlock": {
     "message": "This file contains password vault data. Enter your vault password to import saved passwords."
   },
+  "sidepanel_settings_vault_prompt_title_export": {
+    "message": "Include vault passwords"
+  },
+  "sidepanel_settings_vault_prompt_title_create": {
+    "message": "Create vault password"
+  },
+  "sidepanel_settings_vault_prompt_title_unlock": {
+    "message": "Unlock password vault"
+  },
+  "sidepanel_settings_vault_prompt_placeholder": {
+    "message": "Vault password"
+  },
+  "sidepanel_settings_vault_prompt_submit": {
+    "message": "Continue"
+  },
   "sidepanel_settings_import_vault_skipped_no_password": {
     "message": "Skipped password vault import (vault password was not provided)."
   },

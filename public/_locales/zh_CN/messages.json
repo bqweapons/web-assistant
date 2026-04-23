@@ -1238,6 +1238,21 @@
   "sidepanel_settings_import_vault_password_prompt_unlock": {
     "message": "此文件包含密码保管库数据。请输入保管库密码以导入已保存密码。"
   },
+  "sidepanel_settings_vault_prompt_title_export": {
+    "message": "包含保管库密码"
+  },
+  "sidepanel_settings_vault_prompt_title_create": {
+    "message": "创建保管库密码"
+  },
+  "sidepanel_settings_vault_prompt_title_unlock": {
+    "message": "解锁密码保管库"
+  },
+  "sidepanel_settings_vault_prompt_placeholder": {
+    "message": "保管库密码"
+  },
+  "sidepanel_settings_vault_prompt_submit": {
+    "message": "继续"
+  },
   "sidepanel_settings_import_vault_skipped_no_password": {
     "message": "已跳过密码保管库导入（未提供保管库密码）。"
   },

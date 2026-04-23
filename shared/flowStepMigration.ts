@@ -1,5 +1,30 @@
 type JsonRecord = Record<string, unknown>;
 
+// 2.4 — Authoritative list of step `type` values that user-authored flows can
+// carry. Source of truth is `createStepTemplate` in ui templates.ts. Anything
+// else (including `__proto__`, `constructor`, or arbitrary legacy keys) is
+// rejected at import / normalization time; downstream `executeStep` would
+// fail at runtime anyway with `unsupported-step-type`, but dropping at the
+// boundary keeps storage clean and protects against future code paths that
+// might trust `step.type` without re-validating.
+// Intentionally excluded: `condition` and `read` are payload-level stepType
+// values the runner builds internally (see buildReadPayload, condition
+// payloads in buildAtomicPayload). Users never author them.
+const VALID_USER_STEP_TYPES = new Set<string>([
+  'click',
+  'input',
+  'wait',
+  'assert',
+  'popup',
+  'navigate',
+  'loop',
+  'if-else',
+  'data-source',
+  'set-variable',
+]);
+const isValidStepType = (value: unknown): value is string =>
+  typeof value === 'string' && VALID_USER_STEP_TYPES.has(value);
+
 export type FlowStepField = {
   id: string;
   label: string;
@@ -208,7 +233,11 @@ const normalizeSetVariableFields = (fields: FlowStepField[]): FlowStepField[] =>
 export const isFlowStepData = (value: unknown): value is FlowStepData =>
   isRecord(value) &&
   typeof value.id === 'string' &&
-  typeof value.type === 'string' &&
+  // 2.4 — reject unknown step types at the predicate level so both
+  // normalizeExistingFlowStep (which guards on isFlowStepData) and any other
+  // downstream gate refuses to accept e.g. `__proto__` or arbitrary legacy
+  // names. Keeps the storage invariant "every FlowStepData.type is runnable".
+  isValidStepType(value.type) &&
   typeof value.title === 'string' &&
   typeof value.summary === 'string' &&
   Array.isArray(value.fields) &&
@@ -299,7 +328,20 @@ const normalizeLegacyActionStep = (
   if (!isRecord(raw)) {
     return null;
   }
-  const type = typeof raw.type === 'string' && raw.type.trim() ? raw.type.trim() : 'step';
+  // 2.4 — Drop legacy steps with unknown types entirely instead of wrapping
+  // them in a generic "Legacy step" shell. The generic fallback used to
+  // accept any type string including `__proto__` / arbitrary garbage; that
+  // storage would later fail at runtime with `unsupported-step-type` anyway,
+  // so rejecting at import is both safer and cleaner (less zombie data).
+  // Historical aliases from older extension versions (open/goto → navigate)
+  // are normalized *before* the whitelist check so legit old data still
+  // imports cleanly.
+  const rawType = typeof raw.type === 'string' ? raw.type.trim() : '';
+  const canonicalType = rawType === 'open' || rawType === 'goto' ? 'navigate' : rawType;
+  if (!isValidStepType(canonicalType)) {
+    return null;
+  }
+  const type = canonicalType;
   const selector = asText(raw.selector);
   const stepId = `${flowId}-legacy-step-${index + 1}`;
   const baseFields: FlowStepField[] = [];
