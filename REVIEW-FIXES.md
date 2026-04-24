@@ -16,7 +16,7 @@ Severity tags match the original review summary (`🔴 HIGH` / `🟡 MED` / `�
 - [x] **0.1** JS transform editor closes on input — split the single effect into two: one for prop-sync (skips when our own commit round-trips back), one for `resetKey`-triggered UI-state reset. Editor/picker state no longer nuked on every keystroke.
 - [x] **0.2** Flow save race after adding last step — introduced `commitSteps` helper that fires `onChange(next)` synchronously from the mutation site. Removed the `useEffect([draftSteps]) → onChange` reconciliation; dropped `syncingFromPropsRef` / `initializedRef`. All 10 mutation sites now call `commitSteps`.
 - [x] **0.3** Typecheck + i18n pass (`npm run compile` ✓, `npm run i18n:check` ✓).
-- [ ] **0.4** User-side manual verification before moving on.
+- [x] **0.4** User-side manual verification — confirmed 2026-04-24. Phase 0 / Phase 1 batch 1 / batch 16 (1.13) / F1 iframe / 1.4 + review fixes all smoke-passed by user.
 
 ### Phase 0 change summary
 
