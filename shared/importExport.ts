@@ -412,16 +412,20 @@ const parseVersionedPayload = (raw: JsonRecord): ParsedImportPayload => {
   // 3.7 — zod gate before hand-off to field-level normalizer. Produces a
   // structured error with a path like `sites: Expected object, received
   // string` instead of the bespoke message this branch used to throw.
+  // Note: `version` is schema-typed as `z.unknown()` (see schema header) to
+  // preserve the pre-zod lenient handling of non-string versions; we coerce
+  // it to string here the same way the old code did.
   const parsed = VersionedImportEnvelopeSchema.safeParse(raw);
   if (!parsed.success) {
     throw new Error(`Invalid import payload: ${formatSchemaError(parsed.error)}`);
   }
-  const { version, sites: rawSites, settings: rawSettings } = parsed.data;
+  const { version: rawVersion, sites: rawSites, settings: rawSettings } = parsed.data;
+  const version = typeof rawVersion === 'string' ? rawVersion : '';
   const warnings: string[] = [];
   if (!COMPATIBLE_IMPORT_VERSIONS.has(version)) {
     warnings.push(`Imported unknown payload version "${version}" using compatibility normalization.`);
   }
-  const sites = normalizeSitesObject(rawSites as Record<string, unknown>);
+  const sites = normalizeSitesObject(rawSites);
   const settings = isRecord(rawSettings) ? normalizeGlobalSettings(rawSettings) : undefined;
   return buildParsedResultFromSites(sites, version, warnings, settings);
 };
@@ -433,7 +437,7 @@ const parseUnversionedSitesPayload = (raw: JsonRecord): ParsedImportPayload => {
     throw new Error(`Invalid import payload: ${formatSchemaError(parsed.error)}`);
   }
   const { sites: rawSites, settings: rawSettings } = parsed.data;
-  const sites = normalizeSitesObject(rawSites as Record<string, unknown>);
+  const sites = normalizeSitesObject(rawSites);
   const settings = isRecord(rawSettings) ? normalizeGlobalSettings(rawSettings) : undefined;
   return buildParsedResultFromSites(sites, 'unversioned', [
     'Imported unversioned payload and normalized to canonical schema.',

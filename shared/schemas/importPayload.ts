@@ -24,11 +24,19 @@ import { z } from 'zod';
 // Versioned export (our canonical format, v1.0.2 / v1.0.3).
 // `sites` / `settings` are `z.unknown()` so field-level migration still owns
 // those shapes; we only gate the top-level envelope.
+//
+// `version` is `z.unknown()` rather than `z.string()` deliberately: the
+// pre-zod code tolerated any non-string version (coerced to '', warned,
+// continued) and routing into this branch only checks `typeof version !==
+// 'undefined'`. Tightening to string-only here would reject imports that
+// used to succeed, which violates Phase 3's "no behavior change" rule.
+// The consumer in `parseVersionedPayload` still coerces to string.
+// Unknown extra keys (e.g. future `secretsVault` transfers) pass through
+// via zod's default `.strip()` behavior without needing an explicit slot.
 export const VersionedImportEnvelopeSchema = z.object({
-  version: z.string(),
+  version: z.unknown(),
   sites: z.record(z.string(), z.unknown()),
   settings: z.unknown().optional(),
-  secretsVault: z.unknown().optional(),
 });
 
 // Unversioned "sites bucket without version" — older snapshots produced
