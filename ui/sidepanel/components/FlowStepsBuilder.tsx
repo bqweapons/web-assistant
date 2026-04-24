@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
+import { useRef, useState, type ReactNode } from 'react';
 import {
   Crosshair,
   ChevronRight,
@@ -20,6 +20,7 @@ import { buildStepSummary, getFieldValue, shouldShowField } from './flowSteps/su
 import { createInputStepWithValue, createStepTemplate } from './flowSteps/templates';
 import { StepFieldControl } from './flowSteps/fieldRenderer';
 import InputSecretValueControl from './flowSteps/InputSecretValueControl';
+import { formatFrameUrlForBadge } from './flowSteps/formatFrameUrlForBadge';
 import {
   FIELD_LABEL_KEYS,
   getConditionOperators,
@@ -36,6 +37,7 @@ import {
   type StepTreeContext,
 } from './flowSteps/treeOps';
 import type { StepData, StepField } from './flowSteps/types';
+import { useFlowStepsDraft } from '../hooks/useFlowStepsDraft';
 
 export type { StepData };
 
@@ -159,26 +161,6 @@ const collectAncestorTypes = (
   return null;
 };
 
-// F1 — Compact read-only display of a step's persisted iframe locator.
-// Strips scheme + trailing slash so the badge shows "host/path" rather
-// than "https://host/path/"; on unparseable inputs the raw URL is
-// returned so the reader still sees something meaningful. CSS handles
-// truncation; this is strictly a shortening of the visible string.
-const formatFrameUrlForBadge = (url: string): string => {
-  const trimmed = url.trim();
-  if (!trimmed) {
-    return trimmed;
-  }
-  try {
-    const parsed = new URL(trimmed);
-    const host = parsed.host;
-    const path = parsed.pathname === '/' ? '' : parsed.pathname;
-    return `${host}${path}` || trimmed;
-  } catch {
-    return trimmed;
-  }
-};
-
 // F1 — Flow pickers return the selector + optional frame URL so a step
 // captured inside an iframe can persist its `targetFrame` locator. All
 // FlowStepsBuilder consumers use this shape (the selector-only picker
@@ -219,7 +201,6 @@ export default function FlowStepsBuilder({
     navigate: t('sidepanel_step_navigate_label', 'Navigate'),
     assert: t('sidepanel_step_assert_label', 'Assert'),
   };
-  const [draftSteps, setDraftSteps] = useState<StepData[]>(steps);
   const [activeStepId, setActiveStepId] = useState('');
   const [activeFieldTarget, setActiveFieldTarget] = useState<{ stepId: string; fieldId: string } | null>(null);
   const [transformEditorTarget, setTransformEditorTarget] = useState<{
@@ -240,23 +221,24 @@ export default function FlowStepsBuilder({
         context: StepTreeContext;
       }
   >(null);
-  const onChangeRef = useRef(onChange);
-  const appliedResetKeyRef = useRef<string | number | symbol>(Symbol('initial-reset'));
-  const draftStepsRef = useRef<StepData[]>(draftSteps);
-  draftStepsRef.current = draftSteps;
-  const commitSteps = useCallback(
-    (updater: (prev: StepData[]) => StepData[]) => {
-      const prev = draftStepsRef.current;
-      const next = updater(prev);
-      if (next === prev) {
-        return;
-      }
-      draftStepsRef.current = next;
-      setDraftSteps(next);
-      onChangeRef.current?.(next);
+  const { draftSteps, draftStepsRef, commitSteps } = useFlowStepsDraft({
+    steps,
+    resetKey,
+    onChange,
+    onStepsReplacedExternally: (next) => {
+      setActiveStepId((prev) => (prev && findStepById(next, prev) ? prev : ''));
     },
-    [],
-  );
+    onResetKeyChange: () => {
+      setActiveStepId('');
+      setActiveFieldTarget(null);
+      setTransformEditorTarget(null);
+      setVariablePickerTarget(null);
+      setInputValueModes({});
+      setCollapsedSteps({});
+      setCollapsedBranches({});
+      setDragState(null);
+    },
+  });
   const setFieldInputRef =
     (_stepId: string, _fieldId: string) => (_node: HTMLInputElement | HTMLTextAreaElement | null) => undefined;
   const templateOptions = { waitModes, conditionOperators };
@@ -299,40 +281,6 @@ export default function FlowStepsBuilder({
     }
     return fallback;
   };
-
-  useEffect(() => {
-    onChangeRef.current = onChange;
-  }, [onChange]);
-
-  // External steps prop changes (e.g. recorder appending steps while drawer is open).
-  // Skip when the prop matches our own latest commit — that's just our onChange round-trip.
-  useEffect(() => {
-    if (steps === draftStepsRef.current) {
-      return;
-    }
-    draftStepsRef.current = steps;
-    setDraftSteps(steps);
-    setActiveStepId((prev) => (prev && findStepById(steps, prev) ? prev : ''));
-  }, [steps]);
-
-  // Fresh open (new flow / switched site) resets editor UI state.
-  useEffect(() => {
-    if (typeof resetKey === 'undefined') {
-      return;
-    }
-    if (appliedResetKeyRef.current === resetKey) {
-      return;
-    }
-    appliedResetKeyRef.current = resetKey;
-    setActiveStepId('');
-    setActiveFieldTarget(null);
-    setTransformEditorTarget(null);
-    setVariablePickerTarget(null);
-    setInputValueModes({});
-    setCollapsedSteps({});
-    setCollapsedBranches({});
-    setDragState(null);
-  }, [resetKey]);
 
   // F1 — Persist an iframe locator (or clear it) onto a step. Called
   // by StepFieldControl after a picker result that carries frameUrl,
