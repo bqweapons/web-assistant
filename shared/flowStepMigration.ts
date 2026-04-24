@@ -1,5 +1,14 @@
 type JsonRecord = Record<string, unknown>;
 
+// 3.6 — Explicit version stamp on each FlowStepData. Absent (undefined / 0)
+// means "v0 legacy": the step was written before versioning existed and must
+// run through normalization. After normalization the step carries _v = 1
+// (CURRENT_STEP_VERSION). Future migrations increment this constant and add a
+// guard `if (step._v < N) { …apply migration N… step._v = N; }` before the
+// final bump to CURRENT_STEP_VERSION. The field is prefixed with _ to signal
+// that it is infrastructure metadata rather than user-visible content.
+export const CURRENT_STEP_VERSION = 1 as const;
+
 // 2.4 — Authoritative list of step `type` values that user-authored flows can
 // carry. Source of truth is `createStepTemplate` in ui templates.ts. Anything
 // else (including `__proto__`, `constructor`, or arbitrary legacy keys) is
@@ -67,6 +76,9 @@ export type FlowStepData = {
   title: string;
   summary: string;
   fields: FlowStepField[];
+  // 3.6 — Migration version stamp. Undefined / missing means v0 (pre-versioning).
+  // After normalization the value is always CURRENT_STEP_VERSION (= 1).
+  _v?: number;
   dataSource?: FlowDataSourceMeta;
   children?: FlowStepData[];
   branches?: Array<{ id: string; label: string; steps: FlowStepData[] }>;
@@ -269,6 +281,7 @@ const normalizeExistingFlowStep = (
     fields: raw.fields
       .map((field) => normalizeFlowStepField(field, idFactory))
       .filter((field): field is FlowStepField => Boolean(field)),
+    _v: CURRENT_STEP_VERSION,
   };
   if (normalized.type === 'set-variable') {
     normalized.fields = normalizeSetVariableFields(normalized.fields);
@@ -392,6 +405,7 @@ const normalizeLegacyActionStep = (
           type: 'text',
         },
       ],
+      _v: CURRENT_STEP_VERSION,
     };
   }
 
