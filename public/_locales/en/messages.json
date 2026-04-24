@@ -1181,6 +1181,9 @@
   "sidepanel_flow_runner_state_cancelled": {
     "message": "Cancelled"
   },
+  "sidepanel_flow_runner_state_paused": {
+    "message": "Waiting for vault unlock"
+  },
   "sidepanel_flow_runner_progress": {
     "message": "{done}/{total} steps"
   },
@@ -1448,35 +1451,59 @@
   "sidepanel_flow_runner_logs_showing_recent": {
     "message": "Showing latest {count} logs"
   },
-  "content_flow_vault_unlock_title": {
-    "message": "Unlock password vault to continue"
+  "vault_unlock_window_title": {
+    "message": "Unlock password vault"
   },
-  "content_flow_vault_unlock_description": {
-    "message": "This is the password vault master password, not the website login password."
+  "vault_unlock_window_description": {
+    "message": "A flow is waiting for the password vault master password. The password stays inside the extension and is not sent to the page."
   },
-  "content_flow_vault_unlock_password_placeholder": {
+  "vault_unlock_context_flow": {
+    "message": "Flow"
+  },
+  "vault_unlock_context_step": {
+    "message": "Step"
+  },
+  "vault_unlock_context_site": {
+    "message": "Site"
+  },
+  "vault_unlock_context_attempt": {
+    "message": "Attempt {count}",
+    "placeholders": {
+      "count": { "content": "$1", "example": "2" }
+    }
+  },
+  "vault_unlock_password_label": {
+    "message": "Master password"
+  },
+  "vault_unlock_password_placeholder": {
     "message": "Password vault master password"
   },
-  "content_flow_vault_unlock_submit": {
-    "message": "Unlock and continue"
+  "vault_unlock_submit": {
+    "message": "Unlock"
   },
-  "content_flow_vault_unlock_cancel_stop": {
-    "message": "Cancel and stop run"
+  "vault_unlock_submitting": {
+    "message": "Unlocking…"
   },
-  "content_flow_vault_unlock_error_invalid_password": {
-    "message": "Invalid password vault master password. Please try again."
+  "vault_unlock_cancel": {
+    "message": "Cancel"
   },
-  "content_flow_vault_unlock_error_empty_password": {
-    "message": "Please enter the password vault master password."
+  "vault_unlock_error_invalid_password": {
+    "message": "Invalid master password."
+  },
+  "vault_unlock_error_empty_password": {
+    "message": "Please enter the master password."
+  },
+  "vault_unlock_error_run_not_pending": {
+    "message": "This flow run was interrupted (the background task may have been suspended). Close this window and run the flow again from the sidepanel."
   },
   "sidepanel_flow_runner_error_secret_vault_unlock_cancelled": {
     "message": "Password vault unlock was cancelled. The flow was stopped."
   },
   "sidepanel_flow_runner_error_secret_vault_unlock_prompt_unavailable": {
-    "message": "Could not show the vault unlock prompt on the page. Open the side panel, unlock the vault, then try again."
+    "message": "Could not open the vault unlock window. Unlock the vault from the side panel, then try again."
   },
   "sidepanel_flow_runner_error_secret_vault_unlock_interrupted": {
-    "message": "Vault unlock was interrupted by page refresh or navigation. Please run the flow again."
+    "message": "Vault unlock was interrupted before it completed. Please run the flow again."
   },
   "sidepanel_flow_runner_error_sw_suspended_during_run": {
     "message": "The browser suspended the background task during this run. The flow was stopped. Please run it again."

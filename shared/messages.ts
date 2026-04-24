@@ -28,7 +28,13 @@ export const MessageType = {
   FLOW_RUN_STATUS: 'FLOW_RUN_STATUS',
   FLOW_RUN_EXECUTE_STEP: 'FLOW_RUN_EXECUTE_STEP',
   FLOW_RUN_STEP_RESULT: 'FLOW_RUN_STEP_RESULT',
-  FLOW_RUN_VAULT_UNLOCK_PROMPT: 'FLOW_RUN_VAULT_UNLOCK_PROMPT',
+  // 1.4 — Vault unlock coordination between the extension-origin
+  // unlock window, the SW, and the runner. Replaces the retired
+  // `FLOW_RUN_VAULT_UNLOCK_PROMPT` page-facing message: the master
+  // password must never transit through page DOM. See 1.4-spec.md.
+  FLOW_RUN_UNLOCK_CONTEXT: 'FLOW_RUN_UNLOCK_CONTEXT',
+  FLOW_RUN_UNLOCK_SUBMIT: 'FLOW_RUN_UNLOCK_SUBMIT',
+  FLOW_RUN_UNLOCK_CANCEL: 'FLOW_RUN_UNLOCK_CANCEL',
   // 1.1 — sidepanel vault operations routed through the SW so the AES key
   // stays in SW memory only. Background owns the key; sidepanel is a pure
   // client. See `shared/secretsClient.ts` for the sidepanel wrapper and
@@ -182,7 +188,13 @@ export type FlowRecordingStatusPayload = {
   url?: string;
 };
 
-export type FlowRunState = 'queued' | 'running' | 'succeeded' | 'failed' | 'cancelled';
+// 1.4 — `paused` is a first-class run state: the runner enters it
+// when a step hits `secret-vault-locked` and an extension-origin
+// unlock window is opened. Sidepanel renders this distinctly from
+// `running`, and the Run button is guarded against double-start.
+// Same `FlowRunState` value lands in the sentinel (1.13) so orphan
+// cleanup treats it as an unfinished interruptible state.
+export type FlowRunState = 'queued' | 'running' | 'paused' | 'succeeded' | 'failed' | 'cancelled';
 export type FlowRunStartSource = 'flows-list' | 'flow-drawer-save-run';
 export type FlowConditionOperator = 'contains' | 'equals' | 'greater' | 'less';
 export type FlowRunAtomicStepType = 'click' | 'input' | 'wait' | 'assert' | 'condition' | 'popup' | 'read';
@@ -303,21 +315,52 @@ export type FlowRunExecuteResultPayload = {
   errorCode?: string;
 };
 
-export type FlowRunVaultUnlockPromptPayload = {
+// 1.4 — Vault unlock window coordination. The extension-origin
+// unlock surface (entrypoints/vaultUnlock/) queries context on mount,
+// submits the master password for verification, and can explicitly
+// cancel. The master password never enters page DOM — these messages
+// travel chrome-extension ↔ chrome-extension only.
+export type FlowRunUnlockContextRequest = {
   runId: string;
-  stepId: string;
-  stepTitle?: string;
-  flowName?: string;
-  siteKey?: string;
-  attempt: number;
-  errorMessage?: string;
-  reason: 'secret-vault-locked';
 };
 
-export type FlowRunVaultUnlockPromptResult =
-  | { action: 'submit'; password: string }
-  | { action: 'cancel' }
-  | { action: 'navigation' };
+export type FlowRunUnlockContextResponse =
+  | {
+      ok: true;
+      runId: string;
+      flowName: string | null;
+      stepTitle: string | null;
+      siteKey: string | null;
+      // 1-based, incremented on each wrong-password attempt. Displayed
+      // in the unlock window so the user can tell retries are landing.
+      attempt: number;
+      // Surfaces the most recent failure reason for UI display — e.g.
+      // 'Invalid master password'. Absent when the window mounts for
+      // the first time or after a successful retry reset.
+      lastErrorMessage?: string;
+    }
+  | {
+      ok: false;
+      code: 'run-not-pending';
+    };
+
+export type FlowRunUnlockSubmitRequest = {
+  runId: string;
+  password: string;
+};
+
+export type FlowRunUnlockSubmitResponse =
+  | { ok: true }
+  | { ok: false; code: 'invalid-password'; attempt: number }
+  | { ok: false; code: 'run-not-pending' };
+
+export type FlowRunUnlockCancelRequest = {
+  runId: string;
+};
+
+export type FlowRunUnlockCancelResponse = {
+  ok: true;
+};
 
 export type RuntimeMessage =
   | { type: typeof MessageType.START_PICKER; data?: PickerStartPayload; forwarded?: boolean; targetTabId?: number }
@@ -345,7 +388,9 @@ export type RuntimeMessage =
   | { type: typeof MessageType.FLOW_RUN_STATUS; data: FlowRunStatusPayload; forwarded?: boolean; targetTabId?: number }
   | { type: typeof MessageType.FLOW_RUN_EXECUTE_STEP; data: FlowRunExecuteStepPayload; forwarded?: boolean; targetTabId?: number }
   | { type: typeof MessageType.FLOW_RUN_STEP_RESULT; data: FlowRunExecuteResultPayload; forwarded?: boolean; targetTabId?: number }
-  | { type: typeof MessageType.FLOW_RUN_VAULT_UNLOCK_PROMPT; data: FlowRunVaultUnlockPromptPayload; forwarded?: boolean; targetTabId?: number }
+  | { type: typeof MessageType.FLOW_RUN_UNLOCK_CONTEXT; data: FlowRunUnlockContextRequest; forwarded?: boolean; targetTabId?: number }
+  | { type: typeof MessageType.FLOW_RUN_UNLOCK_SUBMIT; data: FlowRunUnlockSubmitRequest; forwarded?: boolean; targetTabId?: number }
+  | { type: typeof MessageType.FLOW_RUN_UNLOCK_CANCEL; data: FlowRunUnlockCancelRequest; forwarded?: boolean; targetTabId?: number }
   // 1.1 — SECRETS_* messages. All responses go back via `{ ok: true, data }`
   // (the common pattern in this module's `respondPromise` helper). `data`
   // field here reflects the REQUEST payload only; response shapes are

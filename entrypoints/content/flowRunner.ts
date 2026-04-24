@@ -3,8 +3,6 @@ import type {
   FlowRunAtomicStepType,
   FlowRunExecuteResultPayload,
   FlowRunExecuteStepPayload,
-  FlowRunVaultUnlockPromptPayload,
-  FlowRunVaultUnlockPromptResult,
 } from '../../shared/messages';
 import { isSecretTokenValue } from '../../shared/secrets';
 
@@ -72,12 +70,6 @@ type FlowModalOptions = {
   confirmLabel: string;
   cancelLabel?: string;
   accent?: 'green' | 'blue';
-  passwordField?: {
-    placeholder: string;
-    errorMessage?: string;
-    initialValue?: string;
-  };
-  onSubmit?: (value: string) => string | null;
 };
 
 const showFlowModal = (options: FlowModalOptions) =>
@@ -135,33 +127,10 @@ const showFlowModal = (options: FlowModalOptions) =>
     wordBreak: 'break-word',
   });
 
-  let input: HTMLInputElement | null = null;
-  let errorText: HTMLDivElement | null = null;
-  if (options.passwordField) {
-    input = document.createElement('input');
-    input.type = 'password';
-    input.autocomplete = 'current-password';
-    input.placeholder = options.passwordField.placeholder;
-    input.value = options.passwordField.initialValue || '';
-    Object.assign(input.style, {
-      width: '100%',
-      boxSizing: 'border-box',
-      borderRadius: '10px',
-      border: '1px solid rgba(15, 23, 42, 0.16)',
-      padding: '10px 12px',
-      fontSize: '14px',
-      outline: 'none',
-    });
-    if (options.passwordField.errorMessage) {
-      errorText = document.createElement('div');
-      errorText.textContent = options.passwordField.errorMessage;
-      Object.assign(errorText.style, {
-        color: '#dc2626',
-        fontSize: '12px',
-        lineHeight: '1.4',
-      });
-    }
-  }
+  // 1.4 — password-field branch and its capture-phase keyboard shield
+  // (1.4′) both retired: master password intake moved to an
+  // extension-origin unlock window. The in-page modal now only
+  // renders plain message dialogs (e.g. popup-confirm steps).
 
   const actions = document.createElement('div');
   Object.assign(actions.style, {
@@ -203,40 +172,8 @@ const showFlowModal = (options: FlowModalOptions) =>
     minWidth: options.cancelLabel ? '120px' : '84px',
   });
 
-  // 1.4' — Defense-in-depth for the in-page vault-unlock modal.
-  // Threat: a malicious page script that registered a capture-phase key/paste
-  // listener BEFORE our modal opened can still observe keystrokes; nothing
-  // runnable from within the page context can perfectly defeat that (browser
-  // event-model limitation, AGENTS.md §7 keeps the in-page design).
-  // Mitigation (best-effort): while the modal is open, attach capture-phase
-  // shield listeners on window+document to stopImmediatePropagation+
-  // preventDefault on any keyboard/clipboard event *outside* our shadow host.
-  // Blocks page listeners registered after us; does NOT win over earlier
-  // window-capture listeners. Also filters synthetic isTrusted=false events.
-  // Shield must register BEFORE onKeyDown so external events get blocked
-  // before the modal hotkey handler would react to them.
-  const shieldedEventTypes = ['keydown', 'keypress', 'keyup', 'paste', 'copy', 'cut'] as const;
-  const shieldActive = Boolean(options.passwordField);
-  const shieldHandler = (event: Event) => {
-    if (!event.isTrusted) {
-      event.stopImmediatePropagation();
-      if (event.cancelable) {
-        event.preventDefault();
-      }
-      return;
-    }
-    const path = typeof event.composedPath === 'function' ? event.composedPath() : [];
-    if (path.includes(host)) {
-      return;
-    }
-    event.stopImmediatePropagation();
-    if (event.cancelable) {
-      event.preventDefault();
-    }
-  };
-
   let settled = false;
-  const close = (reason: FlowModalAction, value?: string) => {
+  const close = (reason: FlowModalAction) => {
     if (settled) {
       return;
     }
@@ -246,19 +183,10 @@ const showFlowModal = (options: FlowModalOptions) =>
     window.removeEventListener('keydown', onKeyDown, true);
     window.removeEventListener('pagehide', onPageHide, true);
     window.removeEventListener('beforeunload', onBeforeUnload, true);
-    if (shieldActive) {
-      for (const eventType of shieldedEventTypes) {
-        window.removeEventListener(eventType, shieldHandler, true);
-        document.removeEventListener(eventType, shieldHandler, true);
-      }
-    }
-    if (input) {
-      input.value = '';
-    }
     mount.replaceChildren();
     mount.style.display = 'none';
     host.style.display = 'none';
-    resolve({ action: reason, value });
+    resolve({ action: reason });
   };
 
   const onKeyDown = (event: KeyboardEvent) => {
@@ -283,30 +211,10 @@ const showFlowModal = (options: FlowModalOptions) =>
   const onPageHide = () => close('navigation');
   const onBeforeUnload = () => close('navigation');
   const onCancelClick = () => close('cancel');
-  const onOkClick = () => {
-    const nextValue = input?.value ?? '';
-    if (options.onSubmit) {
-      const validationError = options.onSubmit(nextValue);
-      if (validationError) {
-        if (errorText) {
-          errorText.textContent = validationError;
-        }
-        input?.focus();
-        input?.select();
-        return;
-      }
-    }
-    close('ok', nextValue);
-  };
+  const onOkClick = () => close('ok');
 
   okButton.addEventListener('click', onOkClick);
   cancelButton?.addEventListener('click', onCancelClick);
-  if (shieldActive) {
-    for (const eventType of shieldedEventTypes) {
-      window.addEventListener(eventType, shieldHandler, true);
-      document.addEventListener(eventType, shieldHandler, true);
-    }
-  }
   window.addEventListener('keydown', onKeyDown, true);
   window.addEventListener('pagehide', onPageHide, true);
   window.addEventListener('beforeunload', onBeforeUnload, true);
@@ -317,15 +225,9 @@ const showFlowModal = (options: FlowModalOptions) =>
     actions.append(okButton);
   }
   dialog.append(title, body);
-  if (input) {
-    dialog.append(input);
-  }
-  if (errorText) {
-    dialog.append(errorText);
-  }
   dialog.append(actions);
   mount.append(backdrop, dialog);
-  window.setTimeout(() => (input || okButton).focus(), 0);
+  window.setTimeout(() => okButton.focus(), 0);
 });
 
 const showFlowPopupMessage = (message: string) =>
@@ -336,66 +238,9 @@ const showFlowPopupMessage = (message: string) =>
     accent: 'green',
   }).then((result) => (result.action === 'navigation' ? 'navigation' : 'ok'));
 
-export const promptFlowVaultUnlockOnPage = async (
-  payload: FlowRunVaultUnlockPromptPayload,
-): Promise<FlowRunVaultUnlockPromptResult> => {
-  const descriptionBase = getContentI18nMessage(
-    'content_flow_vault_unlock_description',
-    'This is the password vault master password, not the website login password.',
-  );
-  const fullMessage = descriptionBase;
-  const normalizedPromptError =
-    typeof payload.errorMessage === 'string' && /invalid master password/i.test(payload.errorMessage)
-      ? getContentI18nMessage(
-          'content_flow_vault_unlock_error_invalid_password',
-          'Invalid password vault master password. Please try again.',
-        )
-      : typeof payload.errorMessage === 'string' && /master password is required/i.test(payload.errorMessage)
-        ? getContentI18nMessage(
-            'content_flow_vault_unlock_error_empty_password',
-            'Please enter the password vault master password.',
-          )
-        : (payload.errorMessage || '');
-  const result = await showFlowModal({
-    title: getContentI18nMessage(
-      'content_flow_vault_unlock_title',
-      'Unlock password vault to continue',
-    ),
-    message: fullMessage,
-    confirmLabel: getContentI18nMessage(
-      'content_flow_vault_unlock_submit',
-      'Unlock and continue',
-    ),
-    cancelLabel: getContentI18nMessage(
-      'content_flow_vault_unlock_cancel_stop',
-      'Cancel and stop run',
-    ),
-    accent: 'blue',
-    passwordField: {
-      placeholder: getContentI18nMessage(
-        'content_flow_vault_unlock_password_placeholder',
-        'Password vault master password',
-      ),
-      errorMessage: normalizedPromptError,
-    },
-    onSubmit(value) {
-      if (!value) {
-        return getContentI18nMessage(
-          'content_flow_vault_unlock_error_empty_password',
-          'Please enter the password vault master password.',
-        );
-      }
-      return null;
-    },
-  });
-  if (result.action === 'navigation') {
-    return { action: 'navigation' };
-  }
-  if (result.action === 'cancel') {
-    return { action: 'cancel' };
-  }
-  return { action: 'submit', password: result.value ?? '' };
-};
+// 1.4 — `promptFlowVaultUnlockOnPage` retired. The master password is
+// never collected from page DOM; unlock lives in an extension-origin
+// window coordinated by the SW. See 1.4-spec.md.
 
 const toNumber = (value: unknown) => {
   const parsed = Number(normalizeText(value));

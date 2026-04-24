@@ -19,6 +19,11 @@ export const getRunnerStateLabel = (state?: FlowRunStatusPayload['state']) => {
   if (state === 'queued') {
     return t('sidepanel_flow_runner_state_queued', 'Queued');
   }
+  if (state === 'paused') {
+    // 1.4 — Run is paused on a vault-unlock window. Distinct label so
+    // the user knows the run didn't fail — it's waiting for them.
+    return t('sidepanel_flow_runner_state_paused', 'Waiting for vault unlock');
+  }
   if (state === 'succeeded') {
     return t('sidepanel_flow_runner_state_succeeded', 'Succeeded');
   }
@@ -78,15 +83,25 @@ export const formatRunnerError = (code?: string, message?: string) => {
     );
   }
   if (code === 'secret-vault-unlock-prompt-unavailable') {
+    // Review fix — copy previously described the retired in-page
+    // prompt ("Open the side panel…"). Under 1.4 the unlock surface
+    // is a dedicated extension-origin window launched by the service
+    // worker; this error code fires when chrome.windows.create fails
+    // (popup blocker, unsupported environment).
     return t(
       'sidepanel_flow_runner_error_secret_vault_unlock_prompt_unavailable',
-      'Could not show the vault unlock prompt on the page. Open the side panel, unlock the vault, then try again.',
+      'Could not open the vault unlock window. Unlock the vault from the side panel, then try again.',
     );
   }
   if (code === 'secret-vault-unlock-interrupted') {
+    // 1.4 — Neutralized (was "interrupted by page refresh or
+    // navigation" before the extension-origin unlock window replaced
+    // the in-page prompt). Fires now when the unlock window was
+    // closed before unlock completed, or the SW was suspended
+    // mid-unlock.
     return t(
       'sidepanel_flow_runner_error_secret_vault_unlock_interrupted',
-      'Vault unlock was interrupted by page refresh or navigation. Please run the flow again.',
+      'Vault unlock was interrupted before it completed. Please run the flow again.',
     );
   }
   if (code === 'popup-dismissed-by-navigation') {
@@ -208,7 +223,13 @@ export const useFlowRunner = (flows: FlowRecord[]): UseFlowRunnerResult => {
   const runLogs = runStatus?.logs ?? [];
   const lastRunLogId = runLogs.length ? runLogs[runLogs.length - 1]?.id : '';
 
-  const isRunActive = runStatus?.state === 'queued' || runStatus?.state === 'running';
+  // 1.4 — `paused` joins the "active" set so Run-button-disable
+  // remains correct while the user is in the unlock window. The SW's
+  // `activeRunByTab` cap is the hard guard; this is UX polish.
+  const isRunActive =
+    runStatus?.state === 'queued' ||
+    runStatus?.state === 'running' ||
+    runStatus?.state === 'paused';
 
   const runErrorMessage = useMemo(() => {
     if (runRequestError) {

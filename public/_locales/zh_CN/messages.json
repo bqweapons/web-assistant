@@ -1061,6 +1061,9 @@
   "sidepanel_flow_runner_state_cancelled": {
     "message": "已取消"
   },
+  "sidepanel_flow_runner_state_paused": {
+    "message": "等待密码保管库解锁"
+  },
   "sidepanel_flow_runner_progress": {
     "message": "{done}/{total} 步"
   },
@@ -1448,35 +1451,59 @@
   "sidepanel_flow_runner_logs_showing_recent": {
     "message": "正在显示最近 {count} 条日志"
   },
-  "content_flow_vault_unlock_title": {
-    "message": "解锁密码保管库以继续"
+  "vault_unlock_window_title": {
+    "message": "解锁密码保管库"
   },
-  "content_flow_vault_unlock_description": {
-    "message": "这里输入的是密码保管库主密码，不是网站登录密码。"
+  "vault_unlock_window_description": {
+    "message": "有流程正在等待密码保管库主密码。主密码只在扩展内部使用，不会发送到页面。"
   },
-  "content_flow_vault_unlock_password_placeholder": {
+  "vault_unlock_context_flow": {
+    "message": "流程"
+  },
+  "vault_unlock_context_step": {
+    "message": "步骤"
+  },
+  "vault_unlock_context_site": {
+    "message": "站点"
+  },
+  "vault_unlock_context_attempt": {
+    "message": "第 {count} 次尝试",
+    "placeholders": {
+      "count": { "content": "$1", "example": "2" }
+    }
+  },
+  "vault_unlock_password_label": {
+    "message": "主密码"
+  },
+  "vault_unlock_password_placeholder": {
     "message": "密码保管库主密码"
   },
-  "content_flow_vault_unlock_submit": {
-    "message": "解锁并继续"
+  "vault_unlock_submit": {
+    "message": "解锁"
   },
-  "content_flow_vault_unlock_cancel_stop": {
-    "message": "取消并停止运行"
+  "vault_unlock_submitting": {
+    "message": "正在解锁…"
   },
-  "content_flow_vault_unlock_error_invalid_password": {
-    "message": "密码保管库主密码错误，请重试。"
+  "vault_unlock_cancel": {
+    "message": "取消"
   },
-  "content_flow_vault_unlock_error_empty_password": {
-    "message": "请输入密码保管库主密码。"
+  "vault_unlock_error_invalid_password": {
+    "message": "主密码错误。"
+  },
+  "vault_unlock_error_empty_password": {
+    "message": "请输入主密码。"
+  },
+  "vault_unlock_error_run_not_pending": {
+    "message": "该流程运行已中断（后台任务可能已被挂起）。请关闭此窗口，并从侧边栏重新运行流程。"
   },
   "sidepanel_flow_runner_error_secret_vault_unlock_cancelled": {
     "message": "你取消了密码保管库解锁，流程已停止。"
   },
   "sidepanel_flow_runner_error_secret_vault_unlock_prompt_unavailable": {
-    "message": "无法在页面显示保管库解锁提示。请打开侧边栏解锁保管库后重试。"
+    "message": "无法打开保管库解锁窗口。请在侧边栏中解锁保管库后重试。"
   },
   "sidepanel_flow_runner_error_secret_vault_unlock_interrupted": {
-    "message": "页面刷新或跳转导致保管库解锁中断，请重新运行流程。"
+    "message": "保管库解锁在完成前被中断，请重新运行流程。"
   },
   "sidepanel_flow_runner_error_sw_suspended_during_run": {
     "message": "浏览器在流程运行期间挂起了后台任务，该流程已停止，请重新运行。"

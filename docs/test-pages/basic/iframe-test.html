@@ -1,0 +1,384 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Ladybird Iframe Test Page</title>
+  <style>
+    :root {
+      color-scheme: light;
+      font-family: "Segoe UI", system-ui, sans-serif;
+      color: #0f172a;
+      background: #f8fafc;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      padding: 24px;
+      line-height: 1.6;
+      background: #f8fafc;
+    }
+
+    h1,
+    h2,
+    h3,
+    p {
+      margin: 0;
+    }
+
+    .wrap {
+      max-width: 1160px;
+      margin: 0 auto;
+      display: grid;
+      gap: 20px;
+    }
+
+    .card {
+      background: #ffffff;
+      border: 1px solid #dbe3ef;
+      border-radius: 16px;
+      padding: 18px;
+      box-shadow: 0 12px 30px rgba(15, 23, 42, 0.08);
+    }
+
+    .muted {
+      color: #475569;
+    }
+
+    .grid {
+      display: grid;
+      gap: 16px;
+      grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+    }
+
+    .stack {
+      display: grid;
+      gap: 12px;
+    }
+
+    label {
+      display: block;
+      font-weight: 600;
+      margin-bottom: 6px;
+    }
+
+    input,
+    textarea,
+    select,
+    button {
+      font: inherit;
+    }
+
+    input,
+    textarea,
+    select {
+      width: 100%;
+      padding: 10px 12px;
+      border: 1px solid #cbd5e1;
+      border-radius: 10px;
+      background: #ffffff;
+    }
+
+    textarea {
+      min-height: 96px;
+      resize: vertical;
+    }
+
+    button {
+      border: 0;
+      border-radius: 10px;
+      padding: 10px 16px;
+      background: #2563eb;
+      color: #ffffff;
+      cursor: pointer;
+      font-weight: 600;
+    }
+
+    button.secondary {
+      background: #475569;
+    }
+
+    .pill-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-top: 10px;
+    }
+
+    .pill {
+      padding: 4px 10px;
+      border-radius: 999px;
+      background: #eff6ff;
+      border: 1px solid #bfdbfe;
+      color: #1d4ed8;
+      font-size: 12px;
+      font-weight: 600;
+    }
+
+    .frame-shell {
+      border: 1px solid #cbd5e1;
+      border-radius: 16px;
+      overflow: hidden;
+      background: #ffffff;
+    }
+
+    .frame-head {
+      display: flex;
+      justify-content: space-between;
+      gap: 12px;
+      padding: 10px 14px;
+      background: #e2e8f0;
+      border-bottom: 1px solid #cbd5e1;
+      font-size: 13px;
+      color: #334155;
+    }
+
+    iframe {
+      width: 100%;
+      border: 0;
+      display: block;
+      background: #ffffff;
+    }
+
+    .child-body {
+      padding: 16px;
+      background: linear-gradient(180deg, #ffffff, #f8fafc);
+    }
+
+    .child-accent {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 4px 10px;
+      border-radius: 999px;
+      background: #ecfeff;
+      border: 1px solid #a5f3fc;
+      color: #155e75;
+      font-size: 12px;
+      font-weight: 700;
+      margin-bottom: 12px;
+    }
+
+    .inline-actions {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+
+    .compact-table {
+      width: 100%;
+      border-collapse: collapse;
+    }
+
+    .compact-table th,
+    .compact-table td {
+      border: 1px solid #dbe3ef;
+      padding: 8px 10px;
+      text-align: left;
+      font-size: 13px;
+    }
+  </style>
+</head>
+<body>
+  <div id="app"></div>
+  <script>
+    const params = new URLSearchParams(window.location.search);
+    const mode = params.get('mode') || 'top';
+    const app = document.getElementById('app');
+
+    const renderTop = () => {
+      document.title = 'Ladybird Iframe Test Page';
+      app.innerHTML = `
+        <div class="wrap">
+          <section class="card stack">
+            <h1>Iframe / Multi-frame Test Page</h1>
+            <p class="muted">
+              Manual smoke target for 1.16. Use this page to confirm that element messages are handled only once in the
+              top frame, while picker and flow recorder still work inside iframes.
+            </p>
+            <div class="pill-row">
+              <span class="pill">elements</span>
+              <span class="pill">iframe</span>
+              <span class="pill">picker</span>
+              <span class="pill">recorder</span>
+              <span class="pill">multi-frame</span>
+            </div>
+          </section>
+
+          <section class="card grid">
+            <div class="stack">
+              <h2>Top Frame Controls</h2>
+              <p class="muted">These targets should still work exactly as before.</p>
+              <div>
+                <label for="top-name-input">Top frame name input</label>
+                <input id="top-name-input" name="top_name" type="text" placeholder="Type in the top frame">
+              </div>
+              <div>
+                <label for="top-notes">Top frame notes</label>
+                <textarea id="top-notes" name="top_notes" placeholder="Textarea in the top frame"></textarea>
+              </div>
+              <div>
+                <label for="top-topic-select">Top frame topic select</label>
+                <select id="top-topic-select" name="top_topic">
+                  <option value="elements">Elements</option>
+                  <option value="picker">Picker</option>
+                  <option value="recorder">Recorder</option>
+                  <option value="cleanup">Cleanup</option>
+                </select>
+              </div>
+              <div class="inline-actions">
+                <button id="top-primary-action" type="button">Top Primary Action</button>
+                <button id="top-secondary-action" class="secondary" type="button">Top Secondary Action</button>
+              </div>
+            </div>
+
+            <div class="stack">
+              <h2>Smoke Checklist</h2>
+              <ol class="muted" style="padding-left: 18px; margin: 0;">
+                <li>Elements CRUD on iframe targets lands exactly once.</li>
+                <li>No duplicate-id or repeated registry errors in nested frame consoles.</li>
+                <li>Picker can still select controls inside the direct iframe and the nested iframe.</li>
+                <li>Flow recorder still captures iframe clicks and inputs.</li>
+              </ol>
+            </div>
+          </section>
+
+          <section class="card stack">
+            <h2>Direct Same-origin Iframe</h2>
+            <p class="muted">
+              First child frame. Good for single-level frame targeting.
+            </p>
+            <div class="frame-shell">
+              <div class="frame-head">
+                <span>Frame: direct child</span>
+                <span>URL: iframe-test.html?mode=child</span>
+              </div>
+              <iframe
+                id="direct-child-frame"
+                title="Direct child iframe"
+                src="./iframe-test.html?mode=child"
+                height="520"></iframe>
+            </div>
+          </section>
+
+          <section class="card stack">
+            <h2>Nested Iframe Host</h2>
+            <p class="muted">
+              Second path for multi-frame targeting. The outer child frame below embeds one more iframe inside itself.
+            </p>
+            <div class="frame-shell">
+              <div class="frame-head">
+                <span>Frame: nested host</span>
+                <span>URL: iframe-test.html?mode=nest-host</span>
+              </div>
+              <iframe
+                id="nested-host-frame"
+                title="Nested iframe host"
+                src="./iframe-test.html?mode=nest-host"
+                height="680"></iframe>
+            </div>
+          </section>
+        </div>
+      `;
+    };
+
+    const renderChild = (label, includeNested) => {
+      document.title = 'Ladybird Iframe Test Child';
+      app.innerHTML = `
+        <div class="child-body">
+          <div class="child-accent">${label}</div>
+          <div class="stack">
+            <div>
+              <h2 style="margin-bottom: 6px;">Frame-local Controls</h2>
+              <p class="muted">Use picker / recorder / element CRUD here to verify frame scoping.</p>
+            </div>
+
+            <div class="grid">
+              <div class="stack">
+                <div>
+                  <label for="${label}-name-input">Frame name input</label>
+                  <input id="${label}-name-input" name="${label}_name" type="text" placeholder="Text inside ${label}">
+                </div>
+                <div>
+                  <label for="${label}-memo">Frame memo</label>
+                  <textarea id="${label}-memo" name="${label}_memo" placeholder="Textarea inside ${label}"></textarea>
+                </div>
+                <div>
+                  <label for="${label}-select">Frame topic select</label>
+                  <select id="${label}-select" name="${label}_topic">
+                    <option value="frame-elements">Frame elements</option>
+                    <option value="frame-picker">Frame picker</option>
+                    <option value="frame-recorder">Frame recorder</option>
+                  </select>
+                </div>
+                <div class="inline-actions">
+                  <button id="${label}-primary-action" type="button">Primary in ${label}</button>
+                  <button id="${label}-secondary-action" class="secondary" type="button">Secondary in ${label}</button>
+                </div>
+              </div>
+
+              <div class="stack">
+                <h3>Frame-local Data Block</h3>
+                <table class="compact-table">
+                  <thead>
+                    <tr>
+                      <th>Surface</th>
+                      <th>Selector idea</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr>
+                      <td>${label} input</td>
+                      <td><code>#${label}-name-input</code></td>
+                    </tr>
+                    <tr>
+                      <td>${label} textarea</td>
+                      <td><code>#${label}-memo</code></td>
+                    </tr>
+                    <tr>
+                      <td>${label} primary button</td>
+                      <td><code>#${label}-primary-action</code></td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            ${includeNested ? `
+              <div class="stack">
+                <h3>Grandchild Frame</h3>
+                <p class="muted">Nested one level deeper under the current child frame.</p>
+                <div class="frame-shell">
+                  <div class="frame-head">
+                    <span>Frame: grandchild</span>
+                    <span>URL: iframe-test.html?mode=grandchild</span>
+                  </div>
+                  <iframe
+                    id="grandchild-frame"
+                    title="Grandchild iframe"
+                    src="./iframe-test.html?mode=grandchild"
+                    height="460"></iframe>
+                </div>
+              </div>
+            ` : ''}
+          </div>
+        </div>
+      `;
+    };
+
+    if (mode === 'child') {
+      renderChild('direct-child', false);
+    } else if (mode === 'nest-host') {
+      renderChild('nested-host', true);
+    } else if (mode === 'grandchild') {
+      renderChild('grandchild', false);
+    } else {
+      renderTop();
+    }
+  </script>
+</body>
+</html>

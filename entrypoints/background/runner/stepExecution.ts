@@ -10,8 +10,7 @@ import {
   type FlowRunStepRequestId,
   type FlowRunState,
   type FlowRunStatusPayload,
-  type FlowRunVaultUnlockPromptPayload,
-  type FlowRunVaultUnlockPromptResult,
+  type FlowRunUnlockContextResponse,
   type RuntimeMessage,
 } from '../../../shared/messages';
 import type { FlowStepData } from '../../../shared/flowStepMigration';
@@ -213,22 +212,6 @@ const estimateFlowSteps = (steps: FlowStepData[]) =>
   steps.reduce((total, step) => total + estimateFlowStep(step), 0);
 
 const normalizeDelimitedText = (value: string) => value.replace(/\r\n?/g, '\n').replace(/\n+$/, '');
-const isRecordObject = (value: unknown): value is Record<string, unknown> =>
-  Boolean(value) && typeof value === 'object' && !Array.isArray(value);
-
-const isVaultUnlockPromptResult = (value: unknown): value is FlowRunVaultUnlockPromptResult => {
-  if (!isRecordObject(value) || typeof value.action !== 'string') {
-    return false;
-  }
-  if (value.action === 'cancel' || value.action === 'navigation') {
-    return true;
-  }
-  if (value.action === 'submit') {
-    return typeof value.password === 'string';
-  }
-  return false;
-};
-
 const collectDataSourceStepIds = (steps: FlowStepData[], sink: string[] = []) => {
   for (const step of steps) {
     if (step.type === 'data-source') {
@@ -286,12 +269,52 @@ type PendingStepRequest = {
   timeoutHandle?: ReturnType<typeof setTimeout>;
 };
 
+// 1.4 — Per-run pending vault unlock. Created by `awaitVaultUnlock`
+// when a step hits `secret-vault-locked`; resolved by the SW's
+// FLOW_RUN_UNLOCK_SUBMIT handler on password verification success,
+// or rejected by FLOW_RUN_UNLOCK_CANCEL / `chrome.windows.onRemoved`
+// when the user closes the unlock window. `attempt` is a
+// display-only counter; it increments on each wrong-password
+// submit and is surfaced via FLOW_RUN_UNLOCK_CONTEXT so the
+// unlock window can render "attempt N" and the last error.
+type PendingUnlockRequest = {
+  runId: string;
+  stepId: string;
+  flowName: string | null;
+  stepTitle: string | null;
+  siteKey: string | null;
+  windowId: number | null;
+  attempt: number;
+  lastErrorMessage?: string;
+  // Review fix — set true while FLOW_RUN_UNLOCK_SUBMIT is running
+  // unlockSecretsVault. The `chrome.windows.onRemoved` watchdog must
+  // not reject a pending unlock whose submit is in flight — otherwise
+  // a user who hits Unlock with the correct password and immediately
+  // closes the window races the watchdog, which fails the run even
+  // though the vault actually unlocked successfully.
+  submitInFlight: boolean;
+  // Set by the onRemoved watchdog when a close arrives while a submit
+  // is in flight. The SUBMIT handler reads this on the
+  // invalid-password path and rejects the run (since the window is
+  // gone and there's nowhere to retry).
+  closedDuringSubmit: boolean;
+  resolve: () => void;
+  reject: (reason: 'cancelled' | 'interrupted') => void;
+};
+
 export class FlowRunnerManager {
   private readonly runs = new Map<string, FlowRunInternal>();
 
   private readonly activeRunByTab = new Map<number, string>();
 
   private readonly pendingStepRequests = new Map<FlowRunStepRequestId, PendingStepRequest>();
+
+  // 1.4 — pending vault-unlock requests keyed by runId. At most one
+  // entry at a time in practice (activeRunByTab caps concurrent runs
+  // globally), but using a Map keeps the lookup shape consistent with
+  // the rest of the runner and naturally handles the windowId-indexed
+  // lookup that `chrome.windows.onRemoved` needs.
+  private readonly pendingUnlockRequests = new Map<string, PendingUnlockRequest>();
 
   private readonly runtime?: FlowRunnerManagerOptions['runtime'];
 
@@ -573,6 +596,20 @@ export class FlowRunnerManager {
       }
       this.pendingStepRequests.delete(requestId);
       pending.reject(reason);
+    }
+    // 1.4 — If the run is being finalized while paused on vault
+    // unlock, clean up the unlock window and settle the awaiting
+    // promise so awaitVaultUnlock unwinds cleanly. Treat as
+    // `interrupted` so the caller surfaces
+    // `secret-vault-unlock-interrupted` — `cancelled` would overwrite
+    // the actual finalize reason (stop / tab-closed / suspension).
+    const unlockEntry = this.pendingUnlockRequests.get(runId);
+    if (unlockEntry) {
+      this.pendingUnlockRequests.delete(runId);
+      if (unlockEntry.windowId !== null) {
+        void this.closeUnlockWindow(unlockEntry.windowId);
+      }
+      unlockEntry.reject('interrupted');
     }
   }
 
@@ -1298,70 +1335,26 @@ export class FlowRunnerManager {
       }
     }
 
-    let promptAttempt = 0;
-    let promptErrorMessage = '';
+    // 1.4 — Same unlock coordination as promptVaultUnlockAndRetry, but
+    // retries `resolveStepFieldValue` instead of a payload build. The
+    // password retry loop lives inside the unlock window; this loop
+    // only covers the rare case of the vault being relocked between
+    // unlock window close and the retry resolve.
     while (true) {
       this.ensureRunHealthy(run);
-      promptAttempt += 1;
-      this.appendLog(run, 'info', 'Waiting for password vault unlock on page.', {
+      this.appendLog(run, 'info', 'Waiting for vault unlock in extension window.', {
         stepId: step.id,
         stepType,
       });
-      const promptResult = await this.requestVaultUnlockPromptOnPage(run, step, {
-        attempt: promptAttempt,
-        errorMessage: promptErrorMessage || undefined,
+      await this.awaitVaultUnlock(run, step, stepType);
+      this.appendLog(run, 'success', 'Password vault unlocked. Resuming run.', {
+        stepId: step.id,
+        stepType,
       });
-
-      if (promptResult.action === 'cancel') {
-        this.appendLog(run, 'info', 'Vault unlock cancelled by user.', {
-          stepId: step.id,
-          stepType,
-        });
-        throw new RunnerError(
-          'secret-vault-unlock-cancelled',
-          'Password vault unlock was cancelled by the user.',
-          { phase: 'execute', recoverable: false },
-        );
-      }
-      if (promptResult.action === 'navigation') {
-        this.appendLog(run, 'info', 'Vault unlock prompt interrupted by navigation.', {
-          stepId: step.id,
-          stepType,
-        });
-        throw new RunnerError(
-          'secret-vault-unlock-interrupted',
-          'Password vault unlock was interrupted by navigation.',
-          { phase: 'execute', recoverable: true },
-        );
-      }
-
-      try {
-        await unlockSecretsVault(promptResult.password);
-        this.appendLog(run, 'success', 'Password vault unlocked. Continuing run.', {
-          stepId: step.id,
-          stepType,
-        });
-      } catch (error) {
-        const message = error instanceof Error ? error.message : String(error);
-        if (/invalid master password/i.test(message)) {
-          promptErrorMessage = 'Invalid master password.';
-          continue;
-        }
-        if (/master password is required/i.test(message)) {
-          promptErrorMessage = 'Master password is required.';
-          continue;
-        }
-        throw new RunnerError('secret-vault-unlock-prompt-unavailable', message, {
-          phase: 'execute',
-          recoverable: false,
-        });
-      }
-
       try {
         return await this.resolveStepFieldValue(run, step, fieldId, context);
       } catch (error) {
         if (error instanceof RunnerError && error.code === 'secret-vault-locked') {
-          promptErrorMessage = 'Password vault is still locked. Please try again.';
           continue;
         }
         throw error;
@@ -1408,27 +1401,136 @@ export class FlowRunnerManager {
     this.markStepCompleted(run);
   }
 
+  // 1.4 — Replaces the pre-1.4 in-page-modal prompt path. When a step
+  // hits `secret-vault-locked`, the runner:
+  //   1. Transitions the run to `paused` (visible to sidepanel /
+  //      persisted to the 1.13 sentinel — orphan-cleanup treats
+  //      `paused` the same as `running` for fail-close).
+  //   2. Opens a dedicated extension-origin unlock window.
+  //   3. Awaits `awaitVaultUnlock`'s promise, which is settled by
+  //      SW message handlers (FLOW_RUN_UNLOCK_SUBMIT on success,
+  //      FLOW_RUN_UNLOCK_CANCEL or windows.onRemoved on abort).
+  //   4. On resolve, transitions back to `running` and retries the
+  //      atomic-payload build from the CURRENT step — the password
+  //      retry loop lives inside the unlock window, so a wrong
+  //      password never kicks the runner back out here.
+  //
+  // `condition` step is excluded at the type level so the pre-1.4
+  // carve-out (documented in executeConditionStep) still holds; the
+  // `stepType` parameter is accepted for logging parity but intent.
   private async promptVaultUnlockAndRetry(
     run: FlowRunInternal,
     step: FlowStepData,
     stepType: Exclude<FlowRunAtomicStepType, 'condition'>,
     context: FlowRenderContext,
   ): Promise<BuiltAtomicPayload> {
-    let promptAttempt = 0;
-    let promptErrorMessage = '';
     while (true) {
       this.ensureRunHealthy(run);
-      promptAttempt += 1;
-      this.appendLog(run, 'info', 'Waiting for password vault unlock on page.', {
+      this.appendLog(run, 'info', 'Waiting for vault unlock in extension window.', {
         stepId: step.id,
         stepType,
       });
-      const promptResult = await this.requestVaultUnlockPromptOnPage(run, step, {
-        attempt: promptAttempt,
-        errorMessage: promptErrorMessage || undefined,
+      await this.awaitVaultUnlock(run, step, stepType);
+      this.appendLog(run, 'success', 'Password vault unlocked. Resuming run.', {
+        stepId: step.id,
+        stepType,
       });
+      try {
+        return await this.buildAtomicPayload(run, step, stepType, context);
+      } catch (error) {
+        if (error instanceof RunnerError && error.code === 'secret-vault-locked') {
+          // Extremely rare: vault was relocked (e.g. sidepanel manager
+          // Lock click) between unlock window close and retry build.
+          // Loop and reprompt. Loop bound is implicit via
+          // `ensureRunHealthy` + the unlock window's own timeouts.
+          continue;
+        }
+        throw error;
+      }
+    }
+  }
 
-      if (promptResult.action === 'cancel') {
+  // 1.4 — Core unlock coordination. Transitions the run to `paused`,
+  // opens the extension-origin unlock window, and returns a promise
+  // that settles when SW message handlers (or the windows.onRemoved
+  // watchdog) call resolvePendingUnlock / rejectPendingUnlock.
+  //
+  // Throws (not resolves) on cancel / interruption so the caller's
+  // try/catch can surface the appropriate RunnerError. On resume,
+  // transitions the run state back to `running` and refreshes the
+  // sentinel — this is the ONLY place the paused→running transition
+  // lives; keep write/transition side-effects contained here.
+  private async awaitVaultUnlock(
+    run: FlowRunInternal,
+    step: FlowStepData,
+    stepType: FlowRunLogEntry['stepType'],
+  ): Promise<void> {
+    if (this.pendingUnlockRequests.has(run.runId)) {
+      // Should never happen — at-most-one global active run + single
+      // unlock per step — but defense: re-focusing the existing
+      // window is strictly safer than creating a second.
+      const existing = this.pendingUnlockRequests.get(run.runId)!;
+      if (existing.windowId !== null) {
+        void this.focusUnlockWindow(existing.windowId);
+      }
+    }
+    run.state = 'paused';
+    this.refreshRunSentinel(run);
+    this.emitStatus(run, true);
+
+    const waitForSettlement = new Promise<void>((resolve, reject) => {
+      const entry: PendingUnlockRequest = {
+        runId: run.runId,
+        stepId: step.id,
+        flowName: run.flow.name || null,
+        stepTitle: step.title || null,
+        siteKey: run.siteKey || null,
+        windowId: null,
+        attempt: 1,
+        submitInFlight: false,
+        closedDuringSubmit: false,
+        resolve,
+        reject,
+      };
+      this.pendingUnlockRequests.set(run.runId, entry);
+    });
+
+    try {
+      const windowId = await this.openUnlockWindow(run.runId);
+      const entry = this.pendingUnlockRequests.get(run.runId);
+      if (entry) {
+        entry.windowId = windowId ?? null;
+      }
+    } catch (error) {
+      this.pendingUnlockRequests.delete(run.runId);
+      // Review fix — if a concurrent finalizeRun has already set run
+      // to failed/cancelled (e.g. STOP_FLOW_RUN, tab-closed), leave the
+      // terminal state intact. Resetting to 'running' here would
+      // resurrect the run and destroy the original error code.
+      if (!this.isRunFinalized(run)) {
+        run.state = 'running';
+        this.refreshRunSentinel(run);
+        this.emitStatus(run, true);
+      }
+      throw new RunnerError(
+        'secret-vault-unlock-prompt-unavailable',
+        error instanceof Error ? error.message : String(error),
+        { phase: 'execute', recoverable: false },
+      );
+    }
+
+    try {
+      await waitForSettlement;
+    } catch (reason) {
+      // Review fix — same guard as above. finalizeRun calls
+      // cancelPendingRequests which rejects this promise; without the
+      // guard we'd overwrite the terminal state finalizeRun just set.
+      if (!this.isRunFinalized(run)) {
+        run.state = 'running';
+        this.refreshRunSentinel(run);
+        this.emitStatus(run, true);
+      }
+      if (reason === 'cancelled') {
         this.appendLog(run, 'info', 'Vault unlock cancelled by user.', {
           stepId: step.id,
           stepType,
@@ -1439,102 +1541,221 @@ export class FlowRunnerManager {
           { phase: 'execute', recoverable: false },
         );
       }
-      if (promptResult.action === 'navigation') {
-        this.appendLog(run, 'info', 'Vault unlock prompt interrupted by navigation.', {
-          stepId: step.id,
-          stepType,
-        });
-        throw new RunnerError(
-          'secret-vault-unlock-interrupted',
-          'Password vault unlock was interrupted by navigation.',
-          { phase: 'execute', recoverable: true },
-        );
-      }
+      this.appendLog(run, 'info', 'Vault unlock interrupted before completion.', {
+        stepId: step.id,
+        stepType,
+      });
+      throw new RunnerError(
+        'secret-vault-unlock-interrupted',
+        'Vault unlock was interrupted before it completed.',
+        { phase: 'execute', recoverable: false },
+      );
+    }
 
-      try {
-        await unlockSecretsVault(promptResult.password);
-        this.appendLog(run, 'success', 'Password vault unlocked. Continuing run.', {
-          stepId: step.id,
-          stepType,
-        });
-      } catch (error) {
-        const message = error instanceof Error ? error.message : String(error);
-        if (/invalid master password/i.test(message)) {
-          promptErrorMessage = 'Invalid master password.';
-          continue;
-        }
-        if (/master password is required/i.test(message)) {
-          promptErrorMessage = 'Master password is required.';
-          continue;
-        }
-        throw new RunnerError('secret-vault-unlock-prompt-unavailable', message, {
-          phase: 'execute',
-          recoverable: false,
-        });
-      }
-
-      try {
-        return await this.buildAtomicPayload(run, step, stepType, context);
-      } catch (error) {
-        if (error instanceof RunnerError && error.code === 'secret-vault-locked') {
-          promptErrorMessage = 'Password vault is still locked. Please try again.';
-          continue;
-        }
-        throw error;
-      }
+    // Resolved — vault unlocked. Transition back to running BEFORE
+    // returning so the subsequent buildAtomicPayload retry runs with
+    // the sentinel reflecting the live state (matters for any SW
+    // cold-start interleaving between here and the dispatch).
+    // Review fix — the rejected-and-resolved race (resolvePendingUnlock
+    // wins before finalizeRun's cancelPendingRequests) can reach this
+    // line with run already finalized; skip the reset in that case.
+    if (!this.isRunFinalized(run)) {
+      run.state = 'running';
+      this.refreshRunSentinel(run);
+      this.emitStatus(run, true);
     }
   }
 
-  private async requestVaultUnlockPromptOnPage(
-    run: FlowRunInternal,
-    step: FlowStepData,
-    options: { attempt: number; errorMessage?: string },
-  ): Promise<FlowRunVaultUnlockPromptResult> {
-    const payload: FlowRunVaultUnlockPromptPayload = {
-      runId: run.runId,
-      stepId: step.id,
-      stepTitle: step.title || undefined,
-      flowName: run.flow.name || undefined,
-      siteKey: run.siteKey || undefined,
-      attempt: options.attempt,
-      errorMessage: options.errorMessage,
-      reason: 'secret-vault-locked',
-    };
-    const message: RuntimeMessage = {
-      type: MessageType.FLOW_RUN_VAULT_UNLOCK_PROMPT,
-      data: payload,
-    };
+  // 1.4 — `chrome.windows.create` wrapper. Returns the created
+  // windowId (numeric) or null if the API is unavailable. Throws on
+  // creation failure; caller converts to `secret-vault-unlock-prompt-
+  // unavailable`.
+  private async openUnlockWindow(runId: string): Promise<number | null> {
+    const chromeGlobal = typeof chrome !== 'undefined' ? chrome : undefined;
+    const windowsApi = chromeGlobal?.windows;
+    const runtimeApi = chromeGlobal?.runtime;
+    if (!windowsApi?.create || !runtimeApi?.getURL) {
+      throw new Error('chrome.windows API unavailable.');
+    }
+    // WXT's typed `getURL` overloads only accept declared entrypoint
+    // paths; the new vaultUnlock entrypoint isn't yet in the auto-
+    // generated `PublicPath` union. Cast through `unknown` so the call
+    // compiles today and starts being typed correctly once the
+    // entrypoint is picked up. No runtime difference.
+    const getURL = runtimeApi.getURL as unknown as (path: string) => string;
+    const url = getURL(`vaultUnlock.html?runId=${encodeURIComponent(runId)}`);
+    const width = 420;
+    const height = 370;
+    // Review fix — chrome.windows.create does not center by default
+    // (it opens at the top-left of the display). Compute position
+    // relative to the currently-focused window so the popup lands in
+    // the user's line of sight. Tolerate failures silently; a non-
+    // centered popup is better than throwing.
+    let left: number | undefined;
+    let top: number | undefined;
+    try {
+      const focused = await windowsApi.getLastFocused?.({ populate: false });
+      if (focused
+        && typeof focused.left === 'number'
+        && typeof focused.top === 'number'
+        && typeof focused.width === 'number'
+        && typeof focused.height === 'number'
+      ) {
+        left = Math.round(focused.left + (focused.width - width) / 2);
+        top = Math.round(focused.top + (focused.height - height) / 2);
+      }
+    } catch {
+      // ignore — fall back to default placement
+    }
+    const created = await windowsApi.create({
+      url,
+      type: 'popup',
+      focused: true,
+      width,
+      height,
+      ...(left !== undefined ? { left } : {}),
+      ...(top !== undefined ? { top } : {}),
+    });
+    return typeof created?.id === 'number' ? created.id : null;
+  }
 
-    const topLevelResponse = await this.tabBridge.sendMessageToTabWithRetry(run.tabId, message, true, { frameId: 0 });
-    let response = topLevelResponse;
-    if (
-      (!response.ok || !isVaultUnlockPromptResult(response.data)) &&
-      typeof run.targetFrameId === 'number' &&
-      run.targetFrameId !== 0
-    ) {
-      response = await this.tabBridge.sendMessageToTabWithRetry(run.tabId, message, true, {
-        frameId: run.targetFrameId,
-      });
+  private async focusUnlockWindow(windowId: number): Promise<void> {
+    const windowsApi = chrome?.windows;
+    if (!windowsApi?.update) {
+      return;
     }
+    try {
+      await windowsApi.update(windowId, { focused: true });
+    } catch (error) {
+      console.warn('vault-unlock-window-focus-failed', error);
+    }
+  }
 
-    if (!response.ok) {
-      const errorMessage = response.error || 'Failed to show vault unlock prompt on page.';
-      const code =
-        /message channel|receiving end does not exist|asynchronous response|before a response was received/i.test(
-          errorMessage,
-        )
-          ? 'secret-vault-unlock-interrupted'
-          : 'secret-vault-unlock-prompt-unavailable';
-      throw new RunnerError(code, errorMessage, { phase: 'dispatch', recoverable: true });
+  // 1.4 — Public surface used by bootstrap.ts message handlers.
+  // Each is deliberately side-effect-light; the owning
+  // `awaitVaultUnlock` promise drives the main transitions.
+
+  getPendingUnlockContext(runId: string): FlowRunUnlockContextResponse {
+    const entry = this.pendingUnlockRequests.get(runId);
+    if (!entry) {
+      return { ok: false, code: 'run-not-pending' };
     }
-    if (!isVaultUnlockPromptResult(response.data)) {
-      throw new RunnerError(
-        'secret-vault-unlock-prompt-unavailable',
-        'Invalid vault unlock prompt response from content script.',
-        { phase: 'dispatch', recoverable: false },
-      );
+    return {
+      ok: true,
+      runId: entry.runId,
+      flowName: entry.flowName,
+      stepTitle: entry.stepTitle,
+      siteKey: entry.siteKey,
+      attempt: entry.attempt,
+      lastErrorMessage: entry.lastErrorMessage,
+    };
+  }
+
+  hasPendingUnlock(runId: string): boolean {
+    return this.pendingUnlockRequests.has(runId);
+  }
+
+  getPendingUnlockAttempt(runId: string): number {
+    return this.pendingUnlockRequests.get(runId)?.attempt ?? 0;
+  }
+
+  recordUnlockAttemptFailure(runId: string, errorMessage: string): void {
+    const entry = this.pendingUnlockRequests.get(runId);
+    if (!entry) {
+      return;
     }
-    return response.data;
+    entry.attempt += 1;
+    entry.lastErrorMessage = errorMessage;
+  }
+
+  resolvePendingUnlock(runId: string): void {
+    const entry = this.pendingUnlockRequests.get(runId);
+    if (!entry) {
+      return;
+    }
+    this.pendingUnlockRequests.delete(runId);
+    if (entry.windowId !== null) {
+      void this.closeUnlockWindow(entry.windowId);
+    }
+    entry.resolve();
+  }
+
+  rejectPendingUnlock(runId: string, reason: 'cancelled' | 'interrupted'): void {
+    const entry = this.pendingUnlockRequests.get(runId);
+    if (!entry) {
+      return;
+    }
+    this.pendingUnlockRequests.delete(runId);
+    if (entry.windowId !== null) {
+      // For explicit cancel (button in the window) we also close the
+      // window so the user isn't left staring at a resolved dialog.
+      // For `interrupted` (windows.onRemoved), the window is already
+      // closing — closeUnlockWindow is a no-op.
+      void this.closeUnlockWindow(entry.windowId);
+    }
+    entry.reject(reason);
+  }
+
+  // Review fix — called by the SUBMIT handler in bootstrap before and
+  // after the unlockSecretsVault call. The inFlight flag suppresses
+  // the windows.onRemoved watchdog's reject so a correct-password
+  // submit that races a user-initiated window close doesn't fail the
+  // run. Returns true if the entry still exists.
+  markUnlockSubmitStart(runId: string): boolean {
+    const entry = this.pendingUnlockRequests.get(runId);
+    if (!entry) {
+      return false;
+    }
+    entry.submitInFlight = true;
+    return true;
+  }
+
+  // Pair to markUnlockSubmitStart. Returns whether the window was
+  // closed while the submit was in flight — SUBMIT callers use this
+  // on the invalid-password path to decide whether to reject the run
+  // (window gone, nowhere to retry) or leave it pending.
+  markUnlockSubmitEnd(runId: string): { closedDuringSubmit: boolean } {
+    const entry = this.pendingUnlockRequests.get(runId);
+    if (!entry) {
+      return { closedDuringSubmit: false };
+    }
+    const closedDuringSubmit = entry.closedDuringSubmit;
+    entry.submitInFlight = false;
+    entry.closedDuringSubmit = false;
+    return { closedDuringSubmit };
+  }
+
+  // Review fix — single entry point for the windows.onRemoved
+  // watchdog. If the matching entry has submitInFlight=true, record
+  // closedDuringSubmit and return without rejecting; the SUBMIT
+  // handler's markUnlockSubmitEnd will handle the race. Otherwise
+  // treat as a user-initiated close and reject the run.
+  handleUnlockWindowRemoved(windowId: number): void {
+    for (const [runId, entry] of this.pendingUnlockRequests) {
+      if (entry.windowId !== windowId) {
+        continue;
+      }
+      if (entry.submitInFlight) {
+        entry.closedDuringSubmit = true;
+        return;
+      }
+      this.rejectPendingUnlock(runId, 'cancelled');
+      return;
+    }
+  }
+
+  private async closeUnlockWindow(windowId: number): Promise<void> {
+    const windowsApi = chrome?.windows;
+    if (!windowsApi?.remove) {
+      return;
+    }
+    try {
+      await windowsApi.remove(windowId);
+    } catch (error) {
+      // Swallow: window may have already been closed by the user or
+      // by Chrome's GC. No harm — the pending entry is already gone.
+      console.warn('vault-unlock-window-close-failed', error);
+    }
   }
 
   private async executeConditionStep(run: FlowRunInternal, step: FlowStepData, context: FlowRenderContext) {

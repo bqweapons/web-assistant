@@ -92,6 +92,39 @@ export const bootstrapBackground = () => {
     } satisfies RuntimeMessage);
   };
 
+  // Review fix — `chrome.windows.create({focused: true})` for the
+  // vault unlock popup shifts window focus → `tabs.onActivated` fires
+  // with the popup's own chrome-extension://… tab → we'd broadcast
+  // that as ACTIVE_PAGE_CONTEXT and the sidepanel would switch away
+  // from the user's real browsing tab (wiping the Flows list). Any
+  // URL that belongs to our own extension should be treated as "not
+  // the user's current page" and skipped; the existing focus context
+  // stays in place until the user returns to a real tab.
+  const runtimeApiForSelf = chrome?.runtime as
+    | { getURL?: (path: string) => string; id?: string }
+    | undefined;
+  const selfOrigin = (() => {
+    try {
+      const url = runtimeApiForSelf?.getURL?.('') || '';
+      if (!url) {
+        return '';
+      }
+      return new URL(url).origin;
+    } catch {
+      return '';
+    }
+  })();
+  const isOwnExtensionUrl = (url?: string) => {
+    if (!url) {
+      return false;
+    }
+    if (selfOrigin && url.startsWith(selfOrigin)) {
+      return true;
+    }
+    const id = runtimeApiForSelf?.id;
+    return Boolean(id && url.startsWith(`chrome-extension://${id}/`));
+  };
+
   // 1.13 — Unique marker for this SW lifetime. Stamped onto every run
   // sentinel so the next cold-start can distinguish our own sentinels
   // from those left behind by a previous (now-suspended) SW. `await`ing
@@ -142,7 +175,15 @@ export const bootstrapBackground = () => {
       const pendingFailurePayloads: FlowRunStatusPayload[] = [];
       for (const sentinel of orphans) {
         toRemove.push(sentinelKeyForRunId(sentinel.runId));
-        if (sentinel.state !== 'queued' && sentinel.state !== 'running') {
+        if (
+          sentinel.state !== 'queued' &&
+          sentinel.state !== 'running' &&
+          // 1.4 — `paused` is also a non-terminal, interruptible state:
+          // the run was waiting on an extension-origin unlock window
+          // when the prior SW died. Fail-close via the same broadcast
+          // path; the user will see the run as failed and can retry.
+          sentinel.state !== 'paused'
+        ) {
           // Terminal sentinel left by a prior SW whose finalize remove()
           // didn't land — clean silently, don't ghost-broadcast.
           continue;
@@ -450,10 +491,94 @@ export const bootstrapBackground = () => {
         });
         return true;
       }
+      // 1.4 — Vault unlock window ↔ runner coordination. The three
+      // handlers below drive the extension-origin unlock window's
+      // lifecycle; see 1.4-spec.md. Invariant: the master password
+      // never enters page DOM. `respondPromise` wraps the handler so
+      // any throw reaches the window client as `{ok: false, error}`.
+      case MessageType.FLOW_RUN_UNLOCK_CONTEXT: {
+        void respondPromise(async () => {
+          const ctx = flowRunnerManager.getPendingUnlockContext(message.data.runId);
+          return { ok: true, data: ctx };
+        });
+        return true;
+      }
+      case MessageType.FLOW_RUN_UNLOCK_SUBMIT: {
+        void respondPromise(async () => {
+          const runId = message.data.runId;
+          if (!flowRunnerManager.hasPendingUnlock(runId)) {
+            return { ok: true, data: { ok: false, code: 'run-not-pending' as const } };
+          }
+          // Review fix — mark the submit in-flight so the
+          // chrome.windows.onRemoved watchdog does not reject the
+          // pending unlock while unlockSecretsVault (PBKDF2 +
+          // decrypt) is still running. Pair with markUnlockSubmitEnd
+          // in finally so the flag always clears.
+          flowRunnerManager.markUnlockSubmitStart(runId);
+          let unlockError: unknown;
+          let unlocked = false;
+          try {
+            // Same SW-only path sidepanel vault manager uses. SW owns
+            // the AES key (1.1); vault stays unlocked afterwards until
+            // SW suspends or the user Locks manually.
+            await unlockSecretsVault(message.data.password);
+            unlocked = true;
+          } catch (error) {
+            unlockError = error;
+          }
+          const { closedDuringSubmit } = flowRunnerManager.markUnlockSubmitEnd(runId);
+          if (unlocked) {
+            // Resolve even if the window closed mid-submit — the
+            // vault is now unlocked so the run can simply resume.
+            flowRunnerManager.resolvePendingUnlock(runId);
+            return { ok: true, data: { ok: true as const } };
+          }
+          const errMsg = unlockError instanceof Error ? unlockError.message : String(unlockError);
+          flowRunnerManager.recordUnlockAttemptFailure(runId, errMsg);
+          if (closedDuringSubmit) {
+            // Window is gone and the password was wrong; there is no
+            // surface to retry into, so fail the run the same way an
+            // explicit user close would have.
+            flowRunnerManager.rejectPendingUnlock(runId, 'cancelled');
+            return {
+              ok: true,
+              data: { ok: false, code: 'run-not-pending' as const },
+            };
+          }
+          const attempt = flowRunnerManager.getPendingUnlockAttempt(runId);
+          return {
+            ok: true,
+            data: { ok: false, code: 'invalid-password' as const, attempt },
+          };
+        });
+        return true;
+      }
+      case MessageType.FLOW_RUN_UNLOCK_CANCEL: {
+        void respondPromise(async () => {
+          flowRunnerManager.rejectPendingUnlock(message.data.runId, 'cancelled');
+          return { ok: true, data: { ok: true as const } };
+        });
+        return true;
+      }
       default:
         return;
     }
   });
+
+  // 1.4 — Watchdog for the unlock window. `onRemoved` fires whenever
+  // the popup closes — user X-button, OS kill, explicit
+  // chrome.windows.remove from our own resolvePendingUnlock. The
+  // manager's handleUnlockWindowRemoved encapsulates the submit-in-
+  // flight guard (review fix): if the user closed the window while a
+  // correct-password submit is still running, we don't reject the
+  // run — the SUBMIT handler resolves it on success or fails it on
+  // invalid password via the closedDuringSubmit flag.
+  const windowsApi = chrome?.windows;
+  if (windowsApi?.onRemoved) {
+    windowsApi.onRemoved.addListener((windowId) => {
+      flowRunnerManager.handleUnlockWindowRemoved(windowId);
+    });
+  }
 
   // 1.14 — Trigger a single read-through-SW at cold-start so any pending
   // normalization / legacy-migration writeback persists while we're in
@@ -477,6 +602,12 @@ export const bootstrapBackground = () => {
       if (!url) {
         return;
       }
+      // Review fix — skip our own extension pages (vault unlock
+      // popup, options, etc.) so they don't overwrite the user's
+      // real page context in the sidepanel.
+      if (isOwnExtensionUrl(url)) {
+        return;
+      }
       const context = derivePageContext(url, tabId, tab.title);
       broadcastPageContext(context);
     });
@@ -486,6 +617,12 @@ export const bootstrapBackground = () => {
     tabsApi.onActivated.addListener(() => {
       void (async () => {
         const tab = await tabBridge.queryActiveTab();
+        // Review fix — same rationale as the onUpdated guard: the
+        // vault unlock popup's `tabs.onActivated` must not clobber
+        // the sidepanel's active-site context.
+        if (isOwnExtensionUrl(tab?.url)) {
+          return;
+        }
         const context = derivePageContext(tab?.url || '', tab?.id, tab?.title);
         broadcastPageContext(context);
       })();

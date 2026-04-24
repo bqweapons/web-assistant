@@ -1130,6 +1130,9 @@
   "sidepanel_flow_runner_state_cancelled": {
     "message": "キャンセル済み"
   },
+  "sidepanel_flow_runner_state_paused": {
+    "message": "保管庫の解除を待機中"
+  },
   "sidepanel_flow_runner_progress": {
     "message": "{done}/{total} ステップ"
   },
@@ -1448,35 +1451,59 @@
   "sidepanel_flow_runner_logs_showing_recent": {
     "message": "最新 {count} 件を表示中"
   },
-  "content_flow_vault_unlock_title": {
-    "message": "続行するにはパスワード保管庫を解除"
+  "vault_unlock_window_title": {
+    "message": "パスワード保管庫の解除"
   },
-  "content_flow_vault_unlock_description": {
-    "message": "これはサイトのログインパスワードではなく、パスワード保管庫のマスターパスワードです。"
+  "vault_unlock_window_description": {
+    "message": "フローがマスターパスワードの入力を待っています。パスワードは拡張機能内に留まり、ページに送信されません。"
   },
-  "content_flow_vault_unlock_password_placeholder": {
-    "message": "保管庫のパスワード（マスターパスワード）"
+  "vault_unlock_context_flow": {
+    "message": "フロー"
   },
-  "content_flow_vault_unlock_submit": {
-    "message": "解除して続行"
+  "vault_unlock_context_step": {
+    "message": "ステップ"
   },
-  "content_flow_vault_unlock_cancel_stop": {
-    "message": "キャンセルして実行を停止"
+  "vault_unlock_context_site": {
+    "message": "サイト"
   },
-  "content_flow_vault_unlock_error_invalid_password": {
-    "message": "保管庫のパスワードが正しくありません。もう一度お試しください。"
+  "vault_unlock_context_attempt": {
+    "message": "{count} 回目の試行",
+    "placeholders": {
+      "count": { "content": "$1", "example": "2" }
+    }
   },
-  "content_flow_vault_unlock_error_empty_password": {
-    "message": "保管庫のパスワードを入力してください。"
+  "vault_unlock_password_label": {
+    "message": "マスターパスワード"
+  },
+  "vault_unlock_password_placeholder": {
+    "message": "保管庫のマスターパスワード"
+  },
+  "vault_unlock_submit": {
+    "message": "解除"
+  },
+  "vault_unlock_submitting": {
+    "message": "解除しています…"
+  },
+  "vault_unlock_cancel": {
+    "message": "キャンセル"
+  },
+  "vault_unlock_error_invalid_password": {
+    "message": "マスターパスワードが正しくありません。"
+  },
+  "vault_unlock_error_empty_password": {
+    "message": "マスターパスワードを入力してください。"
+  },
+  "vault_unlock_error_run_not_pending": {
+    "message": "このフロー実行は中断されました（バックグラウンドタスクが停止された可能性があります）。このウィンドウを閉じ、サイドパネルからフローをもう一度実行してください。"
   },
   "sidepanel_flow_runner_error_secret_vault_unlock_cancelled": {
     "message": "パスワード保管庫の解除がキャンセルされたため、フローを停止しました。"
   },
   "sidepanel_flow_runner_error_secret_vault_unlock_prompt_unavailable": {
-    "message": "ページ上に保管庫解除ダイアログを表示できませんでした。サイドパネルで保管庫を解除してから、もう一度お試しください。"
+    "message": "保管庫解除ウィンドウを開けませんでした。サイドパネルで保管庫を解除してから、もう一度お試しください。"
   },
   "sidepanel_flow_runner_error_secret_vault_unlock_interrupted": {
-    "message": "ページの再読み込みまたは移動により保管庫解除が中断されました。フローを再実行してください。"
+    "message": "保管庫の解除が完了前に中断されました。フローを再実行してください。"
   },
   "sidepanel_flow_runner_error_sw_suspended_during_run": {
     "message": "バックグラウンドタスクが実行中に停止されました。フローが中断されたため、再度実行してください。"

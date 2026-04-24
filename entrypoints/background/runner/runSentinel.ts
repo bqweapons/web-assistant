@@ -24,7 +24,17 @@
 export const SENTINEL_PREFIX = 'ladybird_run_sentinel_';
 export const SW_SUSPENDED_ERROR_CODE = 'sw-suspended-during-run';
 
-export type RunSentinelState = 'queued' | 'running' | 'succeeded' | 'failed' | 'cancelled';
+// 1.4 — `paused` mirrors FlowRunState's new value. 1.13 orphan-cleanup
+// treats it as an unfinished interruptible state alongside queued /
+// running: a SW cold-start with a stale `paused` sentinel broadcasts
+// `failed` with `sw-suspended-during-run`, same fail-close policy.
+export type RunSentinelState =
+  | 'queued'
+  | 'running'
+  | 'paused'
+  | 'succeeded'
+  | 'failed'
+  | 'cancelled';
 
 export type RunSentinel = {
   runId: string;
@@ -79,6 +89,7 @@ export const removeRunSentinel = (runId: string): void => {
 const isValidState = (value: unknown): value is RunSentinelState =>
   value === 'queued' ||
   value === 'running' ||
+  value === 'paused' ||
   value === 'succeeded' ||
   value === 'failed' ||
   value === 'cancelled';

@@ -8,7 +8,7 @@ import {
 } from '../shared/siteDataSchema';
 import { startPicker, stopPicker } from './content/picker';
 import { handleInjectionMessage, registerPageContextIfNeeded } from './content/injection';
-import { executeFlowRunStep, promptFlowVaultUnlockOnPage } from './content/flowRunner';
+import { executeFlowRunStep } from './content/flowRunner';
 import { startFlowRecorder, stopFlowRecorder } from './content/flowRecorder';
 import { rehydratePersistedHiddenRules } from './content/hiddenRules';
 
@@ -309,19 +309,10 @@ export default defineContentScript({
           sendResponse?.({ ok: true, data: { matched } });
           return true;
         }
-        case MessageType.FLOW_RUN_VAULT_UNLOCK_PROMPT: {
-          void promptFlowVaultUnlockOnPage(message.data)
-            .then((result) => {
-              sendResponse?.({ ok: true, data: result });
-            })
-            .catch((error) => {
-              sendResponse?.({
-                ok: false,
-                error: error instanceof Error ? error.message : String(error),
-              });
-            });
-          return true;
-        }
+        // 1.4 — `FLOW_RUN_VAULT_UNLOCK_PROMPT` retired. The master
+        // password must never enter page DOM; unlock now happens in
+        // an extension-origin window coordinated by the SW. See
+        // 1.4-spec.md and `entrypoints/vaultUnlock/`.
         default:
           return;
       }
