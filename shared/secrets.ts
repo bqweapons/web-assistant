@@ -1,13 +1,55 @@
 const SECRETS_VAULT_KEY = 'ladybird_secrets_v1';
 const SECRETS_SESSION_KEY = 'ladybird_secrets_session_v1';
-const VAULT_VERSION = 1 as const;
+// 1.2 — bumped from 1 to 2. v2 vaults carry an inline `kdf` object so the
+// algorithm/iterations can evolve via data-format migration (rather than
+// requiring a code release every time the target changes). Legacy v1 vaults
+// on disk are read back as if they had `kdf: LEGACY_KDF_PARAMS` and then
+// silently upgraded to v2 on the next successful unlock (see
+// `tryMigrateVaultToCurrentKdf`). The storage key string stays
+// `ladybird_secrets_v1` — that's just the chrome.storage key identifier,
+// not the payload version; renaming it would strand existing users.
+const VAULT_VERSION = 2 as const;
 const VERIFIER_PLAINTEXT = 'ladybird-secret-v1';
-const PBKDF2_ITERATIONS = 200_000;
 export const SECRET_VAULT_TRANSFER_VERSION = 'ladybird-secrets-transfer-v1' as const;
 const SECRET_TOKEN_PATTERN =
   /{{\s*secret(?:\.([A-Za-z0-9_.:-]+)|\[\s*["']([^"']+)["']\s*\])\s*}}/g;
 const SECRET_TOKEN_EXACT_PATTERN =
   /^\{\{\s*secret(?:\.([A-Za-z0-9_.:-]+)|\[\s*["']([^"']+)["']\s*\])\s*\}\}$/;
+
+// 1.2 — KDF parameter type. Only PBKDF2-SHA256 today; declaring the shape
+// as a tagged union with a single tag keeps the door open for Argon2id
+// without touching call sites that pass around `KdfParams` opaquely. When
+// Argon2id lands, extend the union rather than adding booleans.
+type KdfParams = {
+  algorithm: 'PBKDF2';
+  hash: 'SHA-256';
+  iterations: number;
+};
+
+// 1.2 — CURRENT is what fresh vaults and completed migrations use. OWASP
+// ASVS 2023 / Bitwarden 2023 default is PBKDF2-SHA256 at 600k iterations.
+// Desktop unlock latency lands around 300-500ms.
+const CURRENT_KDF_PARAMS: KdfParams = {
+  algorithm: 'PBKDF2',
+  hash: 'SHA-256',
+  iterations: 600_000,
+};
+
+// 1.2 — LEGACY mirrors the pre-1.2 hardcoded values. This constant is the
+// ONLY correct way to decrypt a v1 vault that's still on disk. Do NOT
+// change these numbers — doing so would silently misinterpret every v1
+// vault (derive a different AES key, fail verifier, user is told their
+// password is wrong). A future vault-format batch may retire legacy
+// support, at which point this constant plus the `raw.version === 1`
+// branch in `normalizeVaultPayload` can be deleted together.
+const LEGACY_KDF_PARAMS: KdfParams = {
+  algorithm: 'PBKDF2',
+  hash: 'SHA-256',
+  iterations: 200_000,
+};
+
+const isSameKdfParams = (a: KdfParams, b: KdfParams) =>
+  a.algorithm === b.algorithm && a.hash === b.hash && a.iterations === b.iterations;
 
 type EncryptedBlob = {
   iv: string;
@@ -20,6 +62,11 @@ type SecretVaultRecord = EncryptedBlob & {
 
 type SecretVaultPayload = {
   version: typeof VAULT_VERSION;
+  // 1.2 — in-memory kdf is always populated. Vault objects read from a v1
+  // format have kdf filled in as LEGACY_KDF_PARAMS during normalize; this
+  // guarantees `deriveAesKeyFromPassword(password, salt, vault.kdf)` is
+  // always a valid call regardless of on-disk version.
+  kdf: KdfParams;
   salt: string;
   verifier: EncryptedBlob;
   items: Record<string, SecretVaultRecord>;
@@ -124,15 +171,54 @@ const normalizeEncryptedBlob = (value: unknown): EncryptedBlob | null => {
   return { iv: value.iv, ciphertext: value.ciphertext };
 };
 
+// 1.2 — Normalize the on-disk kdf field. Accepts only shapes we know we can
+// derive a key for. Rejecting unknown shapes here means a future vault with
+// algorithm we don't support lands as "unreadable" rather than silently
+// mis-derived.
+const normalizeKdfParams = (value: unknown): KdfParams | null => {
+  if (!isRecord(value)) {
+    return null;
+  }
+  if (value.algorithm !== 'PBKDF2' || value.hash !== 'SHA-256') {
+    return null;
+  }
+  if (
+    typeof value.iterations !== 'number' ||
+    !Number.isFinite(value.iterations) ||
+    value.iterations < 1
+  ) {
+    return null;
+  }
+  return {
+    algorithm: 'PBKDF2',
+    hash: 'SHA-256',
+    iterations: Math.floor(value.iterations),
+  };
+};
+
 const normalizeVaultPayload = (raw: unknown): SecretVaultPayload | null => {
   if (!isRecord(raw)) {
     return null;
   }
-  if (raw.version !== VAULT_VERSION || typeof raw.salt !== 'string') {
+  if (typeof raw.salt !== 'string') {
     return null;
   }
   const verifier = normalizeEncryptedBlob(raw.verifier);
   if (!verifier) {
+    return null;
+  }
+  // 1.2 — v2 vaults require a valid `kdf` object; v1 vaults (pre-1.2) lack
+  // the field and get LEGACY_KDF_PARAMS applied. Any other version or
+  // malformed kdf is treated as unreadable (returns null → caller sees
+  // "vault not configured" rather than getting confused about which KDF
+  // to try).
+  let kdf: KdfParams | null = null;
+  if (raw.version === 2) {
+    kdf = normalizeKdfParams(raw.kdf);
+  } else if (raw.version === 1) {
+    kdf = LEGACY_KDF_PARAMS;
+  }
+  if (!kdf) {
     return null;
   }
   const rawItems = isRecord(raw.items) ? raw.items : {};
@@ -150,6 +236,7 @@ const normalizeVaultPayload = (raw: unknown): SecretVaultPayload | null => {
   });
   return {
     version: VAULT_VERSION,
+    kdf,
     salt: raw.salt,
     verifier,
     items,
@@ -263,20 +350,28 @@ export const resetSecretsVault = async (): Promise<SecretVaultStatus> => {
   };
 };
 
-const deriveAesKeyFromPassword = async (password: string, salt: Uint8Array) => {
+// 1.2 — KDF params now flow through as an argument rather than hardcoded
+// constants. Callers read `vault.kdf` when working with an existing vault
+// (so an unmigrated v1 vault keeps using LEGACY_KDF_PARAMS for unlock)
+// and pass `CURRENT_KDF_PARAMS` when creating/migrating.
+const deriveAesKeyFromPassword = async (
+  password: string,
+  salt: Uint8Array,
+  kdf: KdfParams,
+) => {
   const material = await crypto.subtle.importKey(
     'raw',
     textEncoder.encode(password),
-    'PBKDF2',
+    kdf.algorithm,
     false,
     ['deriveKey'],
   );
   return crypto.subtle.deriveKey(
     {
-      name: 'PBKDF2',
+      name: kdf.algorithm,
       salt: toCryptoBuffer(salt),
-      iterations: PBKDF2_ITERATIONS,
-      hash: 'SHA-256',
+      iterations: kdf.iterations,
+      hash: kdf.hash,
     },
     material,
     { name: 'AES-GCM', length: 256 },
@@ -310,12 +405,67 @@ const decryptString = async (key: CryptoKey, blob: EncryptedBlob): Promise<strin
   return textDecoder.decode(plaintext);
 };
 
-const buildEmptyVault = async (key: CryptoKey, saltBytes: Uint8Array): Promise<SecretVaultPayload> => ({
+const buildEmptyVault = async (
+  key: CryptoKey,
+  saltBytes: Uint8Array,
+  kdf: KdfParams,
+): Promise<SecretVaultPayload> => ({
   version: VAULT_VERSION,
+  kdf,
   salt: toBase64(saltBytes),
   verifier: await encryptString(key, VERIFIER_PLAINTEXT),
   items: {},
 });
+
+// 1.2 — Silent best-effort upgrade of a vault's KDF to CURRENT_KDF_PARAMS.
+// Runs after the password has been verified in `unlockSecretsVault`.
+// Design: unlock correctness takes priority — if ANY step of migration
+// fails (item decrypt, item encrypt, vault write), we log and return
+// null, and the caller keeps using the existing (unmigrated) vault and
+// its key. Next unlock retries. This matches the 2.7 read-path principle:
+// an optional upgrade must never degrade the main operation.
+//
+// Ordering: new vault is written in a single `writeVaultPayload` call
+// (atomic key-level set in chrome.storage). The old vault stays intact on
+// disk until that single write succeeds — there is no partial state.
+// Session update happens AFTER this function returns, in the caller.
+// Between the vault write and the session update, a concurrent call to
+// `getUnlockedKeyForVault` observes new-vault-salt vs old-session-salt,
+// returns null, and the operation fails closed (user re-unlocks); it
+// cannot decrypt with a mismatched key.
+//
+// Salt is rotated (new 16 bytes) because rotating on KDF-param change
+// costs nothing and avoids carrying a salt that was sized/chosen under
+// the old parameter regime.
+const tryMigrateVaultToCurrentKdf = async (
+  vault: SecretVaultPayload,
+  password: string,
+): Promise<{ vault: SecretVaultPayload; key: CryptoKey } | null> => {
+  try {
+    const newSaltBytes = getRandomBytes(16);
+    const newKey = await deriveAesKeyFromPassword(password, newSaltBytes, CURRENT_KDF_PARAMS);
+    const oldKey = await deriveAesKeyFromPassword(password, fromBase64(vault.salt), vault.kdf);
+    const newItems: Record<string, SecretVaultRecord> = {};
+    for (const [name, record] of Object.entries(vault.items)) {
+      const plaintext = await decryptString(oldKey, record);
+      const encrypted = await encryptString(newKey, plaintext);
+      newItems[name] = { ...encrypted, updatedAt: record.updatedAt };
+    }
+    const newVerifier = await encryptString(newKey, VERIFIER_PLAINTEXT);
+    const newVault: SecretVaultPayload = {
+      version: VAULT_VERSION,
+      kdf: CURRENT_KDF_PARAMS,
+      salt: toBase64(newSaltBytes),
+      verifier: newVerifier,
+      items: newItems,
+    };
+    await writeVaultPayload(newVault);
+    return { vault: newVault, key: newKey };
+  } catch (error) {
+    console.warn('vault-kdf-migration-failed', error);
+    return null;
+  }
+};
 
 const getUnlockedKeyForVault = async (vault: SecretVaultPayload): Promise<CryptoKey | null> => {
   const session = await readSessionPayload();
@@ -392,12 +542,16 @@ export const unlockSecretsVault = async (password: string): Promise<SecretVaultS
   let vault = await readVaultPayload();
   let key: CryptoKey;
   if (!vault) {
+    // Fresh vault → always uses CURRENT_KDF_PARAMS. No migration consideration.
     const saltBytes = getRandomBytes(16);
-    key = await deriveAesKeyFromPassword(trimmed, saltBytes);
-    vault = await buildEmptyVault(key, saltBytes);
+    key = await deriveAesKeyFromPassword(trimmed, saltBytes, CURRENT_KDF_PARAMS);
+    vault = await buildEmptyVault(key, saltBytes, CURRENT_KDF_PARAMS);
     await writeVaultPayload(vault);
   } else {
-    key = await deriveAesKeyFromPassword(trimmed, fromBase64(vault.salt));
+    // 1.2 — derive with STORED kdf (not current). That's what the items
+    // and verifier in this vault were encrypted against. Using current
+    // kdf here would fail the verifier check for every legacy vault.
+    key = await deriveAesKeyFromPassword(trimmed, fromBase64(vault.salt), vault.kdf);
     try {
       const verifier = await decryptString(key, vault.verifier);
       if (verifier !== VERIFIER_PLAINTEXT) {
@@ -405,6 +559,22 @@ export const unlockSecretsVault = async (password: string): Promise<SecretVaultS
       }
     } catch {
       throw new Error('Invalid master password.');
+    }
+    // 1.2 — password is verified. Attempt silent KDF upgrade if the vault
+    // is behind CURRENT_KDF_PARAMS. Migration is best-effort; if it fails
+    // for any reason (quota, storage error, an item that won't decrypt),
+    // we fall through with the old vault + old key so the user still gets
+    // a successful unlock. Next unlock retries the migration. Per user
+    // review of 1.2 design: "migration is best-effort; unlock correctness
+    // first" — matches the read-path principle established in 2.7.
+    if (!isSameKdfParams(vault.kdf, CURRENT_KDF_PARAMS)) {
+      const migrated = await tryMigrateVaultToCurrentKdf(vault, trimmed);
+      if (migrated) {
+        vault = migrated.vault;
+        key = migrated.key;
+      }
+      // migrated === null → keep old vault + old key, session below uses
+      // the old salt. Nothing on disk has changed in this branch.
     }
   }
   await persistUnlockedKey(vault.salt, key);
