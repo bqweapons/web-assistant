@@ -5,7 +5,10 @@ import PasswordPromptDialog from '../components/PasswordPromptDialog';
 import PasswordVaultManager from '../components/PasswordVaultManager';
 import { LOCALE_OPTIONS, SupportedLocale, getLocaleLabel, setLocale, t, useLocale } from '../utils/i18n';
 import { getGlobalSettings, setGlobalSettings } from '../../../shared/globalSettings';
-import { getAllSitesData, setAllSitesData } from '../../../shared/storage';
+// 1.14 — reads go through `shared/storage` (read-only, any realm);
+// writes go through `shared/siteStorageClient` (messages the SW).
+import { getAllSitesData } from '../../../shared/storage';
+import { setAllSitesData } from '../../../shared/siteStorageClient';
 import { buildExportPayload, mergeSitesData, parseImportPayload } from '../../../shared/importExport';
 // 1.1 — key-requiring vault ops go through the message-based client (AES
 // key lives SW-only). Pure helpers like `parseSecretVaultTransferPayload`

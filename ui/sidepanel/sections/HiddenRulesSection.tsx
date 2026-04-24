@@ -8,7 +8,9 @@ import { t } from '../utils/i18n';
 import { formatLocalDateTime } from '../utils/dateTime';
 import { GLOBAL_SETTINGS_STORAGE_KEY, getGlobalSettings, setGlobalSettings, type GlobalSettings } from '../../../shared/globalSettings';
 import type { SelectorPickerAccept } from '../../../shared/messages';
-import { getSiteData, setSiteData, STORAGE_KEY } from '../../../shared/storage';
+// 1.14 — write API moved to the message-based client.
+import { getSiteData, STORAGE_KEY } from '../../../shared/storage';
+import { setSiteData } from '../../../shared/siteStorageClient';
 import { buildDefaultSiteUrl, deriveSiteKey, type StructuredHiddenRecord } from '../../../shared/siteDataSchema';
 
 type HiddenRulesSectionProps = {

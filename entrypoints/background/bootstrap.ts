@@ -13,6 +13,11 @@ import {
   unlockSecretsVault,
   upsertSecretValue,
 } from './secretsVault';
+import {
+  primeSiteStoragePersistence,
+  setAllSitesDataInSw,
+  setSiteDataInSw,
+} from './siteStorage';
 
 const CONTENT_SCRIPT_FILE = 'content-scripts/content.js';
 
@@ -298,10 +303,36 @@ export const bootstrapBackground = () => {
         });
         return true;
       }
+      // 1.14 — site data writes routed to SW. `respondPromise` surfaces
+      // `StorageQuotaExceededError` and other writer errors to the
+      // sidepanel client as `{ ok: false, error }` → rejected Promise.
+      case MessageType.SITES_SET_SITE: {
+        void respondPromise(async () => {
+          await setSiteDataInSw(message.data.siteKey, message.data.data);
+          return { ok: true };
+        });
+        return true;
+      }
+      case MessageType.SITES_SET_ALL: {
+        void respondPromise(async () => {
+          await setAllSitesDataInSw(message.data.sites);
+          return { ok: true };
+        });
+        return true;
+      }
       default:
         return;
     }
   });
+
+  // 1.14 — Trigger a single read-through-SW at cold-start so any pending
+  // normalization / legacy-migration writeback persists while we're in
+  // the writer realm. Deferred by one macrotask so we don't block the
+  // listener-registration flow, and wrapped in try/catch inside the
+  // prime function itself so bootstrap can't fail on storage I/O.
+  setTimeout(() => {
+    void primeSiteStoragePersistence();
+  }, 0);
 
   if (tabsApi?.onUpdated) {
     tabsApi.onUpdated.addListener((tabId, changeInfo, tab) => {

@@ -36,7 +36,8 @@ import {
   type RuntimeMessage,
   type SelectorPickerAccept,
 } from '../../../shared/messages';
-import { setSiteData } from '../../../shared/storage';
+// 1.14 — write API moved to the message-based client.
+import { setSiteData } from '../../../shared/siteStorageClient';
 import {
   buildDefaultSiteUrl,
   deriveSiteKey,

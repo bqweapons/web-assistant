@@ -1,5 +1,5 @@
 import type { FlowStepData } from './flowStepMigration';
-import type { StructuredElementRecord } from './siteDataSchema';
+import type { StructuredElementRecord, StructuredSiteData } from './siteDataSchema';
 import type { SecretVaultStatus, SecretVaultTransferPayload } from './secrets';
 
 export const MessageType = {
@@ -42,6 +42,17 @@ export const MessageType = {
   SECRETS_DELETE: 'SECRETS_DELETE',
   SECRETS_EXPORT_TRANSFER: 'SECRETS_EXPORT_TRANSFER',
   SECRETS_IMPORT_TRANSFER: 'SECRETS_IMPORT_TRANSFER',
+  // 1.14 — sidepanel write operations routed through the SW so that the
+  // persisted-write path lives in a single realm with a single serialized
+  // queue. Sidepanel (and any other non-SW caller) reaches these via
+  // `shared/siteStorageClient.ts`; the SW owns the writer module at
+  // `entrypoints/background/siteStorage.ts`. Content scripts remain
+  // read-only and no longer trigger writebacks (they run in the host page
+  // origin, which `navigator.locks` cannot coordinate with chrome-extension
+  // origin — structurally removing the write capability is the correct
+  // fix, not trying to serialize a cross-origin race).
+  SITES_SET_SITE: 'SITES_SET_SITE',
+  SITES_SET_ALL: 'SITES_SET_ALL',
 } as const;
 
 export type MessageType = (typeof MessageType)[keyof typeof MessageType];
@@ -312,7 +323,13 @@ export type RuntimeMessage =
   | { type: typeof MessageType.SECRETS_UPSERT; data: { name: string; value: string }; forwarded?: boolean; targetTabId?: number }
   | { type: typeof MessageType.SECRETS_DELETE; data: { name: string }; forwarded?: boolean; targetTabId?: number }
   | { type: typeof MessageType.SECRETS_EXPORT_TRANSFER; data: { password: string }; forwarded?: boolean; targetTabId?: number }
-  | { type: typeof MessageType.SECRETS_IMPORT_TRANSFER; data: { payload: SecretVaultTransferPayload; password: string }; forwarded?: boolean; targetTabId?: number };
+  | { type: typeof MessageType.SECRETS_IMPORT_TRANSFER; data: { payload: SecretVaultTransferPayload; password: string }; forwarded?: boolean; targetTabId?: number }
+  // 1.14 — `data` shapes mirror the legacy `setSiteData` / `setAllSitesData`
+  // signatures so the client wrapper is a direct rename. Response is `{ ok: true }`
+  // with no data payload (void-equivalent); write errors (quota, storage) come
+  // back as `{ ok: false, error }` through `respondPromise`.
+  | { type: typeof MessageType.SITES_SET_SITE; data: { siteKey: string; data: Partial<StructuredSiteData> }; forwarded?: boolean; targetTabId?: number }
+  | { type: typeof MessageType.SITES_SET_ALL; data: { sites: Record<string, StructuredSiteData> }; forwarded?: boolean; targetTabId?: number };
 
 // 1.1 — response shape registry. Used by `shared/secretsClient.ts` to type
 // the resolved value from each `sendRuntimeMessage` call. Keeping this

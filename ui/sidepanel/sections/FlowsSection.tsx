@@ -9,7 +9,9 @@ import {
   type FlowRecordingEventPayload,
   type SelectorPickerAccept,
 } from '../../../shared/messages';
-import { getSiteData, setSiteData, STORAGE_KEY } from '../../../shared/storage';
+// 1.14 — write API moved to the message-based client.
+import { getSiteData, STORAGE_KEY } from '../../../shared/storage';
+import { setSiteData } from '../../../shared/siteStorageClient';
 import { deriveSiteKey } from '../../../shared/siteDataSchema';
 import type { FlowStepData } from '../../../shared/flowStepMigration';
 import { isSecretTokenValue } from '../../../shared/secrets';
