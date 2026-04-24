@@ -1064,6 +1064,12 @@
   "sidepanel_steps_delete": {
     "message": "Delete step"
   },
+  "sidepanel_steps_iframe_badge": {
+    "message": "iframe: {url}",
+    "placeholders": {
+      "url": { "content": "$1", "example": "example.com/inner" }
+    }
+  },
   "sidepanel_steps_file_label": {
     "message": "File"
   },
@@ -1474,6 +1480,12 @@
   },
   "sidepanel_flow_runner_error_sw_suspended_during_run": {
     "message": "The browser suspended the background task during this run. The flow was stopped. Please run it again."
+  },
+  "sidepanel_flow_runner_error_target_frame_not_found": {
+    "message": "The iframe this step was recorded in is no longer on the page, or the selector did not match inside it."
+  },
+  "sidepanel_flow_runner_error_ambiguous_frame_match": {
+    "message": "The selector matches elements in more than one iframe. Re-record the step with only the intended iframe open, or narrow the selector."
   },
   "sidepanel_flow_input_secret_bound_missing": {
     "message": "Bound password no longer exists in the vault: {name}. Please choose or create a password and bind again."

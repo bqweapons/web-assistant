@@ -1209,7 +1209,7 @@ export class FlowRunnerManager {
           : 'value';
     if (sourceMode === 'selector') {
       const readBuilt = await this.buildReadPayload(run, step, context);
-      const result = await this.invokeContentStep(run, readBuilt.payload);
+      const result = await this.invokeContentStep(run, step, readBuilt.payload);
       if (!result.ok) {
         this.appendLog(
           run,
@@ -1388,7 +1388,7 @@ export class FlowRunnerManager {
       stepId: step.id,
       stepType,
     });
-    const result = await this.invokeContentStep(run, built.payload);
+    const result = await this.invokeContentStep(run, step, built.payload);
     if (!result.ok) {
       this.appendLog(
         run,
@@ -1548,7 +1548,7 @@ export class FlowRunnerManager {
       stepId: step.id,
       stepType: 'condition',
     });
-    const result = await this.invokeContentStep(run, built.payload);
+    const result = await this.invokeContentStep(run, step, built.payload);
     if (!result.ok) {
       this.appendLog(
         run,
@@ -1731,14 +1731,150 @@ export class FlowRunnerManager {
     return { payload, taintedFields };
   }
 
+  // F1 — Per-step frame resolution. Returns the frameId to stamp on
+  // the outgoing FLOW_RUN_EXECUTE_STEP, or `undefined` to fall through
+  // to the existing top-frame-only default behavior.
+  //
+  // Precedence:
+  //   1. `run.targetFrameId` (run-level override set at START_FLOW_RUN
+  //      time from sender.frameId; e.g. a flow launched from inside an
+  //      iframe's injected button) — returned as-is, no probe.
+  //   2. Payload has no selector — nothing to probe for; return
+  //      undefined so dispatch stays top-only (wait-time, navigate,
+  //      set-variable without selector, etc.).
+  //   3. Probe every known frame of the tab via FLOW_RUN_FRAME_PROBE.
+  //      Apply rules per the step's `targetFrame` locator:
+  //        - `step.targetFrame.url` set: pick only frames whose
+  //          current URL matches AND where the selector resolves.
+  //          0 hits => throw `target-frame-not-found` (strict;
+  //          persisted locator promises the step runs here only).
+  //          1 hit => that frameId.
+  //          >=2 => throw `ambiguous-frame-match` (same URL repeated
+  //          across multiple frames; rare but possible).
+  //        - `step.targetFrame` absent: pick any frame where selector
+  //          resolved. 0 => return undefined (fall back to top so the
+  //          existing "Element not found" error path still fires).
+  //          1 => that frameId. >=2 => `ambiguous-frame-match`.
+  //
+  // Any webNavigation.getAllFrames failure is logged and the function
+  // falls back to undefined; the existing dispatch path takes over.
+  private async resolveStepTargetFrame(
+    run: FlowRunInternal,
+    step: FlowStepData,
+    payload: FlowRunExecuteStepPayload,
+  ): Promise<number | undefined> {
+    if (typeof run.targetFrameId === 'number') {
+      return run.targetFrameId;
+    }
+    const selector = payload.selector;
+    if (typeof selector !== 'string' || selector.length === 0) {
+      return undefined;
+    }
+    type FrameDetails = { frameId: number; url?: string };
+    const webNavigation = (chrome as unknown as {
+      webNavigation?: {
+        getAllFrames?: (details: { tabId: number }) => Promise<FrameDetails[] | undefined>;
+      };
+    })?.webNavigation;
+    if (!webNavigation?.getAllFrames) {
+      return undefined;
+    }
+    let frames: FrameDetails[] | null = null;
+    try {
+      frames = (await webNavigation.getAllFrames({ tabId: run.tabId })) ?? null;
+    } catch (error) {
+      this.appendLog(run, 'info', 'frame-resolution: webNavigation.getAllFrames failed, dispatching top-only.', {
+        stepId: step.id,
+      });
+      console.warn('flow-run-frame-resolution-failed', error);
+      return undefined;
+    }
+    if (!Array.isArray(frames) || frames.length === 0) {
+      return undefined;
+    }
+    if (frames.length === 1 && !step.targetFrame?.url) {
+      // Only top frame and no persisted iframe locator — nothing for
+      // the probe to disambiguate; short-circuit to save a message.
+      // When step.targetFrame IS set but no iframes are present, we
+      // still run the probe so the `target-frame-not-found` branch
+      // fires cleanly (the user's recorded iframe is gone).
+      return undefined;
+    }
+    // Probe each frame individually (chrome.tabs.sendMessage needs an
+    // explicit frameId to scope the delivery; a broadcast-style send
+    // only yields the first responder which defeats the whole point).
+    const probeResults = await Promise.all(
+      frames.map(async (frame) => {
+        try {
+          const raw = await this.tabBridge.sendMessageToTabRaw(
+            run.tabId,
+            {
+              type: MessageType.FLOW_RUN_FRAME_PROBE,
+              data: { selector },
+            },
+            { frameId: frame.frameId },
+          );
+          const response = raw?.response as { ok?: boolean; data?: { matched?: boolean } } | undefined;
+          const matched = Boolean(response?.ok && response?.data?.matched);
+          return { frameId: frame.frameId, url: frame.url || '', matched };
+        } catch (error) {
+          console.warn('flow-run-frame-probe-failed', { frameId: frame.frameId, error });
+          return { frameId: frame.frameId, url: frame.url || '', matched: false };
+        }
+      }),
+    );
+    const targetUrl = step.targetFrame?.url;
+    if (typeof targetUrl === 'string' && targetUrl.length > 0) {
+      const candidates = probeResults.filter((r) => r.url === targetUrl && r.matched);
+      if (candidates.length === 0) {
+        throw new RunnerError(
+          'target-frame-not-found',
+          `The recorded iframe (${targetUrl}) for step ${step.id} is no longer on the page, or the selector did not match inside it.`,
+          { phase: 'execute', recoverable: false },
+        );
+      }
+      if (candidates.length >= 2) {
+        throw new RunnerError(
+          'ambiguous-frame-match',
+          `The step's selector matched inside more than one iframe at ${targetUrl}. Re-record the step with just the intended iframe open.`,
+          { phase: 'execute', recoverable: false },
+        );
+      }
+      return candidates[0].frameId;
+    }
+    const matched = probeResults.filter((r) => r.matched);
+    if (matched.length === 0) {
+      // Fall through: no frame claimed the selector. Dispatch to the
+      // top frame so the usual "Element not found" path fires with the
+      // expected error code rather than introducing a new 0-hit shape.
+      return undefined;
+    }
+    if (matched.length >= 2) {
+      throw new RunnerError(
+        'ambiguous-frame-match',
+        `The step's selector matched in ${matched.length} frames. The step needs an iframe locator; re-record it or narrow the selector.`,
+        { phase: 'execute', recoverable: false },
+      );
+    }
+    return matched[0].frameId;
+  }
+
   private async invokeContentStep(
     run: FlowRunInternal,
+    step: FlowStepData,
     payload: FlowRunExecuteStepPayload,
   ): Promise<FlowRunExecuteResultPayload> {
     const deadline = Date.now() + STEP_MESSAGE_RETRY_TIMEOUT_MS;
     let lastTransportError = '';
     let attempt = 0;
     const stepStartUrl = run.activeUrl;
+    // F1 — Resolve the frame ONCE before the retry loop. Per-retry
+    // resolution would re-probe on every transport retry and also make
+    // the retry window carry a stale resolution across a page
+    // navigation, which is surprising. The run-level targetFrameId
+    // override (from bootstrap.ts's sender.frameId at START_FLOW_RUN)
+    // wins first; if absent, probe when the payload carries a selector.
+    const resolvedFrameId = await this.resolveStepTargetFrame(run, step, payload);
     try {
       while (Date.now() < deadline) {
         this.ensureRunHealthy(run);
@@ -1749,8 +1885,8 @@ export class FlowRunnerManager {
           runId: run.runId,
           requestId,
           attempt,
-          targetFrameId: run.targetFrameId,
-          topFrameOnly: typeof run.targetFrameId === 'number' ? false : true,
+          targetFrameId: resolvedFrameId,
+          topFrameOnly: typeof resolvedFrameId === 'number' ? false : true,
         };
         run.inFlightAtomic = {
           stepId: payload.stepId,
@@ -1771,7 +1907,7 @@ export class FlowRunnerManager {
             data: requestPayload,
           },
           true,
-          typeof run.targetFrameId === 'number' ? { frameId: run.targetFrameId } : undefined,
+          typeof resolvedFrameId === 'number' ? { frameId: resolvedFrameId } : undefined,
         );
         if (!response.ok) {
           lastTransportError = response.error || 'Failed to dispatch step to content script.';

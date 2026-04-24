@@ -51,6 +51,16 @@ export type FlowDataSourceMeta = {
   rawText?: string;
 };
 
+// F1 — Optional frame locator persisted on a step. Populated by the
+// recorder / picker when the captured element lives inside an iframe;
+// resolved back to a concrete `frameId` at dispatch time via the
+// runner's `FLOW_RUN_FRAME_PROBE` pass. Field name is `url` (not
+// `frameUrl`) to line up with the existing element `context.frame.url`
+// shape and to leave room for future sibling fields without renaming.
+export type FlowStepTargetFrame = {
+  url: string;
+};
+
 export type FlowStepData = {
   id: string;
   type: string;
@@ -60,6 +70,7 @@ export type FlowStepData = {
   dataSource?: FlowDataSourceMeta;
   children?: FlowStepData[];
   branches?: Array<{ id: string; label: string; steps: FlowStepData[] }>;
+  targetFrame?: FlowStepTargetFrame;
 };
 
 export type NormalizeFlowStepsOptions = {
@@ -292,6 +303,15 @@ const normalizeExistingFlowStep = (
       );
     if (branches.length > 0) {
       normalized.branches = branches;
+    }
+  }
+  // F1 — preserve targetFrame through normalization. Structural check
+  // only: we trust the `url` string; the runner will probe frames at
+  // dispatch time and cope with stale / unreachable URLs there.
+  if (isRecord(raw.targetFrame) && typeof (raw.targetFrame as { url?: unknown }).url === 'string') {
+    const url = (raw.targetFrame as { url: string }).url.trim();
+    if (url) {
+      normalized.targetFrame = { url };
     }
   }
   if (isRecord(raw.dataSource)) {

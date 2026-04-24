@@ -82,6 +82,13 @@ type ElementsSectionProps = {
   lastSyncedAt?: number;
   onRefresh?: () => void;
   onStartPicker?: (accept: SelectorPickerAccept) => Promise<string | null>;
+  // F1 — Frame-aware picker for the embedded FlowStepsBuilder (elements
+  // with attached flows). Distinct from `onStartPicker` so the element's
+  // own selector fields keep the string-only shape while flow step
+  // editing inside this section can capture iframe metadata.
+  onStartFlowPicker?: (
+    accept: SelectorPickerAccept,
+  ) => Promise<{ selector: string; frameUrl?: string } | null>;
   onStartAreaPicker?: () => Promise<PickerRect | null>;
   onStartElementPicker?: (options?: { disallowInput?: boolean }) => Promise<{
     selector: string;
@@ -101,6 +108,7 @@ export default function ElementsSection({
   lastSyncedAt,
   onRefresh,
   onStartPicker,
+  onStartFlowPicker,
   onStartAreaPicker,
   onStartElementPicker,
 }: ElementsSectionProps) {
@@ -2392,7 +2400,7 @@ export default function ElementsSection({
           <FlowStepsBuilder
             steps={draftFlow.steps}
             onChange={(steps) => setDraftFlow((prev) => ({ ...prev, steps }))}
-            onStartPicker={onStartPicker}
+            onStartPicker={onStartFlowPicker}
           />
         </div>
       </FlowDrawer>

@@ -28,7 +28,11 @@ type FlowsSectionProps = {
   hasActivePage?: boolean;
   createFlowOpen?: boolean;
   onCreateFlowClose?: () => void;
-  onStartPicker?: (accept: SelectorPickerAccept) => Promise<string | null>;
+  // F1 — Flow picker preserves iframe frame metadata so recorded/picked
+  // steps can persist `targetFrame.url` and replay into the right frame.
+  onStartPicker?: (
+    accept: SelectorPickerAccept,
+  ) => Promise<{ selector: string; frameUrl?: string } | null>;
 };
 
 type FlowSummaryActions = {

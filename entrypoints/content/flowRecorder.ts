@@ -192,6 +192,10 @@ export const startFlowRecorder = (payload: FlowRecordingStartPayload) => {
   let lastInputAt = 0;
   let pendingInput: PendingInputState | null = null;
 
+  // F1 — When the recorder fires from inside an iframe, attach the
+  // frame's location.href so recording→step conversion can persist it
+  // as step.targetFrame.url. Top-frame recorders leave frameUrl absent.
+  const frameUrlForEvents = window.top !== window ? window.location.href : undefined;
   const sendEvent = (data: Omit<FlowRecordingEventPayload, 'sessionId' | 'eventId' | 'timestamp' | 'url'>) => {
     sendRuntimeMessageSafe({
       type: MessageType.FLOW_RECORDING_EVENT,
@@ -200,6 +204,7 @@ export const startFlowRecorder = (payload: FlowRecordingStartPayload) => {
         eventId: createEventId(data.type),
         timestamp: Date.now(),
         url: window.location.href,
+        ...(frameUrlForEvents ? { frameUrl: frameUrlForEvents } : {}),
         ...data,
       },
     });

@@ -107,6 +107,18 @@ export const formatRunnerError = (code?: string, message?: string) => {
       'The browser suspended the background task during this run. The flow was stopped. Please run it again.',
     );
   }
+  if (code === 'target-frame-not-found') {
+    return t(
+      'sidepanel_flow_runner_error_target_frame_not_found',
+      'The iframe this step was recorded in is no longer on the page, or the selector did not match inside it.',
+    );
+  }
+  if (code === 'ambiguous-frame-match') {
+    return t(
+      'sidepanel_flow_runner_error_ambiguous_frame_match',
+      'The selector matches elements in more than one iframe. Re-record the step with only the intended iframe open, or narrow the selector.',
+    );
+  }
   return message || code || t('sidepanel_flow_runner_error_unknown', 'Flow run failed.');
 };
 

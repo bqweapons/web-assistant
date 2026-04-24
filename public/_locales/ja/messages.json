@@ -1001,6 +1001,12 @@
   "sidepanel_steps_delete": {
     "message": "ステップを削除"
   },
+  "sidepanel_steps_iframe_badge": {
+    "message": "iframe: {url}",
+    "placeholders": {
+      "url": { "content": "$1", "example": "example.com/inner" }
+    }
+  },
   "sidepanel_steps_file_label": {
     "message": "ファイル"
   },
@@ -1474,6 +1480,12 @@
   },
   "sidepanel_flow_runner_error_sw_suspended_during_run": {
     "message": "バックグラウンドタスクが実行中に停止されました。フローが中断されたため、再度実行してください。"
+  },
+  "sidepanel_flow_runner_error_target_frame_not_found": {
+    "message": "このステップを記録した iframe がページ上に存在しないか、iframe 内でセレクタが一致しませんでした。"
+  },
+  "sidepanel_flow_runner_error_ambiguous_frame_match": {
+    "message": "セレクタが複数の iframe 内の要素に一致しています。対象の iframe だけを開いた状態で記録し直すか、セレクタをより限定してください。"
   },
   "sidepanel_flow_input_secret_bound_missing": {
     "message": "紐付け済みのパスワードが保管庫に見つかりません: {name}。別のパスワードを選択するか、新しく作成して再度紐付けしてください。"

@@ -59,6 +59,11 @@ export const MessageType = {
   // sidepanel mounting later drain the queue and render the failure.
   // Response: `{ ok: true, data: { notifications: FlowRunStatusPayload[] } }`.
   FLOW_RUN_PENDING_FAILURES_QUERY: 'FLOW_RUN_PENDING_FAILURES_QUERY',
+  // F1 — Per-step frame resolution. Runner broadcasts this to each
+  // known frame (via chrome.tabs.sendMessage with explicit frameId)
+  // right before dispatching a selector-carrying atomic step. Each
+  // content listener replies with `{matched}`; runner picks the winner.
+  FLOW_RUN_FRAME_PROBE: 'FLOW_RUN_FRAME_PROBE',
 } as const;
 
 export type MessageType = (typeof MessageType)[keyof typeof MessageType];
@@ -85,6 +90,12 @@ export type PickerResultPayload = {
   afterSelector?: string;
   containerId?: string;
   rect?: PickerRect;
+  // F1 — When the picker fires inside an iframe (window.top !== window),
+  // the content script stamps the frame's location.href here so the
+  // sidepanel can persist a step-level `targetFrame.url` locator and the
+  // runner can resolve it back to a frameId at dispatch time. Absent
+  // when the pick happened in the top frame.
+  frameUrl?: string;
 };
 
 export type PickerCancelledPayload = {
@@ -143,6 +154,25 @@ export type FlowRecordingEventPayload = {
   value?: string;
   inputKind?: 'text' | 'textarea' | 'select' | 'contenteditable' | 'password';
   message?: string;
+  // F1 — Non-top-frame origin of the captured event. Set iff the
+  // recorder firing this event was running inside an iframe
+  // (window.top !== window); the recording→step conversion writes this
+  // into step.targetFrame.url so replay can resolve the frame again.
+  frameUrl?: string;
+};
+
+// F1 — Frame-probe payloads. Sent to every frame of a tab as part of
+// per-step frame resolution (only when the step carries a selector and
+// there's no run-level targetFrameId override). Request is minimal
+// by design — the sender already knows each frame's URL from
+// webNavigation.getAllFrames, so the probe only needs to report back
+// whether the selector resolves to a node in that frame's document.
+export type FlowRunFrameProbeRequest = {
+  selector: string;
+};
+
+export type FlowRunFrameProbeResult = {
+  matched: boolean;
 };
 
 export type FlowRecordingStatusPayload = {
@@ -336,7 +366,8 @@ export type RuntimeMessage =
   // back as `{ ok: false, error }` through `respondPromise`.
   | { type: typeof MessageType.SITES_SET_SITE; data: { siteKey: string; data: Partial<StructuredSiteData> }; forwarded?: boolean; targetTabId?: number }
   | { type: typeof MessageType.SITES_SET_ALL; data: { sites: Record<string, StructuredSiteData> }; forwarded?: boolean; targetTabId?: number }
-  | { type: typeof MessageType.FLOW_RUN_PENDING_FAILURES_QUERY; data?: undefined; forwarded?: boolean; targetTabId?: number };
+  | { type: typeof MessageType.FLOW_RUN_PENDING_FAILURES_QUERY; data?: undefined; forwarded?: boolean; targetTabId?: number }
+  | { type: typeof MessageType.FLOW_RUN_FRAME_PROBE; data: FlowRunFrameProbeRequest; forwarded?: boolean; targetTabId?: number };
 
 // 1.1 — response shape registry. Used by `shared/secretsClient.ts` to type
 // the resolved value from each `sendRuntimeMessage` call. Keeping this

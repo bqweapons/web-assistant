@@ -289,6 +289,26 @@ export default defineContentScript({
             });
           return true;
         }
+        case MessageType.FLOW_RUN_FRAME_PROBE: {
+          // F1 — Per-frame selector probe. Each known frame receives
+          // this via chrome.tabs.sendMessage with an explicit frameId,
+          // so here we simply test whether the selector resolves in
+          // THIS frame's document. Intentionally no top-frame guard:
+          // the whole point is for iframes to respond too. Invalid
+          // selectors report matched:false rather than throwing so the
+          // runner sees a uniform response shape regardless of frame.
+          const selector = message.data?.selector;
+          let matched = false;
+          if (typeof selector === 'string' && selector.length > 0) {
+            try {
+              matched = document.querySelector(selector) !== null;
+            } catch {
+              matched = false;
+            }
+          }
+          sendResponse?.({ ok: true, data: { matched } });
+          return true;
+        }
         case MessageType.FLOW_RUN_VAULT_UNLOCK_PROMPT: {
           void promptFlowVaultUnlockOnPage(message.data)
             .then((result) => {

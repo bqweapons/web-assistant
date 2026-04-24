@@ -159,11 +159,41 @@ const collectAncestorTypes = (
   return null;
 };
 
+// F1 — Compact read-only display of a step's persisted iframe locator.
+// Strips scheme + trailing slash so the badge shows "host/path" rather
+// than "https://host/path/"; on unparseable inputs the raw URL is
+// returned so the reader still sees something meaningful. CSS handles
+// truncation; this is strictly a shortening of the visible string.
+const formatFrameUrlForBadge = (url: string): string => {
+  const trimmed = url.trim();
+  if (!trimmed) {
+    return trimmed;
+  }
+  try {
+    const parsed = new URL(trimmed);
+    const host = parsed.host;
+    const path = parsed.pathname === '/' ? '' : parsed.pathname;
+    return `${host}${path}` || trimmed;
+  } catch {
+    return trimmed;
+  }
+};
+
+// F1 — Flow pickers return the selector + optional frame URL so a step
+// captured inside an iframe can persist its `targetFrame` locator. All
+// FlowStepsBuilder consumers use this shape (the selector-only picker
+// that elements/hidden pass around is already wrapped at App.tsx into
+// a frame-aware variant before reaching this component).
+export type FlowPickerResult = {
+  selector: string;
+  frameUrl?: string;
+};
+
 type FlowStepsBuilderProps = {
   steps?: StepData[];
   resetKey?: string | number;
   onChange?: (steps: StepData[]) => void;
-  onStartPicker?: (accept: SelectorPickerAccept) => Promise<string | null>;
+  onStartPicker?: (accept: SelectorPickerAccept) => Promise<FlowPickerResult | null>;
 };
 
 export default function FlowStepsBuilder({
@@ -303,6 +333,29 @@ export default function FlowStepsBuilder({
     setCollapsedBranches({});
     setDragState(null);
   }, [resetKey]);
+
+  // F1 — Persist an iframe locator (or clear it) onto a step. Called
+  // by StepFieldControl after a picker result that carries frameUrl,
+  // and kept narrow: only toggles the `targetFrame` key, never mutates
+  // fields or summary. Passing `undefined` clears.
+  const updateStepTargetFrame = (stepId: string, frameUrl: string | undefined) => {
+    commitSteps((prev) =>
+      updateSteps(prev, stepId, (step) => {
+        if (!frameUrl) {
+          if (!step.targetFrame) {
+            return step;
+          }
+          const { targetFrame: _discarded, ...rest } = step;
+          void _discarded;
+          return rest;
+        }
+        if (step.targetFrame?.url === frameUrl) {
+          return step;
+        }
+        return { ...step, targetFrame: { url: frameUrl } };
+      }),
+    );
+  };
 
   const updateField = (stepId: string, fieldId: string, value: string) => {
     commitSteps((prev) =>
@@ -748,6 +801,17 @@ export default function FlowStepsBuilder({
                   <p className="mt-1 min-w-0 max-w-full break-all text-[11px] text-muted-foreground">
                     {step.summary}
                   </p>
+                  {step.targetFrame?.url ? (
+                    <p
+                      className="mt-1 min-w-0 max-w-full truncate text-[10px] text-muted-foreground/80"
+                      title={step.targetFrame.url}
+                    >
+                      {t('sidepanel_steps_iframe_badge', 'iframe: {url}').replace(
+                        '{url}',
+                        formatFrameUrlForBadge(step.targetFrame.url),
+                      )}
+                    </p>
+                  ) : null}
                 </div>
               </button>
               <button
@@ -1144,6 +1208,7 @@ export default function FlowStepsBuilder({
                                   setFieldInputRef={setFieldInputRef}
                                   onFocusField={(stepId, fieldId) => setActiveFieldTarget({ stepId, fieldId })}
                                   onStartPicker={onStartPicker}
+                                  onUpdateStepTargetFrame={updateStepTargetFrame}
                                 />
                               );
                             })()}
@@ -1238,6 +1303,7 @@ export default function FlowStepsBuilder({
                               setFieldInputRef={setFieldInputRef}
                               onFocusField={(stepId, fieldId) => setActiveFieldTarget({ stepId, fieldId })}
                               onStartPicker={onStartPicker}
+                              onUpdateStepTargetFrame={updateStepTargetFrame}
                             />
                           </div>
                         </label>,

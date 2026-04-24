@@ -23,16 +23,27 @@ const updateStepField = (step: FlowStepData, fieldId: string, value: string, con
 const getStepFieldValue = (step: FlowStepData, fieldId: string) =>
   step.fields.find((field) => field.id === fieldId)?.value || '';
 
+// F1 — Stamp the recorder's frameUrl into step.targetFrame so replay
+// can resolve the right iframe. Absent frameUrl means the recording
+// came from the top frame; leave targetFrame off entirely (rather than
+// writing `{ url: '' }`) to keep the storage shape minimal.
+const withRecordedTargetFrame = (
+  step: FlowStepData,
+  frameUrl: string | undefined,
+): FlowStepData => (frameUrl ? { ...step, targetFrame: { url: frameUrl } } : step);
+
 const buildRecordedStep = (event: FlowRecordingEventPayload): FlowStepData | null => {
   const options = getTemplateOptions();
   if (event.type === 'click' && event.selector) {
     const base = createStepTemplate('click', options);
-    return updateStepField(base, 'selector', event.selector, options.conditionOperators);
+    const withSelector = updateStepField(base, 'selector', event.selector, options.conditionOperators);
+    return withRecordedTargetFrame(withSelector, event.frameUrl);
   }
   if (event.type === 'input' && event.selector) {
     const base = createStepTemplate('input', options);
     const withSelector = updateStepField(base, 'selector', event.selector, options.conditionOperators);
-    return updateStepField(withSelector, 'value', event.value || '', options.conditionOperators);
+    const withValue = updateStepField(withSelector, 'value', event.value || '', options.conditionOperators);
+    return withRecordedTargetFrame(withValue, event.frameUrl);
   }
   return null;
 };

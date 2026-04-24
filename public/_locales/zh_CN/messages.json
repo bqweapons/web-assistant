@@ -932,6 +932,12 @@
   "sidepanel_steps_delete": {
     "message": "删除步骤"
   },
+  "sidepanel_steps_iframe_badge": {
+    "message": "iframe: {url}",
+    "placeholders": {
+      "url": { "content": "$1", "example": "example.com/inner" }
+    }
+  },
   "sidepanel_steps_file_label": {
     "message": "文件"
   },
@@ -1474,6 +1480,12 @@
   },
   "sidepanel_flow_runner_error_sw_suspended_during_run": {
     "message": "浏览器在流程运行期间挂起了后台任务，该流程已停止，请重新运行。"
+  },
+  "sidepanel_flow_runner_error_target_frame_not_found": {
+    "message": "该步骤所记录的 iframe 已不在页面上，或选择器未在其中匹配到元素。"
+  },
+  "sidepanel_flow_runner_error_ambiguous_frame_match": {
+    "message": "该选择器在多个 iframe 中都有匹配。请仅保留目标 iframe 重新录制，或让选择器更精确。"
   },
   "sidepanel_flow_input_secret_bound_missing": {
     "message": "已绑定的密码在保管库中不存在：{name}。请选择或新建一个密码后重新绑定。"

@@ -141,6 +141,24 @@ export default function App() {
     [startPicker],
   );
 
+  // F1 — Flow-specific picker that preserves iframe frame metadata so
+  // FlowStepsBuilder can persist `step.targetFrame.url` alongside the
+  // selector. Hardcodes `showInsertionMarker: false` to match the
+  // prior `startSelectorPickerWithoutInsertionMarker` semantics that
+  // flows already used. Elements / Hidden keep the selector-only
+  // wrappers — element messages are top-frame scoped (see 1.16), so
+  // picking inside an iframe there wouldn't be actionable anyway.
+  const startFlowSelectorPicker = useCallback(
+    (accept: SelectorPickerAccept) =>
+      startPicker(accept, { showInsertionMarker: false }).then((result) => {
+        if (!result?.selector) {
+          return null;
+        }
+        return { selector: result.selector, frameUrl: result.frameUrl };
+      }),
+    [startPicker],
+  );
+
   const startSelectorPickerWithoutInsertionMarker = useCallback(
     (accept: SelectorPickerAccept) =>
       startPicker(accept, { showInsertionMarker: false }).then((result) => result?.selector ?? null),
@@ -292,6 +310,7 @@ export default function App() {
               lastSyncedAt={pageContext?.timestamp}
               onRefresh={refreshPageContext}
               onStartPicker={startSelectorPicker}
+              onStartFlowPicker={startFlowSelectorPicker}
               onStartAreaPicker={startAreaPicker}
               onStartElementPicker={startSelectorPickerWithNeighbors}
             />
@@ -304,7 +323,7 @@ export default function App() {
               hasActivePage={hasActivePage}
               createFlowOpen={createFlowOpen}
               onCreateFlowClose={() => setCreateFlowOpen(false)}
-              onStartPicker={startSelectorPickerWithoutInsertionMarker}
+              onStartPicker={startFlowSelectorPicker}
             />
           )}
           {activeTab === TAB_IDS.hiddenRules && (
