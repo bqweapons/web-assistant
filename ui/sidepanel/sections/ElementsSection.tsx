@@ -1882,7 +1882,7 @@ export default function ElementsSection({
             </button>
       <button
         type="button"
-        className="btn-icon h-8 w-8 border-transparent bg-primary text-primary-foreground hover:brightness-95"
+        className="btn-icon btn-icon-primary h-8 w-8"
         onClick={() => {
           void handleElementSave();
         }}
@@ -2070,7 +2070,7 @@ export default function ElementsSection({
                   <div className="flex items-center gap-1">
                     <button
                       type="button"
-                      className="btn-ghost h-6 w-6 p-0"
+                      className="btn-toolbar"
                       aria-label={t('sidepanel_elements_font_decrease', 'Decrease font size')}
                       onClick={() => adjustNumericStyle('fontSize', -1, 'px', 12)}
                     >
@@ -2078,7 +2078,7 @@ export default function ElementsSection({
                     </button>
                     <button
                       type="button"
-                      className="btn-ghost h-6 w-6 p-0"
+                      className="btn-toolbar"
                       aria-label={t('sidepanel_elements_font_increase', 'Increase font size')}
                       onClick={() => adjustNumericStyle('fontSize', 1, 'px', 12)}
                     >
@@ -2089,7 +2089,7 @@ export default function ElementsSection({
                   <div className="flex items-center gap-2">
                     <button
                       type="button"
-                      className={`btn-ghost h-6 w-6 p-0 ${isBold ? 'bg-accent text-accent-foreground' : ''}`}
+                      className={`btn-toolbar ${isBold ? 'bg-accent text-accent-foreground' : ''}`}
                       aria-pressed={isBold}
                       onClick={() => applyCustomCssUpdates({ fontWeight: isBold ? '' : '700' })}
                     >
@@ -2097,7 +2097,7 @@ export default function ElementsSection({
                     </button>
                     <button
                       type="button"
-                      className={`btn-ghost h-6 w-6 p-0 ${isItalic ? 'bg-accent text-accent-foreground' : ''}`}
+                      className={`btn-toolbar ${isItalic ? 'bg-accent text-accent-foreground' : ''}`}
                       aria-pressed={isItalic}
                       onClick={() => applyCustomCssUpdates({ fontStyle: isItalic ? '' : 'italic' })}
                     >
@@ -2105,7 +2105,7 @@ export default function ElementsSection({
                     </button>
                     <button
                       type="button"
-                      className={`btn-ghost h-6 w-6 p-0 ${isUnderline ? 'bg-accent text-accent-foreground' : ''}`}
+                      className={`btn-toolbar ${isUnderline ? 'bg-accent text-accent-foreground' : ''}`}
                       aria-pressed={isUnderline}
                       onClick={() =>
                         applyCustomCssUpdates({
@@ -2120,7 +2120,7 @@ export default function ElementsSection({
                   <div className="flex items-center gap-2">
                     <button
                       type="button"
-                      className={`btn-ghost h-6 w-6 p-0 ${textAlignValue === 'left' ? 'bg-accent text-accent-foreground' : ''}`}
+                      className={`btn-toolbar ${textAlignValue === 'left' ? 'bg-accent text-accent-foreground' : ''}`}
                       aria-pressed={textAlignValue === 'left'}
                       onClick={() => applyCustomCssUpdates({ textAlign: 'left' })}
                     >
@@ -2128,7 +2128,7 @@ export default function ElementsSection({
                     </button>
                     <button
                       type="button"
-                      className={`btn-ghost h-6 w-6 p-0 ${textAlignValue === 'center' ? 'bg-accent text-accent-foreground' : ''}`}
+                      className={`btn-toolbar ${textAlignValue === 'center' ? 'bg-accent text-accent-foreground' : ''}`}
                       aria-pressed={textAlignValue === 'center'}
                       onClick={() => applyCustomCssUpdates({ textAlign: 'center' })}
                     >
@@ -2136,7 +2136,7 @@ export default function ElementsSection({
                     </button>
                     <button
                       type="button"
-                      className={`btn-ghost h-6 w-6 p-0 ${textAlignValue === 'right' ? 'bg-accent text-accent-foreground' : ''}`}
+                      className={`btn-toolbar ${textAlignValue === 'right' ? 'bg-accent text-accent-foreground' : ''}`}
                       aria-pressed={textAlignValue === 'right'}
                       onClick={() => applyCustomCssUpdates({ textAlign: 'right' })}
                     >

@@ -1,4 +1,4 @@
-import { MessageType } from '../../../../shared/messages';
+import { MessageType, type RuntimeMessage } from '../../../../shared/messages';
 import { sendRuntimeMessage } from '../../../../shared/runtimeMessaging';
 import { t } from '../../utils/i18n';
 
@@ -34,11 +34,17 @@ export const sendElementMessage = async (
   payload?: Record<string, unknown>,
   options?: { targetTabId?: number },
 ) => {
+  // 2.5 — This helper takes loose `MessageType` + `Record<string, unknown>`
+  // args for caller convenience (all callers pass element-injection kinds
+  // like CREATE_ELEMENT / UPDATE_ELEMENT where the data shape is validated
+  // receiver-side). The cast here is the audit marker: we're crossing the
+  // discriminated-union boundary on purpose. Narrowing the `type` param to
+  // an element-message subset would be cleaner but is out of 2.5 scope.
   const response = (await sendRuntimeMessage({
     type,
     data: payload,
     targetTabId: options?.targetTabId,
-  })) as {
+  } as RuntimeMessage)) as {
     ok?: boolean;
     error?: string;
   };

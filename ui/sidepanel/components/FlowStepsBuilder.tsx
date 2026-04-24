@@ -691,51 +691,70 @@ export default function FlowStepsBuilder({
               handleDrop();
             }}
           >
+            {/* 2.9 — flattened: previously this row was a single
+                role="button" div with a real <button> (delete) nested
+                inside. ARIA forbids interactive-in-interactive, and the
+                stopPropagation hack only papered over the click-bubble
+                problem (screen readers still announced two buttons). Now
+                two sibling <button>s in a flex row; the activate button
+                carries the draggable + onDragStart/End. Native <button>
+                handles Enter/Space activation, so the prior onKeyDown is
+                gone. Style note: the activate button resets default
+                user-agent `<button>` border/background (`border-0
+                bg-transparent` plus `appearance-none`) so the row still
+                reads as a single card surface — skipping this reset
+                caused a visible button-shape regression where the
+                activate area rendered like a raised button inside the
+                card. */}
+            {/* 2.9 — bg layer lives on the WRAPPER, not the activate
+                button: the trash button is a flex sibling of the activate
+                button, so putting hover/active bg on the activate button
+                would leave the trash button's 32×32 area outside the
+                highlight. Wrapper rounded-lg matches the card shell so
+                corners align. */}
             <div
-              role="button"
-              tabIndex={0}
-              className={`group flex w-full cursor-pointer items-center gap-2 rounded-lg px-3 py-2 text-left text-xs transition ${
-                isActive ? 'bg-primary/10 text-foreground' : 'text-muted-foreground'
+              className={`group flex items-center rounded-lg transition ${
+                isActive
+                  ? 'bg-primary/10 hover:bg-primary/15'
+                  : 'hover:bg-accent/50'
               }`}
-              onClick={() => setActiveStepId(isActive ? '' : step.id)}
-              onKeyDown={(event) => {
-                if (event.key === 'Enter' || event.key === ' ') {
-                  event.preventDefault();
-                  setActiveStepId(isActive ? '' : step.id);
-                }
-              }}
-              draggable={Boolean(listContext)}
-              onDragStart={(event) => {
-                if (!listContext) {
-                  return;
-                }
-                event.dataTransfer.effectAllowed = 'move';
-                event.dataTransfer.setData('text/plain', step.id);
-                setDragState({ stepId: step.id, context: listContext });
-              }}
-              onDragEnd={() => setDragState(null)}
             >
-              <GripVertical className="h-3.5 w-3.5 text-muted-foreground" />
-              <div className="min-w-0 flex-1">
-                <div className="flex min-w-0 items-center gap-2">
-                  <span className="inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-full border border-border bg-muted text-[10px] font-semibold text-foreground">
-                    {index + 1}
-                  </span>
-                  <p className="min-w-0 truncate text-xs font-semibold text-foreground">{step.title}</p>
-                  <span className="badge-pill shrink-0 text-[9px] uppercase tracking-wide">{typeLabel}</span>
-                </div>
-                <p className="mt-1 min-w-0 max-w-full break-all text-[11px] text-muted-foreground">
-                  {step.summary}
-                </p>
-              </div>
               <button
                 type="button"
-                className="btn-icon btn-icon-danger ml-auto h-8 w-8 opacity-0 transition-opacity group-hover:opacity-100"
-                aria-label={t('sidepanel_steps_delete', 'Delete step')}
-                onClick={(event) => {
-                  event.stopPropagation();
-                  handleDeleteStep(step.id);
+                className={`flex min-w-0 flex-1 cursor-pointer appearance-none items-center gap-2 rounded-lg border-0 bg-transparent px-3 py-2 text-left text-xs transition ${
+                  isActive ? 'text-foreground' : 'text-muted-foreground'
+                }`}
+                onClick={() => setActiveStepId(isActive ? '' : step.id)}
+                draggable={Boolean(listContext)}
+                onDragStart={(event) => {
+                  if (!listContext) {
+                    return;
+                  }
+                  event.dataTransfer.effectAllowed = 'move';
+                  event.dataTransfer.setData('text/plain', step.id);
+                  setDragState({ stepId: step.id, context: listContext });
                 }}
+                onDragEnd={() => setDragState(null)}
+              >
+                <GripVertical className="h-3.5 w-3.5 text-muted-foreground" />
+                <div className="min-w-0 flex-1">
+                  <div className="flex min-w-0 items-center gap-2">
+                    <span className="inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-full border border-border bg-muted text-[10px] font-semibold text-foreground">
+                      {index + 1}
+                    </span>
+                    <p className="min-w-0 truncate text-xs font-semibold text-foreground">{step.title}</p>
+                    <span className="badge-pill shrink-0 text-[9px] uppercase tracking-wide">{typeLabel}</span>
+                  </div>
+                  <p className="mt-1 min-w-0 max-w-full break-all text-[11px] text-muted-foreground">
+                    {step.summary}
+                  </p>
+                </div>
+              </button>
+              <button
+                type="button"
+                className="btn-icon btn-icon-danger mr-3 h-8 w-8 shrink-0 opacity-0 transition-opacity group-hover:opacity-100"
+                aria-label={t('sidepanel_steps_delete', 'Delete step')}
+                onClick={() => handleDeleteStep(step.id)}
               >
                 <Trash2 className="h-3.5 w-3.5" />
               </button>

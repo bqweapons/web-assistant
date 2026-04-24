@@ -74,10 +74,19 @@ export default function InputSecretValueControl({
   const effectiveSelectedSecretName = selectedSecretName || tokenInfo?.name || '';
 
   useEffect(() => {
+    // 2.2 — step/field change is a context boundary. Wipe sensitive ephemeral
+    // state from the previous step (master password the user typed but didn't
+    // submit; plaintext of a half-created secret) so it doesn't ride into
+    // an unrelated editor surface. `selectedSecretName` is overwritten
+    // (not additively merged) — if the new step has no token, the dropdown
+    // resets to empty rather than carrying the prior step's selection.
     setMode(tokenInfo ? 'secret' : 'literal');
-    if (tokenInfo?.name) {
-      setSelectedSecretName(tokenInfo.name);
-    }
+    setSelectedSecretName(tokenInfo?.name ?? '');
+    setUnlockPassword('');
+    setNewSecretName('');
+    setNewSecretValue('');
+    setShowCreateSecretForm(false);
+    setErrorMessage('');
   }, [step.id, field.id, tokenInfo?.name]);
 
   useEffect(() => {
@@ -120,6 +129,20 @@ export default function InputSecretValueControl({
       secretCount: status.secretCount,
       names: status.names,
     });
+    if (!status.unlocked) {
+      // 2.2 — vault is observed locked (we polled and it came back !unlocked).
+      // Drop the sensitive ephemeral state we hold locally: the master
+      // password the user just typed (no longer useful — they have to retype
+      // for the next unlock), and the plaintext of any in-progress new-secret
+      // form (the create call would have failed anyway; UX is "vault locked,
+      // start over"). Closing the create form prevents the half-typed
+      // plaintext from sitting in a hidden DOM input.
+      setUnlockPassword('');
+      setNewSecretName('');
+      setNewSecretValue('');
+      setShowCreateSecretForm(false);
+      return;
+    }
     if (status.names.length > 0 && !selectedSecretName) {
       setSelectedSecretName(status.names[0]);
     }
@@ -191,6 +214,9 @@ export default function InputSecretValueControl({
       onFocusField(step.id, field.id);
       setSelectedSecretName(normalizedName);
       setShowCreateSecretForm(false);
+      // 2.2 — clear both name and value once the secret is persisted; name
+      // is regenerated from selector context next time the form opens.
+      setNewSecretName('');
       setNewSecretValue('');
       await refreshVaultStatus();
     } catch (error) {

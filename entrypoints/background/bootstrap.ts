@@ -5,6 +5,15 @@ import { TabBridge, type TabMessageResponse } from './runtime/tabBridge';
 
 const CONTENT_SCRIPT_FILE = 'content-scripts/content.js';
 
+// 2.11 — module-level flag guards against duplicate listener registration if
+// `bootstrapBackground` is called more than once in a single SW lifetime
+// (HMR during `wxt dev`, accidental double-import, etc.). `hasListener`-based
+// dedup wouldn't work here: each call creates new closures (safeBroadcast,
+// broadcastPageContext) so listener reference equality fails. The flag is
+// set AFTER the `runtime?.onMessage` null check so a call in a context where
+// the runtime API isn't yet available can retry on a later invocation.
+let bootstrapped = false;
+
 export const bootstrapBackground = () => {
   if (typeof chrome !== 'undefined' && chrome.sidePanel?.setPanelBehavior) {
     const result = chrome.sidePanel.setPanelBehavior({ openPanelOnActionClick: true });
@@ -101,6 +110,15 @@ export const bootstrapBackground = () => {
   if (!runtime?.onMessage) {
     return;
   }
+
+  // 2.11 — see flag comment near top of file. Past this point we are
+  // committed to registering listeners; guard flips now so any subsequent
+  // call short-circuits without duplicating them. Placed AFTER the null
+  // check so a retry remains possible if the runtime API wasn't ready.
+  if (bootstrapped) {
+    return;
+  }
+  bootstrapped = true;
 
   runtime.onMessage.addListener((rawMessage, sender, sendResponse) => {
     const message = rawMessage as RuntimeMessage | undefined;

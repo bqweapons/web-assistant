@@ -1,7 +1,13 @@
 import type { RuntimeMessage } from './messages';
 
+// 2.5 — Removed the `| Record<string, unknown>` escape hatch. Callers must
+// pass a discriminated `RuntimeMessage`; if a local abstraction genuinely
+// needs to be type-loose (e.g. a helper that forwards any element-injection
+// message kind), it should cast explicitly at its own boundary so the audit
+// surface is visible. The prior union accepted anything, silently defeating
+// the discriminated message contract.
 export const sendRuntimeMessage = <TResponse = unknown>(
-  message: RuntimeMessage | Record<string, unknown>,
+  message: RuntimeMessage,
   runtimeApi = chrome?.runtime,
 ): Promise<TResponse> => {
   return new Promise<TResponse>((resolve, reject) => {

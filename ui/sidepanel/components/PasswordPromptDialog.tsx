@@ -1,5 +1,6 @@
 import { useEffect, useId, useRef, useState, type FormEvent } from 'react';
 import { Check, Eye, EyeOff, Lock, X } from 'lucide-react';
+import { useFocusTrap } from '../hooks/useFocusTrap';
 import { t } from '../utils/i18n';
 
 type PasswordPromptDialogProps = {
@@ -29,14 +30,15 @@ export default function PasswordPromptDialog({
   const messageId = useId();
   const formRef = useRef<HTMLFormElement | null>(null);
   const inputRef = useRef<HTMLInputElement | null>(null);
-  const onCancelRef = useRef(onCancel);
   const [value, setValue] = useState('');
   const [revealed, setRevealed] = useState(false);
 
-  useEffect(() => {
-    onCancelRef.current = onCancel;
-  }, [onCancel]);
-
+  // 2.8 — explicit input focus is preserved (the hook's "skip if panel
+  // already owns activeElement" guard means the raf-driven focus and
+  // the hook's initial-focus pass don't fight each other regardless of
+  // ordering). Local Escape listener is gone — useFocusTrap is the single
+  // owner. Input value reset on open stays here (component concern,
+  // unrelated to focus management).
   useEffect(() => {
     if (!open) {
       return;
@@ -44,18 +46,12 @@ export default function PasswordPromptDialog({
     setValue('');
     setRevealed(false);
     const raf = requestAnimationFrame(() => inputRef.current?.focus());
-    const handleKey = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') {
-        event.preventDefault();
-        onCancelRef.current();
-      }
-    };
-    document.addEventListener('keydown', handleKey);
     return () => {
       cancelAnimationFrame(raf);
-      document.removeEventListener('keydown', handleKey);
     };
   }, [open]);
+
+  useFocusTrap(formRef, open, onCancel);
 
   if (!open) {
     return null;

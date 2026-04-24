@@ -54,7 +54,14 @@ Repository conventions and action-flow reference for Ladybird (WXT mainline).
 
 ### UI consistency rules
 - All visible action buttons should use `icon + label` by default. Pure text buttons are only acceptable for intentionally minimal text-only controls, not for normal primary/secondary actions.
-- Use only existing shared button styles (`btn-primary`, `btn-ghost`, `btn-icon`, `btn-icon-danger`). Do not introduce undefined button classes.
+- Use only existing shared button styles. Do not introduce undefined button classes. The approved set is:
+  - `btn-primary` — rectangular primary (main call-to-action).
+  - `btn-ghost` — rectangular secondary / neutral.
+  - `btn-icon` — circular icon-only (base for `btn-icon-primary` / `btn-icon-danger`).
+  - `btn-icon-primary` — circular icon-only with primary fill; use when a rectangular `btn-primary` won't fit (e.g. Drawer title-bar actions). Must be combined with `btn-icon`.
+  - `btn-icon-danger` — circular icon-only with destructive color. Must be combined with `btn-icon`.
+  - `btn-danger` — rectangular destructive (dialog confirms for delete / discard). Do not compose with `btn-ghost` / `btn-primary`.
+  - `btn-toolbar` — compact icon-only (24×24) for toolbar clusters (font-size, bold, italic, alignment). Use `bg-accent text-accent-foreground` or the `aria-pressed:` variant for active state.
 - If two sibling actions belong to the same action group (for example `Save / Cancel`, `Bind / New`), prefer rendering them on one row and splitting the available width evenly.
 - If button labels are too long for the sidepanel width, shorten the label and keep the icon instead of allowing layout-breaking wrapping.
 - Reuse existing visual patterns across sections. Delete, save, cancel, clear, close, unlock, and confirm actions should look and behave consistently.

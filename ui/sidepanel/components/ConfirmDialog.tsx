@@ -1,5 +1,6 @@
-import { useEffect, useId, useRef } from 'react';
+import { useId, useRef } from 'react';
 import { AlertTriangle, Check, X } from 'lucide-react';
+import { useFocusTrap } from '../hooks/useFocusTrap';
 import { t } from '../utils/i18n';
 
 type ConfirmDialogProps = {
@@ -28,26 +29,12 @@ export default function ConfirmDialog({
   const titleId = useId();
   const messageId = useId();
   const panelRef = useRef<HTMLDivElement | null>(null);
-  const onCancelRef = useRef(onCancel);
 
-  useEffect(() => {
-    onCancelRef.current = onCancel;
-  }, [onCancel]);
-
-  useEffect(() => {
-    if (!open) {
-      return;
-    }
-    const handleKey = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') {
-        event.preventDefault();
-        onCancelRef.current();
-      }
-    };
-    panelRef.current?.focus();
-    document.addEventListener('keydown', handleKey);
-    return () => document.removeEventListener('keydown', handleKey);
-  }, [open]);
+  // 2.8 — focus trap owns Escape, initial focus, Tab wrap, and prior-focus
+  // restore. Replaces the previous local Esc listener + panelRef.focus()
+  // pair. Open-or-not gating is via the `open` argument; the hook is a
+  // no-op while `open === false`.
+  useFocusTrap(panelRef, open, onCancel);
 
   if (!open) {
     return null;
@@ -85,7 +72,7 @@ export default function ConfirmDialog({
             </button>
             <button
               type="button"
-              className={`h-8 gap-1 px-3 text-xs ${danger ? 'btn-icon-danger btn-ghost' : 'btn-primary'}`}
+              className={`h-8 gap-1 px-3 text-xs ${danger ? 'btn-danger' : 'btn-primary'}`}
               onClick={onConfirm}
             >
               {danger ? <AlertTriangle className="h-3.5 w-3.5" /> : <Check className="h-3.5 w-3.5" />}

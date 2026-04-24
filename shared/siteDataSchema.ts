@@ -1,4 +1,10 @@
 import type { FlowStepData } from './flowStepMigration';
+// 2.6 — `normalizeSiteKey` and `deriveSiteKey` were duplicated here with
+// subtly different fallback semantics from the copies in urlKeys.ts. Both
+// now live in urlKeys.ts as the single source of truth; we re-export from
+// this module to avoid churning the ~15 import sites that reach for them
+// through the schema file.
+import { deriveSiteKey as deriveSiteKeyShared, normalizeSiteKey as normalizeSiteKeyShared } from './urlKeys';
 
 type JsonRecord = Record<string, unknown>;
 
@@ -82,25 +88,11 @@ export type StructuredStoragePayload = {
 const isRecord = (value: unknown): value is JsonRecord =>
   Boolean(value) && typeof value === 'object' && !Array.isArray(value);
 
-export const normalizeSiteKey = (value: string) =>
-  value.replace(/^https?:\/\//, '').replace(/^file:\/\//, '').replace(/\/$/, '');
-
-export const deriveSiteKey = (input: string) => {
-  const trimmed = input.trim();
-  if (!trimmed) {
-    return '';
-  }
-  try {
-    const parsed = new URL(trimmed);
-    if (parsed.protocol === 'file:') {
-      return normalizeSiteKey(trimmed.split(/[?#]/)[0] || trimmed);
-    }
-    const host = parsed.host || parsed.hostname || '';
-    return normalizeSiteKey(host || trimmed);
-  } catch {
-    return normalizeSiteKey(trimmed);
-  }
-};
+// DEPRECATED re-export — new code should import `normalizeSiteKey` /
+// `deriveSiteKey` from './urlKeys' directly. These stay only so the ~15
+// existing import sites don't need a sweep; remove once they're migrated.
+export const normalizeSiteKey = normalizeSiteKeyShared;
+export const deriveSiteKey = deriveSiteKeyShared;
 
 export const buildDefaultSiteUrl = (siteKey: string) => {
   if (!siteKey) {
