@@ -1,5 +1,6 @@
 import type { FlowStepData } from './flowStepMigration';
 import type { StructuredElementRecord } from './siteDataSchema';
+import type { SecretVaultStatus, SecretVaultTransferPayload } from './secrets';
 
 export const MessageType = {
   START_PICKER: 'START_PICKER',
@@ -28,6 +29,19 @@ export const MessageType = {
   FLOW_RUN_EXECUTE_STEP: 'FLOW_RUN_EXECUTE_STEP',
   FLOW_RUN_STEP_RESULT: 'FLOW_RUN_STEP_RESULT',
   FLOW_RUN_VAULT_UNLOCK_PROMPT: 'FLOW_RUN_VAULT_UNLOCK_PROMPT',
+  // 1.1 — sidepanel vault operations routed through the SW so the AES key
+  // stays in SW memory only. Background owns the key; sidepanel is a pure
+  // client. See `shared/secretsClient.ts` for the sidepanel wrapper and
+  // `entrypoints/background/secretsVault.ts` for the SW-side state.
+  SECRETS_STATUS: 'SECRETS_STATUS',
+  SECRETS_UNLOCK: 'SECRETS_UNLOCK',
+  SECRETS_LOCK: 'SECRETS_LOCK',
+  SECRETS_RESET: 'SECRETS_RESET',
+  SECRETS_RESOLVE: 'SECRETS_RESOLVE',
+  SECRETS_UPSERT: 'SECRETS_UPSERT',
+  SECRETS_DELETE: 'SECRETS_DELETE',
+  SECRETS_EXPORT_TRANSFER: 'SECRETS_EXPORT_TRANSFER',
+  SECRETS_IMPORT_TRANSFER: 'SECRETS_IMPORT_TRANSFER',
 } as const;
 
 export type MessageType = (typeof MessageType)[keyof typeof MessageType];
@@ -284,4 +298,35 @@ export type RuntimeMessage =
   | { type: typeof MessageType.FLOW_RUN_STATUS; data: FlowRunStatusPayload; forwarded?: boolean; targetTabId?: number }
   | { type: typeof MessageType.FLOW_RUN_EXECUTE_STEP; data: FlowRunExecuteStepPayload; forwarded?: boolean; targetTabId?: number }
   | { type: typeof MessageType.FLOW_RUN_STEP_RESULT; data: FlowRunExecuteResultPayload; forwarded?: boolean; targetTabId?: number }
-  | { type: typeof MessageType.FLOW_RUN_VAULT_UNLOCK_PROMPT; data: FlowRunVaultUnlockPromptPayload; forwarded?: boolean; targetTabId?: number };
+  | { type: typeof MessageType.FLOW_RUN_VAULT_UNLOCK_PROMPT; data: FlowRunVaultUnlockPromptPayload; forwarded?: boolean; targetTabId?: number }
+  // 1.1 — SECRETS_* messages. All responses go back via `{ ok: true, data }`
+  // (the common pattern in this module's `respondPromise` helper). `data`
+  // field here reflects the REQUEST payload only; response shapes are
+  // documented at the handler in `entrypoints/background/bootstrap.ts`
+  // and consumed in `shared/secretsClient.ts`.
+  | { type: typeof MessageType.SECRETS_STATUS; data?: undefined; forwarded?: boolean; targetTabId?: number }
+  | { type: typeof MessageType.SECRETS_UNLOCK; data: { password: string }; forwarded?: boolean; targetTabId?: number }
+  | { type: typeof MessageType.SECRETS_LOCK; data?: undefined; forwarded?: boolean; targetTabId?: number }
+  | { type: typeof MessageType.SECRETS_RESET; data?: undefined; forwarded?: boolean; targetTabId?: number }
+  | { type: typeof MessageType.SECRETS_RESOLVE; data: { name: string }; forwarded?: boolean; targetTabId?: number }
+  | { type: typeof MessageType.SECRETS_UPSERT; data: { name: string; value: string }; forwarded?: boolean; targetTabId?: number }
+  | { type: typeof MessageType.SECRETS_DELETE; data: { name: string }; forwarded?: boolean; targetTabId?: number }
+  | { type: typeof MessageType.SECRETS_EXPORT_TRANSFER; data: { password: string }; forwarded?: boolean; targetTabId?: number }
+  | { type: typeof MessageType.SECRETS_IMPORT_TRANSFER; data: { payload: SecretVaultTransferPayload; password: string }; forwarded?: boolean; targetTabId?: number };
+
+// 1.1 — response shape registry. Used by `shared/secretsClient.ts` to type
+// the resolved value from each `sendRuntimeMessage` call. Keeping this
+// separate from the RuntimeMessage union avoids making the union itself
+// carry response data, which would conflict with how the runtime wraps
+// everything in `{ ok, data, error }`.
+export type SecretsMessageResponse = {
+  [MessageType.SECRETS_STATUS]: SecretVaultStatus;
+  [MessageType.SECRETS_UNLOCK]: SecretVaultStatus;
+  [MessageType.SECRETS_LOCK]: { locked: true };
+  [MessageType.SECRETS_RESET]: SecretVaultStatus;
+  [MessageType.SECRETS_RESOLVE]: { value: string };
+  [MessageType.SECRETS_UPSERT]: SecretVaultStatus;
+  [MessageType.SECRETS_DELETE]: SecretVaultStatus;
+  [MessageType.SECRETS_EXPORT_TRANSFER]: SecretVaultTransferPayload | null;
+  [MessageType.SECRETS_IMPORT_TRANSFER]: SecretVaultStatus;
+};

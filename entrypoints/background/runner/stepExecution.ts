@@ -23,7 +23,10 @@ import {
 import { TabBridge } from '../runtime/tabBridge';
 import { parseDataSourceRows } from './dataSource';
 import { JsTransformExecutor } from './jsTransformExecutor';
-import { resolveSecretTokens, unlockSecretsVault } from '../../../shared/secrets';
+// 1.1 — background code calls the SW-only vault module directly (same
+// realm, no message round-trip). Sidepanel / content code uses
+// `shared/secretsClient.ts` instead.
+import { resolveSecretTokens, unlockSecretsVault } from '../secretsVault';
 import {
   getRenderedStepFieldValue,
   getStepField,

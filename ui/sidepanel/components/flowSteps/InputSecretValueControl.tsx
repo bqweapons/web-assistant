@@ -3,14 +3,20 @@ import { Check, KeyRound, Keyboard, Link2, Plus, Unlock, X } from 'lucide-react'
 import SelectMenu from '../SelectMenu';
 import SegmentedTabs from '../SegmentedTabs';
 import { t } from '../../utils/i18n';
+// 1.1 — split imports: pure helpers (token parsing, regex) stay in
+// `shared/secrets`; key-requiring ops (`getSecretsVaultStatus`,
+// `unlockSecretsVault`, `upsertSecretValue`) go through the
+// message-based client so the AES key stays in the SW.
 import {
   buildSecretToken,
-  getSecretsVaultStatus,
   isSecretTokenValue,
   parseSecretTokenValue,
+} from '../../../../shared/secrets';
+import {
+  getSecretsVaultStatus,
   unlockSecretsVault,
   upsertSecretValue,
-} from '../../../../shared/secrets';
+} from '../../../../shared/secretsClient';
 import type { StepData, StepField } from './types';
 import { getStepFieldStringValue, isPasswordLikeSelector } from './secretInputUtils';
 

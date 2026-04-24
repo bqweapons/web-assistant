@@ -1,5 +1,7 @@
 import { useEffect, useId, useRef, useState } from 'react';
 import { AlertTriangle, Check, Eye, EyeOff, KeyRound, Pencil, Trash2, Unlock, X } from 'lucide-react';
+// 1.1 — all ops in this file require the AES key; all go through the
+// message-based client. The SW owns the key.
 import {
   deleteSecretValue,
   getSecretsVaultStatus,
@@ -7,7 +9,7 @@ import {
   resolveSecretValue,
   unlockSecretsVault,
   upsertSecretValue,
-} from '../../../shared/secrets';
+} from '../../../shared/secretsClient';
 import Card from './Card';
 import ConfirmDialog from './ConfirmDialog';
 import { useFocusTrap } from '../hooks/useFocusTrap';

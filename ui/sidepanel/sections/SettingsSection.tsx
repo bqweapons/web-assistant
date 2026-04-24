@@ -7,12 +7,15 @@ import { LOCALE_OPTIONS, SupportedLocale, getLocaleLabel, setLocale, t, useLocal
 import { getGlobalSettings, setGlobalSettings } from '../../../shared/globalSettings';
 import { getAllSitesData, setAllSitesData } from '../../../shared/storage';
 import { buildExportPayload, mergeSitesData, parseImportPayload } from '../../../shared/importExport';
+// 1.1 — key-requiring vault ops go through the message-based client (AES
+// key lives SW-only). Pure helpers like `parseSecretVaultTransferPayload`
+// stay in the shared module.
 import {
   exportSecretVaultTransferPayload,
   getSecretsVaultStatus,
   importSecretVaultTransferPayload,
-  parseSecretVaultTransferPayload,
-} from '../../../shared/secrets';
+} from '../../../shared/secretsClient';
+import { parseSecretVaultTransferPayload } from '../../../shared/secrets';
 
 const isRecord = (value: unknown): value is Record<string, unknown> =>
   Boolean(value) && typeof value === 'object' && !Array.isArray(value);

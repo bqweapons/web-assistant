@@ -2,6 +2,17 @@ import { MessageType, type PageContextPayload, type RuntimeMessage } from '../..
 import { FlowRunnerManager } from './runner/FlowRunnerManager';
 import { derivePageContext } from './runtime/pageContext';
 import { TabBridge, type TabMessageResponse } from './runtime/tabBridge';
+import {
+  deleteSecretValue,
+  exportSecretVaultTransferPayload,
+  getSecretsVaultStatus,
+  importSecretVaultTransferPayload,
+  lockSecretsVault,
+  resetSecretsVault,
+  resolveSecretValue,
+  unlockSecretsVault,
+  upsertSecretValue,
+} from './secretsVault';
 
 const CONTENT_SCRIPT_FILE = 'content-scripts/content.js';
 
@@ -212,6 +223,78 @@ export const bootstrapBackground = () => {
         void respondPromise(async () => {
           const result = flowRunnerManager.stop(message.data.runId);
           return { ok: true, data: result };
+        });
+        return true;
+      }
+      // 1.1 — vault operations routed to the SW so the AES key stays in
+      // this realm only. All handlers bubble thrown errors (e.g. "Invalid
+      // master password", "Secret vault is locked") through `respondPromise`
+      // → `{ ok: false, error }`; the sidepanel client surfaces them as
+      // rejected Promises. Response shapes are declared in
+      // `SecretsMessageResponse` in shared/messages.ts.
+      case MessageType.SECRETS_STATUS: {
+        void respondPromise(async () => {
+          const status = await getSecretsVaultStatus();
+          return { ok: true, data: status };
+        });
+        return true;
+      }
+      case MessageType.SECRETS_UNLOCK: {
+        void respondPromise(async () => {
+          const status = await unlockSecretsVault(message.data.password);
+          return { ok: true, data: status };
+        });
+        return true;
+      }
+      case MessageType.SECRETS_LOCK: {
+        void respondPromise(async () => {
+          await lockSecretsVault();
+          return { ok: true, data: { locked: true as const } };
+        });
+        return true;
+      }
+      case MessageType.SECRETS_RESET: {
+        void respondPromise(async () => {
+          const status = await resetSecretsVault();
+          return { ok: true, data: status };
+        });
+        return true;
+      }
+      case MessageType.SECRETS_RESOLVE: {
+        void respondPromise(async () => {
+          const value = await resolveSecretValue(message.data.name);
+          return { ok: true, data: { value } };
+        });
+        return true;
+      }
+      case MessageType.SECRETS_UPSERT: {
+        void respondPromise(async () => {
+          const status = await upsertSecretValue(message.data.name, message.data.value);
+          return { ok: true, data: status };
+        });
+        return true;
+      }
+      case MessageType.SECRETS_DELETE: {
+        void respondPromise(async () => {
+          const status = await deleteSecretValue(message.data.name);
+          return { ok: true, data: status };
+        });
+        return true;
+      }
+      case MessageType.SECRETS_EXPORT_TRANSFER: {
+        void respondPromise(async () => {
+          const payload = await exportSecretVaultTransferPayload(message.data.password);
+          return { ok: true, data: payload };
+        });
+        return true;
+      }
+      case MessageType.SECRETS_IMPORT_TRANSFER: {
+        void respondPromise(async () => {
+          const status = await importSecretVaultTransferPayload(
+            message.data.payload,
+            message.data.password,
+          );
+          return { ok: true, data: status };
         });
         return true;
       }
