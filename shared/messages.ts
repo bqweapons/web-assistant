@@ -53,6 +53,12 @@ export const MessageType = {
   // fix, not trying to serialize a cross-origin race).
   SITES_SET_SITE: 'SITES_SET_SITE',
   SITES_SET_ALL: 'SITES_SET_ALL',
+  // 1.13 — sidepanel-initiated query for run-failure notices that the SW
+  // synthesized during cold-start orphan cleanup. Orphan broadcast alone
+  // is lossy when the sidepanel isn't open; this pull channel lets a
+  // sidepanel mounting later drain the queue and render the failure.
+  // Response: `{ ok: true, data: { notifications: FlowRunStatusPayload[] } }`.
+  FLOW_RUN_PENDING_FAILURES_QUERY: 'FLOW_RUN_PENDING_FAILURES_QUERY',
 } as const;
 
 export type MessageType = (typeof MessageType)[keyof typeof MessageType];
@@ -329,7 +335,8 @@ export type RuntimeMessage =
   // with no data payload (void-equivalent); write errors (quota, storage) come
   // back as `{ ok: false, error }` through `respondPromise`.
   | { type: typeof MessageType.SITES_SET_SITE; data: { siteKey: string; data: Partial<StructuredSiteData> }; forwarded?: boolean; targetTabId?: number }
-  | { type: typeof MessageType.SITES_SET_ALL; data: { sites: Record<string, StructuredSiteData> }; forwarded?: boolean; targetTabId?: number };
+  | { type: typeof MessageType.SITES_SET_ALL; data: { sites: Record<string, StructuredSiteData> }; forwarded?: boolean; targetTabId?: number }
+  | { type: typeof MessageType.FLOW_RUN_PENDING_FAILURES_QUERY; data?: undefined; forwarded?: boolean; targetTabId?: number };
 
 // 1.1 — response shape registry. Used by `shared/secretsClient.ts` to type
 // the resolved value from each `sendRuntimeMessage` call. Keeping this

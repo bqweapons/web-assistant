@@ -1472,6 +1472,9 @@
   "sidepanel_flow_runner_error_secret_vault_unlock_interrupted": {
     "message": "Vault unlock was interrupted by page refresh or navigation. Please run the flow again."
   },
+  "sidepanel_flow_runner_error_sw_suspended_during_run": {
+    "message": "The browser suspended the background task during this run. The flow was stopped. Please run it again."
+  },
   "sidepanel_flow_input_secret_bound_missing": {
     "message": "Bound password no longer exists in the vault: {name}. Please choose or create a password and bind again."
   },

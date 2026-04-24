@@ -18,6 +18,16 @@ import {
   setAllSitesDataInSw,
   setSiteDataInSw,
 } from './siteStorage';
+import {
+  appendPendingFailureNotices,
+  readOrphanSentinels,
+  removeSentinelKeys,
+  sentinelKeyForRunId,
+  SW_SUSPENDED_ERROR_CODE,
+  takePendingFailureNotices,
+  type RunSentinel,
+} from './runner/runSentinel';
+import type { FlowRunStatusPayload } from '../../shared/messages';
 
 const CONTENT_SCRIPT_FILE = 'content-scripts/content.js';
 
@@ -82,7 +92,90 @@ export const bootstrapBackground = () => {
     } satisfies RuntimeMessage);
   };
 
-  const flowRunnerManager = new FlowRunnerManager({ runtime, tabBridge });
+  // 1.13 — Unique marker for this SW lifetime. Stamped onto every run
+  // sentinel so the next cold-start can distinguish our own sentinels
+  // from those left behind by a previous (now-suspended) SW. `await`ing
+  // orphanCleanupPromise in `start()` is the primary race guard; the
+  // instance id is belt-and-braces for pathological interleavings (e.g.
+  // cold-start re-running in one SW lifetime due to HMR / double-import).
+  const swInstanceId =
+    typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function'
+      ? crypto.randomUUID()
+      : `sw-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
+
+  // 1.13 — Orphan-cleanup pass. Reads all run sentinels left by a prior
+  // SW instance (swInstanceId mismatch) and, for those whose last-
+  // recorded state was queued/running, broadcasts a failed FLOW_RUN_STATUS
+  // with the `sw-suspended-during-run` error code so sidepanel can show
+  // the run as failed instead of leaving it stuck on "running". Terminal-
+  // state sentinels (succeeded/failed/cancelled — left from a finalize
+  // whose remove() was lost to an SW-suspend race) are cleaned silently
+  // without a broadcast. `start()` awaits this promise before writing a
+  // fresh sentinel so a new run cannot be swept by in-progress cleanup.
+  const buildSuspendedStatus = (sentinel: RunSentinel): FlowRunStatusPayload => ({
+    runId: sentinel.runId,
+    flowId: sentinel.flowId,
+    siteKey: sentinel.siteKey,
+    tabId: sentinel.tabId,
+    state: 'failed',
+    currentStepId: sentinel.currentStepId,
+    progress: {
+      completedSteps: sentinel.completedSteps,
+      totalSteps: sentinel.totalSteps,
+    },
+    error: {
+      code: SW_SUSPENDED_ERROR_CODE,
+      message: 'Browser suspended the background worker during this run.',
+      phase: 'execute',
+      recoverable: false,
+    },
+    startedAt: sentinel.startedAt,
+    endedAt: Date.now(),
+    activeUrl: sentinel.activeUrl,
+    logs: [],
+  });
+
+  const orphanCleanupPromise: Promise<void> = (async () => {
+    try {
+      const { orphans, strayKeys } = await readOrphanSentinels(swInstanceId);
+      const toRemove: string[] = [...strayKeys];
+      const pendingFailurePayloads: FlowRunStatusPayload[] = [];
+      for (const sentinel of orphans) {
+        toRemove.push(sentinelKeyForRunId(sentinel.runId));
+        if (sentinel.state !== 'queued' && sentinel.state !== 'running') {
+          // Terminal sentinel left by a prior SW whose finalize remove()
+          // didn't land — clean silently, don't ghost-broadcast.
+          continue;
+        }
+        const payload = buildSuspendedStatus(sentinel);
+        // Live-listener path (may be dropped if no sidepanel is open).
+        safeBroadcast({
+          type: MessageType.FLOW_RUN_STATUS,
+          data: payload,
+          forwarded: true,
+        } satisfies RuntimeMessage);
+        // Persistent pull path: sidepanel mounting later will drain this
+        // queue via FLOW_RUN_PENDING_FAILURES_QUERY and render the same
+        // failure, so the revival notice is never silently lost.
+        pendingFailurePayloads.push(payload);
+      }
+      if (pendingFailurePayloads.length > 0) {
+        await appendPendingFailureNotices(pendingFailurePayloads);
+      }
+      if (toRemove.length > 0) {
+        await removeSentinelKeys(toRemove);
+      }
+    } catch (error) {
+      console.warn('orphan-cleanup-failed', error);
+    }
+  })();
+
+  const flowRunnerManager = new FlowRunnerManager({
+    runtime,
+    tabBridge,
+    swInstanceId,
+    orphanCleanupPromise,
+  });
   const isElementInjectionMessage = (type: RuntimeMessage['type']) =>
     type === MessageType.CREATE_ELEMENT ||
     type === MessageType.UPDATE_ELEMENT ||
@@ -317,6 +410,16 @@ export const bootstrapBackground = () => {
         void respondPromise(async () => {
           await setAllSitesDataInSw(message.data.sites);
           return { ok: true };
+        });
+        return true;
+      }
+      // 1.13 — sidepanel drains any orphan-failure notices the SW stashed
+      // during cold-start. Read-and-clear: once drained, the next query
+      // sees an empty list so the same notice is never replayed twice.
+      case MessageType.FLOW_RUN_PENDING_FAILURES_QUERY: {
+        void respondPromise(async () => {
+          const notices = (await takePendingFailureNotices()) as FlowRunStatusPayload[];
+          return { ok: true, data: { notifications: notices } };
         });
         return true;
       }

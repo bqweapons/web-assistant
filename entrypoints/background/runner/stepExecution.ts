@@ -27,6 +27,7 @@ import { JsTransformExecutor } from './jsTransformExecutor';
 // realm, no message round-trip). Sidepanel / content code uses
 // `shared/secretsClient.ts` instead.
 import { resolveSecretTokens, unlockSecretsVault } from '../secretsVault';
+import { removeRunSentinel, writeRunSentinel, type RunSentinel } from './runSentinel';
 import {
   getRenderedStepFieldValue,
   getStepField,
@@ -264,6 +265,16 @@ type FlowRunnerManagerOptions = {
   };
   tabBridge: TabBridge;
   statusThrottleMs?: number;
+  // 1.13 — unique marker for this SW lifetime. Stamped into every run
+  // sentinel so next cold-start's orphan-cleanup can distinguish our own
+  // sentinels from those left behind by a previous suspended SW.
+  swInstanceId?: string;
+  // 1.13 — promise that resolves once bootstrap's orphan-cleanup pass has
+  // finished. `start()` awaits this before writing a new sentinel, so a
+  // fresh sentinel is never in storage at the instant cleanup enumerates
+  // keys. Defaults to an already-resolved promise when absent (tests /
+  // standalone construction).
+  orphanCleanupPromise?: Promise<void>;
 };
 
 type PendingStepRequest = {
@@ -292,10 +303,17 @@ export class FlowRunnerManager {
 
   private stepRequestSequence = 0;
 
+  // 1.13 — see FlowRunnerManagerOptions comments.
+  private readonly swInstanceId: string;
+  private readonly orphanCleanupPromise: Promise<void>;
+
   constructor(options: FlowRunnerManagerOptions) {
     this.runtime = options.runtime;
     this.tabBridge = options.tabBridge;
     this.statusThrottleMs = options.statusThrottleMs ?? STATUS_THROTTLE_MS;
+    this.swInstanceId =
+      options.swInstanceId ?? `sw-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
+    this.orphanCleanupPromise = options.orphanCleanupPromise ?? Promise.resolve();
   }
 
   async start(payload: FlowRunStartPayload, options?: { targetFrameId?: number }) {
@@ -360,6 +378,12 @@ export class FlowRunnerManager {
       }
     }
 
+    // 1.13 — Wait for bootstrap's orphan-cleanup pass to finish before
+    // writing this run's sentinel. Cleanup reads all keys synchronously in
+    // one pass; once awaited here, any later write is guaranteed not to
+    // race against an in-flight cleanup read.
+    await this.orphanCleanupPromise;
+
     const now = Date.now();
     const runId = `run-${now}-${Math.random().toString(36).slice(2, 8)}`;
     const run: FlowRunInternal = {
@@ -387,10 +411,36 @@ export class FlowRunnerManager {
     };
     this.runs.set(runId, run);
     this.activeRunByTab.set(tabId, runId);
+    // 1.13 — persist initial sentinel so a suspended-then-revived SW can
+    // detect this run as orphaned.
+    this.refreshRunSentinel(run);
     this.appendLog(run, 'info', `Run queued for flow "${flow.name || flow.id}".`);
     this.emitStatus(run, true);
     void this.executeRun(run);
     return { runId };
+  }
+
+  // 1.13 — Write the current run state to chrome.storage.session. Called
+  // at run start, on step transitions (`executeSteps`), after each step
+  // completion (`markStepCompleted`), and once more at `finalizeRun` with
+  // the terminal state so the orphan-cleanup pass can silently skip
+  // already-finalized runs even if the subsequent delete is lost to an
+  // SW-suspend race. Fire-and-forget: errors logged, not surfaced.
+  private refreshRunSentinel(run: FlowRunInternal) {
+    const sentinel: RunSentinel = {
+      runId: run.runId,
+      flowId: run.flow.id,
+      tabId: run.tabId,
+      siteKey: run.siteKey,
+      startedAt: run.startedAt,
+      totalSteps: run.progress.totalSteps,
+      completedSteps: run.progress.completedSteps,
+      currentStepId: run.currentStepId,
+      state: run.state,
+      activeUrl: run.activeUrl,
+      swInstanceId: this.swInstanceId,
+    };
+    writeRunSentinel(sentinel);
   }
 
   stop(runId: string) {
@@ -955,6 +1005,16 @@ export class FlowRunnerManager {
     }
     this.appendLog(run, 'info', `finalize: run ${state}`);
     this.releaseActiveRun(run);
+    // 1.13 — delete the run sentinel IMMEDIATELY on finalize, NOT inside
+    // scheduleCleanup (60s delay). Putting the remove in scheduleCleanup
+    // would leave an already-terminal run observable as an orphan if the
+    // SW suspended during that 60s window — next cold-start would
+    // broadcast a ghost failed FLOW_RUN_STATUS for a run the user already
+    // saw complete. We first write the terminal state to the sentinel so
+    // even if the delete IPC is lost to an SW-suspend race, orphan
+    // cleanup sees state != queued/running and skips broadcast.
+    this.refreshRunSentinel(run);
+    removeRunSentinel(run.runId);
     this.emitStatus(run, true);
     this.scheduleCleanup(run);
   }
@@ -964,11 +1024,16 @@ export class FlowRunnerManager {
     if (run.progress.completedSteps > run.progress.totalSteps) {
       run.progress.totalSteps = run.progress.completedSteps;
     }
+    // 1.13 — keep sentinel progress roughly current; orphan status can
+    // show "stopped at step N of M" instead of "N of 0".
+    this.refreshRunSentinel(run);
     this.emitStatus(run, true);
   }
 
   private async executeRun(run: FlowRunInternal) {
     run.state = 'running';
+    // 1.13 — state transition queued→running; update sentinel.
+    this.refreshRunSentinel(run);
     this.appendLog(run, 'info', 'Run started.');
     this.emitStatus(run, true);
     try {
@@ -1023,6 +1088,9 @@ export class FlowRunnerManager {
     for (const step of steps) {
       this.ensureRunHealthy(run);
       run.currentStepId = step.id;
+      // 1.13 — refresh sentinel so orphan broadcast can name the step the
+      // run was paused on.
+      this.refreshRunSentinel(run);
       this.appendLog(run, 'info', `Start step: ${step.type} (${step.id}).`, {
         stepId: step.id,
         stepType: step.type as FlowRunLogEntry['stepType'],
@@ -2015,6 +2083,10 @@ export class FlowRunnerManager {
     if (parsed.rows.length !== parsed.estimatedRows && parsed.rowStepWeight > 0) {
       const delta = (parsed.rows.length - parsed.estimatedRows) * parsed.rowStepWeight;
       run.progress.totalSteps = Math.max(run.progress.completedSteps, run.progress.totalSteps + delta);
+      // 1.13 — data-source rows may differ from the static estimate;
+      // keep sentinel totalSteps in sync so an orphan-failed status after
+      // a mid-flight suspension reports the right step count.
+      this.refreshRunSentinel(run);
       this.emitStatus(run, false);
     }
     for (let index = 0; index < parsed.rows.length; index += 1) {

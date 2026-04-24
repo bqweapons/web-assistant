@@ -101,6 +101,12 @@ export const formatRunnerError = (code?: string, message?: string) => {
       'Variable names must start with a letter or underscore and use only letters, numbers, or underscores.',
     );
   }
+  if (code === 'sw-suspended-during-run') {
+    return t(
+      'sidepanel_flow_runner_error_sw_suspended_during_run',
+      'The browser suspended the background task during this run. The flow was stopped. Please run it again.',
+    );
+  }
   return message || code || t('sidepanel_flow_runner_error_unknown', 'Flow run failed.');
 };
 
@@ -223,6 +229,56 @@ export const useFlowRunner = (flows: FlowRecord[]): UseFlowRunnerResult => {
     };
     runtime.onMessage.addListener(handleRuntimeMessage);
     return () => runtime.onMessage.removeListener(handleRuntimeMessage);
+  }, []);
+
+  // 1.13 — On mount, drain any orphan-failure notices the SW stashed
+  // during cold-start. Without this, the live FLOW_RUN_STATUS broadcast
+  // in orphan cleanup is lost whenever the sidepanel isn't already open
+  // at the instant of SW revival — the intended revival notice would
+  // never reach the user. Drain-on-query: each notice is delivered
+  // exactly once; a subsequent live FLOW_RUN_STATUS from a new run will
+  // overwrite `runStatus` as usual.
+  useEffect(() => {
+    let cancelled = false;
+    void (async () => {
+      try {
+        const response = await sendRuntimeMessage({
+          type: MessageType.FLOW_RUN_PENDING_FAILURES_QUERY,
+        });
+        if (cancelled) {
+          return;
+        }
+        // `sendRuntimeMessage` unwraps the `{ ok, data }` envelope and
+        // resolves with `data` directly (shared/runtimeMessaging.ts:28–30),
+        // so the notifications array sits at the top level here. Reading
+        // `response.data.notifications` would double-unwrap and always be
+        // undefined — that's the bug this effect exists to avoid.
+        const notifications = (response as { notifications?: FlowRunStatusPayload[] })
+          ?.notifications;
+        if (!Array.isArray(notifications) || notifications.length === 0) {
+          return;
+        }
+        // Pick the most-recent by endedAt so if multiple orphans
+        // accumulated (laptop slept several times without a sidepanel
+        // open), we render the latest failure.
+        const latest = notifications.reduce((acc, item) =>
+          (item?.endedAt ?? 0) > (acc?.endedAt ?? 0) ? item : acc,
+        );
+        setRunStatus((prev) => {
+          // If a live FLOW_RUN_STATUS has already populated runStatus
+          // with a newer run (endedAt / startedAt later), keep that.
+          if (prev && (prev.startedAt ?? 0) > (latest.startedAt ?? 0)) {
+            return prev;
+          }
+          return latest;
+        });
+      } catch (error) {
+        console.warn('flow-run-pending-failures-query-failed', error);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   const startFlowRun = useCallback(async (flow: FlowRecord, source: FlowRunStartSource) => {

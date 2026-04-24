@@ -1472,6 +1472,9 @@
   "sidepanel_flow_runner_error_secret_vault_unlock_interrupted": {
     "message": "ページの再読み込みまたは移動により保管庫解除が中断されました。フローを再実行してください。"
   },
+  "sidepanel_flow_runner_error_sw_suspended_during_run": {
+    "message": "バックグラウンドタスクが実行中に停止されました。フローが中断されたため、再度実行してください。"
+  },
   "sidepanel_flow_input_secret_bound_missing": {
     "message": "紐付け済みのパスワードが保管庫に見つかりません: {name}。別のパスワードを選択するか、新しく作成して再度紐付けしてください。"
   },

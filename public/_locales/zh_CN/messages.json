@@ -1472,6 +1472,9 @@
   "sidepanel_flow_runner_error_secret_vault_unlock_interrupted": {
     "message": "页面刷新或跳转导致保管库解锁中断，请重新运行流程。"
   },
+  "sidepanel_flow_runner_error_sw_suspended_during_run": {
+    "message": "浏览器在流程运行期间挂起了后台任务，该流程已停止，请重新运行。"
+  },
   "sidepanel_flow_input_secret_bound_missing": {
     "message": "已绑定的密码在保管库中不存在：{name}。请选择或新建一个密码后重新绑定。"
   },
