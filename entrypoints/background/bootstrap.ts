@@ -310,8 +310,35 @@ export const bootstrapBackground = () => {
       }
       case MessageType.START_FLOW_RUN: {
         void respondPromise(async () => {
+          // F1-fix — the run-level `targetFrameId` is a pre-F1 override
+          // meant for "flow was triggered from inside an iframe" (e.g.
+          // an injected button in an iframe): the entire run then runs
+          // in that iframe without per-step probing. Two earlier bugs
+          // hid inside this call:
+          //   (a) sidepanel-initiated flows also carry `sender.frameId
+          //       === 0` (the sidepanel's own extension-page frame),
+          //       so the override was accidentally set to 0 for every
+          //       sidepanel Run click. resolveStepTargetFrame's first
+          //       rule returns `run.targetFrameId` as-is, so probe was
+          //       skipped and every step went to the top frame — the
+          //       iframe flow step feature was broken by default.
+          //   (b) a top-frame button (frameId === 0) would also set
+          //       the override to 0 and disable probe, which is not
+          //       what "user pressed a top-frame button" implies.
+          // Fix: only treat this as a real override when the message
+          // came from a tab's content script (`sender.tab.id` set)
+          // AND the frame is actually an iframe (`frameId > 0`). All
+          // other cases go through per-step frame resolution.
+          const senderFrameId = sender?.frameId;
+          const senderTabId = sender?.tab?.id;
+          const targetFrameId =
+            typeof senderTabId === 'number' &&
+            typeof senderFrameId === 'number' &&
+            senderFrameId > 0
+              ? senderFrameId
+              : undefined;
           const result = await flowRunnerManager.start(message.data, {
-            targetFrameId: typeof sender?.frameId === 'number' ? sender.frameId : undefined,
+            targetFrameId,
           });
           return { ok: true, data: result };
         });

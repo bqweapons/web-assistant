@@ -1736,9 +1736,12 @@ export class FlowRunnerManager {
   // to the existing top-frame-only default behavior.
   //
   // Precedence:
-  //   1. `run.targetFrameId` (run-level override set at START_FLOW_RUN
-  //      time from sender.frameId; e.g. a flow launched from inside an
-  //      iframe's injected button) — returned as-is, no probe.
+  //   1. `run.targetFrameId` (run-level override). Bootstrap only sets
+  //      this when the flow was actually triggered from inside a tab
+  //      iframe (sender.tab.id present AND sender.frameId > 0). A
+  //      sidepanel Run click or a top-frame injected-button click
+  //      both fall through to per-step resolution — treating either
+  //      of those as a run-pinned override was an earlier F1 bug.
   //   2. Payload has no selector — nothing to probe for; return
   //      undefined so dispatch stays top-only (wait-time, navigate,
   //      set-variable without selector, etc.).
