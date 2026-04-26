@@ -9,7 +9,9 @@ import {
   type FlowRecordingEventPayload,
   type SelectorPickerAccept,
 } from '../../../shared/messages';
-import { getSiteData, setSiteData, STORAGE_KEY } from '../../../shared/storage';
+// 1.14 — write API moved to the message-based client.
+import { getSiteData, STORAGE_KEY } from '../../../shared/storage';
+import { setSiteData } from '../../../shared/siteStorageClient';
 import { deriveSiteKey } from '../../../shared/siteDataSchema';
 import type { FlowStepData } from '../../../shared/flowStepMigration';
 import { isSecretTokenValue } from '../../../shared/secrets';
@@ -26,7 +28,11 @@ type FlowsSectionProps = {
   hasActivePage?: boolean;
   createFlowOpen?: boolean;
   onCreateFlowClose?: () => void;
-  onStartPicker?: (accept: SelectorPickerAccept) => Promise<string | null>;
+  // F1 — Flow picker preserves iframe frame metadata so recorded/picked
+  // steps can persist `targetFrame.url` and replay into the right frame.
+  onStartPicker?: (
+    accept: SelectorPickerAccept,
+  ) => Promise<{ selector: string; frameUrl?: string } | null>;
 };
 
 type FlowSummaryActions = {

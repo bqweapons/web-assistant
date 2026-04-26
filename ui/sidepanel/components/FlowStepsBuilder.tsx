@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type ReactNode } from 'react';
+import { useRef, useState, type ReactNode } from 'react';
 import {
   Crosshair,
   ChevronRight,
@@ -20,6 +20,7 @@ import { buildStepSummary, getFieldValue, shouldShowField } from './flowSteps/su
 import { createInputStepWithValue, createStepTemplate } from './flowSteps/templates';
 import { StepFieldControl } from './flowSteps/fieldRenderer';
 import InputSecretValueControl from './flowSteps/InputSecretValueControl';
+import { formatFrameUrlForBadge } from './flowSteps/formatFrameUrlForBadge';
 import {
   FIELD_LABEL_KEYS,
   getConditionOperators,
@@ -36,6 +37,7 @@ import {
   type StepTreeContext,
 } from './flowSteps/treeOps';
 import type { StepData, StepField } from './flowSteps/types';
+import { useFlowStepsDraft } from '../hooks/useFlowStepsDraft';
 
 export type { StepData };
 
@@ -159,11 +161,21 @@ const collectAncestorTypes = (
   return null;
 };
 
+// F1 — Flow pickers return the selector + optional frame URL so a step
+// captured inside an iframe can persist its `targetFrame` locator. All
+// FlowStepsBuilder consumers use this shape (the selector-only picker
+// that elements/hidden pass around is already wrapped at App.tsx into
+// a frame-aware variant before reaching this component).
+export type FlowPickerResult = {
+  selector: string;
+  frameUrl?: string;
+};
+
 type FlowStepsBuilderProps = {
   steps?: StepData[];
   resetKey?: string | number;
   onChange?: (steps: StepData[]) => void;
-  onStartPicker?: (accept: SelectorPickerAccept) => Promise<string | null>;
+  onStartPicker?: (accept: SelectorPickerAccept) => Promise<FlowPickerResult | null>;
 };
 
 export default function FlowStepsBuilder({
@@ -189,7 +201,6 @@ export default function FlowStepsBuilder({
     navigate: t('sidepanel_step_navigate_label', 'Navigate'),
     assert: t('sidepanel_step_assert_label', 'Assert'),
   };
-  const [draftSteps, setDraftSteps] = useState<StepData[]>(steps);
   const [activeStepId, setActiveStepId] = useState('');
   const [activeFieldTarget, setActiveFieldTarget] = useState<{ stepId: string; fieldId: string } | null>(null);
   const [transformEditorTarget, setTransformEditorTarget] = useState<{
@@ -210,10 +221,24 @@ export default function FlowStepsBuilder({
         context: StepTreeContext;
       }
   >(null);
-  const syncingFromPropsRef = useRef(false);
-  const initializedRef = useRef(false);
-  const onChangeRef = useRef(onChange);
-  const appliedResetKeyRef = useRef<string | number | symbol>(Symbol('initial-reset'));
+  const { draftSteps, draftStepsRef, commitSteps } = useFlowStepsDraft({
+    steps,
+    resetKey,
+    onChange,
+    onStepsReplacedExternally: (next) => {
+      setActiveStepId((prev) => (prev && findStepById(next, prev) ? prev : ''));
+    },
+    onResetKeyChange: () => {
+      setActiveStepId('');
+      setActiveFieldTarget(null);
+      setTransformEditorTarget(null);
+      setVariablePickerTarget(null);
+      setInputValueModes({});
+      setCollapsedSteps({});
+      setCollapsedBranches({});
+      setDragState(null);
+    },
+  });
   const setFieldInputRef =
     (_stepId: string, _fieldId: string) => (_node: HTMLInputElement | HTMLTextAreaElement | null) => undefined;
   const templateOptions = { waitModes, conditionOperators };
@@ -257,43 +282,31 @@ export default function FlowStepsBuilder({
     return fallback;
   };
 
-  useEffect(() => {
-    onChangeRef.current = onChange;
-  }, [onChange]);
-
-  useEffect(() => {
-    if (typeof resetKey !== 'undefined') {
-      if (appliedResetKeyRef.current !== resetKey) {
-        appliedResetKeyRef.current = resetKey;
-      }
-    }
-    syncingFromPropsRef.current = true;
-    setDraftSteps(steps);
-    setActiveStepId((prev) => {
-      if (prev && findStepById(steps, prev)) {
-        return prev;
-      }
-      return '';
-    });
-    setTransformEditorTarget(null);
-    setVariablePickerTarget(null);
-  }, [resetKey, steps]);
-
-  useEffect(() => {
-    if (!initializedRef.current) {
-      initializedRef.current = true;
-      syncingFromPropsRef.current = false;
-      return;
-    }
-    if (syncingFromPropsRef.current) {
-      syncingFromPropsRef.current = false;
-      return;
-    }
-    onChangeRef.current?.(draftSteps);
-  }, [draftSteps]);
+  // F1 — Persist an iframe locator (or clear it) onto a step. Called
+  // by StepFieldControl after a picker result that carries frameUrl,
+  // and kept narrow: only toggles the `targetFrame` key, never mutates
+  // fields or summary. Passing `undefined` clears.
+  const updateStepTargetFrame = (stepId: string, frameUrl: string | undefined) => {
+    commitSteps((prev) =>
+      updateSteps(prev, stepId, (step) => {
+        if (!frameUrl) {
+          if (!step.targetFrame) {
+            return step;
+          }
+          const { targetFrame: _discarded, ...rest } = step;
+          void _discarded;
+          return rest;
+        }
+        if (step.targetFrame?.url === frameUrl) {
+          return step;
+        }
+        return { ...step, targetFrame: { url: frameUrl } };
+      }),
+    );
+  };
 
   const updateField = (stepId: string, fieldId: string, value: string) => {
-    setDraftSteps((prev) =>
+    commitSteps((prev) =>
       updateSteps(prev, stepId, (step) => {
         let nextFields = step.fields.map((field) =>
           field.id === fieldId ? { ...field, value } : field,
@@ -352,11 +365,11 @@ export default function FlowStepsBuilder({
   ) => {
     const newStep = createStepTemplate(type, templateOptions);
     if (target.scope === 'root') {
-      setDraftSteps((prev) => [...prev, newStep]);
+      commitSteps((prev) => [...prev, newStep]);
       setActiveStepId(newStep.id);
       return;
     }
-    setDraftSteps((prev) =>
+    commitSteps((prev) =>
       updateSteps(prev, target.stepId, (step) => {
         if (target.scope === 'children') {
           const nextChildren = [...(step.children ?? []), newStep];
@@ -379,16 +392,9 @@ export default function FlowStepsBuilder({
   };
 
   const handleDeleteStep = (stepId: string) => {
-    setDraftSteps((prev) => {
-      const next = removeStepById(prev, stepId);
-      setActiveStepId((current) => {
-        if (current && findStepById(next, current)) {
-          return current;
-        }
-        return '';
-      });
-      return next;
-    });
+    commitSteps((prev) => removeStepById(prev, stepId));
+    const nextSteps = draftStepsRef.current;
+    setActiveStepId((current) => (current && findStepById(nextSteps, current) ? current : ''));
     setTransformEditorTarget((prev) => (prev?.stepId === stepId ? null : prev));
     setVariablePickerTarget((prev) => (prev?.stepId === stepId ? null : prev));
   };
@@ -413,7 +419,7 @@ export default function FlowStepsBuilder({
     }
     if (fallbackStepId) {
       const newStep = createInputStepWithValue(token, templateOptions);
-      setDraftSteps((prev) => {
+      commitSteps((prev) => {
         if (!findStepById(prev, fallbackStepId)) {
           return prev;
         }
@@ -430,14 +436,12 @@ export default function FlowStepsBuilder({
       setActiveFieldTarget(null);
       return;
     }
-    setDraftSteps((prev) => {
-      const target = activeFieldTarget;
-      if (!target) {
-        return prev;
-      }
-      setActiveFieldTarget(target);
-      setActiveStepId(target.stepId);
-      return updateSteps(prev, target.stepId, (step) => {
+    const target = activeFieldTarget;
+    if (!target) {
+      return;
+    }
+    commitSteps((prev) =>
+      updateSteps(prev, target.stepId, (step) => {
         const nextFields = step.fields.map((field) => {
           if (field.id !== target.fieldId) {
             return field;
@@ -447,12 +451,13 @@ export default function FlowStepsBuilder({
         });
         const nextStep = { ...step, fields: nextFields };
         return { ...nextStep, summary: summarizeStep(nextStep) };
-      });
-    });
+      }),
+    );
+    setActiveStepId(target.stepId);
   };
 
   const insertInputValueShortcut = (stepId: string, fieldId: string, token: string) => {
-    setDraftSteps((prev) =>
+    commitSteps((prev) =>
       updateSteps(prev, stepId, (step) => {
         const nextFields = step.fields.map((field) => {
           if (field.id !== fieldId) {
@@ -554,7 +559,7 @@ export default function FlowStepsBuilder({
       current: NonNullable<StepField['transform']> | undefined,
     ) => StepField['transform'] | undefined,
   ) => {
-    setDraftSteps((prev) =>
+    commitSteps((prev) =>
       updateSteps(prev, stepId, (step) => {
         const nextFields = step.fields.map((field) => {
           if (field.id !== fieldId) {
@@ -611,7 +616,7 @@ export default function FlowStepsBuilder({
     const reader = new FileReader();
     reader.onload = () => {
       const text = typeof reader.result === 'string' ? reader.result : '';
-      setDraftSteps((prev) => {
+      commitSteps((prev) => {
         const step = findStepById(prev, stepId);
         if (!step) {
           return prev;
@@ -663,7 +668,7 @@ export default function FlowStepsBuilder({
           if (!dragState || !listContext || !canDropHere || dragState.stepId === step.id) {
             return;
           }
-          setDraftSteps((prev) => reorderWithinContext(prev, listContext, dragState.stepId, step.id));
+          commitSteps((prev) => reorderWithinContext(prev, listContext, dragState.stepId, step.id));
           setDragState(null);
         };
         return (
@@ -687,51 +692,81 @@ export default function FlowStepsBuilder({
               handleDrop();
             }}
           >
+            {/* 2.9 — flattened: previously this row was a single
+                role="button" div with a real <button> (delete) nested
+                inside. ARIA forbids interactive-in-interactive, and the
+                stopPropagation hack only papered over the click-bubble
+                problem (screen readers still announced two buttons). Now
+                two sibling <button>s in a flex row; the activate button
+                carries the draggable + onDragStart/End. Native <button>
+                handles Enter/Space activation, so the prior onKeyDown is
+                gone. Style note: the activate button resets default
+                user-agent `<button>` border/background (`border-0
+                bg-transparent` plus `appearance-none`) so the row still
+                reads as a single card surface — skipping this reset
+                caused a visible button-shape regression where the
+                activate area rendered like a raised button inside the
+                card. */}
+            {/* 2.9 — bg layer lives on the WRAPPER, not the activate
+                button: the trash button is a flex sibling of the activate
+                button, so putting hover/active bg on the activate button
+                would leave the trash button's 32×32 area outside the
+                highlight. Wrapper rounded-lg matches the card shell so
+                corners align. */}
             <div
-              role="button"
-              tabIndex={0}
-              className={`group flex w-full cursor-pointer items-center gap-2 rounded-lg px-3 py-2 text-left text-xs transition ${
-                isActive ? 'bg-primary/10 text-foreground' : 'text-muted-foreground'
+              className={`group flex items-center rounded-lg transition ${
+                isActive
+                  ? 'bg-primary/10 hover:bg-primary/15'
+                  : 'hover:bg-accent/50'
               }`}
-              onClick={() => setActiveStepId(isActive ? '' : step.id)}
-              onKeyDown={(event) => {
-                if (event.key === 'Enter' || event.key === ' ') {
-                  event.preventDefault();
-                  setActiveStepId(isActive ? '' : step.id);
-                }
-              }}
-              draggable={Boolean(listContext)}
-              onDragStart={(event) => {
-                if (!listContext) {
-                  return;
-                }
-                event.dataTransfer.effectAllowed = 'move';
-                event.dataTransfer.setData('text/plain', step.id);
-                setDragState({ stepId: step.id, context: listContext });
-              }}
-              onDragEnd={() => setDragState(null)}
             >
-              <GripVertical className="h-3.5 w-3.5 text-muted-foreground" />
-              <div className="min-w-0 flex-1">
-                <div className="flex min-w-0 items-center gap-2">
-                  <span className="inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-full border border-border bg-muted text-[10px] font-semibold text-foreground">
-                    {index + 1}
-                  </span>
-                  <p className="min-w-0 truncate text-xs font-semibold text-foreground">{step.title}</p>
-                  <span className="badge-pill shrink-0 text-[9px] uppercase tracking-wide">{typeLabel}</span>
-                </div>
-                <p className="mt-1 min-w-0 max-w-full break-all text-[11px] text-muted-foreground">
-                  {step.summary}
-                </p>
-              </div>
               <button
                 type="button"
-                className="btn-icon btn-icon-danger ml-auto h-8 w-8 opacity-0 transition-opacity group-hover:opacity-100"
-                aria-label={t('sidepanel_steps_delete', 'Delete step')}
-                onClick={(event) => {
-                  event.stopPropagation();
-                  handleDeleteStep(step.id);
+                className={`flex min-w-0 flex-1 cursor-pointer appearance-none items-center gap-2 rounded-lg border-0 bg-transparent px-3 py-2 text-left text-xs transition ${
+                  isActive ? 'text-foreground' : 'text-muted-foreground'
+                }`}
+                onClick={() => setActiveStepId(isActive ? '' : step.id)}
+                draggable={Boolean(listContext)}
+                onDragStart={(event) => {
+                  if (!listContext) {
+                    return;
+                  }
+                  event.dataTransfer.effectAllowed = 'move';
+                  event.dataTransfer.setData('text/plain', step.id);
+                  setDragState({ stepId: step.id, context: listContext });
                 }}
+                onDragEnd={() => setDragState(null)}
+              >
+                <GripVertical className="h-3.5 w-3.5 text-muted-foreground" />
+                <div className="min-w-0 flex-1">
+                  <div className="flex min-w-0 items-center gap-2">
+                    <span className="inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-full border border-border bg-muted text-[10px] font-semibold text-foreground">
+                      {index + 1}
+                    </span>
+                    <p className="min-w-0 truncate text-xs font-semibold text-foreground">{step.title}</p>
+                    <span className="badge-pill shrink-0 text-[9px] uppercase tracking-wide">{typeLabel}</span>
+                  </div>
+                  <p className="mt-1 min-w-0 max-w-full break-all text-[11px] text-muted-foreground">
+                    {step.summary}
+                  </p>
+                  {step.targetFrame?.url ? (
+                    <p
+                      className="mt-1 min-w-0 max-w-full truncate text-[10px] text-muted-foreground/80"
+                      title={step.targetFrame.url}
+                    >
+                      {t('sidepanel_steps_iframe_badge', 'iframe: {url}').replace(
+                        '{url}',
+                        formatFrameUrlForBadge(step.targetFrame.url),
+                      )}
+                    </p>
+                  ) : null}
+                </div>
+              </button>
+              <button
+                type="button"
+                className="btn-icon btn-icon-danger mr-3 h-8 w-8 shrink-0 opacity-0 transition-opacity group-hover:opacity-100"
+                aria-label={t('sidepanel_steps_delete', 'Delete step')}
+                onClick={() => handleDeleteStep(step.id)}
               >
                 <Trash2 className="h-3.5 w-3.5" />
               </button>
@@ -1121,6 +1156,7 @@ export default function FlowStepsBuilder({
                                   setFieldInputRef={setFieldInputRef}
                                   onFocusField={(stepId, fieldId) => setActiveFieldTarget({ stepId, fieldId })}
                                   onStartPicker={onStartPicker}
+                                  onUpdateStepTargetFrame={updateStepTargetFrame}
                                 />
                               );
                             })()}
@@ -1215,6 +1251,7 @@ export default function FlowStepsBuilder({
                               setFieldInputRef={setFieldInputRef}
                               onFocusField={(stepId, fieldId) => setActiveFieldTarget({ stepId, fieldId })}
                               onStartPicker={onStartPicker}
+                              onUpdateStepTargetFrame={updateStepTargetFrame}
                             />
                           </div>
                         </label>,
@@ -1456,7 +1493,7 @@ export default function FlowStepsBuilder({
             if (!dragState || !dropContext) {
               return;
             }
-            setDraftSteps((prev) => reorderWithinContext(prev, dropContext, dragState.stepId));
+            commitSteps((prev) => reorderWithinContext(prev, dropContext, dragState.stepId));
             setDragState(null);
           }}
         />

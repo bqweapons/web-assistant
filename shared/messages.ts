@@ -1,5 +1,6 @@
 import type { FlowStepData } from './flowStepMigration';
-import type { StructuredElementRecord } from './siteDataSchema';
+import type { StructuredElementRecord, StructuredSiteData } from './siteDataSchema';
+import type { SecretVaultStatus, SecretVaultTransferPayload } from './secrets';
 
 export const MessageType = {
   START_PICKER: 'START_PICKER',
@@ -27,7 +28,48 @@ export const MessageType = {
   FLOW_RUN_STATUS: 'FLOW_RUN_STATUS',
   FLOW_RUN_EXECUTE_STEP: 'FLOW_RUN_EXECUTE_STEP',
   FLOW_RUN_STEP_RESULT: 'FLOW_RUN_STEP_RESULT',
-  FLOW_RUN_VAULT_UNLOCK_PROMPT: 'FLOW_RUN_VAULT_UNLOCK_PROMPT',
+  // 1.4 — Vault unlock coordination between the extension-origin
+  // unlock window, the SW, and the runner. Replaces the retired
+  // `FLOW_RUN_VAULT_UNLOCK_PROMPT` page-facing message: the master
+  // password must never transit through page DOM. See 1.4-spec.md.
+  FLOW_RUN_UNLOCK_CONTEXT: 'FLOW_RUN_UNLOCK_CONTEXT',
+  FLOW_RUN_UNLOCK_SUBMIT: 'FLOW_RUN_UNLOCK_SUBMIT',
+  FLOW_RUN_UNLOCK_CANCEL: 'FLOW_RUN_UNLOCK_CANCEL',
+  // 1.1 — sidepanel vault operations routed through the SW so the AES key
+  // stays in SW memory only. Background owns the key; sidepanel is a pure
+  // client. See `shared/secretsClient.ts` for the sidepanel wrapper and
+  // `entrypoints/background/secretsVault.ts` for the SW-side state.
+  SECRETS_STATUS: 'SECRETS_STATUS',
+  SECRETS_UNLOCK: 'SECRETS_UNLOCK',
+  SECRETS_LOCK: 'SECRETS_LOCK',
+  SECRETS_RESET: 'SECRETS_RESET',
+  SECRETS_RESOLVE: 'SECRETS_RESOLVE',
+  SECRETS_UPSERT: 'SECRETS_UPSERT',
+  SECRETS_DELETE: 'SECRETS_DELETE',
+  SECRETS_EXPORT_TRANSFER: 'SECRETS_EXPORT_TRANSFER',
+  SECRETS_IMPORT_TRANSFER: 'SECRETS_IMPORT_TRANSFER',
+  // 1.14 — sidepanel write operations routed through the SW so that the
+  // persisted-write path lives in a single realm with a single serialized
+  // queue. Sidepanel (and any other non-SW caller) reaches these via
+  // `shared/siteStorageClient.ts`; the SW owns the writer module at
+  // `entrypoints/background/siteStorage.ts`. Content scripts remain
+  // read-only and no longer trigger writebacks (they run in the host page
+  // origin, which `navigator.locks` cannot coordinate with chrome-extension
+  // origin — structurally removing the write capability is the correct
+  // fix, not trying to serialize a cross-origin race).
+  SITES_SET_SITE: 'SITES_SET_SITE',
+  SITES_SET_ALL: 'SITES_SET_ALL',
+  // 1.13 — sidepanel-initiated query for run-failure notices that the SW
+  // synthesized during cold-start orphan cleanup. Orphan broadcast alone
+  // is lossy when the sidepanel isn't open; this pull channel lets a
+  // sidepanel mounting later drain the queue and render the failure.
+  // Response: `{ ok: true, data: { notifications: FlowRunStatusPayload[] } }`.
+  FLOW_RUN_PENDING_FAILURES_QUERY: 'FLOW_RUN_PENDING_FAILURES_QUERY',
+  // F1 — Per-step frame resolution. Runner broadcasts this to each
+  // known frame (via chrome.tabs.sendMessage with explicit frameId)
+  // right before dispatching a selector-carrying atomic step. Each
+  // content listener replies with `{matched}`; runner picks the winner.
+  FLOW_RUN_FRAME_PROBE: 'FLOW_RUN_FRAME_PROBE',
 } as const;
 
 export type MessageType = (typeof MessageType)[keyof typeof MessageType];
@@ -54,6 +96,12 @@ export type PickerResultPayload = {
   afterSelector?: string;
   containerId?: string;
   rect?: PickerRect;
+  // F1 — When the picker fires inside an iframe (window.top !== window),
+  // the content script stamps the frame's location.href here so the
+  // sidepanel can persist a step-level `targetFrame.url` locator and the
+  // runner can resolve it back to a frameId at dispatch time. Absent
+  // when the pick happened in the top frame.
+  frameUrl?: string;
 };
 
 export type PickerCancelledPayload = {
@@ -112,6 +160,25 @@ export type FlowRecordingEventPayload = {
   value?: string;
   inputKind?: 'text' | 'textarea' | 'select' | 'contenteditable' | 'password';
   message?: string;
+  // F1 — Non-top-frame origin of the captured event. Set iff the
+  // recorder firing this event was running inside an iframe
+  // (window.top !== window); the recording→step conversion writes this
+  // into step.targetFrame.url so replay can resolve the frame again.
+  frameUrl?: string;
+};
+
+// F1 — Frame-probe payloads. Sent to every frame of a tab as part of
+// per-step frame resolution (only when the step carries a selector and
+// there's no run-level targetFrameId override). Request is minimal
+// by design — the sender already knows each frame's URL from
+// webNavigation.getAllFrames, so the probe only needs to report back
+// whether the selector resolves to a node in that frame's document.
+export type FlowRunFrameProbeRequest = {
+  selector: string;
+};
+
+export type FlowRunFrameProbeResult = {
+  matched: boolean;
 };
 
 export type FlowRecordingStatusPayload = {
@@ -121,7 +188,13 @@ export type FlowRecordingStatusPayload = {
   url?: string;
 };
 
-export type FlowRunState = 'queued' | 'running' | 'succeeded' | 'failed' | 'cancelled';
+// 1.4 — `paused` is a first-class run state: the runner enters it
+// when a step hits `secret-vault-locked` and an extension-origin
+// unlock window is opened. Sidepanel renders this distinctly from
+// `running`, and the Run button is guarded against double-start.
+// Same `FlowRunState` value lands in the sentinel (1.13) so orphan
+// cleanup treats it as an unfinished interruptible state.
+export type FlowRunState = 'queued' | 'running' | 'paused' | 'succeeded' | 'failed' | 'cancelled';
 export type FlowRunStartSource = 'flows-list' | 'flow-drawer-save-run';
 export type FlowConditionOperator = 'contains' | 'equals' | 'greater' | 'less';
 export type FlowRunAtomicStepType = 'click' | 'input' | 'wait' | 'assert' | 'condition' | 'popup' | 'read';
@@ -227,27 +300,67 @@ export type FlowRunExecuteResultPayload = {
   stepId: string;
   stepType: FlowRunAtomicStepType;
   conditionMatched?: boolean;
+  // 1.6 taint signalling:
+  // - `read` step: `actual` IS returned (user may legitimately want the value
+  //   flowing into a subsequent step); `sensitive: true` marks it so the
+  //   runner must add the resulting variable to `taintedVariables`.
+  // - `condition`/`assert`/`wait-condition`: comparison happens in the
+  //   content script; `actual` is OMITTED (undefined) when `sensitive: true`
+  //   because nothing downstream needs it and keeping it would only add a
+  //   leak surface. `conditionMatched` stays complete.
   actual?: string;
+  sensitive?: boolean;
   details?: FlowRunExecutionDetails;
   error?: string;
   errorCode?: string;
 };
 
-export type FlowRunVaultUnlockPromptPayload = {
+// 1.4 — Vault unlock window coordination. The extension-origin
+// unlock surface (entrypoints/vaultUnlock/) queries context on mount,
+// submits the master password for verification, and can explicitly
+// cancel. The master password never enters page DOM — these messages
+// travel chrome-extension ↔ chrome-extension only.
+export type FlowRunUnlockContextRequest = {
   runId: string;
-  stepId: string;
-  stepTitle?: string;
-  flowName?: string;
-  siteKey?: string;
-  attempt: number;
-  errorMessage?: string;
-  reason: 'secret-vault-locked';
 };
 
-export type FlowRunVaultUnlockPromptResult =
-  | { action: 'submit'; password: string }
-  | { action: 'cancel' }
-  | { action: 'navigation' };
+export type FlowRunUnlockContextResponse =
+  | {
+      ok: true;
+      runId: string;
+      flowName: string | null;
+      stepTitle: string | null;
+      siteKey: string | null;
+      // 1-based, incremented on each wrong-password attempt. Displayed
+      // in the unlock window so the user can tell retries are landing.
+      attempt: number;
+      // Surfaces the most recent failure reason for UI display — e.g.
+      // 'Invalid master password'. Absent when the window mounts for
+      // the first time or after a successful retry reset.
+      lastErrorMessage?: string;
+    }
+  | {
+      ok: false;
+      code: 'run-not-pending';
+    };
+
+export type FlowRunUnlockSubmitRequest = {
+  runId: string;
+  password: string;
+};
+
+export type FlowRunUnlockSubmitResponse =
+  | { ok: true }
+  | { ok: false; code: 'invalid-password'; attempt: number }
+  | { ok: false; code: 'run-not-pending' };
+
+export type FlowRunUnlockCancelRequest = {
+  runId: string;
+};
+
+export type FlowRunUnlockCancelResponse = {
+  ok: true;
+};
 
 export type RuntimeMessage =
   | { type: typeof MessageType.START_PICKER; data?: PickerStartPayload; forwarded?: boolean; targetTabId?: number }
@@ -275,4 +388,45 @@ export type RuntimeMessage =
   | { type: typeof MessageType.FLOW_RUN_STATUS; data: FlowRunStatusPayload; forwarded?: boolean; targetTabId?: number }
   | { type: typeof MessageType.FLOW_RUN_EXECUTE_STEP; data: FlowRunExecuteStepPayload; forwarded?: boolean; targetTabId?: number }
   | { type: typeof MessageType.FLOW_RUN_STEP_RESULT; data: FlowRunExecuteResultPayload; forwarded?: boolean; targetTabId?: number }
-  | { type: typeof MessageType.FLOW_RUN_VAULT_UNLOCK_PROMPT; data: FlowRunVaultUnlockPromptPayload; forwarded?: boolean; targetTabId?: number };
+  | { type: typeof MessageType.FLOW_RUN_UNLOCK_CONTEXT; data: FlowRunUnlockContextRequest; forwarded?: boolean; targetTabId?: number }
+  | { type: typeof MessageType.FLOW_RUN_UNLOCK_SUBMIT; data: FlowRunUnlockSubmitRequest; forwarded?: boolean; targetTabId?: number }
+  | { type: typeof MessageType.FLOW_RUN_UNLOCK_CANCEL; data: FlowRunUnlockCancelRequest; forwarded?: boolean; targetTabId?: number }
+  // 1.1 — SECRETS_* messages. All responses go back via `{ ok: true, data }`
+  // (the common pattern in this module's `respondPromise` helper). `data`
+  // field here reflects the REQUEST payload only; response shapes are
+  // documented at the handler in `entrypoints/background/bootstrap.ts`
+  // and consumed in `shared/secretsClient.ts`.
+  | { type: typeof MessageType.SECRETS_STATUS; data?: undefined; forwarded?: boolean; targetTabId?: number }
+  | { type: typeof MessageType.SECRETS_UNLOCK; data: { password: string }; forwarded?: boolean; targetTabId?: number }
+  | { type: typeof MessageType.SECRETS_LOCK; data?: undefined; forwarded?: boolean; targetTabId?: number }
+  | { type: typeof MessageType.SECRETS_RESET; data?: undefined; forwarded?: boolean; targetTabId?: number }
+  | { type: typeof MessageType.SECRETS_RESOLVE; data: { name: string }; forwarded?: boolean; targetTabId?: number }
+  | { type: typeof MessageType.SECRETS_UPSERT; data: { name: string; value: string }; forwarded?: boolean; targetTabId?: number }
+  | { type: typeof MessageType.SECRETS_DELETE; data: { name: string }; forwarded?: boolean; targetTabId?: number }
+  | { type: typeof MessageType.SECRETS_EXPORT_TRANSFER; data: { password: string }; forwarded?: boolean; targetTabId?: number }
+  | { type: typeof MessageType.SECRETS_IMPORT_TRANSFER; data: { payload: SecretVaultTransferPayload; password: string }; forwarded?: boolean; targetTabId?: number }
+  // 1.14 — `data` shapes mirror the legacy `setSiteData` / `setAllSitesData`
+  // signatures so the client wrapper is a direct rename. Response is `{ ok: true }`
+  // with no data payload (void-equivalent); write errors (quota, storage) come
+  // back as `{ ok: false, error }` through `respondPromise`.
+  | { type: typeof MessageType.SITES_SET_SITE; data: { siteKey: string; data: Partial<StructuredSiteData> }; forwarded?: boolean; targetTabId?: number }
+  | { type: typeof MessageType.SITES_SET_ALL; data: { sites: Record<string, StructuredSiteData> }; forwarded?: boolean; targetTabId?: number }
+  | { type: typeof MessageType.FLOW_RUN_PENDING_FAILURES_QUERY; data?: undefined; forwarded?: boolean; targetTabId?: number }
+  | { type: typeof MessageType.FLOW_RUN_FRAME_PROBE; data: FlowRunFrameProbeRequest; forwarded?: boolean; targetTabId?: number };
+
+// 1.1 — response shape registry. Used by `shared/secretsClient.ts` to type
+// the resolved value from each `sendRuntimeMessage` call. Keeping this
+// separate from the RuntimeMessage union avoids making the union itself
+// carry response data, which would conflict with how the runtime wraps
+// everything in `{ ok, data, error }`.
+export type SecretsMessageResponse = {
+  [MessageType.SECRETS_STATUS]: SecretVaultStatus;
+  [MessageType.SECRETS_UNLOCK]: SecretVaultStatus;
+  [MessageType.SECRETS_LOCK]: { locked: true };
+  [MessageType.SECRETS_RESET]: SecretVaultStatus;
+  [MessageType.SECRETS_RESOLVE]: { value: string };
+  [MessageType.SECRETS_UPSERT]: SecretVaultStatus;
+  [MessageType.SECRETS_DELETE]: SecretVaultStatus;
+  [MessageType.SECRETS_EXPORT_TRANSFER]: SecretVaultTransferPayload | null;
+  [MessageType.SECRETS_IMPORT_TRANSFER]: SecretVaultStatus;
+};

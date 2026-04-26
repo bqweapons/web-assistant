@@ -1,5 +1,39 @@
 type JsonRecord = Record<string, unknown>;
 
+// 3.6 — Explicit version stamp on each FlowStepData. Absent (undefined / 0)
+// means "v0 legacy": the step was written before versioning existed and must
+// run through normalization. After normalization the step carries _v = 1
+// (CURRENT_STEP_VERSION). Future migrations increment this constant and add a
+// guard `if (step._v < N) { …apply migration N… step._v = N; }` before the
+// final bump to CURRENT_STEP_VERSION. The field is prefixed with _ to signal
+// that it is infrastructure metadata rather than user-visible content.
+export const CURRENT_STEP_VERSION = 1 as const;
+
+// 2.4 — Authoritative list of step `type` values that user-authored flows can
+// carry. Source of truth is `createStepTemplate` in ui templates.ts. Anything
+// else (including `__proto__`, `constructor`, or arbitrary legacy keys) is
+// rejected at import / normalization time; downstream `executeStep` would
+// fail at runtime anyway with `unsupported-step-type`, but dropping at the
+// boundary keeps storage clean and protects against future code paths that
+// might trust `step.type` without re-validating.
+// Intentionally excluded: `condition` and `read` are payload-level stepType
+// values the runner builds internally (see buildReadPayload, condition
+// payloads in buildAtomicPayload). Users never author them.
+const VALID_USER_STEP_TYPES = new Set<string>([
+  'click',
+  'input',
+  'wait',
+  'assert',
+  'popup',
+  'navigate',
+  'loop',
+  'if-else',
+  'data-source',
+  'set-variable',
+]);
+const isValidStepType = (value: unknown): value is string =>
+  typeof value === 'string' && VALID_USER_STEP_TYPES.has(value);
+
 export type FlowStepField = {
   id: string;
   label: string;
@@ -26,15 +60,29 @@ export type FlowDataSourceMeta = {
   rawText?: string;
 };
 
+// F1 — Optional frame locator persisted on a step. Populated by the
+// recorder / picker when the captured element lives inside an iframe;
+// resolved back to a concrete `frameId` at dispatch time via the
+// runner's `FLOW_RUN_FRAME_PROBE` pass. Field name is `url` (not
+// `frameUrl`) to line up with the existing element `context.frame.url`
+// shape and to leave room for future sibling fields without renaming.
+export type FlowStepTargetFrame = {
+  url: string;
+};
+
 export type FlowStepData = {
   id: string;
   type: string;
   title: string;
   summary: string;
   fields: FlowStepField[];
+  // 3.6 — Migration version stamp. Undefined / missing means v0 (pre-versioning).
+  // After normalization the value is always CURRENT_STEP_VERSION (= 1).
+  _v?: number;
   dataSource?: FlowDataSourceMeta;
   children?: FlowStepData[];
   branches?: Array<{ id: string; label: string; steps: FlowStepData[] }>;
+  targetFrame?: FlowStepTargetFrame;
 };
 
 export type NormalizeFlowStepsOptions = {
@@ -208,7 +256,11 @@ const normalizeSetVariableFields = (fields: FlowStepField[]): FlowStepField[] =>
 export const isFlowStepData = (value: unknown): value is FlowStepData =>
   isRecord(value) &&
   typeof value.id === 'string' &&
-  typeof value.type === 'string' &&
+  // 2.4 — reject unknown step types at the predicate level so both
+  // normalizeExistingFlowStep (which guards on isFlowStepData) and any other
+  // downstream gate refuses to accept e.g. `__proto__` or arbitrary legacy
+  // names. Keeps the storage invariant "every FlowStepData.type is runnable".
+  isValidStepType(value.type) &&
   typeof value.title === 'string' &&
   typeof value.summary === 'string' &&
   Array.isArray(value.fields) &&
@@ -229,6 +281,7 @@ const normalizeExistingFlowStep = (
     fields: raw.fields
       .map((field) => normalizeFlowStepField(field, idFactory))
       .filter((field): field is FlowStepField => Boolean(field)),
+    _v: CURRENT_STEP_VERSION,
   };
   if (normalized.type === 'set-variable') {
     normalized.fields = normalizeSetVariableFields(normalized.fields);
@@ -265,6 +318,15 @@ const normalizeExistingFlowStep = (
       normalized.branches = branches;
     }
   }
+  // F1 — preserve targetFrame through normalization. Structural check
+  // only: we trust the `url` string; the runner will probe frames at
+  // dispatch time and cope with stale / unreachable URLs there.
+  if (isRecord(raw.targetFrame) && typeof (raw.targetFrame as { url?: unknown }).url === 'string') {
+    const url = (raw.targetFrame as { url: string }).url.trim();
+    if (url) {
+      normalized.targetFrame = { url };
+    }
+  }
   if (isRecord(raw.dataSource)) {
     normalized.dataSource = {};
     if (typeof raw.dataSource.fileName === 'string') {
@@ -291,6 +353,18 @@ const normalizeExistingFlowStep = (
   return normalized;
 };
 
+// 3.6 — Wrap every return of `normalizeLegacyActionStep` so the version
+// stamp can never be forgotten on a new branch. Earlier revisions stamped
+// only the `input` branch and left set-variable / click / wait / navigate /
+// fallback as v0; future migrations keyed on `step._v < N` would have re-
+// migrated those steps as if they were still legacy. Centralizing the stamp
+// here keeps the invariant "every legacy-normalized step exits at
+// CURRENT_STEP_VERSION" mechanical instead of per-branch discipline.
+const stampLegacy = (step: FlowStepData): FlowStepData => ({
+  ...step,
+  _v: CURRENT_STEP_VERSION,
+});
+
 const normalizeLegacyActionStep = (
   raw: unknown,
   index: number,
@@ -299,7 +373,20 @@ const normalizeLegacyActionStep = (
   if (!isRecord(raw)) {
     return null;
   }
-  const type = typeof raw.type === 'string' && raw.type.trim() ? raw.type.trim() : 'step';
+  // 2.4 — Drop legacy steps with unknown types entirely instead of wrapping
+  // them in a generic "Legacy step" shell. The generic fallback used to
+  // accept any type string including `__proto__` / arbitrary garbage; that
+  // storage would later fail at runtime with `unsupported-step-type` anyway,
+  // so rejecting at import is both safer and cleaner (less zombie data).
+  // Historical aliases from older extension versions (open/goto → navigate)
+  // are normalized *before* the whitelist check so legit old data still
+  // imports cleanly.
+  const rawType = typeof raw.type === 'string' ? raw.type.trim() : '';
+  const canonicalType = rawType === 'open' || rawType === 'goto' ? 'navigate' : rawType;
+  if (!isValidStepType(canonicalType)) {
+    return null;
+  }
+  const type = canonicalType;
   const selector = asText(raw.selector);
   const stepId = `${flowId}-legacy-step-${index + 1}`;
   const baseFields: FlowStepField[] = [];
@@ -316,7 +403,7 @@ const normalizeLegacyActionStep = (
 
   if (type === 'input') {
     const value = asText(raw.value);
-    return {
+    return stampLegacy({
       id: stepId,
       type: 'input',
       title: 'Fill input',
@@ -330,7 +417,7 @@ const normalizeLegacyActionStep = (
           type: 'text',
         },
       ],
-    };
+    });
   }
 
   if (type === 'set-variable') {
@@ -338,7 +425,7 @@ const normalizeLegacyActionStep = (
     const value = asText(raw.value);
     const selectorValue = asText(raw.selector);
     const sourceMode = selectorValue ? 'selector' : 'value';
-    return {
+    return stampLegacy({
       id: stepId,
       type: 'set-variable',
       title: 'Set Variable',
@@ -376,7 +463,7 @@ const normalizeLegacyActionStep = (
           showWhen: { fieldId: 'sourceMode', value: 'value' },
         },
       ],
-    };
+    });
   }
 
   if (type === 'click') {
@@ -389,13 +476,13 @@ const normalizeLegacyActionStep = (
         type: 'checkbox',
       });
     }
-    return {
+    return stampLegacy({
       id: stepId,
       type: 'click',
       title: 'Click element',
       summary: buildLegacySummary('click', selector, ''),
       fields,
-    };
+    });
   }
 
   if (type === 'wait') {
@@ -426,18 +513,18 @@ const normalizeLegacyActionStep = (
         withPicker: true,
       });
     }
-    return {
+    return stampLegacy({
       id: stepId,
       type: 'wait',
       title: 'Wait',
       summary: buildLegacySummary('wait', selector, duration),
       fields,
-    };
+    });
   }
 
   if (type === 'navigate' || type === 'open' || type === 'goto') {
     const url = asText(raw.url || raw.href || raw.value);
-    return {
+    return stampLegacy({
       id: stepId,
       type: 'navigate',
       title: 'Navigate',
@@ -450,7 +537,7 @@ const normalizeLegacyActionStep = (
           type: 'text',
         },
       ],
-    };
+    });
   }
 
   const fallbackFields = Object.entries(raw)
@@ -463,13 +550,13 @@ const normalizeLegacyActionStep = (
     }))
     .filter((field) => field.value);
 
-  return {
+  return stampLegacy({
     id: stepId,
     type,
     title: type ? `Legacy ${type} step` : 'Legacy step',
     summary: buildLegacySummary(type, selector, ''),
     fields: fallbackFields,
-  };
+  });
 };
 
 export const normalizeFlowSteps = (

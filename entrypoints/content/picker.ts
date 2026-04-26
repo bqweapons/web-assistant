@@ -402,7 +402,11 @@ export const startPicker = (options: {
       }
     }
     overlay.show(target);
-    onResult({ selector, beforeSelector, afterSelector, containerId });
+    // F1 — stamp frameUrl only when the pick fired inside an iframe.
+    // The sidepanel persists it to step.targetFrame.url so replay can
+    // resolve the frame via probe. Top-frame picks stay unchanged.
+    const frameUrl = window.top !== window ? window.location.href : undefined;
+    onResult({ selector, beforeSelector, afterSelector, containerId, frameUrl });
     dispose();
   };
 

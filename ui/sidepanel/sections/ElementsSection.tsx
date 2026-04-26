@@ -1,24 +1,13 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
-  AlignCenter,
-  AlignLeft,
-  AlignRight,
-  AArrowDown,
-  AArrowUp,
   Circle,
-  Bold,
   Check,
-  ChevronDown,
-  Crosshair,
   ExternalLink,
-  Italic,
   Play,
   RefreshCw,
   Link as LinkIcon,
   Search,
   Square,
-  Trash2,
-  Underline,
   X,
 } from 'lucide-react';
 import Card from '../components/Card';
@@ -36,18 +25,14 @@ import {
   type RuntimeMessage,
   type SelectorPickerAccept,
 } from '../../../shared/messages';
-import { setSiteData } from '../../../shared/storage';
 import {
   buildDefaultSiteUrl,
   deriveSiteKey,
 } from '../../../shared/siteDataSchema';
 import type { FlowStepData } from '../../../shared/flowStepMigration';
 import {
-  getElementActionFlowId,
-  getElementFloating,
   getElementHref,
   getElementLayout,
-  getElementLinkTarget,
   getElementPosition,
   getElementScope,
   getElementSelector,
@@ -67,6 +52,19 @@ import {
 } from './elements/normalize';
 import { getInjectionErrorMessage, sendElementMessage as sendElementMessageShared } from './elements/useElementsMessaging';
 import { useElementsStore } from './elements/useElementsStore';
+import {
+  detectStylePreset as detectStylePresetFn,
+  formatCustomCss as formatCustomCssFn,
+  getNumericValue,
+  parseCustomCss,
+  resolveColorValue as resolveColorValueFn,
+  type StylePreset,
+} from './elements/styleUtils';
+import { getPageHref, getPageLabel as getPageLabelFn, getPagePathLabel } from './elements/pageUrlFormat';
+import ElementStyleEditor from './elements/ElementStyleEditor';
+import ElementBasicsAction from './elements/ElementBasicsAction';
+import ElementCard from './elements/ElementCard';
+import { useElementsWriteQueue } from '../hooks/useElementsWriteQueue';
 import { getStepCount } from './flows/normalize';
 import { appendRecordedEventToSteps } from './flows/recording';
 import { useFlowRecording } from './flows/useFlowRecording';
@@ -81,6 +79,13 @@ type ElementsSectionProps = {
   lastSyncedAt?: number;
   onRefresh?: () => void;
   onStartPicker?: (accept: SelectorPickerAccept) => Promise<string | null>;
+  // F1 — Frame-aware picker for the embedded FlowStepsBuilder (elements
+  // with attached flows). Distinct from `onStartPicker` so the element's
+  // own selector fields keep the string-only shape while flow step
+  // editing inside this section can capture iframe metadata.
+  onStartFlowPicker?: (
+    accept: SelectorPickerAccept,
+  ) => Promise<{ selector: string; frameUrl?: string } | null>;
   onStartAreaPicker?: () => Promise<PickerRect | null>;
   onStartElementPicker?: (options?: { disallowInput?: boolean }) => Promise<{
     selector: string;
@@ -100,6 +105,7 @@ export default function ElementsSection({
   lastSyncedAt,
   onRefresh,
   onStartPicker,
+  onStartFlowPicker,
   onStartAreaPicker,
   onStartElementPicker,
 }: ElementsSectionProps) {
@@ -217,9 +223,6 @@ export default function ElementsSection({
   const [injectionError, setInjectionError] = useState('');
   const previewTimerRef = useRef<number | null>(null);
   const suppressPreviewElementIdRef = useRef<string | null>(null);
-  const elementsWriteQueueRef = useRef<Promise<void>>(Promise.resolve());
-  const latestElementsRef = useRef<StoredElementRecord[]>(elements);
-  const latestFlowsRef = useRef(flows);
   const latestDraftElementIdRef = useRef<string | null>(draftElementId);
   const draftFlowSeedNameRef = useRef('');
   const elementTargetTabId = hasActivePage && typeof tabId === 'number' ? tabId : undefined;
@@ -235,86 +238,24 @@ export default function ElementsSection({
     [elementTargetTabId],
   );
 
-  const persistSiteData = useCallback(
-    async (nextElements: StoredElementRecord[], nextFlows: typeof flows) => {
-      if (!normalizedSiteKey) {
-        return;
-      }
-      await setSiteData(normalizedSiteKey, {
-        elements: nextElements,
-        flows: nextFlows,
-      });
-    },
-    [normalizedSiteKey],
-  );
-
   const handlePersistFailure = useCallback((error: unknown) => {
     console.warn('elements-persist-failed', error);
     const message = error instanceof Error ? error.message : String(error);
     setInjectionError(message);
   }, []);
 
-  useEffect(() => {
-    latestElementsRef.current = elements;
-  }, [elements]);
-
-  useEffect(() => {
-    latestFlowsRef.current = flows;
-  }, [flows]);
+  const { latestElementsRef, runElementsWrite } = useElementsWriteQueue({
+    normalizedSiteKey,
+    elements,
+    flows,
+    setElements,
+    setFlows,
+    onPersistFailure: handlePersistFailure,
+  });
 
   useEffect(() => {
     latestDraftElementIdRef.current = draftElementId;
   }, [draftElementId]);
-
-  type ElementsWriteContext = {
-    elements: StoredElementRecord[];
-    flows: typeof flows;
-  };
-
-  type ElementsWriteResult<T> = {
-    elements: StoredElementRecord[];
-    flows: typeof flows;
-    result?: T;
-    skipPersist?: boolean;
-  };
-
-  const runElementsWrite = useCallback(
-    async <T,>(
-      opName: string,
-      mutate: (
-        context: ElementsWriteContext,
-      ) => Promise<ElementsWriteResult<T> | null> | ElementsWriteResult<T> | null,
-    ): Promise<T | undefined> => {
-      const task = elementsWriteQueueRef.current.then(async () => {
-        const baseElements = latestElementsRef.current;
-        const baseFlows = latestFlowsRef.current;
-        const next = await mutate({ elements: baseElements, flows: baseFlows });
-        if (!next) {
-          return undefined;
-        }
-        if (!next.skipPersist) {
-          await persistSiteData(next.elements, next.flows);
-        }
-        latestElementsRef.current = next.elements;
-        latestFlowsRef.current = next.flows;
-        setElements(() => next.elements);
-        setFlows(() => next.flows);
-        return next.result;
-      });
-      elementsWriteQueueRef.current = task.then(
-        () => undefined,
-        () => undefined,
-      );
-      try {
-        return await task;
-      } catch (error) {
-        console.warn('elements-write-failed', opName, error);
-        handlePersistFailure(error);
-        throw error;
-      }
-    },
-    [handlePersistFailure, persistSiteData, setElements, setFlows],
-  );
 
   useEffect(() => {
     const runtime = chrome?.runtime;
@@ -685,80 +626,8 @@ export default function ElementsSection({
     return value;
   };
 
-  const getPageHref = (pageUrl: string, siteUrl: string) => {
-    if (pageUrl.startsWith('http://') || pageUrl.startsWith('https://') || pageUrl.startsWith('file://')) {
-      return pageUrl;
-    }
-    const siteHasScheme =
-      siteUrl.startsWith('http://') || siteUrl.startsWith('https://') || siteUrl.startsWith('file://');
-    const siteRoot = siteUrl.replace(/\/$/, '');
-    if (pageUrl.startsWith('/')) {
-      return siteHasScheme ? `${siteRoot}${pageUrl}` : `https://${siteRoot}${pageUrl}`;
-    }
-    if (pageUrl.includes('/')) {
-      return `https://${pageUrl}`;
-    }
-    if (siteHasScheme) {
-      return siteUrl;
-    }
-    return `https://${siteRoot}`;
-  };
-  const getPageLabel = (pageUrl: string, siteUrl: string) => {
-    if (!pageUrl) {
-      return t('sidepanel_label_unknown_page', 'Unknown page');
-    }
-    const formatHostPath = (host: string, pathname: string) => {
-      const cleanPath = pathname.replace(/^\/+/, '');
-      return cleanPath ? `${host}/${cleanPath}` : host;
-    };
-    if (pageUrl.startsWith('http://') || pageUrl.startsWith('https://') || pageUrl.startsWith('file://')) {
-      try {
-        const url = new URL(pageUrl);
-        if (url.protocol === 'file:') {
-          const fileName = url.pathname.split('/').pop();
-          return fileName || url.pathname || pageUrl;
-        }
-        const isRoot = url.pathname === '/' && !url.search && !url.hash;
-        const hasExplicitTrailingSlash = pageUrl.endsWith('/') && !pageUrl.endsWith('://');
-        if (isRoot) {
-          const origin = `${url.protocol}//${url.host}`;
-          return hasExplicitTrailingSlash ? `${origin}/` : origin;
-        }
-        return `${url.protocol}//${formatHostPath(url.host, url.pathname)}`;
-      } catch {
-        return pageUrl;
-      }
-    }
-    if (pageUrl.startsWith('/')) {
-      const siteHost = siteUrl.replace(/^https?:\/\//, '').replace(/^file:\/\//, '').replace(/\/$/, '');
-      if (siteHost) {
-        if (pageUrl === '/') {
-          return `${siteHost}/`;
-        }
-        return formatHostPath(siteHost, pageUrl);
-      }
-      return pageUrl.replace(/^\/+/, '');
-    }
-    const [hostCandidate, ...rest] = pageUrl.split('/');
-    if (rest.length > 0) {
-      return formatHostPath(hostCandidate, `/${rest.join('/')}`);
-    }
-    return pageUrl;
-  };
-  const getPagePathLabel = (pageUrl: string, siteUrl: string) => {
-    try {
-      const href = getPageHref(pageUrl, siteUrl);
-      const parsed = new URL(href);
-      const path = parsed.pathname || '/';
-      return path || '/';
-    } catch {
-      if (pageUrl.startsWith('/')) {
-        return pageUrl || '/';
-      }
-      const [, ...rest] = pageUrl.split('/');
-      return rest.length ? `/${rest.join('/')}` : '/';
-    }
-  };
+  const getPageLabel = (pageUrl: string, siteUrl: string) =>
+    getPageLabelFn(pageUrl, siteUrl, t('sidepanel_label_unknown_page', 'Unknown page'));
   const getElementDetail = (element: ElementRecord) => {
     const type = getElementType(element).toLowerCase();
     if (type === 'button') {
@@ -837,49 +706,11 @@ export default function ElementsSection({
     return rows;
   };
 
-  const detectStylePreset = (style: Record<string, string> = {}) => {
-    const normalized = Object.keys(style).reduce<Record<string, string>>((acc, key) => {
-      acc[key] = typeof style[key] === 'string' ? style[key].trim() : '';
-      return acc;
-    }, {});
-    const match = stylePresets.find((preset) => {
-      if (!preset.styles) {
-        return false;
-      }
-      const entries = Object.entries(preset.styles);
-      if (entries.length === 0) {
-        return false;
-      }
-      return entries.every(([key, value]) => (normalized[key] || '').trim() === (value || '').trim());
-    });
-    return match?.value || '';
-  };
+  const detectStylePreset = (style: Record<string, string> = {}) =>
+    detectStylePresetFn(stylePresets as StylePreset[], style);
 
-  const toKebabCase = (value: string) => value.replace(/[A-Z]/g, (match) => `-${match.toLowerCase()}`);
-
-  const formatCustomCss = (rules: Record<string, string>) => {
-    const entries: string[] = [];
-    const used = new Set<string>();
-    const pushEntry = (key: string) => {
-      const rawValue = rules[key];
-      if (!rawValue) {
-        return;
-      }
-      const value = rawValue.trim();
-      if (!value) {
-        return;
-      }
-      entries.push(`${toKebabCase(key)}: ${value};`);
-      used.add(key);
-    };
-    customCssOrder.forEach(pushEntry);
-    Object.keys(rules).forEach((key) => {
-      if (!used.has(key)) {
-        pushEntry(key);
-      }
-    });
-    return entries.join('\n');
-  };
+  const formatCustomCss = (rules: Record<string, string>) =>
+    formatCustomCssFn(rules, customCssOrder);
 
   const applyStylePreset = (presetValue: string) => {
     if (!editElement) {
@@ -896,33 +727,6 @@ export default function ElementsSection({
         customCss: nextCustomCss,
       },
     });
-  };
-
-  const parseCustomCss = (raw: string) => {
-    const rules: Record<string, string> = {};
-    raw
-      .split(';')
-      .map((segment) => segment.trim())
-      .filter(Boolean)
-      .forEach((segment) => {
-        const [property, ...rest] = segment.split(':');
-        if (!property || rest.length === 0) {
-          return;
-        }
-        const value = rest.join(':').trim();
-        if (!value) {
-          return;
-        }
-        const key = property
-          .trim()
-          .toLowerCase()
-          .replace(/-([a-z])/g, (_, char: string) => char.toUpperCase());
-        if (!key) {
-          return;
-        }
-        rules[key] = value;
-      });
-    return rules;
   };
 
   const customStyleOverrides = useMemo(
@@ -989,11 +793,6 @@ export default function ElementsSection({
     return editElement?.style?.inline?.[key] || '';
   };
 
-  const getNumericValue = (value: string) => {
-    const match = value.match(/-?\d+(\.\d+)?/);
-    return match ? match[0] : '';
-  };
-
   const getNumericStyleValue = (key: string) => getNumericValue(getStyleValue(key));
 
   const updateNumericStyle = (key: string, rawValue: string, unit: string) => {
@@ -1008,78 +807,7 @@ export default function ElementsSection({
     applyCustomCssUpdates({ [key]: `${next}${unit}` });
   };
 
-  const normalizeHex = (raw: string) => {
-    const value = raw.trim();
-    if (!value.startsWith('#')) {
-      return '';
-    }
-    const hex = value.slice(1);
-    if (hex.length === 3) {
-      return `#${hex
-        .split('')
-        .map((ch) => `${ch}${ch}`)
-        .join('')}`;
-    }
-    if (hex.length === 4) {
-      return `#${hex
-        .slice(0, 3)
-        .split('')
-        .map((ch) => `${ch}${ch}`)
-        .join('')}`;
-    }
-    if (hex.length === 6) {
-      return `#${hex}`;
-    }
-    if (hex.length === 8) {
-      return `#${hex.slice(0, 6)}`;
-    }
-    return '';
-  };
-
-  const colorToHex = (value: string) => {
-    const normalized = value.trim();
-    const hex = normalizeHex(normalized);
-    if (hex) {
-      return hex;
-    }
-    if (!normalized) {
-      return '';
-    }
-    if (typeof document === 'undefined') {
-      return '';
-    }
-    const test = document.createElement('div');
-    test.style.color = '';
-    test.style.color = normalized;
-    if (!test.style.color) {
-      return '';
-    }
-    document.body.appendChild(test);
-    const rgb = getComputedStyle(test).color;
-    test.remove();
-    const match = rgb.match(/rgba?\((\d+),\s*(\d+),\s*(\d+)(?:,\s*([.\d]+))?\)/);
-    if (!match) {
-      return '';
-    }
-    const [, r, g, b, a] = match;
-    if (a !== undefined && Number(a) === 0) {
-      return '';
-    }
-    const toHex = (num: string) => Number(num).toString(16).padStart(2, '0');
-    return `#${toHex(r)}${toHex(g)}${toHex(b)}`;
-  };
-
-  const resolveColorValue = (value: string, fallback: string) => {
-    const hex = colorToHex(value);
-    if (hex) {
-      return hex;
-    }
-    const fallbackHex = colorToHex(fallback);
-    if (fallbackHex) {
-      return fallbackHex;
-    }
-    return '#ffffff';
-  };
+  const resolveColorValue = (value: string, fallback: string) => resolveColorValueFn(value, fallback);
 
   const fontWeightValue = getStyleValue('fontWeight');
   const isBold = fontWeightValue === 'bold' || Number(fontWeightValue) >= 600;
@@ -1608,48 +1336,20 @@ export default function ElementsSection({
   }, [activeElement, editElement, sendElementMessage]);
 
   const renderElementCard = (element: ElementRecord) => (
-    <Card
+    <ElementCard
       key={element.id}
-      className="p-4"
-      onClick={hasActivePage ? () => handleSelectElement(element.id) : undefined}
-    >
-      <div className="flex items-start justify-between gap-2">
-        <div className="flex min-w-0 flex-1 items-center gap-2">
-          <span className="badge-pill shrink-0">{getElementTypeLabel(getElementType(element))}</span>
-          <h3 className="min-w-0 flex-1 truncate text-sm font-semibold text-card-foreground">
-            {getElementLabel(element)}
-          </h3>
-        </div>
-        <div className="flex shrink-0 items-center gap-1">
-          <button
-            type="button"
-            className={actionClass}
-            aria-label={t('sidepanel_elements_locate', 'Locate element')}
-            title={hasActivePage ? t('sidepanel_elements_locate', 'Locate element') : readOnlyReason}
-            onClick={(event) => handleFocusElement(event, element.id)}
-            disabled={!hasActivePage}
-          >
-            <Crosshair className="h-4 w-4" />
-          </button>
-          <button
-            type="button"
-            className={`${actionClass} btn-icon-danger`}
-            aria-label={t('sidepanel_elements_delete', 'Delete element')}
-            title={hasActivePage ? t('sidepanel_elements_delete', 'Delete element') : readOnlyReason}
-            onClick={(event) => handleDeleteElement(event, element.id)}
-            disabled={!hasActivePage}
-          >
-            <Trash2 className="h-4 w-4" />
-          </button>
-        </div>
-      </div>
-      <div className="mt-2 flex items-center justify-between gap-2">
-        <p className="min-w-0 flex-1 truncate text-xs text-muted-foreground">
-          {getElementDetail(element)}
-        </p>
-        <p className="shrink-0 text-xs text-muted-foreground">{formatTimestamp(element.updatedAt)}</p>
-      </div>
-    </Card>
+      element={element}
+      typeLabel={getElementTypeLabel(getElementType(element))}
+      elementLabel={getElementLabel(element)}
+      detail={getElementDetail(element)}
+      timestampLabel={formatTimestamp(element.updatedAt)}
+      hasActivePage={hasActivePage}
+      readOnlyReason={readOnlyReason}
+      actionClass={actionClass}
+      onSelect={() => handleSelectElement(element.id)}
+      onFocus={handleFocusElement}
+      onDelete={handleDeleteElement}
+    />
   );
 
   return (
@@ -1882,7 +1582,7 @@ export default function ElementsSection({
             </button>
       <button
         type="button"
-        className="btn-icon h-8 w-8 border-transparent bg-primary text-primary-foreground hover:brightness-95"
+        className="btn-icon btn-icon-primary h-8 w-8"
         onClick={() => {
           void handleElementSave();
         }}
@@ -1901,458 +1601,50 @@ export default function ElementsSection({
 >
         {editElement ? (
           <div className="grid gap-3 text-xs text-muted-foreground">
-            <div className="rounded border border-border bg-card p-3">
-              <div className="text-xs font-semibold text-foreground">
-                {t('sidepanel_elements_basics', 'Basics')}
-              </div>
-              <div className="mt-2 grid gap-2 sm:grid-cols-2">
-                <label className="grid gap-1 sm:col-span-2">
-                  <span>{t('sidepanel_field_name', 'Name')}</span>
-                  <input
-                    className="input"
-                    value={editElement.text}
-                    onChange={(event) =>
-                      setEditElement({
-                        ...editElement,
-                        text: event.target.value,
-                        updatedAt: Date.now(),
-                      })
-                    }
-                    placeholder={t('sidepanel_elements_name_placeholder', 'Element text')}
-                  />
-                </label>
-                <label className="inline-flex items-center gap-2 text-xs sm:col-span-2">
-                  <input
-                    type="checkbox"
-                    className="h-4 w-4"
-                  checked={editElement.scope === 'site'}
-                  onChange={(event) =>
-                    setEditElement({
-                      ...editElement,
-                      scope: event.target.checked ? 'site' : 'page',
-                      context: {
-                        ...editElement.context,
-                        pageKey: event.target.checked
-                          ? null
-                          : editElement.context.pageKey || currentPageScopedKey || defaultPageKey,
-                      },
-                      updatedAt: Date.now(),
-                    })
-                  }
-                />
-                  <span>{t('sidepanel_elements_apply_site', 'Apply to entire site')}</span>
-                </label>
-              </div>
-            </div>
-            <div className="rounded border border-border bg-card p-3">
-              <div className="text-xs font-semibold text-foreground">
-                {t('sidepanel_elements_action_title', 'Action')}
-              </div>
-              <div className="mt-2 grid gap-2 sm:grid-cols-2">
-                {getElementType(editElement).toLowerCase() === 'button' ? (
-                  <div className="grid gap-1 sm:col-span-2">
-                    <span>{t('sidepanel_field_action_flow', 'Action flow')}</span>
-                    <SelectMenu
-                      value={getElementActionFlowId(editElement)}
-                      options={actionFlowOptions}
-                      useInputStyle={false}
-                      buttonClassName={selectButtonClass}
-                      onChange={(value) => {
-                        if (value === '__create__') {
-                          draftFlowSeedNameRef.current = editElement.text.trim();
-                          setFlowDrawerOpen(true);
-                          return;
-                        }
-                        setEditElement({
-                          ...editElement,
-                          behavior: {
-                            ...editElement.behavior,
-                            actionFlowId: value,
-                          },
-                          updatedAt: Date.now(),
-                        });
-                      }}
-                    />
-                  </div>
-                ) : null}
-                {getElementType(editElement).toLowerCase() === 'link' ? (
-                  <>
-                    <label className="grid gap-1 sm:col-span-2">
-                      <span>{t('sidepanel_elements_link_url', 'Link URL')}</span>
-                      <input
-                        className="input"
-                        value={getElementHref(editElement)}
-                        onChange={(event) =>
-                          setEditElement({
-                            ...editElement,
-                            behavior: {
-                              ...editElement.behavior,
-                              href: event.target.value,
-                            },
-                            updatedAt: Date.now(),
-                          })
-                        }
-                        placeholder={t('sidepanel_elements_link_placeholder', 'https://example.com')}
-                      />
-                    </label>
-                    <div className="grid gap-1 sm:col-span-2">
-                      <span>{t('sidepanel_elements_link_target', 'Link target')}</span>
-                      <SelectMenu
-                        value={getElementLinkTarget(editElement)}
-                        options={[
-                          { value: 'new-tab', label: t('sidepanel_elements_link_new_tab', 'Open in new tab') },
-                          { value: 'same-tab', label: t('sidepanel_elements_link_same_tab', 'Open in same tab') },
-                        ]}
-                        useInputStyle={false}
-                        buttonClassName={selectButtonClass}
-                        onChange={(value) =>
-                          setEditElement({
-                            ...editElement,
-                            behavior: {
-                              ...editElement.behavior,
-                              target: value === 'same-tab' ? 'same-tab' : 'new-tab',
-                            },
-                            updatedAt: Date.now(),
-                          })
-                        }
-                      />
-                    </div>
-                  </>
-                ) : null}
-                {getElementType(editElement).toLowerCase() === 'area' ? (
-                  <div className="grid gap-1 sm:col-span-2">
-                    <span>{t('sidepanel_field_layout', 'Layout')}</span>
-                    <SelectMenu
-                      value={getElementLayout(editElement)}
-                      options={[
-                        { value: 'row', label: t('sidepanel_layout_row', 'Row') },
-                        { value: 'column', label: t('sidepanel_layout_column', 'Column') },
-                      ]}
-                      useInputStyle
-                      buttonClassName={selectButtonClass}
-                      onChange={(value) =>
-                        setEditElement({
-                          ...editElement,
-                          behavior: {
-                            ...editElement.behavior,
-                            layout: value === 'column' ? 'column' : 'row',
-                          },
-                          updatedAt: Date.now(),
-                        })
-                      }
-                    />
-                  </div>
-                ) : null}
-              </div>
-            </div>
-            <div className="rounded border border-border bg-card p-3">
-              <div className="text-xs font-semibold text-foreground">
-                {t('sidepanel_elements_styles_title', 'Styles')}
-              </div>
-              <div className="mt-2 grid gap-3">
-                <div className="grid gap-1">
-                  <span className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
-                    {t('sidepanel_elements_style_preset', 'Preset')}
-                  </span>
-                  <SelectMenu
-                    value={editElement.style?.preset || ''}
-                    options={stylePresets.map((preset) => ({
-                      value: preset.value,
-                      label: preset.label,
-                    }))}
-                    useInputStyle={false}
-                    buttonClassName={selectButtonClass}
-                    onChange={(value) => applyStylePreset(value)}
-                  />
-                </div>
-
-                <div className="flex flex-wrap items-center gap-2 rounded border border-border bg-muted p-2 sm:flex-nowrap">
-                  <div className="flex items-center gap-1">
-                    <button
-                      type="button"
-                      className="btn-ghost h-6 w-6 p-0"
-                      aria-label={t('sidepanel_elements_font_decrease', 'Decrease font size')}
-                      onClick={() => adjustNumericStyle('fontSize', -1, 'px', 12)}
-                    >
-                      <AArrowDown className="h-3.5 w-3.5" />
-                    </button>
-                    <button
-                      type="button"
-                      className="btn-ghost h-6 w-6 p-0"
-                      aria-label={t('sidepanel_elements_font_increase', 'Increase font size')}
-                      onClick={() => adjustNumericStyle('fontSize', 1, 'px', 12)}
-                    >
-                      <AArrowUp className="h-3.5 w-3.5" />
-                    </button>
-                  </div>
-                  <span className="h-6 w-px bg-border" />
-                  <div className="flex items-center gap-2">
-                    <button
-                      type="button"
-                      className={`btn-ghost h-6 w-6 p-0 ${isBold ? 'bg-accent text-accent-foreground' : ''}`}
-                      aria-pressed={isBold}
-                      onClick={() => applyCustomCssUpdates({ fontWeight: isBold ? '' : '700' })}
-                    >
-                      <Bold className="h-3.5 w-3.5" />
-                    </button>
-                    <button
-                      type="button"
-                      className={`btn-ghost h-6 w-6 p-0 ${isItalic ? 'bg-accent text-accent-foreground' : ''}`}
-                      aria-pressed={isItalic}
-                      onClick={() => applyCustomCssUpdates({ fontStyle: isItalic ? '' : 'italic' })}
-                    >
-                      <Italic className="h-3.5 w-3.5" />
-                    </button>
-                    <button
-                      type="button"
-                      className={`btn-ghost h-6 w-6 p-0 ${isUnderline ? 'bg-accent text-accent-foreground' : ''}`}
-                      aria-pressed={isUnderline}
-                      onClick={() =>
-                        applyCustomCssUpdates({
-                          textDecoration: isUnderline ? '' : 'underline',
-                        })
-                      }
-                    >
-                      <Underline className="h-3.5 w-3.5" />
-                    </button>
-                  </div>
-                  <span className="h-6 w-px bg-border" />
-                  <div className="flex items-center gap-2">
-                    <button
-                      type="button"
-                      className={`btn-ghost h-6 w-6 p-0 ${textAlignValue === 'left' ? 'bg-accent text-accent-foreground' : ''}`}
-                      aria-pressed={textAlignValue === 'left'}
-                      onClick={() => applyCustomCssUpdates({ textAlign: 'left' })}
-                    >
-                      <AlignLeft className="h-3.5 w-3.5" />
-                    </button>
-                    <button
-                      type="button"
-                      className={`btn-ghost h-6 w-6 p-0 ${textAlignValue === 'center' ? 'bg-accent text-accent-foreground' : ''}`}
-                      aria-pressed={textAlignValue === 'center'}
-                      onClick={() => applyCustomCssUpdates({ textAlign: 'center' })}
-                    >
-                      <AlignCenter className="h-3.5 w-3.5" />
-                    </button>
-                    <button
-                      type="button"
-                      className={`btn-ghost h-6 w-6 p-0 ${textAlignValue === 'right' ? 'bg-accent text-accent-foreground' : ''}`}
-                      aria-pressed={textAlignValue === 'right'}
-                      onClick={() => applyCustomCssUpdates({ textAlign: 'right' })}
-                    >
-                      <AlignRight className="h-3.5 w-3.5" />
-                    </button>
-                  </div>
-                </div>
-
-                <div className="grid gap-3 rounded border border-border bg-muted p-2">
-                  <div className="grid gap-2">
-                    <div className="grid gap-1">
-                      <span className="text-[10px] font-semibold uppercase text-muted-foreground">
-                        {t('sidepanel_elements_style_text', 'Text')}
-                      </span>
-                      <div className="flex items-center gap-2">
-                        <input
-                          type="color"
-                          className="h-7 w-6.5 cursor-pointer rounded-md border border-border p-0"
-                          value={resolveColorValue(textColorValue, '#0f172a')}
-                          onChange={(event) => applyCustomCssUpdates({ color: event.target.value })}
-                        />
-                        <span className="h-6 w-px bg-border" />
-                        {renderColorSwatches('color')}
-                      </div>
-                    </div>
-                    <div className="grid gap-1">
-                      <span className="text-[10px] font-semibold uppercase text-muted-foreground">
-                        {t('sidepanel_elements_style_background', 'Background')}
-                      </span>
-                      <div className="flex items-center gap-2">
-                        <input
-                          type="color"
-                          className="h-7 w-6.5 cursor-pointer rounded-md border border-border p-0"
-                          value={resolveColorValue(backgroundColorValue, '#ffffff')}
-                          onChange={(event) =>
-                            applyCustomCssUpdates({ backgroundColor: event.target.value })
-                          }
-                        />
-                        <span className="h-6 w-px bg-border" />
-                        {renderColorSwatches('backgroundColor')}
-                      </div>
-                    </div>
-                  </div>
-                </div>
-
-                <details className="group">
-                  <summary className="cursor-pointer list-none">
-                    <div className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
-                      <span>{t('sidepanel_field_layout', 'Layout')}</span>
-                      <span className="h-px flex-1 bg-border" />
-                      <ChevronDown className="h-4 w-4 text-muted-foreground transition group-open:rotate-180" />
-                    </div>
-                  </summary>
-                  <div className="mt-2 flex flex-wrap items-center gap-2 rounded border border-border p-2">
-                    <div className="flex items-center gap-2">
-                      <span className="text-[10px] font-semibold uppercase text-muted-foreground">
-                        {t('sidepanel_elements_style_border', 'Border')}
-                      </span>
-                      <input
-                        className="input h-8 w-40 px-2 text-xs"
-                        value={borderValue}
-                        onChange={(event) => applyCustomCssUpdates({ border: event.target.value })}
-                        placeholder={t('sidepanel_elements_border_placeholder', '1px solid #000')}
-                      />
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <span className="text-[10px] font-semibold uppercase text-muted-foreground">
-                        {t('sidepanel_elements_style_radius', 'Radius')}
-                      </span>
-                      <input
-                        className="input h-8 w-16 px-2 text-xs"
-                        type="number"
-                        value={borderRadiusValue}
-                        onChange={(event) =>
-                          updateNumericStyle('borderRadius', event.target.value, 'px')
-                        }
-                        placeholder={t('sidepanel_elements_radius_placeholder', '8')}
-                      />
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <span className="text-[10px] font-semibold uppercase text-muted-foreground">
-                        {t('sidepanel_elements_style_shadow', 'Shadow')}
-                      </span>
-                      <SelectMenu
-                        value={shadowOptions.some((option) => option.value === boxShadowValue) ? boxShadowValue : ''}
-                        options={shadowOptions}
-                        placeholder={t('sidepanel_elements_shadow_custom', 'Custom')}
-                        useInputStyle
-                        buttonClassName="h-8 w-28 px-2 text-xs"
-                        onChange={(value) => applyCustomCssUpdates({ boxShadow: value })}
-                      />
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <span className="text-[10px] font-semibold uppercase text-muted-foreground">
-                        {t('sidepanel_elements_style_padding', 'Padding')}
-                      </span>
-                      <input
-                        className="input h-8 w-28 px-2 text-xs"
-                        value={paddingValue}
-                        onChange={(event) => applyCustomCssUpdates({ padding: event.target.value })}
-                        placeholder={t('sidepanel_elements_padding_placeholder', '8px 16px')}
-                      />
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <span className="text-[10px] font-semibold uppercase text-muted-foreground">
-                        {t('sidepanel_elements_style_margin', 'Margin')}
-                      </span>
-                      <input
-                        className="input h-8 w-28 px-2 text-xs"
-                        value={marginValue}
-                        onChange={(event) => applyCustomCssUpdates({ margin: event.target.value })}
-                        placeholder={t('sidepanel_elements_margin_placeholder', '0 auto')}
-                      />
-                    </div>
-                  </div>
-                </details>
-
-                <details className="group">
-                  <summary className="cursor-pointer list-none">
-                    <div className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
-                      <span>{t('sidepanel_elements_style_position', 'Position')}</span>
-                      <span className="h-px flex-1 bg-border" />
-                      <ChevronDown className="h-4 w-4 text-muted-foreground transition group-open:rotate-180" />
-                    </div>
-                  </summary>
-                  <div className="mt-2 flex flex-wrap items-center gap-2 rounded border border-border p-2">
-                    <div className="flex items-center gap-2">
-                      <span className="text-[10px] font-semibold uppercase text-muted-foreground">
-                        {t('sidepanel_elements_position_mode', 'Mode')}
-                      </span>
-                      <SelectMenu
-                        value={positionValue}
-                        options={positionOptions}
-                        placeholder={t('sidepanel_elements_position_auto', 'Auto')}
-                        useInputStyle
-                        buttonClassName="h-8 w-24 px-2 text-xs"
-                        onChange={(value) => applyCustomCssUpdates({ position: value })}
-                      />
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <span className="text-[10px] font-semibold uppercase text-muted-foreground">
-                        {t('sidepanel_elements_position_width', 'W')}
-                      </span>
-                      <input
-                        className="input h-8 w-16 px-2 text-xs"
-                        type="number"
-                        value={widthValue}
-                        onChange={(event) => updateNumericStyle('width', event.target.value, 'px')}
-                        placeholder={t('sidepanel_elements_position_width_placeholder', '120')}
-                      />
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <span className="text-[10px] font-semibold uppercase text-muted-foreground">
-                        {t('sidepanel_elements_position_height', 'H')}
-                      </span>
-                      <input
-                        className="input h-8 w-16 px-2 text-xs"
-                        type="number"
-                        value={heightValue}
-                        onChange={(event) => updateNumericStyle('height', event.target.value, 'px')}
-                        placeholder={t('sidepanel_elements_position_height_placeholder', '40')}
-                      />
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <span className="text-[10px] font-semibold uppercase text-muted-foreground">
-                        {t('sidepanel_elements_position_x', 'X')}
-                      </span>
-                      <input
-                        className="input h-8 w-16 px-2 text-xs"
-                        type="number"
-                        value={leftValue}
-                        onChange={(event) => updateNumericStyle('left', event.target.value, 'px')}
-                        placeholder={t('sidepanel_elements_position_x_placeholder', '12')}
-                      />
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <span className="text-[10px] font-semibold uppercase text-muted-foreground">
-                        {t('sidepanel_elements_position_y', 'Y')}
-                      </span>
-                      <input
-                        className="input h-8 w-16 px-2 text-xs"
-                        type="number"
-                        value={topValue}
-                        onChange={(event) => updateNumericStyle('top', event.target.value, 'px')}
-                        placeholder={t('sidepanel_elements_position_y_placeholder', '12')}
-                      />
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <span className="text-[10px] font-semibold uppercase text-muted-foreground">
-                        {t('sidepanel_elements_position_z', 'Z')}
-                      </span>
-                      <input
-                        className="input h-8 w-16 px-2 text-xs"
-                        type="number"
-                        value={zIndexValue}
-                        onChange={(event) => updateNumericStyle('zIndex', event.target.value, '')}
-                        placeholder={t('sidepanel_elements_position_z_placeholder', '999')}
-                      />
-                    </div>
-                  </div>
-                </details>
-
-                <label className="grid gap-1">
-                  <span className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
-                    {t('sidepanel_elements_custom_styles', 'Custom Styles')}
-                  </span>
-                  <textarea
-                    className="input min-h-[88px] font-mono text-[11px]"
-                    rows={3}
-                    value={editElement.style?.customCss || ''}
-                    onChange={(event) => applyCustomCssText(event.target.value)}
-                    placeholder={t('sidepanel_elements_custom_styles_placeholder', 'color: #0f172a; padding: 8px;')}
-                  />
-                </label>
-              </div>
-            </div>
+            <ElementBasicsAction
+              editElement={editElement}
+              actionFlowOptions={actionFlowOptions}
+              selectButtonClass={selectButtonClass}
+              currentPageScopedKey={currentPageScopedKey}
+              defaultPageKey={defaultPageKey}
+              onChangeEditElement={setEditElement}
+              onRequestCreateFlow={(seedName) => {
+                draftFlowSeedNameRef.current = seedName;
+                setFlowDrawerOpen(true);
+              }}
+            />
+            <ElementStyleEditor
+              stylePresets={stylePresets}
+              currentPresetValue={editElement.style?.preset || ''}
+              shadowOptions={shadowOptions}
+              positionOptions={positionOptions}
+              customCssValue={editElement.style?.customCss || ''}
+              selectButtonClass={selectButtonClass}
+              isBold={isBold}
+              isItalic={isItalic}
+              isUnderline={isUnderline}
+              textAlignValue={textAlignValue}
+              textColorValue={textColorValue}
+              backgroundColorValue={backgroundColorValue}
+              borderValue={borderValue}
+              borderRadiusValue={borderRadiusValue}
+              boxShadowValue={boxShadowValue}
+              paddingValue={paddingValue}
+              marginValue={marginValue}
+              positionValue={positionValue}
+              widthValue={widthValue}
+              heightValue={heightValue}
+              leftValue={leftValue}
+              topValue={topValue}
+              zIndexValue={zIndexValue}
+              onApplyStylePreset={applyStylePreset}
+              onApplyCustomCssUpdates={applyCustomCssUpdates}
+              onApplyCustomCssText={applyCustomCssText}
+              onAdjustNumericStyle={adjustNumericStyle}
+              onUpdateNumericStyle={updateNumericStyle}
+              resolveColorValue={resolveColorValue}
+              renderColorSwatches={renderColorSwatches}
+            />
           </div>
         ) : null}
       </Drawer>
@@ -2391,7 +1683,7 @@ export default function ElementsSection({
           <FlowStepsBuilder
             steps={draftFlow.steps}
             onChange={(steps) => setDraftFlow((prev) => ({ ...prev, steps }))}
-            onStartPicker={onStartPicker}
+            onStartPicker={onStartFlowPicker}
           />
         </div>
       </FlowDrawer>

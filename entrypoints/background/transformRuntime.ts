@@ -1,3 +1,43 @@
+// 1.7 — property-name blacklist for the tree-walking interpreter's member
+// access path. Without this, `String.constructor("return ...")()` (or the
+// equivalent via `__proto__` / `prototype`) reaches the real Function
+// constructor through the host-JS `String` / `Number` / `Boolean` objects
+// that the runtime exposes in scope, compiling arbitrary code inside the
+// transform sandbox worker. Blocking these names at the member evaluator
+// short-circuits every variant:
+//   - dot notation:     String.constructor
+//   - computed access:  String["constructor"]
+//   - escaped literals: String["constructor"]   (tokenized to 'constructor')
+//   - indirect chain:   String.prototype.constructor, helpers.trim.constructor
+//   - obfuscated build: String[('cons' + 'tructor')]  (evaluates to 'constructor')
+// The interpreter does not support member ASSIGNMENT (parser has no such
+// production), so prototype pollution via `row.__proto__.x = y` is already
+// impossible; the `__proto__` ban here is defense-in-depth for a future
+// assignment-capable parser.
+//
+// `caller` / `arguments`: blocked for consistency with the "no reflection
+// / metaprogramming" rule. In strict-mode function objects these already
+// throw TypeError on access, so blocking them adds no functional loss
+// and keeps the semantic bar uniform.
+//
+// Scope of this fix: property-name blacklist ONLY. Identifier whitelist
+// and removing native `String`/`Number`/`Boolean` from scope (so no host
+// constructor is even reachable by name) are reasonable deeper defenses
+// but aren't needed to block the known escape; deferred as follow-ups.
+// QuickJS-wasm sandbox swap would make this whole file obsolete; also
+// deferred.
+const FORBIDDEN_PROPERTY_NAMES = new Set<string>([
+  'constructor',
+  'prototype',
+  '__proto__',
+  '__defineGetter__',
+  '__defineSetter__',
+  '__lookupGetter__',
+  '__lookupSetter__',
+  'caller',
+  'arguments',
+]);
+
 export type TransformRowContext = Record<string, string>;
 
 export type TransformLoopContext = {
@@ -345,7 +385,14 @@ const evaluateExpressionNode = (node: ExprNode, scope: Record<string, unknown>):
     const property = node.computed
       ? evaluateExpressionNode(node.property, scope)
       : (node.property as { type: 'literal'; value: unknown }).value;
-    return (object as Record<string, unknown>)[String(property)];
+    // 1.7 — normalize to a string first so dot notation, computed access,
+    // string literals, and obfuscated concat (`('cons'+'tructor')`) all
+    // land in the same code path.
+    const propertyName = String(property);
+    if (FORBIDDEN_PROPERTY_NAMES.has(propertyName)) {
+      throw new Error(`Forbidden property access: ${propertyName}`);
+    }
+    return (object as Record<string, unknown>)[propertyName];
   }
   const callee = evaluateExpressionNode(node.callee, scope);
   if (typeof callee !== 'function') {

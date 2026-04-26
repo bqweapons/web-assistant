@@ -4,7 +4,9 @@ import Card from '../components/Card';
 import ConfirmDialog from '../components/ConfirmDialog';
 import StatCard from '../components/StatCard';
 import { t } from '../utils/i18n';
-import { getAllSitesData, setAllSitesData, STORAGE_KEY, type SiteData } from '../../../shared/storage';
+// 1.14 — write API moved to the message-based client.
+import { getAllSitesData, STORAGE_KEY, type SiteData } from '../../../shared/storage';
+import { setAllSitesData } from '../../../shared/siteStorageClient';
 
 export default function OverviewSection() {
   const [siteStats, setSiteStats] = useState<

@@ -1,3 +1,32 @@
+// 1.14 — `shared/storage.ts` is now READ-ONLY from non-SW realms. Writes
+// (including normalization writebacks and legacy-migration flag flips)
+// have been moved to `entrypoints/background/siteStorage.ts` (SW-only).
+// Sidepanel write callers use `shared/siteStorageClient.ts`, which sends
+// `SITES_SET_*` messages to the SW.
+//
+// Why this split: `chrome.storage.local` is shared across realms, but the
+// JS-level `writeQueue` lived per-realm (each V8 isolate loaded the module
+// independently). Two concurrent writers from different realms could race
+// on the whole-document `storage.set({ [SITE_DATA_STORAGE_KEY]: ... })`,
+// producing last-write-wins data loss. `navigator.locks` can't coordinate
+// this because content scripts run in the host page's origin while
+// sidepanel/SW run in `chrome-extension://`; locks are origin-scoped and
+// don't see each other across origins. The only structural fix is to
+// strip write capability from every realm except the SW.
+//
+// Reads normalize in memory and return; they never persist back to disk.
+// If the stored data needs tidying (normalization changed) or if legacy
+// v1 data is detected, the caller gets the normalized/migrated view for
+// this read, but the on-disk bytes aren't updated. Persistence happens:
+//   1. On SW cold-start via `primeSiteStoragePersistence` (bootstrap.ts)
+//   2. On any sidepanel-initiated write via `SITES_SET_*` messages
+// Both paths run inside `siteStorage.ts`'s write queue.
+//
+// `StorageQuotaExceededError` and `CORRUPT_BACKUP_KEY` are exported so
+// the SW-side writer can share the same types/constants without duplicating
+// them; the quota-detection logic itself is duplicated in siteStorage.ts
+// to keep this file dependency-free for non-SW surfaces.
+
 import {
   deriveSiteKey,
   type StructuredSiteData,
@@ -9,31 +38,28 @@ import { normalizeStructuredStoragePayload } from './siteDataMigration';
 import { SITE_DATA_STORAGE_KEY } from './storageKeys';
 
 export const STORAGE_KEY = SITE_DATA_STORAGE_KEY;
-// Legacy auto-migration (old extension -> new extension).
-// To disable automatic legacy detection + migration in a future version, remove:
-// 1) `LEGACY_STORAGE_KEY` and `LEGACY_MIGRATION_FLAG_KEY`
-// 2) `legacyMigrationPromise`, `isRecord`, `tryMigrateLegacyPayload`,
-//    `ensureLegacyMigrationForChromeStorage`, and `ensureLegacyMigrationForLocalStorage`
-// 3) The legacy migration branches inside `readStructuredPayload` (both chrome.storage and localStorage paths)
+
+// Legacy auto-migration constants. These are read-only here (flag check +
+// in-memory migration only); the flag flip and the persistence of the
+// migrated payload happen in SW siteStorage.ts.
 const LEGACY_STORAGE_KEY = 'injectedElements';
 const LEGACY_MIGRATION_FLAG_KEY = 'ladybird_legacy_migrated_v1';
+// Exported so SW siteStorage.ts can back up corrupt local-storage bytes
+// under the same key (single source of truth for the key string).
+export const CORRUPT_BACKUP_KEY = 'ladybird_sites__corrupt_backup';
 
 export type SiteData = StructuredSiteData;
-
 export type StoragePayload = StructuredStoragePayload;
 
-const EMPTY_SITE_DATA: SiteData = { elements: [], flows: [], hidden: [] };
-let writeQueue: Promise<void> = Promise.resolve();
-let legacyMigrationPromise: Promise<void> | null = null;
+export class StorageQuotaExceededError extends Error {
+  readonly code = 'storage-quota-exceeded' as const;
+  constructor(public readonly cause?: unknown) {
+    super('storage quota exceeded');
+    this.name = 'StorageQuotaExceededError';
+  }
+}
 
-const enqueueWrite = async <T>(operation: () => Promise<T>): Promise<T> => {
-  const run = writeQueue.then(operation, operation);
-  writeQueue = run.then(
-    () => undefined,
-    () => undefined,
-  );
-  return run;
-};
+const EMPTY_SITE_DATA: SiteData = { elements: [], flows: [], hidden: [] };
 
 const getLocalStorage = () => {
   if (typeof chrome !== 'undefined' && chrome.storage?.local) {
@@ -45,14 +71,15 @@ const getLocalStorage = () => {
 const isRecord = (value: unknown): value is Record<string, unknown> =>
   Boolean(value) && typeof value === 'object' && !Array.isArray(value);
 
-// One-time legacy payload migration helper.
-// Safe removal target when retiring old-data compatibility.
-const tryMigrateLegacyPayload = (
+// 1.14 — Purely in-memory legacy migration for non-SW reads. Doesn't
+// write anything. Returns the migrated payload (or the untouched payload
+// if no legacy data present or if the migration flag is already set).
+const maybeApplyLegacyInMemory = (
   currentPayload: StructuredStoragePayload,
   legacyRaw: unknown,
-): StructuredStoragePayload | null => {
+): StructuredStoragePayload => {
   if (!isRecord(legacyRaw)) {
-    return null;
+    return currentPayload;
   }
   try {
     const parsed = parseImportPayload(legacyRaw);
@@ -60,161 +87,60 @@ const tryMigrateLegacyPayload = (
     const normalized = normalizeStructuredStoragePayload({ sites: mergedSites });
     return normalized.payload;
   } catch (error) {
-    console.warn('legacy-site-migration-failed', error);
-    return null;
+    console.warn('legacy-site-migration-in-memory-failed', error);
+    return currentPayload;
   }
 };
 
-const writeStructuredPayload = async (payload: StructuredStoragePayload) => {
-  const storage = getLocalStorage();
-  if (storage) {
-    await storage.set({ [STORAGE_KEY]: payload });
-    return;
-  }
-  try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(payload));
-  } catch (error) {
-    console.warn('site-load-failed', error);
-  }
-};
-
-type ReadStructuredPayloadOptions = {
-  skipLegacyMigration?: boolean;
-};
-
-const ensureLegacyMigrationForChromeStorage = async (storage: NonNullable<ReturnType<typeof getLocalStorage>>) => {
-  if (legacyMigrationPromise) {
-    await legacyMigrationPromise;
-    return;
-  }
-  legacyMigrationPromise = (async () => {
-    const before = await storage.get([LEGACY_STORAGE_KEY, LEGACY_MIGRATION_FLAG_KEY]);
-    if (before?.[LEGACY_MIGRATION_FLAG_KEY] === true || typeof before?.[LEGACY_STORAGE_KEY] === 'undefined') {
-      return;
-    }
-    await enqueueWrite(async () => {
-      const latestPayload = await readStructuredPayload({ skipLegacyMigration: true });
-      const latestLegacy = await storage.get([LEGACY_STORAGE_KEY, LEGACY_MIGRATION_FLAG_KEY]);
-      if (
-        latestLegacy?.[LEGACY_MIGRATION_FLAG_KEY] === true ||
-        typeof latestLegacy?.[LEGACY_STORAGE_KEY] === 'undefined'
-      ) {
-        return;
-      }
-      const migrated = tryMigrateLegacyPayload(latestPayload, latestLegacy[LEGACY_STORAGE_KEY]);
-      if (!migrated) {
-        return;
-      }
-      await storage.set({
-        [STORAGE_KEY]: migrated,
-        [LEGACY_MIGRATION_FLAG_KEY]: true,
-      });
-    });
-  })()
-    .catch((error) => {
-      console.warn('legacy-site-migration-failed', error);
-    })
-    .finally(() => {
-      legacyMigrationPromise = null;
-    });
-  await legacyMigrationPromise;
-};
-
-const ensureLegacyMigrationForLocalStorage = async () => {
-  if (legacyMigrationPromise) {
-    await legacyMigrationPromise;
-    return;
-  }
-  legacyMigrationPromise = (async () => {
-    const legacyMigrationDone = localStorage.getItem(LEGACY_MIGRATION_FLAG_KEY) === '1';
-    const legacyRawText = localStorage.getItem(LEGACY_STORAGE_KEY);
-    if (legacyMigrationDone || !legacyRawText) {
-      return;
-    }
-    await enqueueWrite(async () => {
-      const latestPayload = await readStructuredPayload({ skipLegacyMigration: true });
-      if (localStorage.getItem(LEGACY_MIGRATION_FLAG_KEY) === '1') {
-        return;
-      }
-      const latestLegacyRawText = localStorage.getItem(LEGACY_STORAGE_KEY);
-      if (!latestLegacyRawText) {
-        return;
-      }
-      let legacyParsed: unknown = null;
-      try {
-        legacyParsed = JSON.parse(latestLegacyRawText);
-      } catch (error) {
-        console.warn('legacy-site-migration-parse-failed', error);
-        return;
-      }
-      const migrated = tryMigrateLegacyPayload(latestPayload, legacyParsed);
-      if (!migrated) {
-        return;
-      }
-      await writeStructuredPayload(migrated);
-      localStorage.setItem(LEGACY_MIGRATION_FLAG_KEY, '1');
-    });
-  })()
-    .catch((error) => {
-      console.warn('legacy-site-migration-failed', error);
-    })
-    .finally(() => {
-      legacyMigrationPromise = null;
-    });
-  await legacyMigrationPromise;
-};
-
-const readStructuredPayload = async (
-  options?: ReadStructuredPayloadOptions,
-): Promise<StructuredStoragePayload> => {
+// 1.14 — READ-ONLY. Non-SW realms (sidepanel, content script) get the
+// same view of the data as the SW would produce (normalization applied,
+// legacy data folded in), but this function never persists anything.
+// Compare with `readStructuredPayloadLocked` in siteStorage.ts, which
+// performs the same logical reads but also writes back tidy/migrated
+// payload (and must be called inside the SW writer queue).
+const readStructuredPayload = async (): Promise<StructuredStoragePayload> => {
   const storage = getLocalStorage();
   if (storage) {
     const result = await storage.get([STORAGE_KEY, LEGACY_STORAGE_KEY, LEGACY_MIGRATION_FLAG_KEY]);
     const rawPayload = result?.[STORAGE_KEY] as unknown;
     await ensureLegacyAutoAdsMigration(rawPayload);
     const normalized = normalizeStructuredStoragePayload(rawPayload);
-    if (normalized.changed) {
-      await writeStructuredPayload(normalized.payload);
-    }
-    // Legacy auto-detect + auto-migrate (chrome.storage path).
-    // Delete this whole block to stop automatic migration from `injectedElements`.
-    if (!options?.skipLegacyMigration) {
-      const legacyMigrationDone = result?.[LEGACY_MIGRATION_FLAG_KEY] === true;
-      if (!legacyMigrationDone && typeof result?.[LEGACY_STORAGE_KEY] !== 'undefined') {
-        await ensureLegacyMigrationForChromeStorage(storage);
-        const migratedRead = await storage.get(STORAGE_KEY);
-        const migratedNormalized = normalizeStructuredStoragePayload(migratedRead?.[STORAGE_KEY] as unknown);
-        if (migratedNormalized.changed) {
-          await writeStructuredPayload(migratedNormalized.payload);
-        }
-        return migratedNormalized.payload;
-      }
+    const legacyMigrationDone = result?.[LEGACY_MIGRATION_FLAG_KEY] === true;
+    if (!legacyMigrationDone && typeof result?.[LEGACY_STORAGE_KEY] !== 'undefined') {
+      return maybeApplyLegacyInMemory(normalized.payload, result[LEGACY_STORAGE_KEY]);
     }
     return normalized.payload;
   }
+  const rawText = localStorage.getItem(STORAGE_KEY);
+  let parsed: unknown;
+  if (rawText) {
+    try {
+      parsed = JSON.parse(rawText);
+    } catch (parseError) {
+      // 1.14 — corruption backup is a WRITE, so it now happens only in
+      // the SW realm (siteStorage.ts's readRawPayload). Non-SW realms
+      // seeing a parse failure just return an empty payload and log; the
+      // SW's next read will attempt the backup.
+      console.warn('site-load-parse-failed', parseError);
+      return { sites: {} };
+    }
+  } else {
+    parsed = { sites: {} };
+  }
   try {
-    const rawText = localStorage.getItem(STORAGE_KEY);
-    const parsed = rawText ? (JSON.parse(rawText) as unknown) : { sites: {} };
     await ensureLegacyAutoAdsMigration(parsed);
     const normalized = normalizeStructuredStoragePayload(parsed);
-    if (normalized.changed) {
-      await writeStructuredPayload(normalized.payload);
-    }
-    // Legacy auto-detect + auto-migrate (localStorage fallback path).
-    // Delete this whole block to stop automatic migration from legacy localStorage data.
-    if (!options?.skipLegacyMigration) {
-      const legacyMigrationDone = localStorage.getItem(LEGACY_MIGRATION_FLAG_KEY) === '1';
-      const legacyRawText = localStorage.getItem(LEGACY_STORAGE_KEY);
-      if (!legacyMigrationDone && legacyRawText) {
-        await ensureLegacyMigrationForLocalStorage();
-        const migratedRawText = localStorage.getItem(STORAGE_KEY);
-        const migratedParsed = migratedRawText ? (JSON.parse(migratedRawText) as unknown) : { sites: {} };
-        const migratedNormalized = normalizeStructuredStoragePayload(migratedParsed);
-        if (migratedNormalized.changed) {
-          await writeStructuredPayload(migratedNormalized.payload);
-        }
-        return migratedNormalized.payload;
+    const legacyMigrationDone = localStorage.getItem(LEGACY_MIGRATION_FLAG_KEY) === '1';
+    const legacyRawText = localStorage.getItem(LEGACY_STORAGE_KEY);
+    if (!legacyMigrationDone && legacyRawText) {
+      let legacyParsed: unknown = null;
+      try {
+        legacyParsed = JSON.parse(legacyRawText);
+      } catch {
+        // Legacy blob doesn't parse — treat as if no legacy data present.
+        return normalized.payload;
       }
+      return maybeApplyLegacyInMemory(normalized.payload, legacyParsed);
     }
     return normalized.payload;
   } catch (error) {
@@ -248,38 +174,4 @@ export const getAllSitesData = async (): Promise<Record<string, SiteData>> => {
     };
   });
   return next;
-};
-
-export const setSiteData = async (siteKey: string, data: Partial<SiteData>) => {
-  const normalizedSiteKey = deriveSiteKey(siteKey) || siteKey.trim();
-  if (!normalizedSiteKey) {
-    return;
-  }
-  await enqueueWrite(async () => {
-    const payload = await readStructuredPayload({ skipLegacyMigration: true });
-    const current = payload.sites?.[normalizedSiteKey] || {
-      elements: [],
-      flows: [],
-      hidden: [],
-    };
-    const raw = {
-      sites: {
-        ...(payload.sites || {}),
-        [normalizedSiteKey]: {
-          elements: data.elements ?? current.elements,
-          flows: data.flows ?? current.flows,
-          hidden: data.hidden ?? current.hidden,
-        },
-      },
-    };
-    const normalized = normalizeStructuredStoragePayload(raw);
-    await writeStructuredPayload(normalized.payload);
-  });
-};
-
-export const setAllSitesData = async (sites: Record<string, SiteData>) => {
-  await enqueueWrite(async () => {
-    const normalized = normalizeStructuredStoragePayload({ sites: sites || {} });
-    await writeStructuredPayload(normalized.payload);
-  });
 };

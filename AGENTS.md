@@ -54,7 +54,14 @@ Repository conventions and action-flow reference for Ladybird (WXT mainline).
 
 ### UI consistency rules
 - All visible action buttons should use `icon + label` by default. Pure text buttons are only acceptable for intentionally minimal text-only controls, not for normal primary/secondary actions.
-- Use only existing shared button styles (`btn-primary`, `btn-ghost`, `btn-icon`, `btn-icon-danger`). Do not introduce undefined button classes.
+- Use only existing shared button styles. Do not introduce undefined button classes. The approved set is:
+  - `btn-primary` — rectangular primary (main call-to-action).
+  - `btn-ghost` — rectangular secondary / neutral.
+  - `btn-icon` — circular icon-only (base for `btn-icon-primary` / `btn-icon-danger`).
+  - `btn-icon-primary` — circular icon-only with primary fill; use when a rectangular `btn-primary` won't fit (e.g. Drawer title-bar actions). Must be combined with `btn-icon`.
+  - `btn-icon-danger` — circular icon-only with destructive color. Must be combined with `btn-icon`.
+  - `btn-danger` — rectangular destructive (dialog confirms for delete / discard). Do not compose with `btn-ghost` / `btn-primary`.
+  - `btn-toolbar` — compact icon-only (24×24) for toolbar clusters (font-size, bold, italic, alignment). Use `bg-accent text-accent-foreground` or the `aria-pressed:` variant for active state.
 - If two sibling actions belong to the same action group (for example `Save / Cancel`, `Bind / New`), prefer rendering them on one row and splitting the available width evenly.
 - If button labels are too long for the sidepanel width, shorten the label and keep the icon instead of allowing layout-breaking wrapping.
 - Reuse existing visual patterns across sections. Delete, save, cancel, clear, close, unlock, and confirm actions should look and behave consistently.
@@ -157,21 +164,26 @@ Conditions are validated at save time. Invalid shapes should not be persisted.
 ### Execution behavior
 - Flow steps execute in the relevant frame context.
 - Step execution messages include frame targeting metadata to avoid duplicate execution in multiple frames.
-- For special user prompts (for example Password Vault unlock), the UI is shown in the page (top frame preferred) and the current step continues after successful user input.
+- For user prompts other than the vault unlock (popup confirmation, etc.), the UI is shown in the page (top frame preferred) and the current step continues after successful user input.
+- **The vault unlock prompt is NOT an in-page prompt** — see the next section.
 
 ### Password Vault interaction during runs
+- The master password is **never** entered into page DOM. The threat model includes page scripts actively sniffing keystrokes.
 - If a flow needs a secret and the vault is locked:
-  - The runner requests an **in-page vault unlock prompt**
-  - The user enters the vault password in the page modal
-  - On success, the flow continues from the current step (not from the beginning)
-- If the user cancels:
-  - The flow fails with a user-facing cancellation error
-- If the page refreshes/navigates during prompt:
-  - The run fails quickly (no long timeout wait)
+  - The runner transitions the run to a new `paused` state (visible to the sidepanel, persisted in the 1.13 run sentinel).
+  - The SW opens a dedicated extension-origin unlock window (`chrome-extension://<id>/vaultUnlock.html`, `chrome.windows.create({type:'popup'})`).
+  - The user enters the master password into that window — chrome-extension origin only; page scripts cannot observe it.
+  - On success, the SW resolves the pending unlock, closes the window, transitions the run back to `running`, and the flow **resumes from the current step** (not from the beginning).
+- Failure paths (all surface as failed runs with an appropriate error code):
+  - User clicks Cancel → `secret-vault-unlock-cancelled`.
+  - User closes the window via X or OS / Chrome kills it → same code, via the `chrome.windows.onRemoved` watchdog.
+  - Wrong password submitted → stays inside the unlock window; retry counter increments; run remains `paused` until success, cancel, or close.
+  - SW suspended while the run is `paused` → next cold-start's 1.13 orphan cleanup treats `paused` as an unfinished state and broadcasts `failed` with `sw-suspended-during-run`.
+- The pre-1.4 in-page modal path (`promptFlowVaultUnlockOnPage`, `FLOW_RUN_VAULT_UNLOCK_PROMPT`) and its 1.4′ capture-phase keyboard shield were retired in the 1.4 batch; see [1.4-spec.md](1.4-spec.md).
 
 ### Safety / privacy
-- Vault passwords entered in page prompts are not logged and not stored in flow logs.
-- Flow step result payloads should not include plain-text `inputValue`.
+- The master password never crosses the page-DOM boundary. It lives in the extension-origin unlock window for one JS turn and then inside the SW's AES-key derivation; no page script can observe either realm.
+- Flow step result payloads must not include plain-text `inputValue` (1.5 taint tracking).
 - Password fields using literal values are blocked by policy (save-time and runtime protection).
 
 ### Typical limits (implementation-enforced)

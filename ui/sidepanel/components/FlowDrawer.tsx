@@ -1,5 +1,6 @@
 import { useEffect, useId, useRef, type ReactNode } from 'react';
 import { X } from 'lucide-react';
+import { useFocusTrap } from '../hooks/useFocusTrap';
 import { t } from '../utils/i18n';
 
 type FlowDrawerProps = {
@@ -28,30 +29,22 @@ export default function FlowDrawer({
   const titleId = useId();
   const descriptionId = useId();
   const panelRef = useRef<HTMLDivElement | null>(null);
-  const onCloseRef = useRef(onClose);
 
-  useEffect(() => {
-    onCloseRef.current = onClose;
-  }, [onClose]);
-
+  // 2.8 — body scroll lock stays here (component concern). Focus + Esc +
+  // Tab-trap delegated to useFocusTrap; previous local Escape listener and
+  // panelRef.focus() pair removed.
   useEffect(() => {
     if (!open || typeof document === 'undefined') {
       return;
     }
     const previousOverflow = document.body.style.overflow;
     document.body.style.overflow = 'hidden';
-    panelRef.current?.focus();
-    const handleKey = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') {
-        onCloseRef.current();
-      }
-    };
-    document.addEventListener('keydown', handleKey);
     return () => {
       document.body.style.overflow = previousOverflow;
-      document.removeEventListener('keydown', handleKey);
     };
   }, [open]);
+
+  useFocusTrap(panelRef, open, onClose);
 
   if (!open) {
     return null;

@@ -1,5 +1,7 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useId, useRef, useState } from 'react';
 import { AlertTriangle, Check, Eye, EyeOff, KeyRound, Pencil, Trash2, Unlock, X } from 'lucide-react';
+// 1.1 — all ops in this file require the AES key; all go through the
+// message-based client. The SW owns the key.
 import {
   deleteSecretValue,
   getSecretsVaultStatus,
@@ -7,9 +9,10 @@ import {
   resolveSecretValue,
   unlockSecretsVault,
   upsertSecretValue,
-} from '../../../shared/secrets';
+} from '../../../shared/secretsClient';
 import Card from './Card';
 import ConfirmDialog from './ConfirmDialog';
+import { useFocusTrap } from '../hooks/useFocusTrap';
 import { t } from '../utils/i18n';
 
 type VaultStatus = {
@@ -44,6 +47,9 @@ export default function PasswordVaultManager() {
   const [editingSecretName, setEditingSecretName] = useState<string | null>(null);
   const [pendingDeleteSecretName, setPendingDeleteSecretName] = useState('');
   const [secretEditor, setSecretEditor] = useState<SecretEditorState | null>(null);
+  const vaultPanelRef = useRef<HTMLDivElement | null>(null);
+  const vaultTitleId = useId();
+  const vaultDescriptionId = useId();
 
   const refreshVaultStatus = async () => {
     const status = await getSecretsVaultStatus();
@@ -54,6 +60,11 @@ export default function PasswordVaultManager() {
       names: status.names,
     });
     if (!status.unlocked) {
+      // 2.2 — drop everything that shouldn't survive a lock event. Includes
+      // `vaultPasswordInput` (a wrong master password the user just typed
+      // shouldn't linger in the input box once we observe the vault as
+      // locked) — was missing in the original cleanup set.
+      setVaultPasswordInput('');
       setRevealedVaultValues({});
       setRevealingSecretName(null);
       setEditingSecretName(null);
@@ -144,6 +155,13 @@ export default function PasswordVaultManager() {
     setPendingDeleteSecretName('');
     setSecretEditor(null);
   };
+
+  // 2.8 — vault viewer modal previously had no focus management at all
+  // (no role="dialog", no autofocus, no Esc, no Tab-trap). Hook owns
+  // Escape so it routes through `handleCloseVaultViewer` → existing
+  // cleanup including 2.2's password-input wipe. Declared AFTER the
+  // handler to avoid the TDZ on identifier access at call time.
+  useFocusTrap(vaultPanelRef, isVaultViewerOpen, handleCloseVaultViewer);
 
   const handleResetVault = async () => {
     if (isVaultBusy) {
@@ -461,20 +479,35 @@ export default function PasswordVaultManager() {
         </div>
       </Card>
       {isVaultViewerOpen ? (
-        <div
-          className="fixed inset-0 z-[2147483000] flex items-center justify-center bg-black/40 p-3"
-          onClick={handleCloseVaultViewer}
-        >
+        <>
+          {/* 2.8 — backdrop is now a sibling <button> (was a clickable
+              <div> wrapping the panel). Keyboard users can reach it via
+              Tab and activate via Enter/Space, and the panel is no longer
+              a child of an interactive element. */}
+          <button
+            type="button"
+            className="fixed inset-0 z-[2147483000] bg-black/40"
+            onClick={handleCloseVaultViewer}
+            aria-label={t('sidepanel_action_close', 'Close')}
+          />
           <div
-            className="flex max-h-[85vh] w-full max-w-md flex-col overflow-hidden rounded-xl border border-border bg-card p-3 shadow-2xl"
-            onClick={(event) => event.stopPropagation()}
+            className="pointer-events-none fixed inset-0 z-[2147483000] flex items-center justify-center p-3"
           >
+            <div
+              ref={vaultPanelRef}
+              role="dialog"
+              aria-modal="true"
+              aria-labelledby={vaultTitleId}
+              aria-describedby={vaultDescriptionId}
+              tabIndex={-1}
+              className="pointer-events-auto flex max-h-[85vh] w-full max-w-md flex-col overflow-hidden rounded-xl border border-border bg-card p-3 shadow-2xl"
+            >
             <div className="mb-3 flex items-start justify-between gap-2">
               <div>
-                <h3 className="text-sm font-semibold text-card-foreground">
+                <h3 id={vaultTitleId} className="text-sm font-semibold text-card-foreground">
                   {t('sidepanel_settings_vault_viewer_title', 'Password Vault Viewer')}
                 </h3>
-                <p className="mt-1 text-xs text-muted-foreground">
+                <p id={vaultDescriptionId} className="mt-1 text-xs text-muted-foreground">
                   {t(
                     'sidepanel_settings_vault_viewer_modal_subtitle',
                     'Enter the vault password to view and manage saved passwords.',
@@ -668,8 +701,9 @@ export default function PasswordVaultManager() {
                 </p>
               ) : null}
             </div>
+            </div>
           </div>
-        </div>
+        </>
       ) : null}
       <ConfirmDialog
         open={Boolean(pendingDeleteSecretName)}

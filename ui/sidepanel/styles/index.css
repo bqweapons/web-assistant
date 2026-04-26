@@ -142,4 +142,57 @@
   .btn-icon-danger:hover {
     background-color: color-mix(in oklch, var(--destructive) 12%, transparent);
   }
+
+  /* 2.10 — circular primary-color icon button. Same shape as btn-icon,
+     but carries the primary fill to mark it as the sheet's main action
+     (typical use: Save icon in a Drawer's title-bar actions slot where
+     a rectangular btn-primary won't fit). Must be composed with .btn-icon
+     as the base class. */
+  .btn-icon-primary {
+    background-color: var(--primary);
+    border-color: transparent;
+    color: var(--primary-foreground);
+  }
+
+  .btn-icon-primary:hover {
+    filter: brightness(0.96);
+    background-color: var(--primary);
+  }
+
+  /* 2.10 — rectangular destructive button. Visual weight between btn-ghost
+     and btn-primary but in the destructive color (dialog confirm for
+     delete/discard). Previously this role was hacked into ConfirmDialog as
+     `btn-icon-danger btn-ghost`, which mixed a circular-icon-only modifier
+     with a rectangular base. Use .btn-danger instead for any rectangular
+     destructive action. */
+  .btn-danger {
+    @apply inline-flex cursor-pointer items-center justify-center border px-3 py-2 text-sm font-semibold shadow-sm transition;
+    border-radius: var(--radius);
+    background-color: color-mix(in oklch, var(--destructive) 10%, transparent);
+    border-color: color-mix(in oklch, var(--destructive) 45%, transparent);
+    color: var(--destructive);
+  }
+
+  .btn-danger:hover {
+    background-color: color-mix(in oklch, var(--destructive) 18%, transparent);
+  }
+
+  /* 2.10 — compact icon-only button for toolbar clusters (font-size, bold,
+     italic, alignment, etc.). Previously rendered as `btn-ghost h-6 w-6 p-0`
+     inline at ~9 sites in ElementsSection; the pattern is canonical enough
+     to deserve its own name. Use `bg-accent text-accent-foreground` (or
+     an `aria-pressed:` variant) to mark the active state; leave
+     unpressed styling to this class. */
+  .btn-toolbar {
+    @apply inline-flex h-6 w-6 cursor-pointer items-center justify-center border p-0 text-xs transition;
+    border-radius: var(--radius);
+    background-color: var(--secondary);
+    border-color: var(--border);
+    color: var(--secondary-foreground);
+  }
+
+  .btn-toolbar:hover {
+    background-color: var(--accent);
+    color: var(--accent-foreground);
+  }
 }

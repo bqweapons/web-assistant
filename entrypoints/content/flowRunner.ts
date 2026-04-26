@@ -3,8 +3,6 @@ import type {
   FlowRunAtomicStepType,
   FlowRunExecuteResultPayload,
   FlowRunExecuteStepPayload,
-  FlowRunVaultUnlockPromptPayload,
-  FlowRunVaultUnlockPromptResult,
 } from '../../shared/messages';
 import { isSecretTokenValue } from '../../shared/secrets';
 
@@ -72,12 +70,6 @@ type FlowModalOptions = {
   confirmLabel: string;
   cancelLabel?: string;
   accent?: 'green' | 'blue';
-  passwordField?: {
-    placeholder: string;
-    errorMessage?: string;
-    initialValue?: string;
-  };
-  onSubmit?: (value: string) => string | null;
 };
 
 const showFlowModal = (options: FlowModalOptions) =>
@@ -135,33 +127,10 @@ const showFlowModal = (options: FlowModalOptions) =>
     wordBreak: 'break-word',
   });
 
-  let input: HTMLInputElement | null = null;
-  let errorText: HTMLDivElement | null = null;
-  if (options.passwordField) {
-    input = document.createElement('input');
-    input.type = 'password';
-    input.autocomplete = 'current-password';
-    input.placeholder = options.passwordField.placeholder;
-    input.value = options.passwordField.initialValue || '';
-    Object.assign(input.style, {
-      width: '100%',
-      boxSizing: 'border-box',
-      borderRadius: '10px',
-      border: '1px solid rgba(15, 23, 42, 0.16)',
-      padding: '10px 12px',
-      fontSize: '14px',
-      outline: 'none',
-    });
-    if (options.passwordField.errorMessage) {
-      errorText = document.createElement('div');
-      errorText.textContent = options.passwordField.errorMessage;
-      Object.assign(errorText.style, {
-        color: '#dc2626',
-        fontSize: '12px',
-        lineHeight: '1.4',
-      });
-    }
-  }
+  // 1.4 — password-field branch and its capture-phase keyboard shield
+  // (1.4′) both retired: master password intake moved to an
+  // extension-origin unlock window. The in-page modal now only
+  // renders plain message dialogs (e.g. popup-confirm steps).
 
   const actions = document.createElement('div');
   Object.assign(actions.style, {
@@ -204,7 +173,7 @@ const showFlowModal = (options: FlowModalOptions) =>
   });
 
   let settled = false;
-  const close = (reason: FlowModalAction, value?: string) => {
+  const close = (reason: FlowModalAction) => {
     if (settled) {
       return;
     }
@@ -217,10 +186,13 @@ const showFlowModal = (options: FlowModalOptions) =>
     mount.replaceChildren();
     mount.style.display = 'none';
     host.style.display = 'none';
-    resolve({ action: reason, value });
+    resolve({ action: reason });
   };
 
   const onKeyDown = (event: KeyboardEvent) => {
+    if (!event.isTrusted) {
+      return;
+    }
     if (event.key === 'Escape') {
       event.preventDefault();
       event.stopPropagation();
@@ -239,21 +211,7 @@ const showFlowModal = (options: FlowModalOptions) =>
   const onPageHide = () => close('navigation');
   const onBeforeUnload = () => close('navigation');
   const onCancelClick = () => close('cancel');
-  const onOkClick = () => {
-    const nextValue = input?.value ?? '';
-    if (options.onSubmit) {
-      const validationError = options.onSubmit(nextValue);
-      if (validationError) {
-        if (errorText) {
-          errorText.textContent = validationError;
-        }
-        input?.focus();
-        input?.select();
-        return;
-      }
-    }
-    close('ok', nextValue);
-  };
+  const onOkClick = () => close('ok');
 
   okButton.addEventListener('click', onOkClick);
   cancelButton?.addEventListener('click', onCancelClick);
@@ -267,15 +225,9 @@ const showFlowModal = (options: FlowModalOptions) =>
     actions.append(okButton);
   }
   dialog.append(title, body);
-  if (input) {
-    dialog.append(input);
-  }
-  if (errorText) {
-    dialog.append(errorText);
-  }
   dialog.append(actions);
   mount.append(backdrop, dialog);
-  window.setTimeout(() => (input || okButton).focus(), 0);
+  window.setTimeout(() => okButton.focus(), 0);
 });
 
 const showFlowPopupMessage = (message: string) =>
@@ -286,66 +238,9 @@ const showFlowPopupMessage = (message: string) =>
     accent: 'green',
   }).then((result) => (result.action === 'navigation' ? 'navigation' : 'ok'));
 
-export const promptFlowVaultUnlockOnPage = async (
-  payload: FlowRunVaultUnlockPromptPayload,
-): Promise<FlowRunVaultUnlockPromptResult> => {
-  const descriptionBase = getContentI18nMessage(
-    'content_flow_vault_unlock_description',
-    'This is the password vault master password, not the website login password.',
-  );
-  const fullMessage = descriptionBase;
-  const normalizedPromptError =
-    typeof payload.errorMessage === 'string' && /invalid master password/i.test(payload.errorMessage)
-      ? getContentI18nMessage(
-          'content_flow_vault_unlock_error_invalid_password',
-          'Invalid password vault master password. Please try again.',
-        )
-      : typeof payload.errorMessage === 'string' && /master password is required/i.test(payload.errorMessage)
-        ? getContentI18nMessage(
-            'content_flow_vault_unlock_error_empty_password',
-            'Please enter the password vault master password.',
-          )
-        : (payload.errorMessage || '');
-  const result = await showFlowModal({
-    title: getContentI18nMessage(
-      'content_flow_vault_unlock_title',
-      'Unlock password vault to continue',
-    ),
-    message: fullMessage,
-    confirmLabel: getContentI18nMessage(
-      'content_flow_vault_unlock_submit',
-      'Unlock and continue',
-    ),
-    cancelLabel: getContentI18nMessage(
-      'content_flow_vault_unlock_cancel_stop',
-      'Cancel and stop run',
-    ),
-    accent: 'blue',
-    passwordField: {
-      placeholder: getContentI18nMessage(
-        'content_flow_vault_unlock_password_placeholder',
-        'Password vault master password',
-      ),
-      errorMessage: normalizedPromptError,
-    },
-    onSubmit(value) {
-      if (!value) {
-        return getContentI18nMessage(
-          'content_flow_vault_unlock_error_empty_password',
-          'Please enter the password vault master password.',
-        );
-      }
-      return null;
-    },
-  });
-  if (result.action === 'navigation') {
-    return { action: 'navigation' };
-  }
-  if (result.action === 'cancel') {
-    return { action: 'cancel' };
-  }
-  return { action: 'submit', password: result.value ?? '' };
-};
+// 1.4 — `promptFlowVaultUnlockOnPage` retired. The master password is
+// never collected from page DOM; unlock lives in an extension-origin
+// window coordinated by the SW. See 1.4-spec.md.
 
 const toNumber = (value: unknown) => {
   const parsed = Number(normalizeText(value));
@@ -387,6 +282,71 @@ const isSupportedInputTarget = (element: Element) =>
   element instanceof HTMLSelectElement ||
   (element instanceof HTMLElement && element.isContentEditable);
 
+// 1.6 — Runtime-only sensitivity detection. Checks the live element's
+// attributes, not the selector string. Known limitations (documented so we
+// don't regret later):
+// - <input type="text"> with CSS `-webkit-text-security: disc` or similar
+//   non-standard masking is NOT detected. A site actively working around
+//   the taint heuristic falls outside our obligation to guess.
+// - Selector-based heuristics (#password, [name*="password"]) are
+//   intentionally NOT used; false-positive rate is too high and element-
+//   level detection is both authoritative and precise.
+const isSensitiveInputElement = (element: Element): boolean => {
+  if (!(element instanceof HTMLInputElement)) {
+    return false;
+  }
+  if (element.type?.toLowerCase() === 'password') {
+    return true;
+  }
+  const autocomplete = (element.autocomplete || '').toLowerCase();
+  if (!autocomplete) {
+    return false;
+  }
+  return (
+    autocomplete.includes('password') ||
+    autocomplete.includes('cc-number') ||
+    autocomplete.includes('cc-csc') ||
+    autocomplete.includes('one-time-code')
+  );
+};
+
+// Framework-controlled inputs (React, Vue with `.prop`, etc.) install their own
+// `value` setter on the instance. Assigning via `el.value = x` goes through that
+// override, which may suppress onChange when the tracker's last-known value matches.
+// Invoking the prototype setter bypasses that override so the framework observes
+// a genuine value change on the next input/change dispatch.
+const nativeInputValueSetter = Object.getOwnPropertyDescriptor(
+  HTMLInputElement.prototype,
+  'value',
+)?.set;
+const nativeTextareaValueSetter = Object.getOwnPropertyDescriptor(
+  HTMLTextAreaElement.prototype,
+  'value',
+)?.set;
+const nativeSelectValueSetter = Object.getOwnPropertyDescriptor(
+  HTMLSelectElement.prototype,
+  'value',
+)?.set;
+
+const setControlledValue = (
+  element: HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement,
+  value: string,
+) => {
+  if (element instanceof HTMLInputElement && nativeInputValueSetter) {
+    nativeInputValueSetter.call(element, value);
+    return;
+  }
+  if (element instanceof HTMLTextAreaElement && nativeTextareaValueSetter) {
+    nativeTextareaValueSetter.call(element, value);
+    return;
+  }
+  if (element instanceof HTMLSelectElement && nativeSelectValueSetter) {
+    nativeSelectValueSetter.call(element, value);
+    return;
+  }
+  element.value = value;
+};
+
 const applySelectValue = (element: HTMLSelectElement, rawValue: string) => {
   const options = Array.from(element.options);
   const trimmed = normalizeText(rawValue);
@@ -402,7 +362,7 @@ const applySelectValue = (element: HTMLSelectElement, rawValue: string) => {
   if (!matched) {
     return false;
   }
-  element.value = matched.value;
+  setControlledValue(element, matched.value);
   if (element.value !== matched.value) {
     matched.selected = true;
   }
@@ -534,7 +494,7 @@ const executeInput = async (payload: FlowRunExecuteStepPayload): Promise<FlowRun
   }
   if (queried.element instanceof HTMLInputElement || queried.element instanceof HTMLTextAreaElement) {
     queried.element.focus();
-    queried.element.value = nextValue;
+    setControlledValue(queried.element, nextValue);
     queried.element.dispatchEvent(new Event('input', { bubbles: true }));
     queried.element.dispatchEvent(new Event('change', { bubbles: true }));
   } else if (queried.element instanceof HTMLSelectElement) {
@@ -594,13 +554,19 @@ const executeRead = async (payload: FlowRunExecuteStepPayload): Promise<FlowRunE
     return buildBaseResult(payload, { errorCode: 'selector-not-found', error: 'Element not found.' });
   }
   const actual = readElementValue(queried.element);
+  const sensitive = isSensitiveInputElement(queried.element);
+  // `actual` is preserved even when sensitive — a legit flow may need to
+  // pipe the value into a later step. The runner uses `sensitive` to mark
+  // the destination variable as tainted so logs / renders are redacted.
+  // `details.actual` is stripped so nothing else accidentally picks it up.
   return buildBaseResult(payload, {
     ok: true,
     actual,
+    sensitive,
     details: {
       selector,
       fieldName: getElementLabel(queried.element),
-      actual,
+      actual: sensitive ? undefined : actual,
     },
   });
 };
@@ -613,15 +579,20 @@ const evaluateConditionFromElement = (
   const expected = asString(payload.expected ?? '');
   const actual = readElementValue(element);
   const matched = compareByOperator(actual, expected, operator);
+  const sensitive = isSensitiveInputElement(element);
+  // Sensitive path: strip `actual` from both the top-level and the details
+  // object. The comparison already happened here; downstream only needs
+  // `conditionMatched`. Keeping `actual` around would only add leak surface.
   return buildBaseResult(payload, {
     ok: true,
     conditionMatched: matched,
-    actual,
+    actual: sensitive ? undefined : actual,
+    sensitive,
     details: {
       selector: normalizeText(payload.selector),
       operator,
       expected,
-      actual,
+      actual: sensitive ? undefined : actual,
     },
   });
 };
@@ -646,6 +617,7 @@ const executeAssert = async (payload: FlowRunExecuteStepPayload): Promise<FlowRu
       errorCode: 'assertion-failed',
       error: 'Assertion failed.',
       actual: evaluated.actual,
+      sensitive: evaluated.sensitive,
       conditionMatched: false,
     });
   }

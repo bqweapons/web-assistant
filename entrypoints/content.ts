@@ -7,10 +7,10 @@ import {
   type StructuredElementRecord,
 } from '../shared/siteDataSchema';
 import { startPicker, stopPicker } from './content/picker';
-import { handleInjectionMessage, registerPageContextIfNeeded, resetInjectionRegistry } from './content/injection';
-import { executeFlowRunStep, promptFlowVaultUnlockOnPage } from './content/flowRunner';
+import { handleInjectionMessage, registerPageContextIfNeeded } from './content/injection';
+import { executeFlowRunStep } from './content/flowRunner';
 import { startFlowRecorder, stopFlowRecorder } from './content/flowRecorder';
-import { clearHiddenRulesStyle, rehydratePersistedHiddenRules } from './content/hiddenRules';
+import { rehydratePersistedHiddenRules } from './content/hiddenRules';
 
 const CONTENT_RUNTIME_READY_KEY = '__ladybirdContentRuntimeReady__';
 type RuntimeMessenger = { sendMessage?: (message: unknown) => void };
@@ -56,15 +56,18 @@ const rehydratePersistedElements = async (hrefSnapshot: string) => {
   }
 };
 
+// 1.16 — Fire-and-forget: the content script has no production unload
+// signal, so these listeners / history patches live for the lifetime of
+// the frame. No teardown path.
 const startPageContextWatcher = (
-  runtime?: RuntimeMessenger,
+  runtime: RuntimeMessenger | undefined,
   onUrlChanged?: (href: string) => void,
-) => {
+): void => {
   if (!runtime?.sendMessage) {
-    return () => undefined;
+    return;
   }
   if (window.top !== window) {
-    return () => undefined;
+    return;
   }
   let lastUrl = '';
   const notify = () => {
@@ -83,20 +86,17 @@ const startPageContextWatcher = (
   const wrapHistory = (method: 'pushState' | 'replaceState') => {
     const original = history[method];
     if (typeof original !== 'function') {
-      return () => undefined;
+      return;
     }
     history[method] = function patched(this: History, ...args: Parameters<History['pushState']>) {
       const result = original.apply(this, args);
       notify();
       return result;
     } as typeof original;
-    return () => {
-      history[method] = original;
-    };
   };
 
-  const stopPush = wrapHistory('pushState');
-  const stopReplace = wrapHistory('replaceState');
+  wrapHistory('pushState');
+  wrapHistory('replaceState');
 
   const handlePop = () => notify();
   const handleVisibility = () => notify();
@@ -104,14 +104,6 @@ const startPageContextWatcher = (
   window.addEventListener('hashchange', handlePop, true);
   window.addEventListener('visibilitychange', handleVisibility, true);
   notify();
-
-  return () => {
-    stopPush();
-    stopReplace();
-    window.removeEventListener('popstate', handlePop, true);
-    window.removeEventListener('hashchange', handlePop, true);
-    window.removeEventListener('visibilitychange', handleVisibility, true);
-  };
 };
 
 export default defineContentScript({
@@ -175,7 +167,7 @@ export default defineContentScript({
       void applyLatestRehydrate(reason);
     };
 
-    const stopWatcher = startPageContextWatcher(runtime, () => {
+    startPageContextWatcher(runtime, () => {
       requestRehydrate('url-change');
     });
     registerPageContextIfNeeded(runtime);
@@ -246,6 +238,20 @@ export default defineContentScript({
         case MessageType.FOCUS_ELEMENT:
         case MessageType.SET_EDITING_ELEMENT:
         case MessageType.REHYDRATE_ELEMENTS: {
+          // 1.16 — Element-injection messages are top-frame only. Script is
+          // registered with `allFrames: true` so each iframe gets its own
+          // onMessage listener; senders that don't specify a `frameId` would
+          // otherwise have every frame try to handle the same message, causing
+          // duplicate registry writes and cross-frame selector mismatches.
+          // Picker, flow recorder, and flow step execute keep their all-frames
+          // behavior intentionally (see 1.16 design notes).
+          if (window.top !== window) {
+            sendResponse?.({
+              ok: true,
+              data: { accepted: false, reason: 'ignored_non_top_frame' },
+            });
+            return true;
+          }
           const result = handleInjectionMessage(message);
           sendResponse?.(result ?? { ok: false, error: 'unsupported-message' });
           return true;
@@ -283,30 +289,41 @@ export default defineContentScript({
             });
           return true;
         }
-        case MessageType.FLOW_RUN_VAULT_UNLOCK_PROMPT: {
-          void promptFlowVaultUnlockOnPage(message.data)
-            .then((result) => {
-              sendResponse?.({ ok: true, data: result });
-            })
-            .catch((error) => {
-              sendResponse?.({
-                ok: false,
-                error: error instanceof Error ? error.message : String(error),
-              });
-            });
+        case MessageType.FLOW_RUN_FRAME_PROBE: {
+          // F1 — Per-frame selector probe. Each known frame receives
+          // this via chrome.tabs.sendMessage with an explicit frameId,
+          // so here we simply test whether the selector resolves in
+          // THIS frame's document. Intentionally no top-frame guard:
+          // the whole point is for iframes to respond too. Invalid
+          // selectors report matched:false rather than throwing so the
+          // runner sees a uniform response shape regardless of frame.
+          const selector = message.data?.selector;
+          let matched = false;
+          if (typeof selector === 'string' && selector.length > 0) {
+            try {
+              matched = document.querySelector(selector) !== null;
+            } catch {
+              matched = false;
+            }
+          }
+          sendResponse?.({ ok: true, data: { matched } });
           return true;
         }
+        // 1.4 — `FLOW_RUN_VAULT_UNLOCK_PROMPT` retired. The master
+        // password must never enter page DOM; unlock now happens in
+        // an extension-origin window coordinated by the SW. See
+        // 1.4-spec.md and `entrypoints/vaultUnlock/`.
         default:
           return;
       }
     });
-    return () => {
-      stopWatcher();
-      stopFlowRecorder();
-      clearHiddenRulesStyle();
-      resetInjectionRegistry();
-      storageApi?.removeListener(handleStorageChange);
-      markerHost[CONTENT_RUNTIME_READY_KEY] = false;
-    };
+    // 1.16 — No `return () => {...}` disposer. MV3 content scripts have no
+    // reliable unload signal; WXT invokes the returned disposer only on dev
+    // HMR, not in production. The previous disposer reset
+    // `CONTENT_RUNTIME_READY_KEY` to false but did NOT remove the anonymous
+    // `runtime.onMessage` listener, so a subsequent HMR-triggered `main()`
+    // would re-register a duplicate listener — defeating the marker-based
+    // idempotency guard above. The marker stays set for the lifetime of the
+    // frame; that's the correct production semantic.
   },
 });

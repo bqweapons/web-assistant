@@ -43,7 +43,7 @@ const resolvePlacementMode = (
   return 'dom';
 };
 
-const normalizeStyle = (
+export const normalizeStyle = (
   rawStyle: unknown,
   legacyPreset?: unknown,
   legacyCustomCss?: unknown,

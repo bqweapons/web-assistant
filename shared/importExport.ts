@@ -5,12 +5,16 @@ import {
   deriveSiteKey,
   type StructuredSiteData,
 } from './siteDataSchema';
-import { normalizeStructuredStoragePayload } from './siteDataMigration';
+import { normalizeStructuredStoragePayload, normalizeStyle } from './siteDataMigration';
+import {
+  LegacyImportEnvelopeSchema,
+  UnversionedImportEnvelopeSchema,
+  VersionedImportEnvelopeSchema,
+  formatSchemaError,
+} from './schemas/importPayload';
 import {
   countSitesData,
-  formatCustomCss,
   isRecord,
-  normalizeStringRecord,
   parseTimestamp,
   stableStringify,
 } from './siteDataUtils';
@@ -60,40 +64,17 @@ const isElementType = (value: unknown): value is 'button' | 'link' | 'tooltip' |
 const isElementPosition = (value: unknown): value is 'append' | 'prepend' | 'before' | 'after' =>
   value === 'append' || value === 'prepend' || value === 'before' || value === 'after';
 
-const normalizeStyle = (
-  rawStyle: unknown,
-  legacyPreset?: unknown,
-  legacyCustomCss?: unknown,
-): { preset?: string; inline: Record<string, string>; customCss: string } => {
-  if (isRecord(rawStyle) && ('inline' in rawStyle || 'preset' in rawStyle || 'customCss' in rawStyle)) {
-    const inline = normalizeStringRecord(rawStyle.inline);
-    const customCss =
-      typeof rawStyle.customCss === 'string'
-        ? rawStyle.customCss
-        : typeof legacyCustomCss === 'string'
-          ? legacyCustomCss
-          : formatCustomCss(inline);
-    return {
-      preset:
-        typeof rawStyle.preset === 'string'
-          ? rawStyle.preset
-          : typeof legacyPreset === 'string'
-            ? legacyPreset
-            : undefined,
-      inline,
-      customCss,
-    };
-  }
-
-  const inline = normalizeStringRecord(rawStyle);
-  const customCss = typeof legacyCustomCss === 'string' ? legacyCustomCss : formatCustomCss(inline);
-  return {
-    preset: typeof legacyPreset === 'string' ? legacyPreset : undefined,
-    inline,
-    customCss,
-  };
-};
-
+// 3.5 — `normalizeStyle` was previously duplicated here and in
+// `./siteDataMigration`. Consolidated on the migration-side export (which has
+// the authoritative return type `StructuredElementRecord['style']`).
+// `resolveLegacyPageKey` stays local: its host-derivation uses `deriveSiteKey`
+// (permissive parse) while migration's `resolvePageKey` uses `normalizeSiteKey`
+// (pure-string) for the URL-path branch — the two variants are **observably
+// equivalent** today because `parsed.host` is always a bare hostname there,
+// but the contracts differ in their fallback behavior when the caller passes a
+// non-URL siteKey. Kept distinct to avoid silently changing legacy-import
+// semantics; candidate for future merge once a shared "pageKey from
+// mixed-input" contract is formalized.
 const resolveLegacyPageKey = (pageUrl: string, scope: 'page' | 'site' | 'global', siteKey: string) => {
   if (scope !== 'page') {
     return null;
@@ -400,12 +381,11 @@ const buildLegacySiteData = (
   return [siteKey, { elements, flows, hidden: [] }];
 };
 
-const isLegacyPayload = (raw: unknown): raw is Record<string, unknown[]> => {
-  if (!isRecord(raw)) {
-    return false;
-  }
-  return Object.values(raw).every((value) => Array.isArray(value));
-};
+// 3.7 — Envelope shape gate. Caller has already pre-routed based on
+// presence of `version` / `sites`; this runs zod on top to guarantee the
+// shape matches before the field-level normalizer touches anything.
+const isLegacyPayload = (raw: unknown): raw is Record<string, unknown[]> =>
+  LegacyImportEnvelopeSchema.safeParse(raw).success;
 
 const normalizeSitesObject = (rawSites: Record<string, unknown>) =>
   normalizeStructuredStoragePayload({ sites: rawSites }).payload.sites;
@@ -429,25 +409,36 @@ const buildParsedResultFromSites = (
 };
 
 const parseVersionedPayload = (raw: JsonRecord): ParsedImportPayload => {
-  const version = typeof raw.version === 'string' ? raw.version : '';
-  if (!isRecord(raw.sites)) {
-    throw new Error('Invalid import payload: "sites" must be an object.');
+  // 3.7 — zod gate before hand-off to field-level normalizer. Produces a
+  // structured error with a path like `sites: Expected object, received
+  // string` instead of the bespoke message this branch used to throw.
+  // Note: `version` is schema-typed as `z.unknown()` (see schema header) to
+  // preserve the pre-zod lenient handling of non-string versions; we coerce
+  // it to string here the same way the old code did.
+  const parsed = VersionedImportEnvelopeSchema.safeParse(raw);
+  if (!parsed.success) {
+    throw new Error(`Invalid import payload: ${formatSchemaError(parsed.error)}`);
   }
+  const { version: rawVersion, sites: rawSites, settings: rawSettings } = parsed.data;
+  const version = typeof rawVersion === 'string' ? rawVersion : '';
   const warnings: string[] = [];
   if (!COMPATIBLE_IMPORT_VERSIONS.has(version)) {
     warnings.push(`Imported unknown payload version "${version}" using compatibility normalization.`);
   }
-  const sites = normalizeSitesObject(raw.sites);
-  const settings = isRecord(raw.settings) ? normalizeGlobalSettings(raw.settings) : undefined;
+  const sites = normalizeSitesObject(rawSites);
+  const settings = isRecord(rawSettings) ? normalizeGlobalSettings(rawSettings) : undefined;
   return buildParsedResultFromSites(sites, version, warnings, settings);
 };
 
 const parseUnversionedSitesPayload = (raw: JsonRecord): ParsedImportPayload => {
-  if (!isRecord(raw.sites)) {
-    throw new Error('Invalid import payload: "sites" must be an object.');
+  // 3.7 — zod gate; same rationale as parseVersionedPayload.
+  const parsed = UnversionedImportEnvelopeSchema.safeParse(raw);
+  if (!parsed.success) {
+    throw new Error(`Invalid import payload: ${formatSchemaError(parsed.error)}`);
   }
-  const sites = normalizeSitesObject(raw.sites);
-  const settings = isRecord(raw.settings) ? normalizeGlobalSettings(raw.settings) : undefined;
+  const { sites: rawSites, settings: rawSettings } = parsed.data;
+  const sites = normalizeSitesObject(rawSites);
+  const settings = isRecord(rawSettings) ? normalizeGlobalSettings(rawSettings) : undefined;
   return buildParsedResultFromSites(sites, 'unversioned', [
     'Imported unversioned payload and normalized to canonical schema.',
   ], settings);
@@ -497,7 +488,29 @@ const mergeById = <T>(currentList: T[], incomingList: T[]) => {
     return parseTimestamp(value.updatedAt, 0);
   };
 
-  incomingList.forEach((item) => {
+  // Cap incoming `updatedAt` at "now". Clamp must happen on the item we
+  // actually store, not only on the comparison value — otherwise a crafted
+  // `updatedAt: MAX_SAFE_INTEGER` could (a) still win its first overwrite
+  // against any local item and (b) poison local state so legitimate future
+  // imports can never replace it (their clamped "now" would lose against the
+  // stored giant timestamp). Shallow-copying the record with a clamped
+  // `updatedAt` fixes both: the attacker's first overwrite still happens in
+  // the "tie with now" case, but subsequent imports can replace it normally.
+  const mergeTimestampCeiling = Date.now();
+  const clampItemUpdatedAt = (item: T): T => {
+    if (!isRecord(item)) {
+      return item;
+    }
+    const record = item as Record<string, unknown>;
+    const ts = parseTimestamp(record.updatedAt, 0);
+    if (ts <= mergeTimestampCeiling) {
+      return item;
+    }
+    return { ...record, updatedAt: mergeTimestampCeiling } as unknown as T;
+  };
+
+  incomingList.forEach((rawItem) => {
+    const item = clampItemUpdatedAt(rawItem);
     const id = getItemId(item);
     if (id && idToIndex.has(id)) {
       const currentIndex = idToIndex.get(id) as number;
@@ -574,15 +587,40 @@ export const buildExportPayload = (
   };
 };
 
+// Defense-in-depth: strip keys that would let a crafted import file mutate
+// prototypes when downstream code does bracket assignment with user keys.
+// `JSON.parse` in modern V8 already promotes `__proto__` to an own property
+// (non-mutating), but sanitizing here also protects any caller that parses JSON
+// via a different tool, and hardens future edits against the `obj[userKey] = v`
+// pattern. Cost: one deep copy per import (imports are rare and small).
+const DANGEROUS_KEYS = new Set(['__proto__', 'constructor', 'prototype']);
+const stripDangerousKeys = (value: unknown): unknown => {
+  if (Array.isArray(value)) {
+    return value.map(stripDangerousKeys);
+  }
+  if (!isRecord(value)) {
+    return value;
+  }
+  const next: Record<string, unknown> = {};
+  for (const key of Object.keys(value)) {
+    if (DANGEROUS_KEYS.has(key)) {
+      continue;
+    }
+    next[key] = stripDangerousKeys((value as Record<string, unknown>)[key]);
+  }
+  return next;
+};
+
 export const parseImportPayload = (raw: unknown): ParsedImportPayload => {
-  if (isRecord(raw) && typeof raw.version !== 'undefined') {
-    return parseVersionedPayload(raw);
+  const sanitized = stripDangerousKeys(raw);
+  if (isRecord(sanitized) && typeof sanitized.version !== 'undefined') {
+    return parseVersionedPayload(sanitized);
   }
-  if (isRecord(raw) && isRecord(raw.sites)) {
-    return parseUnversionedSitesPayload(raw);
+  if (isRecord(sanitized) && isRecord(sanitized.sites)) {
+    return parseUnversionedSitesPayload(sanitized);
   }
-  if (isLegacyPayload(raw)) {
-    return parseLegacyPayload(raw);
+  if (isLegacyPayload(sanitized)) {
+    return parseLegacyPayload(sanitized);
   }
   throw new Error('Invalid import payload format.');
 };
