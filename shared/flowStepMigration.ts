@@ -353,6 +353,18 @@ const normalizeExistingFlowStep = (
   return normalized;
 };
 
+// 3.6 — Wrap every return of `normalizeLegacyActionStep` so the version
+// stamp can never be forgotten on a new branch. Earlier revisions stamped
+// only the `input` branch and left set-variable / click / wait / navigate /
+// fallback as v0; future migrations keyed on `step._v < N` would have re-
+// migrated those steps as if they were still legacy. Centralizing the stamp
+// here keeps the invariant "every legacy-normalized step exits at
+// CURRENT_STEP_VERSION" mechanical instead of per-branch discipline.
+const stampLegacy = (step: FlowStepData): FlowStepData => ({
+  ...step,
+  _v: CURRENT_STEP_VERSION,
+});
+
 const normalizeLegacyActionStep = (
   raw: unknown,
   index: number,
@@ -391,7 +403,7 @@ const normalizeLegacyActionStep = (
 
   if (type === 'input') {
     const value = asText(raw.value);
-    return {
+    return stampLegacy({
       id: stepId,
       type: 'input',
       title: 'Fill input',
@@ -405,8 +417,7 @@ const normalizeLegacyActionStep = (
           type: 'text',
         },
       ],
-      _v: CURRENT_STEP_VERSION,
-    };
+    });
   }
 
   if (type === 'set-variable') {
@@ -414,7 +425,7 @@ const normalizeLegacyActionStep = (
     const value = asText(raw.value);
     const selectorValue = asText(raw.selector);
     const sourceMode = selectorValue ? 'selector' : 'value';
-    return {
+    return stampLegacy({
       id: stepId,
       type: 'set-variable',
       title: 'Set Variable',
@@ -452,7 +463,7 @@ const normalizeLegacyActionStep = (
           showWhen: { fieldId: 'sourceMode', value: 'value' },
         },
       ],
-    };
+    });
   }
 
   if (type === 'click') {
@@ -465,13 +476,13 @@ const normalizeLegacyActionStep = (
         type: 'checkbox',
       });
     }
-    return {
+    return stampLegacy({
       id: stepId,
       type: 'click',
       title: 'Click element',
       summary: buildLegacySummary('click', selector, ''),
       fields,
-    };
+    });
   }
 
   if (type === 'wait') {
@@ -502,18 +513,18 @@ const normalizeLegacyActionStep = (
         withPicker: true,
       });
     }
-    return {
+    return stampLegacy({
       id: stepId,
       type: 'wait',
       title: 'Wait',
       summary: buildLegacySummary('wait', selector, duration),
       fields,
-    };
+    });
   }
 
   if (type === 'navigate' || type === 'open' || type === 'goto') {
     const url = asText(raw.url || raw.href || raw.value);
-    return {
+    return stampLegacy({
       id: stepId,
       type: 'navigate',
       title: 'Navigate',
@@ -526,7 +537,7 @@ const normalizeLegacyActionStep = (
           type: 'text',
         },
       ],
-    };
+    });
   }
 
   const fallbackFields = Object.entries(raw)
@@ -539,13 +550,13 @@ const normalizeLegacyActionStep = (
     }))
     .filter((field) => field.value);
 
-  return {
+  return stampLegacy({
     id: stepId,
     type,
     title: type ? `Legacy ${type} step` : 'Legacy step',
     summary: buildLegacySummary(type, selector, ''),
     fields: fallbackFields,
-  };
+  });
 };
 
 export const normalizeFlowSteps = (
