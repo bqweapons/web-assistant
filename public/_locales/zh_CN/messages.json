@@ -32,9 +32,6 @@
   "sidepanel_action_save_changes": {
     "message": "保存更改"
   },
-  "sidepanel_action_save_run": {
-    "message": "保存并运行"
-  },
   "sidepanel_action_settings": {
     "message": "设置"
   },
@@ -422,9 +419,6 @@
   "sidepanel_flows_subtitle": {
     "message": "构建可复用的操作序列。"
   },
-  "sidepanel_flows_summary_title": {
-    "message": "摘要"
-  },
   "sidepanel_flows_title": {
     "message": "操作流程"
   },
@@ -677,9 +671,6 @@
   "sidepanel_flow_input_secret_select_required": {
     "message": "请选择一个密码。"
   },
-  "sidepanel_flow_input_secret_bind_selected": {
-    "message": "绑定所选密码"
-  },
   "sidepanel_flow_input_secret_create": {
     "message": "新建密码"
   },
@@ -694,9 +685,6 @@
   },
   "sidepanel_flow_input_secret_create_and_unlock": {
     "message": "创建并解锁保管库"
-  },
-  "sidepanel_flow_input_secret_save_bind": {
-    "message": "保存并绑定"
   },
   "sidepanel_flow_input_secret_save_bind_action": {
     "message": "保存并绑定"
@@ -1166,12 +1154,6 @@
   "sidepanel_hidden_filter_paused": {
     "message": "已暂停"
   },
-  "sidepanel_hidden_filter_auto": {
-    "message": "自动"
-  },
-  "sidepanel_hidden_filter_manual": {
-    "message": "手动"
-  },
   "sidepanel_hidden_bulk_enable_all": {
     "message": "全部启用"
   },
@@ -1195,12 +1177,6 @@
   },
   "sidepanel_hidden_auto_ads_update_error": {
     "message": "\u66f4\u65b0\u81ea\u52a8\u5e7f\u544a\u5c4f\u853d\u5931\u8d25\uff0c\u8bf7\u91cd\u8bd5\u3002"
-  },
-  "sidepanel_hidden_auto_rule_name": {
-    "message": "自动广告规则"
-  },
-  "sidepanel_hidden_auto_rule_note": {
-    "message": "由“自动隐藏广告”生成。"
   },
   "sidepanel_step_summary_wait_appear": {
     "message": "等待 {selector} 出现"
@@ -1336,12 +1312,6 @@
   },
   "sidepanel_settings_vault_viewer_reset_success": {
     "message": "密码保管库已重置。现在可以创建新的保管库密码。"
-  },
-  "sidepanel_settings_vault_secret_manage_title": {
-    "message": "密码管理"
-  },
-  "sidepanel_settings_vault_secret_manage_hint": {
-    "message": "可以新增、编辑或删除密码库中保存的密码。"
   },
   "sidepanel_settings_vault_secret_editor_create": {
     "message": "新增密码"
@@ -1525,12 +1495,6 @@
   },
   "sidepanel_flow_recording_status_label": {
     "message": "录制器"
-  },
-  "sidepanel_flow_recording_status_active": {
-    "message": "录制中"
-  },
-  "sidepanel_flow_recording_status_idle": {
-    "message": "空闲"
   },
   "sidepanel_flow_recording_hint_basic": {
     "message": "录制页面上的点击和输入操作。"

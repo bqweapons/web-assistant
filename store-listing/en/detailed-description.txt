@@ -27,7 +27,7 @@ Hidden Rules
 Password Vault
 - Save reusable passwords for flow input steps in a locally encrypted Password Vault.
 - Password fields are protected from plain-text flow storage by policy.
-- If a flow needs the vault while the side panel is closed, Ladybird can prompt for vault unlock directly on the page and continue the current step.
+- If a flow needs the vault while it is locked, Ladybird opens a dedicated extension-owned window for the master password (the password never enters the page) and resumes from the current step on success.
 
 Import / Export
 - Export saved configuration as JSON.

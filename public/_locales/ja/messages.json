@@ -32,9 +32,6 @@
   "sidepanel_action_save_changes": {
     "message": "変更を保存"
   },
-  "sidepanel_action_save_run": {
-    "message": "保存して実行"
-  },
   "sidepanel_action_settings": {
     "message": "設定"
   },
@@ -422,9 +419,6 @@
   "sidepanel_flows_subtitle": {
     "message": "再利用可能なアクション手順を作成します。"
   },
-  "sidepanel_flows_summary_title": {
-    "message": "サマリー"
-  },
   "sidepanel_flows_title": {
     "message": "アクションフロー"
   },
@@ -497,12 +491,6 @@
   "sidepanel_hidden_filter_paused": {
     "message": "停止"
   },
-  "sidepanel_hidden_filter_auto": {
-    "message": "自動"
-  },
-  "sidepanel_hidden_filter_manual": {
-    "message": "手動"
-  },
   "sidepanel_hidden_selector_placeholder": {
     "message": "CSS セレクター"
   },
@@ -538,12 +526,6 @@
   },
   "sidepanel_hidden_auto_ads_update_error": {
     "message": "\u81ea\u52d5\u5e83\u544a\u30d6\u30ed\u30c3\u30af\u3092\u66f4\u65b0\u3067\u304d\u307e\u305b\u3093\u3067\u3057\u305f\u3002\u3082\u3046\u4e00\u5ea6\u304a\u8a66\u3057\u304f\u3060\u3055\u3044\u3002"
-  },
-  "sidepanel_hidden_auto_rule_name": {
-    "message": "自動広告ルール"
-  },
-  "sidepanel_hidden_auto_rule_note": {
-    "message": "広告自動非表示から生成されたルールです。"
   },
   "sidepanel_hidden_action_select": {
     "message": "\u30da\u30fc\u30b8\u8981\u7d20\u3092\u975e\u8868\u793a"
@@ -740,9 +722,6 @@
   "sidepanel_flow_input_secret_select_required": {
     "message": "パスワードを選択してください。"
   },
-  "sidepanel_flow_input_secret_bind_selected": {
-    "message": "選択したパスワードを紐付け"
-  },
   "sidepanel_flow_input_secret_create": {
     "message": "新しいパスワードを作成"
   },
@@ -757,9 +736,6 @@
   },
   "sidepanel_flow_input_secret_create_and_unlock": {
     "message": "保管庫を作成して解除"
-  },
-  "sidepanel_flow_input_secret_save_bind": {
-    "message": "保存して紐付け"
   },
   "sidepanel_flow_input_secret_save_bind_action": {
     "message": "保存してバインド"
@@ -1337,12 +1313,6 @@
   "sidepanel_settings_vault_viewer_reset_success": {
     "message": "パスワード保管庫をリセットしました。新しい保管庫パスワードを作成できます。"
   },
-  "sidepanel_settings_vault_secret_manage_title": {
-    "message": "パスワード管理"
-  },
-  "sidepanel_settings_vault_secret_manage_hint": {
-    "message": "保管庫に保存されたパスワードを追加・編集・削除できます。"
-  },
   "sidepanel_settings_vault_secret_editor_create": {
     "message": "パスワードを追加"
   },
@@ -1525,12 +1495,6 @@
   },
   "sidepanel_flow_recording_status_label": {
     "message": "レコーダー"
-  },
-  "sidepanel_flow_recording_status_active": {
-    "message": "記録中"
-  },
-  "sidepanel_flow_recording_status_idle": {
-    "message": "待機中"
   },
   "sidepanel_flow_recording_hint_basic": {
     "message": "ページ上のクリックと入力を記録します。"

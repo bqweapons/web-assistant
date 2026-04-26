@@ -35,9 +35,6 @@
   "sidepanel_action_save_changes": {
     "message": "Save changes"
   },
-  "sidepanel_action_save_run": {
-    "message": "Save & Run"
-  },
   "sidepanel_action_settings": {
     "message": "Settings"
   },
@@ -461,9 +458,6 @@
   "sidepanel_flows_subtitle": {
     "message": "Build reusable action sequences."
   },
-  "sidepanel_flows_summary_title": {
-    "message": "Summary"
-  },
   "sidepanel_flows_title": {
     "message": "Action flows"
   },
@@ -539,12 +533,6 @@
   "sidepanel_hidden_filter_paused": {
     "message": "Paused"
   },
-  "sidepanel_hidden_filter_auto": {
-    "message": "Auto"
-  },
-  "sidepanel_hidden_filter_manual": {
-    "message": "Manual"
-  },
   "sidepanel_hidden_selector_placeholder": {
     "message": "CSS selector"
   },
@@ -580,12 +568,6 @@
   },
   "sidepanel_hidden_auto_ads_update_error": {
     "message": "Failed to update automatic ad blocking. Please try again."
-  },
-  "sidepanel_hidden_auto_rule_name": {
-    "message": "Auto ad rule"
-  },
-  "sidepanel_hidden_auto_rule_note": {
-    "message": "Generated from Auto hide ads."
   },
   "sidepanel_hidden_action_select": {
     "message": "Hide page element"
@@ -782,9 +764,6 @@
   "sidepanel_flow_input_secret_select_required": {
     "message": "Please choose a password."
   },
-  "sidepanel_flow_input_secret_bind_selected": {
-    "message": "Bind selected password"
-  },
   "sidepanel_flow_input_secret_bind_action": {
     "message": "Bind"
   },
@@ -799,9 +778,6 @@
   },
   "sidepanel_flow_input_secret_create_and_unlock": {
     "message": "Create vault and unlock"
-  },
-  "sidepanel_flow_input_secret_save_bind": {
-    "message": "Save and bind"
   },
   "sidepanel_flow_input_secret_save_bind_action": {
     "message": "Save & bind"
@@ -1337,12 +1313,6 @@
   "sidepanel_settings_vault_viewer_reset_success": {
     "message": "Password vault was reset. You can create a new vault password now."
   },
-  "sidepanel_settings_vault_secret_manage_title": {
-    "message": "Manage passwords"
-  },
-  "sidepanel_settings_vault_secret_manage_hint": {
-    "message": "Add, edit, or delete saved passwords stored in the vault."
-  },
   "sidepanel_settings_vault_secret_editor_create": {
     "message": "Add password"
   },
@@ -1525,12 +1495,6 @@
   },
   "sidepanel_flow_recording_status_label": {
     "message": "Recorder"
-  },
-  "sidepanel_flow_recording_status_active": {
-    "message": "Recording"
-  },
-  "sidepanel_flow_recording_status_idle": {
-    "message": "Idle"
   },
   "sidepanel_flow_recording_hint_basic": {
     "message": "Record clicks and inputs from the page."
