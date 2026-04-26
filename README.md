@@ -64,7 +64,7 @@ Load the unpacked extension from:
 ### Password Vault (Flows)
 - Use the Password Vault UI when binding password inputs in flow steps.
 - Password fields are blocked from plain-text persistence in flows.
-- If the vault is locked during a run, Ladybird can prompt for vault unlock directly on the page and continue the current step.
+- If the vault is locked during a run, Ladybird opens a dedicated unlock window owned by the extension (the master password never enters the page) and resumes from the current step on success. Closing or cancelling the window fails the run.
 - If you forget the vault password, the vault **cannot be recovered**. You must reset it (saved vault passwords are deleted).
 
 ## Action Flow (Overview)

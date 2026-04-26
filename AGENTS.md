@@ -13,19 +13,25 @@ Repository conventions and action-flow reference for Ladybird (WXT mainline).
 ### Core folders
 - `entrypoints/`
   - `background/` background runtime, runner, tab bridge
+    - `runner/` flow execution: `stepExecution.ts` (FlowRunnerManager class), `types.ts` (shared types + `MAX_*` limits), `vaultUnlockCoord.ts` (1.4 unlock-window coordination), `runSentinel.ts` (1.13 SW-suspension fail-close), `flowHelpers.ts`, `stepMessages.ts`, `tokenRenderer.ts`, `dataSource.ts`, `jsTransformExecutor.ts`
   - `content.ts` content entrypoint and runtime message handling
-  - `content/flowRunner.ts` page-side flow step execution + modal UI helpers
+  - `content/flowRunner.ts` page-side flow step execution + in-page popup modals
+  - `content/injection/` injection logic split (3.2): `registry`, `hostFactory`, `dragController`, `resizeController`, `dropTargets`, `reconciler`, plus `shared`, `style`, `selector`, `fileRun`, `runtimeBridge`. `entrypoints/content/injection.ts` is the thin composition root.
+  - `vaultUnlock/` (1.4) dedicated extension-origin window for vault unlock — `index.html` + `main.tsx` + `UnlockDialog.tsx`. Master password never enters page DOM.
 - `ui/sidepanel/`
   - `App.tsx` sidepanel tabs/header
   - `sections/` Elements / Flows / Hidden / Overview / Settings
+  - `sections/elements/` (3.3) extracted sub-components from ElementsSection (`ElementCard`, `ElementStyleEditor`, `ElementBasicsAction`, helpers)
   - `components/` shared controls and flow editor UI
+  - `hooks/` (3.3) reusable hooks: `useFlowStepsDraft`, `useElementsWriteQueue`, etc.
+  - `utils/i18n.ts` shared locale store (also consumed by `entrypoints/vaultUnlock/`)
 - `shared/`
-  - `messages.ts` runtime message contracts
-  - `storage.ts` structured site data persistence + legacy import migration
-  - `importExport.ts` import/export + legacy format parsing
+  - `messages.ts` runtime message contracts (single source of truth for the typed message bus)
+  - `storage.ts` + `siteDataSchema.ts` + `siteDataMigration.ts` + `flowStepMigration.ts` structured site data persistence + legacy migration (with 3.6 `_v` version stamp on flow steps)
+  - `importExport.ts` import/export + legacy format parsing (3.7 zod schema validation at the import envelope)
   - `secrets.ts` Password Vault (local encrypted secrets)
 - `public/_locales/{en,ja,zh_CN}/messages.json`
-  - sidepanel/content i18n resources
+  - sidepanel/content/vaultUnlock i18n resources
 - `scripts/`
   - `dev.mjs` dev runner helper
   - `check-locales.mjs` locale integrity gate

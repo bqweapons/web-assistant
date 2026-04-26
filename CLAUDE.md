@@ -38,20 +38,27 @@ Three extension surfaces communicate via a typed message bus; all message kinds 
 ### 1. Background (service worker) — `entrypoints/background.ts` → `background/bootstrap.ts`
 - Bootstraps side-panel behavior (`openPanelOnActionClick`), instantiates `TabBridge` and `FlowRunnerManager`, and registers the single `runtime.onMessage` listener.
 - Routes sidepanel → content messages via `TabBridge` (forwards to requested tab or active tab, re-injects content script if needed).
-- Listens to `tabs.onUpdated` / `tabs.onActivated` to broadcast `ACTIVE_PAGE_CONTEXT`.
-- `background/runner/` owns flow execution orchestration (`FlowRunnerManager.ts`, `stepExecution.ts`, `tokenRenderer.ts`, `dataSource.ts`, `jsTransformExecutor.ts`). **This is the source of truth for step/iteration/timeout limits.**
+- Listens to `tabs.onUpdated` / `tabs.onActivated` to broadcast `ACTIVE_PAGE_CONTEXT`. Skips broadcasts whose active tab is one of our own extension URLs (vault unlock window, etc.) so they don't clobber the sidepanel's current-page context.
+- `background/runner/` owns flow execution orchestration. After 3.1 the file split is: `stepExecution.ts` (the `FlowRunnerManager` class + dispatcher), `types.ts` (shared types, `RunnerError`, `MAX_*` limits), `vaultUnlockCoord.ts` (1.4 unlock-window coordinator), `runSentinel.ts` (1.13 SW-suspension fail-close sentinel), `flowHelpers.ts`, `stepMessages.ts`, plus `tokenRenderer.ts` / `dataSource.ts` / `jsTransformExecutor.ts`. **`stepExecution.ts` is the source of truth for step/iteration/timeout limits.** No barrel — import directly from `./stepExecution`.
 - `transformRuntime.ts` + `transformSandbox.worker.ts` run user JS transforms in a web worker sandbox.
 
 ### 2. Content script — `entrypoints/content.ts` + `entrypoints/content/`
-- `injection.ts` injects and rehydrates structured elements (button/link/tooltip/area) onto the page.
-- `flowRunner.ts` is the page-side executor for individual flow steps dispatched by the background runner; also renders in-page modals (popups, vault-unlock prompt).
+- `injection.ts` is now the thin composition root. After 3.2 the actual injection logic lives under `entrypoints/content/injection/` (`registry`, `hostFactory`, `dragController`, `resizeController`, `dropTargets`, `reconciler`, plus existing `shared`, `style`, `selector`, `fileRun`, `runtimeBridge`).
+- `flowRunner.ts` is the page-side executor for individual flow steps dispatched by the background runner; also renders in-page popup modals. Vault unlock is **NOT** in-page — see surface 4 below.
 - `flowRecorder.ts` records user interactions into flow steps. `picker.ts` drives the selector/area picker. `hiddenRules.ts` applies user-hide-element rules.
-- Only the top frame rehydrates persisted elements; frame-targeted execution metadata prevents duplicate runs across iframes.
+- Only the top frame rehydrates persisted elements (1.16). Frame-targeted execution metadata + the F1 per-step `FLOW_RUN_FRAME_PROBE` resolve flow steps to a specific iframe via the persisted `targetFrame.url` locator.
 
 ### 3. Sidepanel UI — `entrypoints/sidepanel/` + `ui/sidepanel/`
 - `App.tsx` hosts the tabbed shell: **Elements / Flows / Hidden / Overview / Settings** (see `ui/sidepanel/sections/`).
 - `components/` holds shared controls. Use these rather than introducing new button/dialog/dropdown primitives — see the UI rules in `AGENTS.md` §3.
 - `components/PasswordVaultManager.tsx` + `components/flowSteps/` contain the Password Vault editor and per-step-type editors.
+- `hooks/` (populated by 3.3) — `useFlowStepsDraft`, `useElementsWriteQueue`, etc. Cross-section reusable state lives here, not inline.
+- `sections/elements/` (populated by 3.3) — sub-components extracted from `ElementsSection.tsx` (`ElementCard`, `ElementStyleEditor`, `ElementBasicsAction`, `pageUrlFormat`, `styleUtils`).
+
+### 4. Vault unlock window — `entrypoints/vaultUnlock/`
+- Dedicated extension-origin popup launched by the SW when a flow needs a secret while the vault is locked (1.4). The master password never enters page DOM.
+- `index.html` + `main.tsx` + `UnlockDialog.tsx`. Reuses the sidepanel locale store (`ui/sidepanel/utils/i18n.ts`) so the window follows the user-selected language, not browser UI language.
+- Coordination: SW transitions the run to `paused`, opens the window via `chrome.windows.create({type:'popup'})`, awaits `FLOW_RUN_UNLOCK_SUBMIT`, resolves and resumes from the current step on success. Window closure (X / OS) → `chrome.windows.onRemoved` watchdog fails the run as cancelled (with a submit-in-flight guard so a correct password racing a window-close still succeeds).
 
 ### Shared layer — `shared/`
 - `messages.ts` — runtime message contracts (enum + payload types). **Always the first file to edit when changing cross-surface behavior.**
@@ -62,7 +69,7 @@ Three extension surfaces communicate via a typed message bus; all message kinds 
 - `urlKeys.ts` — canonical `siteKey` / `pageKey` derivation; both content and background must agree on these.
 
 ### Flow runtime (summary)
-Flows run when an injected element is clicked. Step types: `click`, `wait`, `input`, `navigate`, `log`, `if`, `while`, `popup`. See `AGENTS.md` §5–§8 for field-level semantics. If the vault is locked during a run, the runner shows an in-page unlock modal and resumes the current step on success; cancel fails the run. Password fields are policy-blocked from persisting literal values — both at save time and runtime.
+Flows run when an injected element is clicked. Step types: `click`, `input`, `wait`, `assert`, `popup`, `navigate`, `loop`, `if-else`, `data-source`, `set-variable` (whitelist enforced at import / migration in `shared/flowStepMigration.ts`). See `AGENTS.md` §5–§8 for field-level semantics. If the vault is locked during a run, the runner transitions the run to a `paused` state, opens the extension-origin unlock window (`entrypoints/vaultUnlock/`), and resumes from the current step on `FLOW_RUN_UNLOCK_SUBMIT` success; close / cancel fails the run with `secret-vault-unlock-cancelled`. Password fields are policy-blocked from persisting literal values — both at save time and runtime. SW suspension during any non-terminal run is fail-closed via the 1.13 `chrome.storage.session` sentinel + cold-start orphan cleanup.
 
 ## Non-obvious conventions
 
