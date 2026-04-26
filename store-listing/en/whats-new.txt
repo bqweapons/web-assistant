@@ -1,10 +1,8 @@
-This release expands flow authoring and simplifies built-in ad blocking.
+This release focuses on Password Vault security and iframe support.
 
-- Added runtime variables with `set-variable`, including reusable `{{var.name}}` tokens across later steps.
-- Added `{{loop.index}}` and `{{row.index}}` tokens for loop and data-source steps.
-- `set-variable` can now read values from page elements by selector.
-- Improved the step editor with variable shortcuts in more fields and more consistent mode-switch tabs.
-- Automatic ad blocking is now a built-in global feature instead of per-site stored rules.
-- Hidden Rules UI now separates manual site rules from the global automatic ad-blocking toggle.
+- Password Vault: the master password is now entered in a dedicated extension-owned window, so page scripts can no longer observe it (it is no longer typed into the page).
+- Flows can now target elements inside iframes via per-step frame matching captured at recording time.
+- Long-running flows are now safely failed when the browser suspends the background worker mid-run, instead of getting stuck.
+- Stronger vault encryption (PBKDF2 hardened to 600k rounds; the AES key is kept non-extractable inside the service worker).
 
-Also includes UI, i18n, and flow-runner polish across recent screens.
+Also includes sidepanel and flow-runner polish across recent screens.
