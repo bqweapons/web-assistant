@@ -1271,6 +1271,7 @@ export default function ElementsSection({
     setInjectionError('');
     const closingId = activeElementId;
     const isDraft = Boolean(closingId && draftElementId && closingId === draftElementId);
+    const savedElement = closingId && !isDraft && activeElement?.id === closingId ? activeElement : null;
     if (previewTimerRef.current != null) {
       window.clearTimeout(previewTimerRef.current);
       previewTimerRef.current = null;
@@ -1298,8 +1299,18 @@ export default function ElementsSection({
         });
       setDraftElementId(null);
     }
+    if (savedElement) {
+      try {
+        await sendElementMessage(MessageType.UPDATE_ELEMENT, { element: toMessageElementPayload(savedElement) });
+        setInjectionError('');
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        setInjectionError(message);
+      }
+    }
     setActiveElementId(null);
   }, [
+    activeElement,
     activeElementId,
     draftElementId,
     previewTimerRef,
