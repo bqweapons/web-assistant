@@ -836,6 +836,9 @@
   "sidepanel_step_set_variable_hint": {
     "message": "后续步骤可通过以下令牌读取此值："
   },
+  "sidepanel_step_set_variable_token_syntax_hint": {
+    "message": "请使用单数 var，例如 {{var.name}}；{{vars.name}} 不会被替换。"
+  },
   "sidepanel_step_set_variable_selector_hint": {
     "message": "请通过标签在 Value 输入和 Selector 获取之间切换。"
   },
@@ -916,6 +919,9 @@
   },
   "sidepanel_steps_count": {
     "message": "{count} 步"
+  },
+  "sidepanel_flow_configured_steps_count": {
+    "message": "{count} 配置步"
   },
   "sidepanel_steps_delete": {
     "message": "删除步骤"
@@ -1053,7 +1059,7 @@
     "message": "等待密码保管库解锁"
   },
   "sidepanel_flow_runner_progress": {
-    "message": "{done}/{total} 步"
+    "message": "{done}/{total} 运行步"
   },
   "sidepanel_flow_runner_stop": {
     "message": "停止"

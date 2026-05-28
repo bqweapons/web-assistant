@@ -1268,6 +1268,12 @@ export default function FlowStepsBuilder({
                       </p>
                       <p className="text-[11px] text-muted-foreground">
                         {t(
+                          'sidepanel_step_set_variable_token_syntax_hint',
+                          'Use singular var, e.g. {{var.name}}. {{vars.name}} is not replaced.',
+                        )}
+                      </p>
+                      <p className="text-[11px] text-muted-foreground">
+                        {t(
                           'sidepanel_step_set_variable_selector_hint',
                           'Use the tabs to switch between Value input and Selector source.',
                         )}
@@ -1525,4 +1531,3 @@ export default function FlowStepsBuilder({
     </div>
   );
 }
-

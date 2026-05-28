@@ -860,6 +860,9 @@
   "sidepanel_step_set_variable_hint": {
     "message": "後続のステップでは次のトークンで参照できます:"
   },
+  "sidepanel_step_set_variable_token_syntax_hint": {
+    "message": "単数形の var を使用してください。例: {{var.name}}。{{vars.name}} は置換されません。"
+  },
   "sidepanel_step_set_variable_selector_hint": {
     "message": "\u30bf\u30d6\u3067 Value \u5165\u529b\u3068 Selector \u53d6\u5f97\u3092\u5207\u308a\u66ff\u3048\u3066\u304f\u3060\u3055\u3044\u3002"
   },
@@ -973,6 +976,9 @@
   },
   "sidepanel_steps_count": {
     "message": "{count} ステップ"
+  },
+  "sidepanel_flow_configured_steps_count": {
+    "message": "{count} 設定ステップ"
   },
   "sidepanel_steps_delete": {
     "message": "ステップを削除"
@@ -1110,7 +1116,7 @@
     "message": "保管庫の解除を待機中"
   },
   "sidepanel_flow_runner_progress": {
-    "message": "{done}/{total} ステップ"
+    "message": "{done}/{total} 実行ステップ"
   },
   "sidepanel_flow_runner_stop": {
     "message": "停止"

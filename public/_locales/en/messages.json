@@ -908,6 +908,9 @@
   "sidepanel_step_set_variable_hint": {
     "message": "Later steps can read this value with"
   },
+  "sidepanel_step_set_variable_token_syntax_hint": {
+    "message": "Use singular var, e.g. {{var.name}}. {{vars.name}} is not replaced."
+  },
   "sidepanel_step_set_variable_selector_hint": {
     "message": "Use the tabs to switch between Value input and Selector source."
   },
@@ -1037,6 +1040,9 @@
   "sidepanel_steps_count": {
     "message": "{count} steps"
   },
+  "sidepanel_flow_configured_steps_count": {
+    "message": "{count} config steps"
+  },
   "sidepanel_steps_delete": {
     "message": "Delete step"
   },
@@ -1161,7 +1167,7 @@
     "message": "Waiting for vault unlock"
   },
   "sidepanel_flow_runner_progress": {
-    "message": "{done}/{total} steps"
+    "message": "{done}/{total} run steps"
   },
   "sidepanel_flow_runner_stop": {
     "message": "Stop"

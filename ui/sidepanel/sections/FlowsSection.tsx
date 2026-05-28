@@ -714,7 +714,7 @@ export default function FlowsSection({
                     </p>
                     {runStatus ? (
                       <span className="rounded-full border border-border bg-background px-2 py-0.5 text-[10px] font-semibold text-muted-foreground">
-                        {t('sidepanel_flow_runner_progress', '{done}/{total} steps')
+                        {t('sidepanel_flow_runner_progress', '{done}/{total} run steps')
                           .replace('{done}', String(runStatus.progress.completedSteps))
                           .replace('{total}', String(runStatus.progress.totalSteps))}
                       </span>
@@ -927,7 +927,10 @@ export default function FlowsSection({
               </div>
               <div className="mt-2 flex items-center justify-between text-xs text-muted-foreground">
                 <span className="badge-pill">
-                  {t('sidepanel_steps_count', '{count} steps').replace('{count}', String(getStepCount(flow.steps)))}
+                  {t('sidepanel_flow_configured_steps_count', '{count} config steps').replace(
+                    '{count}',
+                    String(getStepCount(flow.steps)),
+                  )}
                 </span>
                 <span className="truncate">{formatTimestamp(flow.updatedAt)}</span>
               </div>
