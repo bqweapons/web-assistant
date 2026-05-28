@@ -1,0 +1,1027 @@
+{
+  "version": "1.0.3",
+  "sites": {
+    "bqweapons.github.io": {
+      "elements": [],
+      "hidden": [],
+      "flows": [
+        {
+          "id": "flow-test-01-input-assert",
+          "name": "FT01 Input and Assert",
+          "description": "Input customerId, then assert the value.",
+          "scope": "page",
+          "siteKey": "bqweapons.github.io",
+          "pageKey": "bqweapons.github.io/web-assistant/test-pages/data-source/datasource-form-a.html",
+          "updatedAt": 1779954000000,
+          "steps": [
+            {
+              "id": "ft01-input-customer-id",
+              "type": "input",
+              "title": "Input",
+              "summary": "Set customerId to FT-CUST-001",
+              "fields": [
+                {
+                  "id": "selector",
+                  "label": "Selector",
+                  "type": "text",
+                  "value": "input[name=\"customerId\"]",
+                  "withPicker": true
+                },
+                {
+                  "id": "value",
+                  "label": "Value",
+                  "type": "text",
+                  "value": "FT-CUST-001"
+                }
+              ]
+            },
+            {
+              "id": "ft01-assert-customer-id",
+              "type": "assert",
+              "title": "Assert",
+              "summary": "customerId equals FT-CUST-001",
+              "fields": [
+                {
+                  "id": "selector",
+                  "label": "Selector",
+                  "type": "text",
+                  "value": "input[name=\"customerId\"]",
+                  "withPicker": true
+                },
+                {
+                  "id": "operator",
+                  "label": "Operator",
+                  "type": "select",
+                  "value": "equals"
+                },
+                {
+                  "id": "expected",
+                  "label": "Expected",
+                  "type": "text",
+                  "value": "FT-CUST-001"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "flow-test-02-click-reset",
+          "name": "FT02 Click Reset",
+          "description": "Input a value, click reset, then assert customerId is empty.",
+          "scope": "page",
+          "siteKey": "bqweapons.github.io",
+          "pageKey": "bqweapons.github.io/web-assistant/test-pages/data-source/datasource-form-a.html",
+          "updatedAt": 1779954000000,
+          "steps": [
+            {
+              "id": "ft02-input-before-reset",
+              "type": "input",
+              "title": "Input",
+              "summary": "Set customerId before reset",
+              "fields": [
+                {
+                  "id": "selector",
+                  "label": "Selector",
+                  "type": "text",
+                  "value": "input[name=\"customerId\"]",
+                  "withPicker": true
+                },
+                {
+                  "id": "value",
+                  "label": "Value",
+                  "type": "text",
+                  "value": "TEMP-RESET"
+                }
+              ]
+            },
+            {
+              "id": "ft02-click-reset",
+              "type": "click",
+              "title": "Click",
+              "summary": "Click #reset-button",
+              "fields": [
+                {
+                  "id": "selector",
+                  "label": "Selector",
+                  "type": "text",
+                  "value": "#reset-button",
+                  "withPicker": true
+                }
+              ]
+            },
+            {
+              "id": "ft02-assert-reset",
+              "type": "assert",
+              "title": "Assert",
+              "summary": "customerId is empty after reset",
+              "fields": [
+                {
+                  "id": "selector",
+                  "label": "Selector",
+                  "type": "text",
+                  "value": "input[name=\"customerId\"]",
+                  "withPicker": true
+                },
+                {
+                  "id": "operator",
+                  "label": "Operator",
+                  "type": "select",
+                  "value": "equals"
+                },
+                {
+                  "id": "expected",
+                  "label": "Expected",
+                  "type": "text",
+                  "value": ""
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "flow-test-03-variable-popup",
+          "name": "FT03 Set Variable and Popup",
+          "description": "Set a variable and render it in a popup.",
+          "scope": "page",
+          "siteKey": "bqweapons.github.io",
+          "pageKey": "bqweapons.github.io/web-assistant/test-pages/data-source/datasource-form-a.html",
+          "updatedAt": 1779954000000,
+          "steps": [
+            {
+              "id": "ft03-set-variable",
+              "type": "set-variable",
+              "title": "Set variable",
+              "summary": "Set flowMessage",
+              "fields": [
+                {
+                  "id": "name",
+                  "label": "Name",
+                  "type": "text",
+                  "value": "flowMessage"
+                },
+                {
+                  "id": "sourceMode",
+                  "label": "Source",
+                  "type": "select",
+                  "value": "value"
+                },
+                {
+                  "id": "selector",
+                  "label": "Selector",
+                  "type": "text",
+                  "value": "",
+                  "withPicker": true
+                },
+                {
+                  "id": "value",
+                  "label": "Value",
+                  "type": "text",
+                  "value": "Variable OK"
+                }
+              ]
+            },
+            {
+              "id": "ft03-popup-variable",
+              "type": "popup",
+              "title": "Popup",
+              "summary": "Show variable value",
+              "fields": [
+                {
+                  "id": "message",
+                  "label": "Message",
+                  "type": "textarea",
+                  "value": "{{var.flowMessage}}"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "flow-test-04-wait-assert",
+          "name": "FT04 Wait Modes and Assert",
+          "description": "Exercise wait time, appear, disappear and condition modes.",
+          "scope": "page",
+          "siteKey": "bqweapons.github.io",
+          "pageKey": "bqweapons.github.io/web-assistant/test-pages/data-source/datasource-form-a.html",
+          "updatedAt": 1779954000000,
+          "steps": [
+            {
+              "id": "ft04-wait-time",
+              "type": "wait",
+              "title": "Wait",
+              "summary": "Wait 100 ms",
+              "fields": [
+                {
+                  "id": "mode",
+                  "label": "Mode",
+                  "type": "select",
+                  "value": "time"
+                },
+                {
+                  "id": "duration",
+                  "label": "Duration",
+                  "type": "number",
+                  "value": "100"
+                },
+                {
+                  "id": "selector",
+                  "label": "Selector",
+                  "type": "text",
+                  "value": "",
+                  "withPicker": true
+                },
+                {
+                  "id": "operator",
+                  "label": "Operator",
+                  "type": "select",
+                  "value": "contains"
+                },
+                {
+                  "id": "expected",
+                  "label": "Expected",
+                  "type": "text",
+                  "value": ""
+                }
+              ]
+            },
+            {
+              "id": "ft04-wait-appear",
+              "type": "wait",
+              "title": "Wait",
+              "summary": "Wait for submit button to appear",
+              "fields": [
+                {
+                  "id": "mode",
+                  "label": "Mode",
+                  "type": "select",
+                  "value": "appear"
+                },
+                {
+                  "id": "duration",
+                  "label": "Duration",
+                  "type": "number",
+                  "value": "0"
+                },
+                {
+                  "id": "selector",
+                  "label": "Selector",
+                  "type": "text",
+                  "value": "button#submit-button",
+                  "withPicker": true
+                },
+                {
+                  "id": "operator",
+                  "label": "Operator",
+                  "type": "select",
+                  "value": "contains"
+                },
+                {
+                  "id": "expected",
+                  "label": "Expected",
+                  "type": "text",
+                  "value": ""
+                }
+              ]
+            },
+            {
+              "id": "ft04-wait-disappear",
+              "type": "wait",
+              "title": "Wait",
+              "summary": "Wait for missing selector to be absent",
+              "fields": [
+                {
+                  "id": "mode",
+                  "label": "Mode",
+                  "type": "select",
+                  "value": "disappear"
+                },
+                {
+                  "id": "duration",
+                  "label": "Duration",
+                  "type": "number",
+                  "value": "0"
+                },
+                {
+                  "id": "selector",
+                  "label": "Selector",
+                  "type": "text",
+                  "value": "#flow-test-never-present",
+                  "withPicker": true
+                },
+                {
+                  "id": "operator",
+                  "label": "Operator",
+                  "type": "select",
+                  "value": "contains"
+                },
+                {
+                  "id": "expected",
+                  "label": "Expected",
+                  "type": "text",
+                  "value": ""
+                }
+              ]
+            },
+            {
+              "id": "ft04-input-budget",
+              "type": "input",
+              "title": "Input",
+              "summary": "Set budget to 7000",
+              "fields": [
+                {
+                  "id": "selector",
+                  "label": "Selector",
+                  "type": "text",
+                  "value": "input[name=\"budget\"]",
+                  "withPicker": true
+                },
+                {
+                  "id": "value",
+                  "label": "Value",
+                  "type": "text",
+                  "value": "7000"
+                }
+              ]
+            },
+            {
+              "id": "ft04-wait-condition",
+              "type": "wait",
+              "title": "Wait",
+              "summary": "Wait for budget > 6000",
+              "fields": [
+                {
+                  "id": "mode",
+                  "label": "Mode",
+                  "type": "select",
+                  "value": "condition"
+                },
+                {
+                  "id": "duration",
+                  "label": "Duration",
+                  "type": "number",
+                  "value": "0"
+                },
+                {
+                  "id": "selector",
+                  "label": "Selector",
+                  "type": "text",
+                  "value": "input[name=\"budget\"]",
+                  "withPicker": true
+                },
+                {
+                  "id": "operator",
+                  "label": "Operator",
+                  "type": "select",
+                  "value": "greater"
+                },
+                {
+                  "id": "expected",
+                  "label": "Expected",
+                  "type": "text",
+                  "value": "6000"
+                }
+              ]
+            },
+            {
+              "id": "ft04-assert-submit",
+              "type": "assert",
+              "title": "Assert",
+              "summary": "Submit button contains Submit",
+              "fields": [
+                {
+                  "id": "selector",
+                  "label": "Selector",
+                  "type": "text",
+                  "value": "button#submit-button",
+                  "withPicker": true
+                },
+                {
+                  "id": "operator",
+                  "label": "Operator",
+                  "type": "select",
+                  "value": "contains"
+                },
+                {
+                  "id": "expected",
+                  "label": "Expected",
+                  "type": "text",
+                  "value": "Submit"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "flow-test-05-if-then",
+          "name": "FT05 If Else Then Branch",
+          "description": "Condition should run the Then branch.",
+          "scope": "page",
+          "siteKey": "bqweapons.github.io",
+          "pageKey": "bqweapons.github.io/web-assistant/test-pages/data-source/datasource-form-a.html",
+          "updatedAt": 1779954000000,
+          "steps": [
+            {
+              "id": "ft05-if-then",
+              "type": "if-else",
+              "title": "If / Else",
+              "summary": "h1 contains Screen A",
+              "fields": [
+                {
+                  "id": "selector",
+                  "label": "Selector",
+                  "type": "text",
+                  "value": "h1",
+                  "withPicker": true
+                },
+                {
+                  "id": "operator",
+                  "label": "Operator",
+                  "type": "select",
+                  "value": "contains"
+                },
+                {
+                  "id": "expected",
+                  "label": "Expected",
+                  "type": "text",
+                  "value": "Screen A"
+                }
+              ],
+              "branches": [
+                {
+                  "id": "then",
+                  "label": "Then",
+                  "steps": [
+                    {
+                      "id": "ft05-popup-then",
+                      "type": "popup",
+                      "title": "Popup",
+                      "summary": "Show then branch",
+                      "fields": [
+                        {
+                          "id": "message",
+                          "label": "Message",
+                          "type": "textarea",
+                          "value": "IF_THEN_OK"
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "id": "else",
+                  "label": "Else",
+                  "steps": [
+                    {
+                      "id": "ft05-popup-else",
+                      "type": "popup",
+                      "title": "Popup",
+                      "summary": "Show else branch",
+                      "fields": [
+                        {
+                          "id": "message",
+                          "label": "Message",
+                          "type": "textarea",
+                          "value": "IF_ELSE_BAD"
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "flow-test-06-if-else",
+          "name": "FT06 If Else Else Branch",
+          "description": "Condition should run the Else branch.",
+          "scope": "page",
+          "siteKey": "bqweapons.github.io",
+          "pageKey": "bqweapons.github.io/web-assistant/test-pages/data-source/datasource-form-a.html",
+          "updatedAt": 1779954000000,
+          "steps": [
+            {
+              "id": "ft06-if-else",
+              "type": "if-else",
+              "title": "If / Else",
+              "summary": "h1 does not contain NoSuchText",
+              "fields": [
+                {
+                  "id": "selector",
+                  "label": "Selector",
+                  "type": "text",
+                  "value": "h1",
+                  "withPicker": true
+                },
+                {
+                  "id": "operator",
+                  "label": "Operator",
+                  "type": "select",
+                  "value": "contains"
+                },
+                {
+                  "id": "expected",
+                  "label": "Expected",
+                  "type": "text",
+                  "value": "NoSuchText"
+                }
+              ],
+              "branches": [
+                {
+                  "id": "then",
+                  "label": "Then",
+                  "steps": [
+                    {
+                      "id": "ft06-popup-then",
+                      "type": "popup",
+                      "title": "Popup",
+                      "summary": "Show then branch",
+                      "fields": [
+                        {
+                          "id": "message",
+                          "label": "Message",
+                          "type": "textarea",
+                          "value": "IF_THEN_BAD"
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "id": "else",
+                  "label": "Else",
+                  "steps": [
+                    {
+                      "id": "ft06-popup-else",
+                      "type": "popup",
+                      "title": "Popup",
+                      "summary": "Show else branch",
+                      "fields": [
+                        {
+                          "id": "message",
+                          "label": "Message",
+                          "type": "textarea",
+                          "value": "IF_ELSE_OK"
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "flow-test-07-loop",
+          "name": "FT07 Loop Popup",
+          "description": "Loop twice and show a popup each time.",
+          "scope": "page",
+          "siteKey": "bqweapons.github.io",
+          "pageKey": "bqweapons.github.io/web-assistant/test-pages/data-source/datasource-form-a.html",
+          "updatedAt": 1779954000000,
+          "steps": [
+            {
+              "id": "ft07-loop",
+              "type": "loop",
+              "title": "Loop",
+              "summary": "Loop 2 times",
+              "fields": [
+                {
+                  "id": "iterations",
+                  "label": "Iterations",
+                  "type": "number",
+                  "value": "2"
+                }
+              ],
+              "children": [
+                {
+                  "id": "ft07-popup-loop",
+                  "type": "popup",
+                  "title": "Popup",
+                  "summary": "Loop popup",
+                  "fields": [
+                    {
+                      "id": "message",
+                      "label": "Message",
+                      "type": "textarea",
+                      "value": "LOOP_OK"
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "flow-test-08-data-source",
+          "name": "FT08 Data Source",
+          "description": "Run two CSV rows through input steps and assert final row.",
+          "scope": "page",
+          "siteKey": "bqweapons.github.io",
+          "pageKey": "bqweapons.github.io/web-assistant/test-pages/data-source/datasource-form-a.html",
+          "updatedAt": 1779954000000,
+          "steps": [
+            {
+              "id": "ft08-data-source",
+              "type": "data-source",
+              "title": "Data Source",
+              "summary": "2 CSV rows",
+              "fields": [],
+              "dataSource": {
+                "fileName": "flow-step-data-source.csv",
+                "fileType": "csv",
+                "columns": [
+                  "customerId",
+                  "fullName",
+                  "email"
+                ],
+                "rowCount": 2,
+                "rawText": "customerId,fullName,email\nDS-1,Ada Lovelace,ada@example.com\nDS-2,Grace Hopper,grace@example.com"
+              },
+              "children": [
+                {
+                  "id": "ft08-input-customer",
+                  "type": "input",
+                  "title": "Input",
+                  "summary": "Set customerId from row",
+                  "fields": [
+                    {
+                      "id": "selector",
+                      "label": "Selector",
+                      "type": "text",
+                      "value": "input[name=\"customerId\"]",
+                      "withPicker": true
+                    },
+                    {
+                      "id": "value",
+                      "label": "Value",
+                      "type": "text",
+                      "value": "{{row.customerId}}"
+                    }
+                  ]
+                },
+                {
+                  "id": "ft08-input-name",
+                  "type": "input",
+                  "title": "Input",
+                  "summary": "Set fullName from row",
+                  "fields": [
+                    {
+                      "id": "selector",
+                      "label": "Selector",
+                      "type": "text",
+                      "value": "input[name=\"fullName\"]",
+                      "withPicker": true
+                    },
+                    {
+                      "id": "value",
+                      "label": "Value",
+                      "type": "text",
+                      "value": "{{row.fullName}}"
+                    }
+                  ]
+                },
+                {
+                  "id": "ft08-input-email",
+                  "type": "input",
+                  "title": "Input",
+                  "summary": "Set email from row",
+                  "fields": [
+                    {
+                      "id": "selector",
+                      "label": "Selector",
+                      "type": "text",
+                      "value": "input[name=\"email\"]",
+                      "withPicker": true
+                    },
+                    {
+                      "id": "value",
+                      "label": "Value",
+                      "type": "text",
+                      "value": "{{row.email}}"
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "id": "ft08-assert-last-row",
+              "type": "assert",
+              "title": "Assert",
+              "summary": "Final customerId is DS-2",
+              "fields": [
+                {
+                  "id": "selector",
+                  "label": "Selector",
+                  "type": "text",
+                  "value": "input[name=\"customerId\"]",
+                  "withPicker": true
+                },
+                {
+                  "id": "operator",
+                  "label": "Operator",
+                  "type": "select",
+                  "value": "equals"
+                },
+                {
+                  "id": "expected",
+                  "label": "Expected",
+                  "type": "text",
+                  "value": "DS-2"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "flow-test-09-navigate",
+          "name": "FT09 Navigate",
+          "description": "Navigate to Screen B on the same site and assert the submitted customerId is visible.",
+          "scope": "page",
+          "siteKey": "bqweapons.github.io",
+          "pageKey": "bqweapons.github.io/web-assistant/test-pages/data-source/datasource-form-a.html",
+          "updatedAt": 1779954000000,
+          "steps": [
+            {
+              "id": "ft09-navigate-screen-b",
+              "type": "navigate",
+              "title": "Navigate",
+              "summary": "Navigate to Screen B",
+              "fields": [
+                {
+                  "id": "url",
+                  "label": "URL",
+                  "type": "text",
+                  "value": "https://bqweapons.github.io/web-assistant/test-pages/data-source/datasource-form-b.html?customerId=FTNAV&fullName=Nav%20User&email=nav@example.com"
+                }
+              ]
+            },
+            {
+              "id": "ft09-assert-screen-b",
+              "type": "assert",
+              "title": "Assert",
+              "summary": "Screen B contains FTNAV",
+              "fields": [
+                {
+                  "id": "selector",
+                  "label": "Selector",
+                  "type": "text",
+                  "value": "body",
+                  "withPicker": true
+                },
+                {
+                  "id": "operator",
+                  "label": "Operator",
+                  "type": "select",
+                  "value": "contains"
+                },
+                {
+                  "id": "expected",
+                  "label": "Expected",
+                  "type": "text",
+                  "value": "FTNAV"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "flow-test-10-click-cross-page-return",
+          "name": "FT10 Click Cross Page and Return",
+          "description": "Click submit to Screen B, assert received values, then click Back to Screen A.",
+          "scope": "page",
+          "siteKey": "bqweapons.github.io",
+          "pageKey": "bqweapons.github.io/web-assistant/test-pages/data-source/datasource-form-a.html",
+          "updatedAt": 1779954000000,
+          "steps": [
+            {
+              "id": "ft10-input-customer",
+              "type": "input",
+              "title": "Input",
+              "summary": "Set customerId before submit",
+              "fields": [
+                {
+                  "id": "selector",
+                  "label": "Selector",
+                  "type": "text",
+                  "value": "input[name=\"customerId\"]",
+                  "withPicker": true
+                },
+                {
+                  "id": "value",
+                  "label": "Value",
+                  "type": "text",
+                  "value": "XPG-001"
+                }
+              ]
+            },
+            {
+              "id": "ft10-input-name",
+              "type": "input",
+              "title": "Input",
+              "summary": "Set fullName before submit",
+              "fields": [
+                {
+                  "id": "selector",
+                  "label": "Selector",
+                  "type": "text",
+                  "value": "input[name=\"fullName\"]",
+                  "withPicker": true
+                },
+                {
+                  "id": "value",
+                  "label": "Value",
+                  "type": "text",
+                  "value": "Cross Page User"
+                }
+              ]
+            },
+            {
+              "id": "ft10-input-email",
+              "type": "input",
+              "title": "Input",
+              "summary": "Set email before submit",
+              "fields": [
+                {
+                  "id": "selector",
+                  "label": "Selector",
+                  "type": "text",
+                  "value": "input[name=\"email\"]",
+                  "withPicker": true
+                },
+                {
+                  "id": "value",
+                  "label": "Value",
+                  "type": "text",
+                  "value": "cross@example.com"
+                }
+              ]
+            },
+            {
+              "id": "ft10-click-submit",
+              "type": "click",
+              "title": "Click",
+              "summary": "Click submit to Screen B",
+              "fields": [
+                {
+                  "id": "selector",
+                  "label": "Selector",
+                  "type": "text",
+                  "value": "button#submit-button",
+                  "withPicker": true
+                }
+              ]
+            },
+            {
+              "id": "ft10-wait-screen-b",
+              "type": "wait",
+              "title": "Wait",
+              "summary": "Wait for Screen B result",
+              "fields": [
+                {
+                  "id": "mode",
+                  "label": "Mode",
+                  "type": "select",
+                  "value": "appear"
+                },
+                {
+                  "id": "duration",
+                  "label": "Duration",
+                  "type": "number",
+                  "value": "0"
+                },
+                {
+                  "id": "selector",
+                  "label": "Selector",
+                  "type": "text",
+                  "value": "#result-customerId",
+                  "withPicker": true
+                },
+                {
+                  "id": "operator",
+                  "label": "Operator",
+                  "type": "select",
+                  "value": "contains"
+                },
+                {
+                  "id": "expected",
+                  "label": "Expected",
+                  "type": "text",
+                  "value": ""
+                }
+              ]
+            },
+            {
+              "id": "ft10-assert-screen-b",
+              "type": "assert",
+              "title": "Assert",
+              "summary": "Screen B received customerId",
+              "fields": [
+                {
+                  "id": "selector",
+                  "label": "Selector",
+                  "type": "text",
+                  "value": "#result-customerId",
+                  "withPicker": true
+                },
+                {
+                  "id": "operator",
+                  "label": "Operator",
+                  "type": "select",
+                  "value": "equals"
+                },
+                {
+                  "id": "expected",
+                  "label": "Expected",
+                  "type": "text",
+                  "value": "XPG-001"
+                }
+              ]
+            },
+            {
+              "id": "ft10-click-back",
+              "type": "click",
+              "title": "Click",
+              "summary": "Click Back to Screen A",
+              "fields": [
+                {
+                  "id": "selector",
+                  "label": "Selector",
+                  "type": "text",
+                  "value": "#back-button",
+                  "withPicker": true
+                }
+              ]
+            },
+            {
+              "id": "ft10-wait-screen-a",
+              "type": "wait",
+              "title": "Wait",
+              "summary": "Wait for Screen A title",
+              "fields": [
+                {
+                  "id": "mode",
+                  "label": "Mode",
+                  "type": "select",
+                  "value": "appear"
+                },
+                {
+                  "id": "duration",
+                  "label": "Duration",
+                  "type": "number",
+                  "value": "0"
+                },
+                {
+                  "id": "selector",
+                  "label": "Selector",
+                  "type": "text",
+                  "value": "h1",
+                  "withPicker": true
+                },
+                {
+                  "id": "operator",
+                  "label": "Operator",
+                  "type": "select",
+                  "value": "contains"
+                },
+                {
+                  "id": "expected",
+                  "label": "Expected",
+                  "type": "text",
+                  "value": ""
+                }
+              ]
+            },
+            {
+              "id": "ft10-assert-screen-a",
+              "type": "assert",
+              "title": "Assert",
+              "summary": "Returned to Screen A",
+              "fields": [
+                {
+                  "id": "selector",
+                  "label": "Selector",
+                  "type": "text",
+                  "value": "h1",
+                  "withPicker": true
+                },
+                {
+                  "id": "operator",
+                  "label": "Operator",
+                  "type": "select",
+                  "value": "contains"
+                },
+                {
+                  "id": "expected",
+                  "label": "Expected",
+                  "type": "text",
+                  "value": "Screen A"
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  }
+}
