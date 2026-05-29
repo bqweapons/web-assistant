@@ -407,20 +407,47 @@ export default function ElementsSection({
     }
     return flows.filter((flow) => flow.siteKey === flowSiteKey);
   }, [flows, flowSiteKey]);
+  const flowNameById = useMemo(() => {
+    return new Map(flows.map((flow) => [flow.id, flow.name]));
+  }, [flows]);
+  const currentActionFlowId = editElement?.behavior.actionFlowId || activeElement?.behavior.actionFlowId || '';
+  const getActionFlowDisplayValue = useCallback(
+    (flowId?: string) => {
+      if (!flowId) {
+        return t('sidepanel_field_not_set', 'Not set');
+      }
+      return flowNameById.get(flowId) || t('sidepanel_elements_action_flow_missing', 'Flow not found');
+    },
+    [flowNameById, locale],
+  );
   const actionFlowOptions = useMemo(
-    () => [
-      { value: '__create__', label: t('sidepanel_flows_create_new', 'Create new flow…'), sticky: true },
-      { value: '', label: t('sidepanel_field_unassigned', 'Unassigned') },
-      ...filteredFlows.map((flow) => ({
-        value: flow.id,
-        label: flow.name,
-        rightLabel: t('sidepanel_steps_count', '{count} steps').replace(
-          '{count}',
-          String(getStepCount(flow.steps)),
-        ),
-      })),
-    ],
-    [filteredFlows, locale],
+    () => {
+      const hasCurrentFlow =
+        currentActionFlowId && filteredFlows.some((flow) => flow.id === currentActionFlowId);
+      return [
+        { value: '__create__', label: t('sidepanel_flows_create_new', 'Create new flow…'), sticky: true },
+        { value: '', label: t('sidepanel_field_unassigned', 'Unassigned') },
+        ...(!hasCurrentFlow && currentActionFlowId
+          ? [
+              {
+                value: currentActionFlowId,
+                label: getActionFlowDisplayValue(currentActionFlowId),
+                rightLabel: t('sidepanel_elements_action_flow_missing_status', 'Missing'),
+                disabled: true,
+              },
+            ]
+          : []),
+        ...filteredFlows.map((flow) => ({
+          value: flow.id,
+          label: flow.name,
+          rightLabel: t('sidepanel_flow_configured_steps_count', '{count} config steps').replace(
+            '{count}',
+            String(getStepCount(flow.steps)),
+          ),
+        })),
+      ];
+    },
+    [currentActionFlowId, filteredFlows, getActionFlowDisplayValue, locale],
   );
   const positionOptions = [
     { value: '', label: t('sidepanel_elements_position_auto', 'Auto') },
@@ -634,7 +661,7 @@ export default function ElementsSection({
       if (element.behavior.actionFlowId) {
         return t('sidepanel_elements_action_flow_value', 'Action flow: {value}').replace(
           '{value}',
-          element.behavior.actionFlowId,
+          getActionFlowDisplayValue(element.behavior.actionFlowId),
         );
       }
       return t('sidepanel_elements_action_flow_unassigned', 'Action flow: Unassigned');
@@ -681,7 +708,7 @@ export default function ElementsSection({
     if (type === 'button') {
       rows.push({
         label: t('sidepanel_field_action_flow', 'Action flow'),
-        value: element.behavior.actionFlowId || t('sidepanel_field_not_set', 'Not set'),
+        value: getActionFlowDisplayValue(element.behavior.actionFlowId),
       });
     }
     if (type === 'link') {

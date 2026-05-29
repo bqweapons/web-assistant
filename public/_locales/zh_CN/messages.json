@@ -11,6 +11,9 @@
   "sidepanel_action_cancel": {
     "message": "取消"
   },
+  "sidepanel_action_check": {
+    "message": "检查"
+  },
   "sidepanel_action_clear": {
     "message": "Clear"
   },
@@ -85,6 +88,12 @@
   },
   "sidepanel_elements_action_flow_value": {
     "message": "操作流程：{value}"
+  },
+  "sidepanel_elements_action_flow_missing": {
+    "message": "未找到流程"
+  },
+  "sidepanel_elements_action_flow_missing_status": {
+    "message": "缺失"
   },
   "sidepanel_elements_action_title": {
     "message": "操作"
@@ -364,6 +373,30 @@
   },
   "sidepanel_flows_create_new": {
     "message": "创建新流程…"
+  },
+  "sidepanel_flows_config_warning_selector_example": {
+    "message": "{step}：选择器仍在使用示例值“{value}”。"
+  },
+  "sidepanel_flows_config_warning_selector_missing": {
+    "message": "{step}：选择器为空。"
+  },
+  "sidepanel_flows_config_warning_url_example": {
+    "message": "{step}：URL 仍在使用示例值。"
+  },
+  "sidepanel_flows_config_warning_url_missing": {
+    "message": "{step}：URL 为空。"
+  },
+  "sidepanel_flows_config_check_passed_message": {
+    "message": "未发现明显的空字段或示例值。"
+  },
+  "sidepanel_flows_config_check_passed_title": {
+    "message": "检查通过"
+  },
+  "sidepanel_flows_config_warnings_more": {
+    "message": "还有 {count} 条提醒"
+  },
+  "sidepanel_flows_config_warnings_title": {
+    "message": "运行前检查"
   },
   "sidepanel_flows_delete": {
     "message": "删除流程"

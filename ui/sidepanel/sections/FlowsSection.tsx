@@ -4,7 +4,7 @@ import Card from '../components/Card';
 import ConfirmDialog from '../components/ConfirmDialog';
 import FlowDrawer from '../components/FlowDrawer';
 import FlowStepsBuilder from '../components/FlowStepsBuilder';
-import { t } from '../utils/i18n';
+import { t, useLocale } from '../utils/i18n';
 import {
   type FlowRecordingEventPayload,
   type SelectorPickerAccept,
@@ -37,12 +37,15 @@ type FlowsSectionProps = {
 
 type FlowSummaryActions = {
   onSave: () => void;
+  onCheck?: () => void;
   onStartRecording?: () => void;
   onStopRecording?: () => void;
   onRun?: () => void;
   disableSave?: boolean;
+  disableCheck?: boolean;
   disableRecording?: boolean;
   disableRun?: boolean;
+  checkDisabledReason?: string;
   recordingDisabledReason?: string;
   runDisabledReason?: string;
   isRecording?: boolean;
@@ -89,6 +92,69 @@ const validateNoLiteralPasswordsInFlow = (flow: Pick<FlowRecord, 'steps'>): stri
   );
 };
 
+const EXAMPLE_SELECTOR_VALUES = new Set(['.btn-primary', '.status']);
+const EXAMPLE_URL_VALUES = new Set(['https://example.com']);
+
+const collectFlowConfigurationWarnings = (steps: FlowStepData[], sink: string[] = []) => {
+  for (const step of steps) {
+    const stepTitle = step.title || step.type;
+    const waitMode = step.type === 'wait' ? getStepFieldStringValue(step, 'mode') : '';
+    const selectorRequired =
+      step.type === 'click' ||
+      step.type === 'input' ||
+      step.type === 'assert' ||
+      step.type === 'if-else' ||
+      (step.type === 'wait' && waitMode !== 'time');
+    if (selectorRequired) {
+      const selector = getStepFieldStringValue(step, 'selector').trim();
+      if (!selector) {
+        sink.push(
+          t('sidepanel_flows_config_warning_selector_missing', '{step}: selector is empty.').replace(
+            '{step}',
+            stepTitle,
+          ),
+        );
+      } else if (EXAMPLE_SELECTOR_VALUES.has(selector)) {
+        sink.push(
+          t(
+            'sidepanel_flows_config_warning_selector_example',
+            '{step}: selector still uses example value "{value}".',
+          )
+            .replace('{step}', stepTitle)
+            .replace('{value}', selector),
+        );
+      }
+    }
+    if (step.type === 'navigate') {
+      const url = getStepFieldStringValue(step, 'url').trim();
+      if (!url) {
+        sink.push(
+          t('sidepanel_flows_config_warning_url_missing', '{step}: URL is empty.').replace(
+            '{step}',
+            stepTitle,
+          ),
+        );
+      } else if (EXAMPLE_URL_VALUES.has(url)) {
+        sink.push(
+          t('sidepanel_flows_config_warning_url_example', '{step}: URL still uses example value.').replace(
+            '{step}',
+            stepTitle,
+          ),
+        );
+      }
+    }
+    if (Array.isArray(step.children) && step.children.length > 0) {
+      collectFlowConfigurationWarnings(step.children, sink);
+    }
+    if (Array.isArray(step.branches)) {
+      for (const branch of step.branches) {
+        collectFlowConfigurationWarnings(branch.steps ?? [], sink);
+      }
+    }
+  }
+  return sink;
+};
+
 const findStepById = (steps: FlowStepData[], stepId?: string): FlowStepData | null => {
   if (!stepId) {
     return null;
@@ -124,6 +190,7 @@ export default function FlowsSection({
   onCreateFlowClose,
   onStartPicker,
 }: FlowsSectionProps) {
+  const locale = useLocale();
   const normalizedSiteKey = useMemo(() => deriveSiteKey(siteKey), [siteKey]);
 
   const [flows, setFlows] = useState<FlowRecord[]>([]);
@@ -138,6 +205,8 @@ export default function FlowsSection({
   const [flowLoadError, setFlowLoadError] = useState('');
   const [pendingDeleteFlowId, setPendingDeleteFlowId] = useState<string | null>(null);
   const [pendingDiscardEdit, setPendingDiscardEdit] = useState(false);
+  const [editCheckVisible, setEditCheckVisible] = useState(false);
+  const [draftCheckVisible, setDraftCheckVisible] = useState(false);
   const [draftFlow, setDraftFlow] = useState({
     name: '',
     description: '',
@@ -224,6 +293,14 @@ export default function FlowsSection({
     ? t('sidepanel_flow_recording_stop_before_save', 'Stop recording before saving or running.')
     : runDisabledReason;
   const isEditDirty = editFlow ? getEditableSnapshot(editFlow) !== editFlowSnapshot : false;
+  const editConfigurationWarnings = useMemo(
+    () => (editFlow ? collectFlowConfigurationWarnings(editFlow.steps, []) : []),
+    [editFlow, locale],
+  );
+  const draftConfigurationWarnings = useMemo(
+    () => collectFlowConfigurationWarnings(draftFlow.steps, []),
+    [draftFlow.steps, locale],
+  );
   const getStepTypeLabel = useCallback((type?: FlowStepData['type']) => {
     switch (type) {
       case 'click':
@@ -350,6 +427,8 @@ export default function FlowsSection({
       setEditResetKey((prev) => prev + 1);
       setCreateResetKey((prev) => prev + 1);
       setDraftFlow({ name: '', description: '', steps: [] });
+      setEditCheckVisible(false);
+      setDraftCheckVisible(false);
     }
   }, [createFlowOpen]);
 
@@ -362,6 +441,8 @@ export default function FlowsSection({
     setCreateResetKey((prev) => prev + 1);
     setPendingDeleteFlowId(null);
     setPendingDiscardEdit(false);
+    setEditCheckVisible(false);
+    setDraftCheckVisible(false);
   }, [normalizedSiteKey]);
 
   const loadFlows = useCallback(async () => {
@@ -429,6 +510,7 @@ export default function FlowsSection({
       setEditFlow(nextEditFlow);
       setEditFlowSnapshot(getEditableSnapshot(nextEditFlow));
       setEditResetKey((prev) => prev + 1);
+      setEditCheckVisible(false);
     },
     [flows],
   );
@@ -439,6 +521,7 @@ export default function FlowsSection({
     setActiveFlowId(null);
     setEditFlow(null);
     setEditFlowSnapshot('');
+    setEditCheckVisible(false);
   }, [stopRecording]);
 
   const closeEditDrawer = useCallback(() => {
@@ -452,6 +535,7 @@ export default function FlowsSection({
   const closeCreateDrawer = useCallback(() => {
     recordingTargetRef.current = null;
     void stopRecording({ silent: true });
+    setDraftCheckVisible(false);
     onCreateFlowClose?.();
   }, [onCreateFlowClose, stopRecording]);
 
@@ -618,6 +702,18 @@ export default function FlowsSection({
         </button>
         <button
           type="button"
+          className="btn-ghost h-8 px-3 text-xs disabled:cursor-not-allowed disabled:opacity-60"
+          onClick={actions.onCheck}
+          disabled={actions.disableCheck || !actions.onCheck}
+          title={actions.disableCheck ? actions.checkDisabledReason : undefined}
+        >
+          <span className="inline-flex items-center gap-1">
+            <Search className="h-3.5 w-3.5" />
+            {t('sidepanel_action_check', 'Check')}
+          </span>
+        </button>
+        <button
+          type="button"
           className="btn-primary h-8 px-3 text-xs disabled:cursor-not-allowed disabled:opacity-60"
           onClick={actions.onSave}
           disabled={actions.disableSave}
@@ -662,6 +758,43 @@ export default function FlowsSection({
       </div>
     </>
   );
+
+  const renderConfigurationCheckResult = (warnings: string[]) => {
+    if (warnings.length === 0) {
+      return (
+        <Card className="border-emerald-300/70 bg-emerald-50 text-emerald-950">
+          <p className="text-xs font-semibold">
+            {t('sidepanel_flows_config_check_passed_title', 'Check passed')}
+          </p>
+          <p className="mt-1 text-[11px]">
+            {t('sidepanel_flows_config_check_passed_message', 'No obvious empty fields or example values found.')}
+          </p>
+        </Card>
+      );
+    }
+    const visibleWarnings = warnings.slice(0, 4);
+    const hiddenCount = warnings.length - visibleWarnings.length;
+    return (
+      <Card className="border-red-300/70 bg-red-50 text-red-950">
+        <p className="text-xs font-semibold">
+          {t('sidepanel_flows_config_warnings_title', 'Check before running')}
+        </p>
+        <ul className="mt-2 list-disc space-y-1 pl-4 text-[11px]">
+          {visibleWarnings.map((warning) => (
+            <li key={warning}>{warning}</li>
+          ))}
+        </ul>
+        {hiddenCount > 0 ? (
+          <p className="mt-2 text-[11px]">
+            {t('sidepanel_flows_config_warnings_more', '+{count} more warnings').replace(
+              '{count}',
+              String(hiddenCount),
+            )}
+          </p>
+        ) : null}
+      </Card>
+    );
+  };
 
   return (
     <section className="flex flex-col gap-2">
@@ -946,6 +1079,7 @@ export default function FlowsSection({
         onClose={closeEditDrawer}
         summary={renderSummary({
           onSave: handleFlowSave,
+          onCheck: () => setEditCheckVisible(true),
           onStartRecording: () => handleStartRecording('edit'),
           onStopRecording: handleStopRecording,
           onRun: editFlow
@@ -954,8 +1088,10 @@ export default function FlowsSection({
               }
             : undefined,
           disableSave: !hasActivePage || isRecording,
+          disableCheck: isRecording || !editFlow,
           disableRecording: Boolean(recordingDisabledReason),
           disableRun: !hasActivePage || isRunActive || isRecording || !editFlow,
+          checkDisabledReason: recordingActionDisabledReason,
           recordingDisabledReason: recordingDisabledReason,
           runDisabledReason: recordingActionDisabledReason,
           isRecording,
@@ -983,6 +1119,7 @@ export default function FlowsSection({
                 placeholder={t('sidepanel_flows_description_placeholder', 'Describe what the flow does')}
               />
             </label>
+            {editCheckVisible ? renderConfigurationCheckResult(editConfigurationWarnings) : null}
             <FlowStepsBuilder
               steps={editFlow.steps}
               resetKey={`edit:${editResetKey}:${activeFlowId || 'none'}`}
@@ -1002,11 +1139,14 @@ export default function FlowsSection({
         onClose={closeCreateDrawer}
         summary={renderSummary({
           onSave: handleCreateFlow,
+          onCheck: () => setDraftCheckVisible(true),
           onStartRecording: () => handleStartRecording('create'),
           onStopRecording: handleStopRecording,
           disableSave: !hasActivePage || isRecording,
+          disableCheck: isRecording,
           disableRecording: Boolean(recordingDisabledReason),
           disableRun: true,
+          checkDisabledReason: recordingActionDisabledReason,
           recordingDisabledReason: recordingDisabledReason,
           isRecording,
           recordingHelperText,
@@ -1032,6 +1172,7 @@ export default function FlowsSection({
               placeholder={t('sidepanel_flows_description_placeholder', 'Describe what the flow does')}
             />
           </label>
+          {draftCheckVisible ? renderConfigurationCheckResult(draftConfigurationWarnings) : null}
           <FlowStepsBuilder
             steps={draftFlow.steps}
             resetKey={`create:${createResetKey}:${normalizedSiteKey}`}

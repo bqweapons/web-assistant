@@ -11,6 +11,9 @@
   "sidepanel_action_cancel": {
     "message": "Cancel"
   },
+  "sidepanel_action_check": {
+    "message": "Check"
+  },
   "sidepanel_action_clear": {
     "message": "Clear"
   },
@@ -88,6 +91,12 @@
   },
   "sidepanel_elements_action_flow_value": {
     "message": "Action flow: {value}"
+  },
+  "sidepanel_elements_action_flow_missing": {
+    "message": "Flow not found"
+  },
+  "sidepanel_elements_action_flow_missing_status": {
+    "message": "Missing"
   },
   "sidepanel_elements_action_title": {
     "message": "Action"
@@ -376,6 +385,30 @@
   },
   "sidepanel_flows_create_new": {
     "message": "Create new flow…"
+  },
+  "sidepanel_flows_config_warning_selector_example": {
+    "message": "{step}: selector still uses example value \"{value}\"."
+  },
+  "sidepanel_flows_config_warning_selector_missing": {
+    "message": "{step}: selector is empty."
+  },
+  "sidepanel_flows_config_warning_url_example": {
+    "message": "{step}: URL still uses example value."
+  },
+  "sidepanel_flows_config_warning_url_missing": {
+    "message": "{step}: URL is empty."
+  },
+  "sidepanel_flows_config_check_passed_message": {
+    "message": "No obvious empty fields or example values found."
+  },
+  "sidepanel_flows_config_check_passed_title": {
+    "message": "Check passed"
+  },
+  "sidepanel_flows_config_warnings_more": {
+    "message": "+{count} more warnings"
+  },
+  "sidepanel_flows_config_warnings_title": {
+    "message": "Check before running"
   },
   "sidepanel_flows_delete": {
     "message": "Delete flow"

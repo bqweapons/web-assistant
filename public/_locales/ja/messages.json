@@ -11,6 +11,9 @@
   "sidepanel_action_cancel": {
     "message": "キャンセル"
   },
+  "sidepanel_action_check": {
+    "message": "チェック"
+  },
   "sidepanel_action_clear": {
     "message": "Clear"
   },
@@ -85,6 +88,12 @@
   },
   "sidepanel_elements_action_flow_value": {
     "message": "アクションフロー: {value}"
+  },
+  "sidepanel_elements_action_flow_missing": {
+    "message": "フローが見つかりません"
+  },
+  "sidepanel_elements_action_flow_missing_status": {
+    "message": "欠落"
   },
   "sidepanel_elements_action_title": {
     "message": "アクション"
@@ -364,6 +373,30 @@
   },
   "sidepanel_flows_create_new": {
     "message": "新しいフローを作成…"
+  },
+  "sidepanel_flows_config_warning_selector_example": {
+    "message": "{step}: セレクターがまだサンプル値「{value}」です。"
+  },
+  "sidepanel_flows_config_warning_selector_missing": {
+    "message": "{step}: セレクターが空です。"
+  },
+  "sidepanel_flows_config_warning_url_example": {
+    "message": "{step}: URL がまだサンプル値です。"
+  },
+  "sidepanel_flows_config_warning_url_missing": {
+    "message": "{step}: URL が空です。"
+  },
+  "sidepanel_flows_config_check_passed_message": {
+    "message": "明らかな空欄やサンプル値は見つかりませんでした。"
+  },
+  "sidepanel_flows_config_check_passed_title": {
+    "message": "チェック完了"
+  },
+  "sidepanel_flows_config_warnings_more": {
+    "message": "他 {count} 件の警告"
+  },
+  "sidepanel_flows_config_warnings_title": {
+    "message": "実行前に確認"
   },
   "sidepanel_flows_delete": {
     "message": "フローを削除"
