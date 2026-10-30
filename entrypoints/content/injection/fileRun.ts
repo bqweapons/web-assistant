@@ -14,6 +14,8 @@ import {
   type RuntimeElement,
 } from './shared';
 import { sendRuntimeMessageSafe } from './runtimeBridge';
+import { pageI18nMessage, showPageNotice } from '../pageNotice';
+import { RUNNER_ERROR_MESSAGES } from '../../../shared/runnerErrorMessages';
 
 type DataSourceStepDescriptor = {
   id: string;
@@ -54,7 +56,12 @@ const collectDataSourceInputsForRun = async (snapshot: FlowRunFlowSnapshot) => {
   for (const step of stepDescriptors) {
     const file = await requestDataSourceFile(
       { title: step.title, fileType: step.fileType },
-      { requireConfirm: true, confirmMessage: `Select CSV/TSV for step: ${step.title}` },
+      {
+        requireConfirm: true,
+        confirmMessage: pageI18nMessage('page_run_data_source_confirm', `Select a CSV/TSV file for step: ${step.title}`, {
+          name: step.title,
+        }),
+      },
     );
     if (!file) {
       throw new Error('data-source-selection-cancelled');
@@ -91,14 +98,15 @@ const startBoundFlowRun = async (element: RuntimeElement) => {
     const message = error instanceof Error ? error.message : String(error);
     return { ok: false, error: message || 'data-source-selection-cancelled' } as const;
   }
-  return sendRuntimeMessageSafe({
+  const response = await sendRuntimeMessageSafe({
     type: MessageType.START_FLOW_RUN,
     data: {
       flow: snapshot,
-      source: 'flows-list',
+      source: 'page-button',
       dataSourceInputs,
     },
   });
+  return response.ok ? ({ ok: true, flowName: snapshot.name } as const) : response;
 };
 
 const triggerSelectorAction = (selector: string) => {
@@ -122,18 +130,49 @@ const triggerSelectorAction = (selector: string) => {
   return true;
 };
 
+const describeStartError = (error: string) => {
+  if (error.startsWith('flow-not-found')) {
+    return pageI18nMessage('page_run_flow_missing', 'The flow linked to this button no longer exists.');
+  }
+  if (/already running/i.test(error)) {
+    return pageI18nMessage('sidepanel_flow_runner_error_busy', 'Another flow is already running.');
+  }
+  const mapped = RUNNER_ERROR_MESSAGES[error];
+  if (mapped) {
+    return pageI18nMessage(mapped.messageKey, mapped.fallback);
+  }
+  return pageI18nMessage('page_run_start_failed', 'Could not start the flow. Open the Ladybird side panel for details.');
+};
+
+// Ignore repeat clicks on the same button while its run is being started.
+const startingElementIds = new Set<string>();
+
 export const executeBoundButtonAction = async (element: RuntimeElement) => {
   const flowId = getElementActionFlowId(element).trim();
   if (flowId) {
-    const response = await startBoundFlowRun(element);
-    if (!response.ok) {
-      if (response.error === 'data-source-selection-cancelled') {
+    if (startingElementIds.has(element.id)) {
+      return;
+    }
+    startingElementIds.add(element.id);
+    try {
+      const response = await startBoundFlowRun(element);
+      if (!response.ok) {
+        if (response.error === 'data-source-selection-cancelled') {
+          return;
+        }
+        console.warn('Failed to start bound flow run', {
+          flowId,
+          error: response.error || 'unknown-error',
+        });
+        showPageNotice('error', describeStartError(response.error || ''));
         return;
       }
-      console.warn('Failed to start bound flow run', {
-        flowId,
-        error: response.error || 'unknown-error',
-      });
+      showPageNotice(
+        'info',
+        pageI18nMessage('page_run_started', `Running flow: ${response.flowName}`, { name: response.flowName }),
+      );
+    } finally {
+      startingElementIds.delete(element.id);
     }
     return;
   }
@@ -144,5 +183,9 @@ export const executeBoundButtonAction = async (element: RuntimeElement) => {
   }
   if (!triggerSelectorAction(actionSelector)) {
     console.warn('Failed to trigger bound action selector', { selector: actionSelector });
+    showPageNotice(
+      'error',
+      pageI18nMessage('page_run_action_target_missing', 'The element this button should click was not found on this page.'),
+    );
   }
 };

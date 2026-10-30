@@ -709,7 +709,31 @@ export class FlowRunnerManager {
     this.refreshRunSentinel(run);
     removeRunSentinel(run.runId);
     this.emitStatus(run, true);
+    this.notifyPageOfRunEnd(run);
     this.scheduleCleanup(run);
+  }
+
+  // Runs started from an injected page button have no side panel watching
+  // them for sure, so tell the page itself how the run ended.
+  private notifyPageOfRunEnd(run: FlowRunInternal) {
+    if (run.source !== 'page-button' || run.error?.code === 'tab-closed') {
+      return;
+    }
+    void this.tabBridge
+      .sendMessageToTabRaw(
+        run.tabId,
+        {
+          type: MessageType.PAGE_FLOW_RUN_FINISHED,
+          data: {
+            flowName: run.flow.name,
+            state: run.state,
+            errorCode: run.error?.code,
+            errorMessage: run.error?.message,
+          },
+        },
+        { frameId: 0 },
+      )
+      .catch(() => undefined);
   }
 
   private markStepCompleted(run: FlowRunInternal) {
