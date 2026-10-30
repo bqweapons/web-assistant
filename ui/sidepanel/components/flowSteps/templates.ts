@@ -13,7 +13,14 @@ export const createStepId = (prefix: string) =>
 const getOperatorLabel = (options: StepFieldOption[], value: string) =>
   options.find((option) => option.value === value)?.label || value;
 
+// New steps start empty: example values live in placeholders only, and the
+// summary is derived from the (empty) fields so it never shows fake data.
 export const createStepTemplate = (type: string, options: TemplateOptions): StepData => {
+  const step = createRawStepTemplate(type, options);
+  return { ...step, summary: buildStepSummary(step, options.conditionOperators) };
+};
+
+const createRawStepTemplate = (type: string, options: TemplateOptions): StepData => {
   const containsLabel = getOperatorLabel(options.conditionOperators, 'contains');
   const equalsLabel = getOperatorLabel(options.conditionOperators, 'equals');
   switch (type) {
@@ -149,7 +156,7 @@ export const createStepTemplate = (type: string, options: TemplateOptions): Step
           .replace('{operator}', containsLabel)
           .replace('{value}', 'Ready'),
         fields: [
-          { id: 'selector', label: 'Selector', placeholder: '.status', type: 'text', value: '.status' },
+          { id: 'selector', label: 'Selector', placeholder: '.status', type: 'text', value: '' },
           {
             id: 'operator',
             label: 'Operator',
@@ -157,7 +164,7 @@ export const createStepTemplate = (type: string, options: TemplateOptions): Step
             value: 'contains',
             options: options.conditionOperators,
           },
-          { id: 'expected', label: 'Value', placeholder: 'Ready', type: 'text', value: 'Ready' },
+          { id: 'expected', label: 'Value', placeholder: 'Ready', type: 'text', value: '' },
         ],
         branches: [
           { id: 'branch-then', label: t('sidepanel_steps_branch_then', 'Then'), steps: [] },
@@ -185,7 +192,7 @@ export const createStepTemplate = (type: string, options: TemplateOptions): Step
             label: 'Selector',
             placeholder: '.status',
             type: 'text',
-            value: '.status',
+            value: '',
             withPicker: true,
             showWhen: { fieldId: 'mode', values: ['condition', 'appear', 'disappear'] },
           },
@@ -202,7 +209,7 @@ export const createStepTemplate = (type: string, options: TemplateOptions): Step
             label: 'Value',
             placeholder: 'Ready',
             type: 'text',
-            value: 'Ready',
+            value: '',
             showWhen: { fieldId: 'mode', value: 'condition' },
           },
         ],
@@ -227,7 +234,7 @@ export const createStepTemplate = (type: string, options: TemplateOptions): Step
           .replace('{operator}', equalsLabel)
           .replace('{value}', 'Ready'),
         fields: [
-          { id: 'selector', label: 'Selector', placeholder: '.status', type: 'text', value: '.status' },
+          { id: 'selector', label: 'Selector', placeholder: '.status', type: 'text', value: '' },
           {
             id: 'operator',
             label: 'Operator',
@@ -235,7 +242,7 @@ export const createStepTemplate = (type: string, options: TemplateOptions): Step
             value: 'equals',
             options: options.conditionOperators,
           },
-          { id: 'expected', label: 'Value', placeholder: 'Ready', type: 'text', value: 'Ready' },
+          { id: 'expected', label: 'Value', placeholder: 'Ready', type: 'text', value: '' },
         ],
       };
     default:
