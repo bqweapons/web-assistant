@@ -1,4 +1,5 @@
 import type { PickerAccept, PickerRect, PickerResultPayload } from '../../shared/messages';
+import { pageI18nMessage } from './pageNotice';
 
 const HIGHLIGHT_BORDER_COLOR = '#1b84ff';
 const HIGHLIGHT_FILL_COLOR = 'rgba(27, 132, 255, 0.2)';
@@ -217,7 +218,7 @@ const isInputTarget = (element: Element) => {
   return false;
 };
 
-const createOverlay = () => {
+const createOverlay = (accept?: PickerAccept) => {
   const container = document.createElement('div');
   container.dataset.pickerOverlay = 'true';
   Object.assign(container.style, {
@@ -226,6 +227,30 @@ const createOverlay = () => {
     pointerEvents: 'none',
     zIndex: '2147483646',
   });
+
+  // Tell the user what to do; only the top frame shows the hint.
+  if (window.top === window) {
+    const hint = document.createElement('div');
+    hint.textContent =
+      accept === 'area'
+        ? pageI18nMessage('page_picker_hint_area', 'Drag to draw an area · Esc to cancel')
+        : pageI18nMessage('page_picker_hint_select', 'Click an element to select it · Esc to cancel');
+    Object.assign(hint.style, {
+      position: 'fixed',
+      top: '12px',
+      left: '50%',
+      transform: 'translateX(-50%)',
+      padding: '6px 12px',
+      borderRadius: '999px',
+      background: 'rgba(15, 23, 42, 0.9)',
+      color: '#ffffff',
+      font: '600 12px/1.4 system-ui, -apple-system, "Segoe UI", sans-serif',
+      boxShadow: '0 8px 20px rgba(15, 23, 42, 0.2)',
+      whiteSpace: 'nowrap',
+      pointerEvents: 'none',
+    });
+    container.appendChild(hint);
+  }
 
   const highlight = document.createElement('div');
   Object.assign(highlight.style, {
@@ -308,7 +333,7 @@ export const startPicker = (options: {
     onCancel,
     onInvalid,
   } = options;
-  const overlay = createOverlay();
+  const overlay = createOverlay(accept);
   const root = document.body || document.documentElement;
   root.appendChild(overlay.container);
   if (document.body) {

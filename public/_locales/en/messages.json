@@ -1639,5 +1639,14 @@
   },
   "page_run_action_target_missing": {
     "message": "The element this button should click was not found on this page."
+  },
+  "page_picker_hint_select": {
+    "message": "Click an element to select it · Esc to cancel"
+  },
+  "page_picker_hint_area": {
+    "message": "Drag to draw an area · Esc to cancel"
+  },
+  "page_recording_badge": {
+    "message": "Ladybird is recording"
   }
 }

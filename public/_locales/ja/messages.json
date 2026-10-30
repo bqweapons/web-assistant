@@ -15,7 +15,7 @@
     "message": "チェック"
   },
   "sidepanel_action_clear": {
-    "message": "Clear"
+    "message": "クリア"
   },
   "sidepanel_action_dark_mode": {
     "message": "ダークモード"
@@ -657,10 +657,10 @@
     "message": "設定を閉じる"
   },
   "sidepanel_settings_data_export": {
-    "message": "Export"
+    "message": "エクスポート"
   },
   "sidepanel_settings_data_import": {
-    "message": "Import"
+    "message": "インポート"
   },
   "sidepanel_settings_data_subtitle": {
     "message": "保存済みの要素とフローをインポート/エクスポートします。"
@@ -678,7 +678,7 @@
     "message": "ロケール: {locale}"
   },
   "sidepanel_settings_share_copy": {
-    "message": "Copy link"
+    "message": "リンクをコピー"
   },
   "sidepanel_settings_share_open": {
     "message": "ストアを開く"
@@ -858,7 +858,7 @@
     "message": "条件に基づいてステップを分岐します。"
   },
   "sidepanel_step_if_else_label": {
-    "message": "If / Else"
+    "message": "条件分岐（If / Else）"
   },
   "sidepanel_step_input_description": {
     "message": "フィールドにテキストを入力します。"
@@ -1524,10 +1524,10 @@
     "message": "バックグラウンドタスクが実行中に停止されました。フローが中断されたため、再度実行してください。"
   },
   "sidepanel_flow_runner_error_target_frame_not_found": {
-    "message": "このステップを記録した iframe がページ上に存在しないか、iframe 内でセレクタが一致しませんでした。"
+    "message": "このステップを記録した iframe がページ上に存在しないか、iframe 内でセレクターが一致しませんでした。"
   },
   "sidepanel_flow_runner_error_ambiguous_frame_match": {
-    "message": "セレクタが複数の iframe 内の要素に一致しています。対象の iframe だけを開いた状態で記録し直すか、セレクタをより限定してください。"
+    "message": "セレクターが複数の iframe 内の要素に一致しています。対象の iframe だけを開いた状態で記録し直すか、セレクターをより限定してください。"
   },
   "sidepanel_flow_input_secret_bound_missing": {
     "message": "紐付け済みのパスワードが保管庫に見つかりません: {name}。別のパスワードを選択するか、新しく作成して再度紐付けしてください。"
@@ -1639,5 +1639,14 @@
   },
   "page_run_action_target_missing": {
     "message": "このボタンがクリックする要素がこのページに見つかりません。"
+  },
+  "page_picker_hint_select": {
+    "message": "要素をクリックして選択 · Esc でキャンセル"
+  },
+  "page_picker_hint_area": {
+    "message": "ドラッグしてエリアを描画 · Esc でキャンセル"
+  },
+  "page_recording_badge": {
+    "message": "Ladybird 記録中"
   }
 }

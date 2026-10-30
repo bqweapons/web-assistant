@@ -131,6 +131,11 @@ const createHostWithShadow = (element: RuntimeElement) => {
       font-size: 12px;
       cursor: pointer;
     }
+    .ladybird-button:focus-visible,
+    .ladybird-link:focus-visible {
+      outline: 2px solid #1b84ff;
+      outline-offset: 2px;
+    }
     .ladybird-tooltip {
       background: #0f172a;
       color: #ffffff;
