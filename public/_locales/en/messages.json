@@ -957,10 +957,10 @@
     "message": "Duration: {value} ms"
   },
   "sidepanel_step_summary_expect": {
-    "message": "Expect {selector} {operator} \\\"{value}\\\""
+    "message": "Expect {selector} {operator} \"{value}\""
   },
   "sidepanel_step_summary_if": {
-    "message": "If {selector} {operator} \\\"{value}\\\""
+    "message": "If {selector} {operator} \"{value}\""
   },
   "sidepanel_step_summary_input": {
     "message": "Input"
@@ -996,7 +996,7 @@
     "message": "Message: {value}"
   },
   "sidepanel_step_summary_wait_until": {
-    "message": "Wait until {selector} {operator} \\\"{value}\\\""
+    "message": "Wait until {selector} {operator} \"{value}\""
   },
   "sidepanel_step_summary_wait_appear": {
     "message": "Wait until {selector} appears"
