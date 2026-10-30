@@ -302,9 +302,10 @@ const setNodeTextPreservingChildren = (node: HTMLElement, value: string) => {
   const textNodes = Array.from(node.childNodes).filter(
     (child): child is Text => child.nodeType === Node.TEXT_NODE,
   );
-  if (textNodes.length > 0) {
-    textNodes[0].nodeValue = value;
-    textNodes.slice(1).forEach((textNode) => textNode.remove());
+  const [firstText, ...extraTexts] = textNodes;
+  if (firstText) {
+    firstText.nodeValue = value;
+    extraTexts.forEach((textNode) => textNode.remove());
     return;
   }
   node.insertBefore(document.createTextNode(value), node.firstChild);
@@ -676,7 +677,7 @@ export const rehydrateElements = (elements: StructuredElementRecord[]) => {
   while (pending.length > 0 && progressed) {
     progressed = false;
     for (let index = 0; index < pending.length; ) {
-      const element = pending[index];
+      const element = pending[index]!;
       const runtimeElement = incomingRuntimeById.get(element.id);
       if (
         runtimeElement &&

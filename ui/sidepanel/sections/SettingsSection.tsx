@@ -4,7 +4,7 @@ import Card from '../components/Card';
 import ConfirmDialog from '../components/ConfirmDialog';
 import PasswordPromptDialog from '../components/PasswordPromptDialog';
 import PasswordVaultManager from '../components/PasswordVaultManager';
-import { LOCALE_OPTIONS, SupportedLocale, getLocaleLabel, setLocale, t, useLocale } from '../utils/i18n';
+import { LOCALE_OPTIONS, type SupportedLocale, getLocaleLabel, setLocale, t, useLocale } from '../utils/i18n';
 import { getGlobalSettings, setGlobalSettings } from '../../../shared/globalSettings';
 // 1.14 — reads go through `shared/storage` (read-only, any realm);
 // writes go through `shared/siteStorageClient` (messages the SW).

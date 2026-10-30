@@ -44,22 +44,22 @@ import {
 } from './flowHelpers';
 import { formatAtomicStartMessage, formatAtomicSuccessMessage } from './stepMessages';
 import {
-  BuiltAtomicPayload,
+  type BuiltAtomicPayload,
   CONDITION_POLL_INTERVAL_MS,
   ENABLE_EVENT_DRIVEN_RECOVERY,
-  FlowRunError,
-  FlowRunInternal,
-  FlowRunnerManagerOptions,
-  InFlightRecoverSource,
+  type FlowRunError,
+  type FlowRunInternal,
+  type FlowRunnerManagerOptions,
+  type InFlightRecoverSource,
   MAX_LOOP_ITERATIONS,
   MAX_RUN_DURATION_MS,
   MAX_RUN_LOG_ENTRIES,
   MAX_TOTAL_STEPS_EXECUTED,
   NAVIGATION_TIMEOUT_MS,
-  PendingStepRequest,
-  PendingUnlockRequest,
+  type PendingStepRequest,
+  type PendingUnlockRequest,
   REDACTED_PLACEHOLDER,
-  ResolvedFieldValue,
+  type ResolvedFieldValue,
   RunnerError,
   STATUS_THROTTLE_MS,
   STEP_ACTION_TIMEOUT_MS,
@@ -67,7 +67,7 @@ import {
   STEP_MESSAGE_RETRY_TIMEOUT_MS,
   STEP_RESULT_WAIT_GRACE_MS,
   STEP_RESULT_WAIT_MIN_MS,
-  TaintedPayloadField,
+  type TaintedPayloadField,
   VARIABLE_NAME_PATTERN,
   WAIT_SELECTOR_TIMEOUT_MS,
   isRawFieldTainted,
@@ -1594,7 +1594,7 @@ export class FlowRunnerManager {
           { phase: 'execute', recoverable: false },
         );
       }
-      return candidates[0].frameId;
+      return candidates[0]!.frameId;
     }
     const matched = probeResults.filter((r) => r.matched);
     if (matched.length === 0) {
@@ -1610,7 +1610,7 @@ export class FlowRunnerManager {
         { phase: 'execute', recoverable: false },
       );
     }
-    return matched[0].frameId;
+    return matched[0]!.frameId;
   }
 
   private async invokeContentStep(

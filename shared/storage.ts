@@ -53,7 +53,7 @@ export type StoragePayload = StructuredStoragePayload;
 
 export class StorageQuotaExceededError extends Error {
   readonly code = 'storage-quota-exceeded' as const;
-  constructor(public readonly cause?: unknown) {
+  constructor(public override readonly cause?: unknown) {
     super('storage quota exceeded');
     this.name = 'StorageQuotaExceededError';
   }

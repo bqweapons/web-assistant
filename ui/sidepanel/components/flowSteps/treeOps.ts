@@ -79,7 +79,8 @@ const reorderList = (items: StepData[], fromId: string, toId?: string) => {
     return items;
   }
   const next = [...items];
-  const [moved] = next.splice(fromIndex, 1);
+  // fromIndex was found above, so splice always removes one item.
+  const moved = next.splice(fromIndex, 1)[0]!;
   if (!toId) {
     next.push(moved);
     return next;

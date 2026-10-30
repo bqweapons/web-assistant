@@ -53,7 +53,7 @@ export const isRawFieldTainted = (rawValue: string, taintedVariables: Set<string
     return true;
   }
   for (const match of rawValue.matchAll(VARIABLE_TOKEN_ANYWHERE)) {
-    if (taintedVariables.has(match[1])) {
+    if (match[1] !== undefined && taintedVariables.has(match[1])) {
       return true;
     }
   }
