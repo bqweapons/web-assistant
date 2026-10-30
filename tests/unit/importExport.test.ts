@@ -56,7 +56,7 @@ describe('mergeSitesData', () => {
       'a.com': { elements: [], hidden: [], flows: [flow('f1', 'new'), flow('f3', 'added')] },
     };
     const merged = mergeSitesData(current, incoming);
-    const names = merged['a.com'].flows.map((f) => `${f.id}:${f.name}`).sort();
+    const names = merged['a.com']!.flows.map((f) => `${f.id}:${f.name}`).sort();
     expect(names).toEqual(['f1:new', 'f2:keep', 'f3:added']);
     expect(merged['b.com']).toEqual(current['b.com']);
   });

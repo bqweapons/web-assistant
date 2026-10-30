@@ -26,7 +26,7 @@ describe('normalizeFlowSteps', () => {
     const list = steps as Exclude<typeof steps, number>;
     expect(list.map((s) => s.type)).toEqual(['click', 'navigate']);
     expect(list.every((s) => isFlowStepData(s))).toBe(true);
-    expect(list[0].fields.find((f) => f.id === 'selector')?.value).toBe('#go');
+    expect(list[0]?.fields.find((f) => f.id === 'selector')?.value).toBe('#go');
   });
 
   it('returns current-format steps unchanged', () => {

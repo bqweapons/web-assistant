@@ -69,7 +69,7 @@ export const test = base.extend<Fixtures, WorkerFixtures>({
     await use(worker);
   },
   extensionId: async ({ serviceWorker }, use) => {
-    await use(serviceWorker.url().split('/')[2]);
+    await use(new URL(serviceWorker.url()).host);
   },
   page: async ({ context }, use) => {
     const page = await context.newPage();

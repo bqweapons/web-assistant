@@ -56,7 +56,7 @@ export const renderWithContext = (input: string, context: FlowRenderContext) => 
     formatNowToken(tokenType, now),
   );
   const withVariables = withNow.replace(VARIABLE_TOKEN_PATTERN, (_full, variableName: string) =>
-    variableName in context.variables ? context.variables[variableName] : '',
+    variableName in context.variables ? (context.variables[variableName] ?? '') : '',
   );
   const withLoop = withVariables.replace(LOOP_INDEX_TOKEN_PATTERN, () =>
     typeof context.loop?.index === 'number' ? String(context.loop.index) : '',
@@ -69,7 +69,7 @@ export const renderWithContext = (input: string, context: FlowRenderContext) => 
       if (!row) {
         return '';
       }
-      return key in row ? row[key] : '';
+      return key in row ? (row[key] ?? '') : '';
     },
   );
 };

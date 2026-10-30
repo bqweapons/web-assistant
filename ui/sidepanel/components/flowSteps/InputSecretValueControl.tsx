@@ -149,8 +149,9 @@ export default function InputSecretValueControl({
       setShowCreateSecretForm(false);
       return;
     }
-    if (status.names.length > 0 && !selectedSecretName) {
-      setSelectedSecretName(status.names[0]);
+    const [firstName] = status.names;
+    if (firstName !== undefined && !selectedSecretName) {
+      setSelectedSecretName(firstName);
     }
   };
 

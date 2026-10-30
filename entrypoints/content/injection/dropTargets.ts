@@ -273,7 +273,7 @@ export const buildAreaOrderUpdates = (
 
   let insertIndex = siblingIds.length;
   for (let index = 0; index < siblingIds.length; index += 1) {
-    const siblingEntry = registry.get(siblingIds[index]);
+    const siblingEntry = registry.get(siblingIds[index]!);
     if (!siblingEntry?.node) {
       continue;
     }

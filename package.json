@@ -29,8 +29,10 @@
     "postcss": "^8.5.32",
     "tailwindcss": "^4.3.3",
     "typescript": "~5.9.3",
+    "vite": "^7.3.7",
     "vitest": "^5.0.5",
-    "wxt": "^0.20.27"
+    "web-ext": "^10.8.0",
+    "wxt": "^0.21.5"
   },
   "dependencies": {
     "lucide-react": "^1.65.0",
