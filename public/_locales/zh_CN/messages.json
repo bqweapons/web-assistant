@@ -1651,5 +1651,20 @@
   },
   "sidepanel_action_save_anyway": {
     "message": "仍然保存"
+  },
+  "sidepanel_settings_import_error_not_json": {
+    "message": "此文件不是 Ladybird 导出文件（无法解析为 JSON）。"
+  },
+  "sidepanel_settings_import_confirm_title": {
+    "message": "导入数据？"
+  },
+  "sidepanel_settings_import_confirm_message": {
+    "message": "要从此文件导入 {sites} 个站点、{elements} 个元素、{flows} 个流程吗？ID 相同的项目会被覆盖，其他已保存的数据保持不变。"
+  },
+  "sidepanel_settings_import_confirm_ads_on": {
+    "message": "自动广告屏蔽将被开启。"
+  },
+  "sidepanel_settings_import_confirm_ads_off": {
+    "message": "自动广告屏蔽将被关闭。"
   }
 }
