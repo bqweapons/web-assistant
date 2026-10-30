@@ -12,9 +12,10 @@ This repository now uses the **WXT-based implementation as the primary mainline*
 
 Core capabilities:
 - Sidepanel management for `Elements` / `Flows` / `Hidden` / `Overview` / `Settings`
-- Action flow builder (`click`, `wait`, `input`, `navigate`, `log`, `if`, `while`, `popup`)
+- Action flow builder (click, input, wait, assert, navigate, popup, if/else, loop, CSV/TSV data source, variables)
 - Password Vault for secure reusable inputs in flows
 - Import / export (including optional vault data export)
+- Hidden rules per site, plus a global automatic ad-blocking toggle
 - Multi-language UI (`en`, `ja`, `zh_CN`)
 
 ## Chrome Web Store
@@ -69,16 +70,12 @@ Load the unpacked extension from:
 
 ## Action Flow (Overview)
 
-Flows run when an injected button is clicked and can automate page interactions before fallback behavior (linked URL or selector action).
+Flows run when an injected button is clicked (or from the side panel) and can automate page interactions before fallback behavior (linked URL or selector action). When a flow is started from a page button, a small notice on the page shows that it started and whether it finished or failed.
 
 Supported step families include:
-- `click`
-- `wait`
-- `input`
-- `navigate`
-- `log`
-- `if` / `while`
-- `popup`
+- `click`, `input`, `wait`, `assert`, `navigate`, `popup`
+- `if-else`, `loop`
+- `data-source` (CSV/TSV rows), `set-variable`
 
 See `AGENTS.md` for the detailed action-flow reference (step fields, conditions, runtime limits, frame behavior, vault usage).
 
@@ -118,7 +115,8 @@ Notes:
 
 ### Supporting material
 - `docs/` docs and policy content
-- `release/` historical artifacts, review notes, and store assets
+- `store-listing/` Chrome Web Store listing text (en / ja / zh-CN)
+- `CHANGELOG.md` release notes
 
 ## Contributing / Developer Notes
 
@@ -132,5 +130,5 @@ See `AGENTS.md` for:
 
 - Data is stored locally in `chrome.storage.local` unless you explicitly export it.
 - Password Vault secrets are encrypted locally and require the vault password to unlock.
-- Cross-origin iframe automation is not supported.
+- Cross-origin iframe automation is limited and may not work in all cases.
 - Some sites with strict CSP or highly dynamic DOM behavior may limit injection stability.

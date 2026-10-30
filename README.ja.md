@@ -12,9 +12,10 @@ Ladybird は、Web ページにノーコードのボタン・リンク・ツー�
 
 主な機能:
 - サイドパネル管理（`Elements` / `Flows` / `Hidden` / `Overview` / `Settings`）
-- アクションフロービルダー（`click`, `wait`, `input`, `navigate`, `log`, `if`, `while`, `popup`）
+- アクションフロービルダー（クリック、入力、待機、アサート、移動、ポップアップ、条件分岐、ループ、CSV/TSV データソース、変数）
 - フロー用パスワード保管庫（Password Vault）
 - インポート / エクスポート（保管庫データの任意エクスポートを含む）
+- サイトごとの非表示ルールと、全体に効く自動広告ブロックの切り替え
 - 多言語 UI（`en`, `ja`, `zh_CN`）
 
 ## Chrome Web Store
@@ -69,16 +70,12 @@ npm run zip
 
 ## アクションフロー（概要）
 
-フローは注入ボタンのクリック時に実行され、リンク遷移やセレクター動作のフォールバック前にページ操作を自動化できます。
+フローは注入ボタンのクリック時（またはサイドパネルから）に実行され、リンク遷移やセレクター動作のフォールバック前にページ操作を自動化できます。ページ上のボタンから開始した場合は、開始と完了・失敗がページ上の小さな通知で表示されます。
 
 主なステップ種別:
-- `click`
-- `wait`
-- `input`
-- `navigate`
-- `log`
-- `if` / `while`
-- `popup`
+- `click`, `input`, `wait`, `assert`, `navigate`, `popup`
+- `if-else`, `loop`
+- `data-source` （CSV/TSV の行）, `set-variable`
 
 ステップ項目、条件、実行制限、frame 動作、保管庫利用の詳細は `AGENTS.md` の Action Flow Reference を参照してください。
 
@@ -118,7 +115,8 @@ Ladybird には、旧形式の保存データ（例: `injectedElements`）を新
 
 ### 補助資料
 - `docs/` ドキュメント / ポリシー
-- `release/` 過去の成果物、レビュー資料、ストア用素材
+- `store-listing/` Chrome Web Store の掲載文（en / ja / zh-CN）
+- `CHANGELOG.md` リリースノート
 
 ## 開発メモ / 貢献
 
@@ -132,5 +130,5 @@ Ladybird には、旧形式の保存データ（例: `injectedElements`）を新
 
 - 明示的にエクスポートしない限り、データは `chrome.storage.local` に保存されます。
 - Password Vault の秘密情報はローカルで暗号化され、利用時は保管庫パスワードが必要です。
-- クロスオリジン iframe の自動化はサポートしていません。
+- クロスオリジン iframe の自動化には制限があり、すべてのケースで動作するとは限りません。
 - 厳しい CSP や変化の激しい DOM を持つサイトでは注入の安定性が下がる場合があります。

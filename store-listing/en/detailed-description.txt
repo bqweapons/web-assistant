@@ -3,7 +3,7 @@ Ladybird helps you customize websites with no-code UI elements, hidden rules, an
 WHAT IT DOES
 
 - Add buttons, links, tooltips, and areas to pages without writing code.
-- Build flows that can click, input, wait, assert, branch, loop, navigate, log, read data sources, set runtime variables, and show popup confirmations.
+- Build flows that can click, input, wait, assert, branch, loop, navigate, read data sources, set runtime variables, and show popup confirmations.
 - Hide distracting page elements with manual hidden rules.
 - Enable built-in automatic ad blocking with a single global toggle.
 - Review saved site data in Overview and manage import/export in Settings.
@@ -19,6 +19,7 @@ Flow Builder
 - Reuse values across steps with tokens such as `{{var.name}}`, `{{loop.index}}`, and `{{row.index}}`.
 - Load CSV/TSV data sources and run steps per row.
 - Show popup checkpoints with custom messages before continuing a flow.
+- When a flow is started from a button on the page, a small notice on the page shows that it started and whether it finished or failed (with the reason).
 
 Hidden Rules
 - Add manual hidden rules for the current site.
