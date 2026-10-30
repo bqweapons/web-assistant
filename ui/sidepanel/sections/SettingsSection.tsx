@@ -1,6 +1,7 @@
 import { useRef, useState, type ChangeEvent } from 'react';
 import { Copy, Download, ExternalLink, Languages, Share2, Upload } from 'lucide-react';
 import Card from '../components/Card';
+import ConfirmDialog from '../components/ConfirmDialog';
 import PasswordPromptDialog from '../components/PasswordPromptDialog';
 import PasswordVaultManager from '../components/PasswordVaultManager';
 import { LOCALE_OPTIONS, SupportedLocale, getLocaleLabel, setLocale, t, useLocale } from '../utils/i18n';
@@ -39,6 +40,22 @@ export default function SettingsSection() {
   const [feedback, setFeedback] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
   const [vaultPasswordPrompt, setVaultPasswordPrompt] =
     useState<VaultPasswordPromptRequest | null>(null);
+  const [importConfirm, setImportConfirm] = useState<{
+    message: string;
+    resolve: (value: boolean) => void;
+  } | null>(null);
+
+  const confirmImport = (message: string): Promise<boolean> =>
+    new Promise((resolve) => {
+      setImportConfirm({ message, resolve });
+    });
+
+  const resolveImportConfirm = (value: boolean) => {
+    setImportConfirm((current) => {
+      current?.resolve(value);
+      return null;
+    });
+  };
 
   const promptVaultPassword = (config: {
     title: string;
@@ -172,9 +189,37 @@ export default function SettingsSection() {
     setFeedback(null);
     try {
       const text = await file.text();
-      const raw = JSON.parse(text) as unknown;
+      let raw: unknown;
+      try {
+        raw = JSON.parse(text);
+      } catch {
+        throw new Error(
+          t('sidepanel_settings_import_error_not_json', 'This file is not a Ladybird export (invalid JSON).'),
+        );
+      }
       const secretsBundle = isRecord(raw) ? parseSecretVaultTransferPayload(raw.secrets) : null;
       const parsed = parseImportPayload(raw);
+      // Show what will change before writing anything.
+      let confirmMessage = t(
+        'sidepanel_settings_import_confirm_message',
+        'Import {sites} site(s), {elements} element(s), {flows} flow(s) from this file? Items with the same ID are replaced; your other saved data is kept.',
+      )
+        .replace('{sites}', String(parsed.summary.siteCount))
+        .replace('{elements}', String(parsed.summary.elementCount))
+        .replace('{flows}', String(parsed.summary.flowCount));
+      if (parsed.settings) {
+        const currentSettings = await getGlobalSettings();
+        if (currentSettings.autoHideAdsEnabled !== parsed.settings.autoHideAdsEnabled) {
+          confirmMessage += ` ${
+            parsed.settings.autoHideAdsEnabled
+              ? t('sidepanel_settings_import_confirm_ads_on', 'Automatic ad blocking will be turned on.')
+              : t('sidepanel_settings_import_confirm_ads_off', 'Automatic ad blocking will be turned off.')
+          }`;
+        }
+      }
+      if (!(await confirmImport(confirmMessage))) {
+        return;
+      }
       const currentSites = await getAllSitesData();
       const mergedSites = mergeSitesData(currentSites, parsed.sites);
       await setAllSitesData(mergedSites);
@@ -459,6 +504,14 @@ export default function SettingsSection() {
           </div>
         </div>
       </Card>
+      <ConfirmDialog
+        open={Boolean(importConfirm)}
+        title={t('sidepanel_settings_import_confirm_title', 'Import data?')}
+        message={importConfirm?.message ?? ''}
+        confirmLabel={t('sidepanel_settings_data_import', 'Import')}
+        onConfirm={() => resolveImportConfirm(true)}
+        onCancel={() => resolveImportConfirm(false)}
+      />
       <PasswordPromptDialog
         open={Boolean(vaultPasswordPrompt)}
         title={vaultPasswordPrompt?.title ?? ''}

@@ -1651,5 +1651,20 @@
   },
   "sidepanel_action_save_anyway": {
     "message": "Save anyway"
+  },
+  "sidepanel_settings_import_error_not_json": {
+    "message": "This file is not a Ladybird export (invalid JSON)."
+  },
+  "sidepanel_settings_import_confirm_title": {
+    "message": "Import data?"
+  },
+  "sidepanel_settings_import_confirm_message": {
+    "message": "Import {sites} site(s), {elements} element(s), {flows} flow(s) from this file? Items with the same ID are replaced; your other saved data is kept."
+  },
+  "sidepanel_settings_import_confirm_ads_on": {
+    "message": "Automatic ad blocking will be turned on."
+  },
+  "sidepanel_settings_import_confirm_ads_off": {
+    "message": "Automatic ad blocking will be turned off."
   }
 }

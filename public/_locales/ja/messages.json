@@ -1651,5 +1651,20 @@
   },
   "sidepanel_action_save_anyway": {
     "message": "このまま保存"
+  },
+  "sidepanel_settings_import_error_not_json": {
+    "message": "このファイルは Ladybird のエクスポートファイルではありません（JSON として読み込めません）。"
+  },
+  "sidepanel_settings_import_confirm_title": {
+    "message": "データをインポートしますか？"
+  },
+  "sidepanel_settings_import_confirm_message": {
+    "message": "このファイルから {sites} サイト、{elements} 要素、{flows} フローをインポートしますか？同じ ID の項目は上書きされ、それ以外の保存データはそのまま残ります。"
+  },
+  "sidepanel_settings_import_confirm_ads_on": {
+    "message": "自動広告ブロックがオンになります。"
+  },
+  "sidepanel_settings_import_confirm_ads_off": {
+    "message": "自動広告ブロックがオフになります。"
   }
 }
