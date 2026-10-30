@@ -1,9 +1,9 @@
 This release focuses on clearer feedback and fixes for everyday use.
 
 - Buttons that start a flow now show a small notice on the page: started, finished, or failed with the reason. Repeat clicks while a flow is starting are ignored.
-- Common flow errors (element not found, timeouts, failed checks, closed tab) are now shown in your language instead of English.
+- Common flow errors (element not found, timeouts, failed checks, closed tab) are now shown in your language instead of English (on-page notices follow the browser language).
 - Elements set for a specific page now update when a single-page app changes the URL without reloading.
 - Tooltips are positioned correctly above, below or beside their target and follow it when the page scrolls.
-- New If/Else, Wait and Assert steps start empty instead of with example values. Saving a flow that still has empty or example values shows a warning first, with a "Save anyway" option.
+- New If/Else, Wait and Assert steps no longer come pre-filled with example values. Saving a flow that still has empty or example values shows a warning first, with a "Save anyway" option.
 - Import now asks for confirmation and shows what will be imported, including any change to automatic ad blocking.
 - The element picker shows a short hint (click to select, Esc to cancel). Remaining English labels in Japanese and Chinese were translated.
