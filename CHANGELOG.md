@@ -2,6 +2,20 @@
 
 User-visible changes per release. Older releases: see git history and `store-listing/*/whats-new.txt` at each tag.
 
+## 2.2.0 — unreleased
+
+Maintenance release: no new features. The extension behaves the same as 2.1.0; the changes are in testing and tooling.
+
+### Added
+- Automated tests: 41 Vitest unit tests (`npm test`) and 11 Playwright end-to-end tests that load the built extension (`npm run test:e2e`).
+- GitHub Actions CI: type check, locale checks, unit tests, build and E2E tests on every push to main/develop and on pull requests.
+
+### Changed
+- Toolchain upgraded across major versions: WXT 0.21, Vite 8 with @vitejs/plugin-react 6, TypeScript 7, lucide-react 1.x. Builds are about twice as fast.
+- Stricter TypeScript settings from WXT 0.21 (`verbatimModuleSyntax`, `noUncheckedIndexedAccess`); the code was adjusted without behavior changes.
+- `npm audit`: down to 4 low-severity items in a dev-only dependency (`deepmerge` via `web-ext`), none in the shipped extension.
+- Node.js 22 or later is required for development.
+
 ## 2.1.0 — unreleased
 
 ### Added

@@ -28,8 +28,10 @@ All commands run from the repo root.
 | Production build (Chrome) | `npm run build` (runs `i18n:check` first) |
 | Production build (Firefox) | `npm run build:firefox` |
 | Distributable zip | `npm run zip` / `npm run zip:firefox` |
+| Unit tests (Vitest, `tests/unit/`) | `npm test` |
+| E2E tests (Playwright, `tests/e2e/`, builds first) | `npm run test:e2e` (`HEADED=1` to watch; `LADYBIRD_EXTENSION_DIR` to test another build) |
 
-No test runner is wired up; `i18n:check` and `compile` are the CI gates. Load the unpacked build from `.output/chrome-mv3/`.
+CI (`.github/workflows/ci.yml`, Node 22) runs compile, both i18n checks, unit tests, build and E2E on every push to main/develop and on PRs. Node >= 22 is required (WXT 0.21). Load the unpacked build from `.output/chrome-mv3/`.
 
 ## Architecture
 
