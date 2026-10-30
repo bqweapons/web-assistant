@@ -1,7 +1,7 @@
 import { MessageType, type PageContextPayload, type RuntimeMessage } from '../../shared/messages';
 import { FlowRunnerManager } from './runner/stepExecution';
 import { derivePageContext } from './runtime/pageContext';
-import { TabBridge, type TabMessageResponse } from './runtime/tabBridge';
+import { TabBridge, type TabBridgeOptions, type TabMessageResponse } from './runtime/tabBridge';
 import {
   deleteSecretValue,
   exportSecretVaultTransferPayload,
@@ -52,7 +52,8 @@ export const bootstrapBackground = () => {
 
   const runtime = chrome?.runtime;
   const tabsApi = chrome?.tabs;
-  const scriptingApi = chrome?.scripting;
+  // wxt 0.20.27 widened the scripting typings; TabBridge only needs the callback form.
+  const scriptingApi = chrome?.scripting as unknown as TabBridgeOptions['scriptingApi'];
   const isNoReceiverError = (error: unknown) =>
     /receiving end does not exist|asynchronous response|message channel(?:\s+is)?\s+closed|before a response was received/i.test(
       error instanceof Error ? error.message : String(error ?? ''),

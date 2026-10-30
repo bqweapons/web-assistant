@@ -18,7 +18,7 @@ type TabMessageOptions = {
   frameId?: number;
 };
 
-type TabBridgeOptions = {
+export type TabBridgeOptions = {
   runtime?: {
     lastError?: { message?: string };
   };
