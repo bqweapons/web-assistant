@@ -60,6 +60,12 @@ test('page button shows a success notice and runs the flow', async ({ page }) =>
   await expect(page.locator('#name')).toHaveValue('hello');
 });
 
+test('JS transform on an input value runs in the flow', async ({ page }) => {
+  await injected(page, 'RunTransform').locator('button').click();
+  await expect.poll(async () => (await notice(page)).tone, { timeout: 15_000 }).toBe('success');
+  await expect(page.locator('#name')).toHaveValue('HELLO!');
+});
+
 test('page button shows a translated failure reason', async ({ page }) => {
   await injected(page, 'RunFail').locator('button').click();
   await expect.poll(async () => (await notice(page)).tone, { timeout: 30_000 }).toBe('error');

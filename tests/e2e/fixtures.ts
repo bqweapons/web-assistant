@@ -8,7 +8,8 @@ import { fileURLToPath } from 'node:url';
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 import type { AddressInfo } from 'node:net';
 
-const EXTENSION_DIR = path.resolve(HERE, '../../.output/chrome-mv3');
+// LADYBIRD_EXTENSION_DIR lets the suite run against another build (e.g. an unzipped release).
+const EXTENSION_DIR = process.env.LADYBIRD_EXTENSION_DIR || path.resolve(HERE, '../../.output/chrome-mv3');
 
 // One small test site: an anchor for injected elements, an input for flows,
 // buttons that change the URL with history.pushState (SPA navigation), and a
@@ -121,6 +122,7 @@ export const buildSeed = (siteKey: string) => ({
         element(siteKey, 'el-run-ok', 'RunOK', 'button', { behavior: { actionFlowId: 'flow-ok' } }),
         element(siteKey, 'el-run-fail', 'RunFail', 'button', { behavior: { actionFlowId: 'flow-fail' } }),
         element(siteKey, 'el-run-missing', 'RunMissing', 'button', { behavior: { actionFlowId: 'flow-deleted' } }),
+        element(siteKey, 'el-run-transform', 'RunTransform', 'button', { behavior: { actionFlowId: 'flow-transform' } }),
       ],
       flows: [
         {
@@ -139,6 +141,27 @@ export const buildSeed = (siteKey: string) => ({
               title: 'Assert',
               summary: '',
               fields: [field('selector', '#name'), field('operator', 'equals', 'select'), field('expected', 'hello')],
+            },
+          ],
+        },
+        {
+          id: 'flow-transform',
+          name: 'Transform flow',
+          description: '',
+          scope: 'site',
+          siteKey,
+          pageKey: null,
+          updatedAt: now,
+          steps: [
+            {
+              id: 't1',
+              type: 'input',
+              title: 'Input',
+              summary: '',
+              fields: [
+                field('selector', '#name'),
+                { ...field('value', 'hello'), transform: { mode: 'js', code: 'return helpers.upper(input) + "!"' } },
+              ],
             },
           ],
         },
