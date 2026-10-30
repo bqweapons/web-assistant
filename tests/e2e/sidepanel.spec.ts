@@ -1,7 +1,7 @@
 import type { Page } from '@playwright/test';
 import fs from 'node:fs';
 import path from 'node:path';
-import { expect, seedStorage, test } from './fixtures';
+import { buildSeed, expect, seedStorage, test } from './fixtures';
 import { anyLocale } from './locale';
 
 // Regex that matches a message in any shipped locale (side panel follows its own
@@ -59,15 +59,20 @@ test('new If/Else step is empty and Save warns first', async ({ context, service
   await expect(panel.getByText(anyText('sidepanel_flows_config_warnings_title'))).toBeVisible();
   const saveAnyway = panel.getByRole('button', { name: anyText('sidepanel_action_save_anyway') });
   await expect(saveAnyway).toHaveCount(1);
+  const storedFlowIds = () =>
+    serviceWorker.evaluate(
+      async (key) =>
+        (((await chrome!.storage.local.get('ladybird_sites')) as { ladybird_sites: any }).ladybird_sites.sites[key]
+          .flows as { id: string }[]).map((flow) => flow.id),
+      site.siteKey,
+    );
+  const seededIds = buildSeed(site.siteKey).sites[site.siteKey]!.flows.map((flow) => flow.id);
+  // The first Save only showed the warnings; nothing was written yet.
+  expect((await storedFlowIds()).sort()).toEqual([...seededIds].sort());
   await saveAnyway.click();
   await expect
-    .poll(() =>
-      serviceWorker.evaluate(
-        async (key) => ((await chrome!.storage.local.get('ladybird_sites')) as { ladybird_sites: any }).ladybird_sites.sites[key].flows.length,
-        site.siteKey,
-      ),
-    )
-    .toBe(3);
+    .poll(async () => (await storedFlowIds()).filter((id) => !seededIds.includes(id)).length)
+    .toBe(1);
 });
 
 test('import asks for confirmation and handles bad files', async ({ context, serviceWorker, extensionId, page, site }, testInfo) => {
