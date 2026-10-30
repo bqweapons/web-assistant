@@ -15,7 +15,7 @@
     "message": "检查"
   },
   "sidepanel_action_clear": {
-    "message": "Clear"
+    "message": "清除"
   },
   "sidepanel_action_dark_mode": {
     "message": "深色模式"
@@ -678,25 +678,25 @@
     "message": "直接输入"
   },
   "sidepanel_flow_input_value_mode_secret": {
-    "message": "从密码库选择"
+    "message": "从密码保管库选择"
   },
   "sidepanel_flow_input_password_warning": {
     "message": "这个输入目标看起来像密码字段。密码不能以明文保存在流程中。"
   },
   "sidepanel_flow_input_password_migration_required": {
-    "message": "密码字段必须使用密码库。明文密码在保存和运行时都会被拦截。"
+    "message": "密码字段必须使用密码保管库。明文密码在保存和运行时都会被拦截。"
   },
   "sidepanel_flow_input_password_save_to_vault": {
-    "message": "保存到密码库并绑定"
+    "message": "保存到密码保管库并绑定"
   },
   "sidepanel_flow_input_password_use_vault": {
-    "message": "使用密码库"
+    "message": "使用密码保管库"
   },
   "sidepanel_flow_input_secret_bound": {
     "message": "已绑定：{name}"
   },
   "sidepanel_flow_input_secret_select": {
-    "message": "密码库中的密码"
+    "message": "密码保管库中的密码"
   },
   "sidepanel_flow_input_secret_select_placeholder": {
     "message": "选择密码"
@@ -753,13 +753,13 @@
     "message": "密码值"
   },
   "sidepanel_flows_validation_password_secret_required": {
-    "message": "检测到密码字段使用明文输入。请先保存到密码库并绑定后再保存或运行。"
+    "message": "检测到密码字段使用明文输入。请先保存到密码保管库并绑定后再保存或运行。"
   },
   "sidepanel_flow_runner_error_password_literal_blocked": {
-    "message": "运行前请先将密码字段保存到密码库。"
+    "message": "运行前请先将密码字段保存到密码保管库。"
   },
   "sidepanel_flow_runner_error_secret_vault_locked": {
-    "message": "请先解锁密码库。"
+    "message": "请先解锁密码保管库。"
   },
   "sidepanel_flow_runner_error_secret_not_found": {
     "message": "找不到已绑定的密码，请重新选择。"
@@ -1639,5 +1639,14 @@
   },
   "page_run_action_target_missing": {
     "message": "在此页面上找不到此按钮要点击的元素。"
+  },
+  "page_picker_hint_select": {
+    "message": "点击元素进行选择 · 按 Esc 取消"
+  },
+  "page_picker_hint_area": {
+    "message": "拖动以绘制区域 · 按 Esc 取消"
+  },
+  "page_recording_badge": {
+    "message": "Ladybird 正在录制"
   }
 }

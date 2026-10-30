@@ -1,3 +1,4 @@
+import { pageI18nMessage } from './pageNotice';
 import {
   MessageType,
   type FlowRecordingEventPayload,
@@ -73,7 +74,7 @@ const createOverlay = () => {
     fontWeight: '600',
     boxShadow: '0 8px 20px rgba(15, 23, 42, 0.2)',
   });
-  container.textContent = 'Ladybird recording';
+  container.textContent = pageI18nMessage('page_recording_badge', 'Ladybird is recording');
   return {
     mount() {
       (document.body || document.documentElement).appendChild(container);
