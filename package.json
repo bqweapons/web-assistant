@@ -14,7 +14,7 @@
     "zip:firefox": "wxt zip -b firefox",
     "compile": "tsc --noEmit",
     "test": "vitest run",
-    "test:e2e": "playwright test",
+    "test:e2e": "npm run build && playwright test",
     "i18n:check": "node scripts/check-locales.mjs",
     "i18n:unused-check": "node scripts/check-unused-locales.mjs",
     "postinstall": "wxt prepare"
