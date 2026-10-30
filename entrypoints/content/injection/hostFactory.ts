@@ -19,7 +19,7 @@ import {
   isElementFloating,
   type RuntimeElement,
 } from './shared';
-import { registry } from './registry';
+import { getEntryRuntime, registry } from './registry';
 import {
   EDITING_ATTR,
   FLOATING_Z_INDEX,
@@ -324,6 +324,8 @@ export const insertNode = (host: HTMLElement, element: RuntimeElement) => {
   return { ok: true };
 };
 
+const VIEWPORT_MARGIN = 4;
+
 export const placeTooltip = (element: RuntimeElement) => {
   const target = resolveTarget(getElementSelector(element));
   const entry = registry.get(element.id);
@@ -331,24 +333,58 @@ export const placeTooltip = (element: RuntimeElement) => {
   if (!(target instanceof HTMLElement) || !(tooltip instanceof HTMLElement)) {
     return;
   }
+  tooltip.style.position = 'fixed';
+  tooltip.style.zIndex = '2147482001';
   const rect = target.getBoundingClientRect();
+  const width = tooltip.offsetWidth;
+  const height = tooltip.offsetHeight;
   const offset = 6;
   const position = getElementTooltipPosition(element) || 'top';
-  const top =
-    position === 'top'
-      ? rect.top - offset
-      : position === 'bottom'
-        ? rect.bottom + offset
-        : rect.top;
-  const left =
-    position === 'left'
-      ? rect.left - offset
-      : position === 'right'
-        ? rect.right + offset
-        : rect.left;
+  let top: number;
+  let left: number;
+  if (position === 'bottom') {
+    top = rect.bottom + offset;
+    left = rect.left + (rect.width - width) / 2;
+  } else if (position === 'left') {
+    top = rect.top + (rect.height - height) / 2;
+    left = rect.left - offset - width;
+  } else if (position === 'right') {
+    top = rect.top + (rect.height - height) / 2;
+    left = rect.right + offset;
+  } else {
+    top = rect.top - offset - height;
+    left = rect.left + (rect.width - width) / 2;
+  }
+  const maxLeft = window.innerWidth - width - VIEWPORT_MARGIN;
+  const maxTop = window.innerHeight - height - VIEWPORT_MARGIN;
+  tooltip.style.left = `${Math.max(VIEWPORT_MARGIN, Math.min(left, maxLeft))}px`;
+  tooltip.style.top = `${Math.max(VIEWPORT_MARGIN, Math.min(top, maxTop))}px`;
+  ensureTooltipTracking();
+};
 
-  tooltip.style.position = 'fixed';
-  tooltip.style.top = `${Math.max(0, top)}px`;
-  tooltip.style.left = `${Math.max(0, left)}px`;
-  tooltip.style.zIndex = '2147482001';
+// Tooltips use fixed positioning, so they must be re-placed whenever the
+// page (or any scroll container) scrolls or the viewport resizes.
+let tooltipTrackingStarted = false;
+let tooltipFrame = 0;
+const ensureTooltipTracking = () => {
+  if (tooltipTrackingStarted) {
+    return;
+  }
+  tooltipTrackingStarted = true;
+  const schedule = () => {
+    if (tooltipFrame) {
+      return;
+    }
+    tooltipFrame = window.requestAnimationFrame(() => {
+      tooltipFrame = 0;
+      registry.forEach((entry) => {
+        const runtimeElement = getEntryRuntime(entry);
+        if (getElementType(runtimeElement) === 'tooltip') {
+          placeTooltip(runtimeElement);
+        }
+      });
+    });
+  };
+  window.addEventListener('scroll', schedule, { capture: true, passive: true });
+  window.addEventListener('resize', schedule, { passive: true });
 };
