@@ -13,11 +13,14 @@
     "zip": "wxt zip",
     "zip:firefox": "wxt zip -b firefox",
     "compile": "tsc --noEmit",
+    "test": "vitest run",
+    "test:e2e": "playwright test",
     "i18n:check": "node scripts/check-locales.mjs",
     "i18n:unused-check": "node scripts/check-unused-locales.mjs",
     "postinstall": "wxt prepare"
   },
   "devDependencies": {
+    "@playwright/test": "^1.64.1",
     "@tailwindcss/postcss": "^4.3.3",
     "@types/react": "^19.3.0",
     "@types/react-dom": "^19.3.0",
@@ -26,6 +29,7 @@
     "postcss": "^8.5.32",
     "tailwindcss": "^4.3.3",
     "typescript": "~5.9.3",
+    "vitest": "^5.0.5",
     "wxt": "^0.20.27"
   },
   "dependencies": {
