@@ -1648,5 +1648,8 @@
   },
   "page_recording_badge": {
     "message": "Ladybird is recording"
+  },
+  "sidepanel_action_save_anyway": {
+    "message": "Save anyway"
   }
 }

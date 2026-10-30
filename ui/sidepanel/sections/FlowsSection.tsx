@@ -37,6 +37,7 @@ type FlowsSectionProps = {
 
 type FlowSummaryActions = {
   onSave: () => void;
+  saveAnyway?: boolean;
   onCheck?: () => void;
   onStartRecording?: () => void;
   onStopRecording?: () => void;
@@ -633,11 +634,21 @@ export default function FlowsSection({
     persistFlows,
   ]);
 
+  // First Save with check warnings shows them instead of saving; the
+  // button then reads "Save anyway" and a second click saves.
   const handleFlowSave = () => {
+    if (!editCheckVisible && editConfigurationWarnings.length > 0) {
+      setEditCheckVisible(true);
+      return;
+    }
     void saveEditedFlow(true);
   };
 
   const handleCreateFlow = () => {
+    if (!draftCheckVisible && draftConfigurationWarnings.length > 0) {
+      setDraftCheckVisible(true);
+      return;
+    }
     void createDraftFlow();
   };
 
@@ -720,7 +731,9 @@ export default function FlowsSection({
         >
           <span className="inline-flex items-center gap-1">
             <Check className="h-3.5 w-3.5" />
-            {t('sidepanel_action_save', 'Save')}
+            {actions.saveAnyway
+              ? t('sidepanel_action_save_anyway', 'Save anyway')
+              : t('sidepanel_action_save', 'Save')}
           </span>
         </button>
       </div>
@@ -1025,7 +1038,7 @@ export default function FlowsSection({
                     </p>
                   </div>
                 </div>
-                <div className="flex shrink-0 items-center gap-1">
+                <div className="flex shrink-0 items-center gap-3">
                   <button
                     type="button"
                     className={actionClass}
@@ -1079,6 +1092,7 @@ export default function FlowsSection({
         onClose={closeEditDrawer}
         summary={renderSummary({
           onSave: handleFlowSave,
+          saveAnyway: editCheckVisible && editConfigurationWarnings.length > 0,
           onCheck: () => setEditCheckVisible(true),
           onStartRecording: () => handleStartRecording('edit'),
           onStopRecording: handleStopRecording,
@@ -1139,6 +1153,7 @@ export default function FlowsSection({
         onClose={closeCreateDrawer}
         summary={renderSummary({
           onSave: handleCreateFlow,
+          saveAnyway: draftCheckVisible && draftConfigurationWarnings.length > 0,
           onCheck: () => setDraftCheckVisible(true),
           onStartRecording: () => handleStartRecording('create'),
           onStopRecording: handleStopRecording,

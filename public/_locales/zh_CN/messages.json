@@ -1648,5 +1648,8 @@
   },
   "page_recording_badge": {
     "message": "Ladybird 正在录制"
+  },
+  "sidepanel_action_save_anyway": {
+    "message": "仍然保存"
   }
 }
