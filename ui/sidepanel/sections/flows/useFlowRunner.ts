@@ -9,6 +9,7 @@ import {
 import { inferDataSourceFileType, requestDataSourceFile } from '../../../../shared/filePicker';
 import { sendRuntimeMessage } from '../../utils/runtimeMessaging';
 import { t } from '../../utils/i18n';
+import { RUNNER_ERROR_MESSAGES } from '../../../../shared/runnerErrorMessages';
 import { getStepCount, toFlowSnapshot, type FlowRecord } from './normalize';
 import type { FlowStepData } from '../../../../shared/flowStepMigration';
 
@@ -133,6 +134,10 @@ export const formatRunnerError = (code?: string, message?: string) => {
       'sidepanel_flow_runner_error_ambiguous_frame_match',
       'The selector matches elements in more than one iframe. Re-record the step with only the intended iframe open, or narrow the selector.',
     );
+  }
+  const mapped = code ? RUNNER_ERROR_MESSAGES[code] : undefined;
+  if (mapped) {
+    return t(mapped.messageKey, mapped.fallback);
   }
   return message || code || t('sidepanel_flow_runner_error_unknown', 'Flow run failed.');
 };

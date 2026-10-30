@@ -534,7 +534,7 @@
     "message": "更新が新しい順"
   },
   "sidepanel_hidden_subtitle": {
-    "message": "\u73fe\u5728\u306e\u30b5\u30a4\u30c8\u7528\u306e\u624b\u52d5\u30eb\u30fc\u30eb\u3002"
+    "message": "現在のサイト用の手動ルール。"
   },
   "sidepanel_hidden_bulk_enable_all": {
     "message": "すべて有効化"
@@ -543,25 +543,25 @@
     "message": "すべて停止"
   },
   "sidepanel_hidden_auto_ads_on": {
-    "message": "\u81ea\u52d5\u5e83\u544a\u30d6\u30ed\u30c3\u30af\u3092\u6709\u52b9\u5316"
+    "message": "自動広告ブロックを有効化"
   },
   "sidepanel_hidden_auto_ads_off": {
-    "message": "\u81ea\u52d5\u5e83\u544a\u30d6\u30ed\u30c3\u30af\u3092\u505c\u6b62"
+    "message": "自動広告ブロックを停止"
   },
   "sidepanel_hidden_auto_ads_title": {
-    "message": "\u81ea\u52d5\u5e83\u544a\u30d6\u30ed\u30c3\u30af"
+    "message": "自動広告ブロック"
   },
   "sidepanel_hidden_auto_ads_subtitle": {
-    "message": "\u3059\u3079\u3066\u306e\u30da\u30fc\u30b8\u3067\u5171\u901a\u5e83\u544a\u3092\u96a0\u3059\u7d44\u307f\u8fbc\u307f\u30eb\u30fc\u30eb\u3002"
+    "message": "すべてのページで共通広告を隠す組み込みルール。"
   },
   "sidepanel_hidden_auto_ads_helper": {
-    "message": "\u3053\u308c\u306f\u30b0\u30ed\u30fc\u30d0\u30eb\u306a\u7d44\u307f\u8fbc\u307f\u6a5f\u80fd\u3067\u3059\u3002\u4e0b\u306e\u624b\u52d5\u975e\u8868\u793a\u30eb\u30fc\u30eb\u3068\u306f\u5225\u3067\u3059\u3002"
+    "message": "これはグローバルな組み込み機能です。下の手動非表示ルールとは別です。"
   },
   "sidepanel_hidden_auto_ads_update_error": {
-    "message": "\u81ea\u52d5\u5e83\u544a\u30d6\u30ed\u30c3\u30af\u3092\u66f4\u65b0\u3067\u304d\u307e\u305b\u3093\u3067\u3057\u305f\u3002\u3082\u3046\u4e00\u5ea6\u304a\u8a66\u3057\u304f\u3060\u3055\u3044\u3002"
+    "message": "自動広告ブロックを更新できませんでした。もう一度お試しください。"
   },
   "sidepanel_hidden_action_select": {
-    "message": "\u30da\u30fc\u30b8\u8981\u7d20\u3092\u975e\u8868\u793a"
+    "message": "ページ要素を非表示"
   },
   "sidepanel_hidden_title": {
     "message": "非表示ルール"
@@ -897,7 +897,7 @@
     "message": "単数形の var を使用してください。例: {{var.name}}。{{vars.name}} は置換されません。"
   },
   "sidepanel_step_set_variable_selector_hint": {
-    "message": "\u30bf\u30d6\u3067 Value \u5165\u529b\u3068 Selector \u53d6\u5f97\u3092\u5207\u308a\u66ff\u3048\u3066\u304f\u3060\u3055\u3044\u3002"
+    "message": "タブで Value 入力と Selector 取得を切り替えてください。"
   },
   "sidepanel_step_set_variable_label": {
     "message": "変数を設定"
@@ -933,7 +933,7 @@
     "message": "{selector} から {name} を設定"
   },
   "sidepanel_step_summary_set_variable_selector_missing": {
-    "message": "Selector \u304b\u3089 {name} \u3092\u8a2d\u5b9a"
+    "message": "Selector から {name} を設定"
   },
   "sidepanel_step_summary_url": {
     "message": "URL: {value}"
@@ -1019,7 +1019,10 @@
   "sidepanel_steps_iframe_badge": {
     "message": "iframe: {url}",
     "placeholders": {
-      "url": { "content": "$1", "example": "example.com/inner" }
+      "url": {
+        "content": "$1",
+        "example": "example.com/inner"
+      }
     }
   },
   "sidepanel_steps_file_label": {
@@ -1478,7 +1481,10 @@
   "vault_unlock_context_attempt": {
     "message": "{count} 回目の試行",
     "placeholders": {
-      "count": { "content": "$1", "example": "2" }
+      "count": {
+        "content": "$1",
+        "example": "2"
+      }
     }
   },
   "vault_unlock_password_label": {
@@ -1564,5 +1570,74 @@
   },
   "sidepanel_elements_margin_placeholder": {
     "message": "0 auto"
+  },
+  "runner_error_missing_selector": {
+    "message": "セレクターが未設定のステップがあります。フローを編集して対象要素を選んでください。"
+  },
+  "runner_error_selector_not_found": {
+    "message": "このページで対象要素が見つかりませんでした。"
+  },
+  "runner_error_invalid_selector": {
+    "message": "無効なセレクターのステップがあります。"
+  },
+  "runner_error_input_target_invalid": {
+    "message": "入力ステップの対象がテキスト欄やセレクトボックスではありません。"
+  },
+  "runner_error_select_option_not_found": {
+    "message": "セレクトボックスに一致する選択肢がありませんでした。"
+  },
+  "runner_error_assertion_failed": {
+    "message": "アサートステップの値が期待値と一致しませんでした。"
+  },
+  "runner_error_wait_appear_timeout": {
+    "message": "要素が表示されるのを待つ間にタイムアウトしました。"
+  },
+  "runner_error_wait_disappear_timeout": {
+    "message": "要素が消えるのを待つ間にタイムアウトしました。"
+  },
+  "runner_error_wait_condition_timeout": {
+    "message": "条件を待つ間にタイムアウトしました。"
+  },
+  "runner_error_navigate_url_missing": {
+    "message": "URL が未設定の移動ステップがあります。"
+  },
+  "runner_error_navigate_url_invalid": {
+    "message": "移動ステップの URL が無効です。"
+  },
+  "runner_error_navigate_timeout": {
+    "message": "移動後のページ読み込みに時間がかかりすぎました。"
+  },
+  "runner_error_tab_closed": {
+    "message": "フローを実行していたタブが閉じられました。"
+  },
+  "runner_error_no_active_tab": {
+    "message": "フローを実行できるアクティブなタブがありません。"
+  },
+  "runner_error_refresh_required": {
+    "message": "Ladybird がまだこのページに接続できません。ページを再読み込みしてからもう一度お試しください。"
+  },
+  "page_run_started": {
+    "message": "フローを実行中: {name}"
+  },
+  "page_run_succeeded": {
+    "message": "フローが完了しました: {name}"
+  },
+  "page_run_failed": {
+    "message": "フローが失敗しました: {name}"
+  },
+  "page_run_cancelled": {
+    "message": "フローを停止しました: {name}"
+  },
+  "page_run_flow_missing": {
+    "message": "このボタンに紐づくフローが見つかりません。Ladybird のサイドパネルでボタンを編集してください。"
+  },
+  "page_run_start_failed": {
+    "message": "フローを開始できませんでした。詳細は Ladybird のサイドパネルをご確認ください。"
+  },
+  "page_run_data_source_confirm": {
+    "message": "ステップ「{name}」で使う CSV/TSV ファイルを選んでください"
+  },
+  "page_run_action_target_missing": {
+    "message": "このボタンがクリックする要素がこのページに見つかりません。"
   }
 }

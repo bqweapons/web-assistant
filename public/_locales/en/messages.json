@@ -1082,7 +1082,10 @@
   "sidepanel_steps_iframe_badge": {
     "message": "iframe: {url}",
     "placeholders": {
-      "url": { "content": "$1", "example": "example.com/inner" }
+      "url": {
+        "content": "$1",
+        "example": "example.com/inner"
+      }
     }
   },
   "sidepanel_steps_file_label": {
@@ -1478,7 +1481,10 @@
   "vault_unlock_context_attempt": {
     "message": "Attempt {count}",
     "placeholders": {
-      "count": { "content": "$1", "example": "2" }
+      "count": {
+        "content": "$1",
+        "example": "2"
+      }
     }
   },
   "vault_unlock_password_label": {
@@ -1564,5 +1570,74 @@
   },
   "sidepanel_elements_margin_placeholder": {
     "message": "0 auto"
+  },
+  "runner_error_missing_selector": {
+    "message": "A step has no selector. Edit the flow and pick the target element."
+  },
+  "runner_error_selector_not_found": {
+    "message": "The target element was not found on this page."
+  },
+  "runner_error_invalid_selector": {
+    "message": "A step has an invalid selector."
+  },
+  "runner_error_input_target_invalid": {
+    "message": "The target of an input step is not a text field or select box."
+  },
+  "runner_error_select_option_not_found": {
+    "message": "No option in the select box matched the value."
+  },
+  "runner_error_assertion_failed": {
+    "message": "An assert step did not match the expected value."
+  },
+  "runner_error_wait_appear_timeout": {
+    "message": "Timed out waiting for the element to appear."
+  },
+  "runner_error_wait_disappear_timeout": {
+    "message": "Timed out waiting for the element to disappear."
+  },
+  "runner_error_wait_condition_timeout": {
+    "message": "Timed out waiting for the condition."
+  },
+  "runner_error_navigate_url_missing": {
+    "message": "A navigate step has no URL."
+  },
+  "runner_error_navigate_url_invalid": {
+    "message": "A navigate step has an invalid URL."
+  },
+  "runner_error_navigate_timeout": {
+    "message": "The page took too long to load after navigation."
+  },
+  "runner_error_tab_closed": {
+    "message": "The tab running this flow was closed."
+  },
+  "runner_error_no_active_tab": {
+    "message": "No active tab to run the flow in."
+  },
+  "runner_error_refresh_required": {
+    "message": "Ladybird cannot reach this page yet. Reload the page and try again."
+  },
+  "page_run_started": {
+    "message": "Running flow: {name}"
+  },
+  "page_run_succeeded": {
+    "message": "Flow finished: {name}"
+  },
+  "page_run_failed": {
+    "message": "Flow failed: {name}"
+  },
+  "page_run_cancelled": {
+    "message": "Flow stopped: {name}"
+  },
+  "page_run_flow_missing": {
+    "message": "The flow linked to this button no longer exists. Edit the button in the Ladybird side panel."
+  },
+  "page_run_start_failed": {
+    "message": "Could not start the flow. Open the Ladybird side panel for details."
+  },
+  "page_run_data_source_confirm": {
+    "message": "Select a CSV/TSV file for step: {name}"
+  },
+  "page_run_action_target_missing": {
+    "message": "The element this button should click was not found on this page."
   }
 }

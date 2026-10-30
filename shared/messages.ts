@@ -70,6 +70,9 @@ export const MessageType = {
   // right before dispatching a selector-carrying atomic step. Each
   // content listener replies with `{matched}`; runner picks the winner.
   FLOW_RUN_FRAME_PROBE: 'FLOW_RUN_FRAME_PROBE',
+  // Runner -> top frame of the run's tab when a flow started from an
+  // injected page button ends, so the page can show a result notice.
+  PAGE_FLOW_RUN_FINISHED: 'PAGE_FLOW_RUN_FINISHED',
 } as const;
 
 export type MessageType = (typeof MessageType)[keyof typeof MessageType];
@@ -195,7 +198,7 @@ export type FlowRecordingStatusPayload = {
 // Same `FlowRunState` value lands in the sentinel (1.13) so orphan
 // cleanup treats it as an unfinished interruptible state.
 export type FlowRunState = 'queued' | 'running' | 'paused' | 'succeeded' | 'failed' | 'cancelled';
-export type FlowRunStartSource = 'flows-list' | 'flow-drawer-save-run';
+export type FlowRunStartSource = 'flows-list' | 'flow-drawer-save-run' | 'page-button';
 export type FlowConditionOperator = 'contains' | 'equals' | 'greater' | 'less';
 export type FlowRunAtomicStepType = 'click' | 'input' | 'wait' | 'assert' | 'condition' | 'popup' | 'read';
 export type FlowRunLogLevel = 'info' | 'success' | 'error';
@@ -271,6 +274,13 @@ export type FlowRunStatusPayload = {
   endedAt?: number;
   activeUrl: string;
   logs: FlowRunLogEntry[];
+};
+
+export type PageFlowRunFinishedPayload = {
+  flowName: string;
+  state: FlowRunState;
+  errorCode?: string;
+  errorMessage?: string;
 };
 
 export type FlowRunExecuteStepPayload = {
@@ -386,6 +396,7 @@ export type RuntimeMessage =
   | { type: typeof MessageType.START_FLOW_RUN; data: FlowRunStartPayload; forwarded?: boolean; targetTabId?: number }
   | { type: typeof MessageType.STOP_FLOW_RUN; data: FlowRunStopPayload; forwarded?: boolean; targetTabId?: number }
   | { type: typeof MessageType.FLOW_RUN_STATUS; data: FlowRunStatusPayload; forwarded?: boolean; targetTabId?: number }
+  | { type: typeof MessageType.PAGE_FLOW_RUN_FINISHED; data: PageFlowRunFinishedPayload; forwarded?: boolean; targetTabId?: number }
   | { type: typeof MessageType.FLOW_RUN_EXECUTE_STEP; data: FlowRunExecuteStepPayload; forwarded?: boolean; targetTabId?: number }
   | { type: typeof MessageType.FLOW_RUN_STEP_RESULT; data: FlowRunExecuteResultPayload; forwarded?: boolean; targetTabId?: number }
   | { type: typeof MessageType.FLOW_RUN_UNLOCK_CONTEXT; data: FlowRunUnlockContextRequest; forwarded?: boolean; targetTabId?: number }

@@ -507,10 +507,10 @@
     "message": "最近更新"
   },
   "sidepanel_hidden_subtitle": {
-    "message": "\u5f53\u524d\u7ad9\u70b9\u7684\u624b\u52a8\u89c4\u5219\u3002"
+    "message": "当前站点的手动规则。"
   },
   "sidepanel_hidden_action_select": {
-    "message": "\u9690\u85cf\u9875\u9762\u5143\u7d20"
+    "message": "隐藏页面元素"
   },
   "sidepanel_hidden_title": {
     "message": "隐藏规则"
@@ -962,7 +962,10 @@
   "sidepanel_steps_iframe_badge": {
     "message": "iframe: {url}",
     "placeholders": {
-      "url": { "content": "$1", "example": "example.com/inner" }
+      "url": {
+        "content": "$1",
+        "example": "example.com/inner"
+      }
     }
   },
   "sidepanel_steps_file_label": {
@@ -1200,22 +1203,22 @@
     "message": "全部暂停"
   },
   "sidepanel_hidden_auto_ads_on": {
-    "message": "\u542f\u7528\u81ea\u52a8\u5e7f\u544a\u5c4f\u853d"
+    "message": "启用自动广告屏蔽"
   },
   "sidepanel_hidden_auto_ads_off": {
-    "message": "\u6682\u505c\u81ea\u52a8\u5e7f\u544a\u5c4f\u853d"
+    "message": "暂停自动广告屏蔽"
   },
   "sidepanel_hidden_auto_ads_title": {
-    "message": "\u81ea\u52a8\u5e7f\u544a\u5c4f\u853d"
+    "message": "自动广告屏蔽"
   },
   "sidepanel_hidden_auto_ads_subtitle": {
-    "message": "\u9002\u7528\u4e8e\u6240\u6709\u9875\u9762\u7684\u5185\u7f6e\u5e38\u89c1\u5e7f\u544a\u89c4\u5219\u3002"
+    "message": "适用于所有页面的内置常见广告规则。"
   },
   "sidepanel_hidden_auto_ads_helper": {
-    "message": "\u8fd9\u662f\u5168\u5c40\u5185\u7f6e\u529f\u80fd\u3002\u4e0b\u65b9\u7684\u624b\u52a8\u9690\u85cf\u89c4\u5219\u4e0e\u5176\u5206\u5f00\u3002"
+    "message": "这是全局内置功能。下方的手动隐藏规则与其分开。"
   },
   "sidepanel_hidden_auto_ads_update_error": {
-    "message": "\u66f4\u65b0\u81ea\u52a8\u5e7f\u544a\u5c4f\u853d\u5931\u8d25\uff0c\u8bf7\u91cd\u8bd5\u3002"
+    "message": "更新自动广告屏蔽失败，请重试。"
   },
   "sidepanel_step_summary_wait_appear": {
     "message": "等待 {selector} 出现"
@@ -1478,7 +1481,10 @@
   "vault_unlock_context_attempt": {
     "message": "第 {count} 次尝试",
     "placeholders": {
-      "count": { "content": "$1", "example": "2" }
+      "count": {
+        "content": "$1",
+        "example": "2"
+      }
     }
   },
   "vault_unlock_password_label": {
@@ -1564,5 +1570,74 @@
   },
   "sidepanel_elements_margin_placeholder": {
     "message": "0 auto"
+  },
+  "runner_error_missing_selector": {
+    "message": "有步骤未设置选择器。请编辑流程并选择目标元素。"
+  },
+  "runner_error_selector_not_found": {
+    "message": "在此页面上找不到目标元素。"
+  },
+  "runner_error_invalid_selector": {
+    "message": "有步骤的选择器无效。"
+  },
+  "runner_error_input_target_invalid": {
+    "message": "输入步骤的目标不是文本框或下拉框。"
+  },
+  "runner_error_select_option_not_found": {
+    "message": "下拉框中没有与该值匹配的选项。"
+  },
+  "runner_error_assertion_failed": {
+    "message": "断言步骤的值与预期不符。"
+  },
+  "runner_error_wait_appear_timeout": {
+    "message": "等待元素出现超时。"
+  },
+  "runner_error_wait_disappear_timeout": {
+    "message": "等待元素消失超时。"
+  },
+  "runner_error_wait_condition_timeout": {
+    "message": "等待条件成立超时。"
+  },
+  "runner_error_navigate_url_missing": {
+    "message": "有跳转步骤未设置 URL。"
+  },
+  "runner_error_navigate_url_invalid": {
+    "message": "跳转步骤的 URL 无效。"
+  },
+  "runner_error_navigate_timeout": {
+    "message": "跳转后页面加载时间过长。"
+  },
+  "runner_error_tab_closed": {
+    "message": "运行此流程的标签页已关闭。"
+  },
+  "runner_error_no_active_tab": {
+    "message": "没有可运行流程的活动标签页。"
+  },
+  "runner_error_refresh_required": {
+    "message": "Ladybird 暂时无法连接此页面。请刷新页面后重试。"
+  },
+  "page_run_started": {
+    "message": "正在运行流程：{name}"
+  },
+  "page_run_succeeded": {
+    "message": "流程已完成：{name}"
+  },
+  "page_run_failed": {
+    "message": "流程运行失败：{name}"
+  },
+  "page_run_cancelled": {
+    "message": "流程已停止：{name}"
+  },
+  "page_run_flow_missing": {
+    "message": "此按钮关联的流程已不存在。请在 Ladybird 侧边栏中编辑该按钮。"
+  },
+  "page_run_start_failed": {
+    "message": "无法启动流程。详情请打开 Ladybird 侧边栏查看。"
+  },
+  "page_run_data_source_confirm": {
+    "message": "请为步骤“{name}”选择 CSV/TSV 文件"
+  },
+  "page_run_action_target_missing": {
+    "message": "在此页面上找不到此按钮要点击的元素。"
   }
 }

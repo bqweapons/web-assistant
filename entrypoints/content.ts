@@ -11,6 +11,24 @@ import { handleInjectionMessage, registerPageContextIfNeeded } from './content/i
 import { executeFlowRunStep } from './content/flowRunner';
 import { startFlowRecorder, stopFlowRecorder } from './content/flowRecorder';
 import { rehydratePersistedHiddenRules } from './content/hiddenRules';
+import { pageI18nMessage, showPageNotice } from './content/pageNotice';
+import { RUNNER_ERROR_MESSAGES } from '../shared/runnerErrorMessages';
+import type { PageFlowRunFinishedPayload } from '../shared/messages';
+
+const showRunFinishedNotice = (data: PageFlowRunFinishedPayload) => {
+  const name = data.flowName;
+  if (data.state === 'succeeded') {
+    showPageNotice('success', pageI18nMessage('page_run_succeeded', `Flow finished: ${name}`, { name }));
+    return;
+  }
+  if (data.state === 'cancelled') {
+    showPageNotice('info', pageI18nMessage('page_run_cancelled', `Flow stopped: ${name}`, { name }));
+    return;
+  }
+  const mapped = data.errorCode ? RUNNER_ERROR_MESSAGES[data.errorCode] : undefined;
+  const detail = mapped ? pageI18nMessage(mapped.messageKey, mapped.fallback) : data.errorMessage || data.errorCode;
+  showPageNotice('error', pageI18nMessage('page_run_failed', `Flow failed: ${name}`, { name }), detail);
+};
 
 const CONTENT_RUNTIME_READY_KEY = '__ladybirdContentRuntimeReady__';
 type RuntimeMessenger = { sendMessage?: (message: unknown) => void };
@@ -103,6 +121,16 @@ const startPageContextWatcher = (
   window.addEventListener('popstate', handlePop, true);
   window.addEventListener('hashchange', handlePop, true);
   window.addEventListener('visibilitychange', handleVisibility, true);
+  // The history wrappers above only see calls made from this isolated
+  // world, not the page's own router. The Navigation API's events reach
+  // every world, so SPA route changes are caught here; older browsers
+  // fall back to a cheap URL poll.
+  const navigationApi = (window as unknown as { navigation?: EventTarget }).navigation;
+  if (navigationApi?.addEventListener) {
+    navigationApi.addEventListener('currententrychange', () => notify());
+  } else {
+    window.setInterval(notify, 1000);
+  }
   notify();
 };
 
@@ -228,6 +256,11 @@ export default defineContentScript({
         }
         case MessageType.STOP_FLOW_RECORDING: {
           stopFlowRecorder(message.data.sessionId);
+          sendResponse?.({ ok: true });
+          return true;
+        }
+        case MessageType.PAGE_FLOW_RUN_FINISHED: {
+          showRunFinishedNotice(message.data);
           sendResponse?.({ ok: true });
           return true;
         }
