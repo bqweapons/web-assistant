@@ -62,7 +62,7 @@ export const getPageLabel = (
     }
     return pageUrl.replace(/^\/+/, '');
   }
-  const [hostCandidate, ...rest] = pageUrl.split('/');
+  const [hostCandidate = '', ...rest] = pageUrl.split('/');
   if (rest.length > 0) {
     return formatHostPath(hostCandidate, `/${rest.join('/')}`);
   }

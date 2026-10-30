@@ -134,8 +134,9 @@ export const useFocusTrap = (
         panel.focus();
         return;
       }
-      const first = tabbables[0];
-      const last = tabbables[tabbables.length - 1];
+      // Non-empty, checked above.
+      const first = tabbables[0]!;
+      const last = tabbables[tabbables.length - 1]!;
       const active = document.activeElement as HTMLElement | null;
       if (event.shiftKey) {
         if (active === first || !panel.contains(active)) {

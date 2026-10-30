@@ -325,7 +325,7 @@ export default function FlowStepsBuilder({
                 showWhen: { fieldId: 'mode', value: 'time' },
               },
             ];
-          } else if (!nextFields[durationIndex].value) {
+          } else if (!nextFields[durationIndex]?.value) {
             nextFields = nextFields.map((field, index) =>
               index === durationIndex ? { ...field, value: '1200' } : field,
             );

@@ -144,7 +144,7 @@ export const colorToHex = (value: string) => {
   if (!match) {
     return '';
   }
-  const [, r, g, b, a] = match;
+  const [, r = '0', g = '0', b = '0', a] = match;
   if (a !== undefined && Number(a) === 0) {
     return '';
   }

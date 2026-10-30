@@ -27,7 +27,7 @@ const openPanel = async ({ context, extensionId, page, site, serviceWorker }: {
   await page.bringToFront();
   await serviceWorker.evaluate(async (origin) => {
     const [tab] = await chrome!.tabs.query({ url: `${origin}/*` });
-    await chrome!.tabs.update(tab.id!, { active: true });
+    await chrome!.tabs.update(tab!.id!, { active: true });
   }, site.origin);
   await expect(panel.getByText(site.siteKey).first()).toBeVisible();
   return panel;

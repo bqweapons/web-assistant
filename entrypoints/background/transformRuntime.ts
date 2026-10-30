@@ -132,7 +132,7 @@ const tokenizeExpression = (input: string): Token[] => {
   const tokens: Token[] = [];
   let index = 0;
   while (index < input.length) {
-    const char = input[index];
+    const char = input.charAt(index);
     if (/\s/.test(char)) {
       index += 1;
       continue;
@@ -145,7 +145,7 @@ const tokenizeExpression = (input: string): Token[] => {
       index += 1;
       let value = '';
       while (index < input.length) {
-        const nextChar = input[index];
+        const nextChar = input.charAt(index);
         if (nextChar === '\\') {
           const escaped = input[index + 1] ?? '';
           const mapped =
@@ -173,8 +173,8 @@ const tokenizeExpression = (input: string): Token[] => {
     if (/\d/.test(char)) {
       let raw = char;
       index += 1;
-      while (index < input.length && /[\d.]/.test(input[index])) {
-        raw += input[index];
+      while (index < input.length && /[\d.]/.test(input.charAt(index))) {
+        raw += input.charAt(index);
         index += 1;
       }
       const numeric = Number(raw);
@@ -202,8 +202,8 @@ const tokenizeExpression = (input: string): Token[] => {
     if (isIdentifierStart(char)) {
       let name = char;
       index += 1;
-      while (index < input.length && isIdentifierPart(input[index])) {
-        name += input[index];
+      while (index < input.length && isIdentifierPart(input.charAt(index))) {
+        name += input.charAt(index);
         index += 1;
       }
       tokens.push({ type: 'identifier', value: name });
@@ -506,13 +506,13 @@ export const runSafeTransformCode = (input: {
     }
     const declaration = /^(?:const|let|var)\s+([A-Za-z_$][A-Za-z0-9_$]*)\s*=\s*([\s\S]+)$/.exec(line);
     if (declaration) {
-      const [, name, expression] = declaration;
+      const [, name = '', expression = ''] = declaration;
       scope[name] = evaluateExpression(expression.trim(), scope);
       continue;
     }
     const returnMatch = /^return\s+([\s\S]+)$/.exec(line);
     if (returnMatch) {
-      const value = evaluateExpression(returnMatch[1].trim(), scope);
+      const value = evaluateExpression((returnMatch[1] ?? '').trim(), scope);
       return toTextValue(value);
     }
     throw new Error(`Unsupported statement in JS transform: ${line}`);

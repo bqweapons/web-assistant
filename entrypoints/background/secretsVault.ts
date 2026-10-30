@@ -484,7 +484,7 @@ export const resolveSecretTokens = async (input: string): Promise<string> => {
   if (matches.length === 0) {
     return input;
   }
-  const uniqueNames = Array.from(new Set(matches.map((match) => match[1] || match[2]).filter(Boolean)));
+  const uniqueNames = Array.from(new Set(matches.map((match) => match[1] || match[2]).filter((name): name is string => Boolean(name))));
   const resolved = new Map<string, string>();
   for (const name of uniqueNames) {
     resolved.set(name, await resolveSecretValue(name));

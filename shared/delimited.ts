@@ -56,7 +56,7 @@ export const extractDelimitedMeta = (
   if (rows.length === 0) {
     return { columns: [] as string[], rowCount: 0, rows };
   }
-  const headerParts = rows[0];
+  const headerParts = rows[0] ?? [];
   const columns = hasHeader
     ? headerParts.map((value) => value.trim()).filter(Boolean)
     : headerParts.map((_, index) => `column${index + 1}`);
@@ -71,7 +71,7 @@ export const mapDelimitedRowsToObjects = (
   if (table.length === 0) {
     return { columns: [] as string[], rows: [] as Record<string, string>[] };
   }
-  const header = table[0];
+  const header = table[0] ?? [];
   const columns = hasHeader
     ? header.map((value, index) => value.trim() || `column${index + 1}`)
     : header.map((_value, index) => `column${index + 1}`);

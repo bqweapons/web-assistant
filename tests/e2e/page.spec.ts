@@ -77,7 +77,7 @@ test('button bound to a deleted flow explains the problem', async ({ page }) => 
 test('element picker shows a hint and closes on Esc', async ({ page, serviceWorker, site }) => {
   await serviceWorker.evaluate(async (origin) => {
     const [tab] = await chrome!.tabs.query({ url: `${origin}/*` });
-    await chrome!.tabs.sendMessage(tab.id!, { type: 'START_PICKER', data: { accept: 'selector' } }, { frameId: 0 });
+    await chrome!.tabs.sendMessage(tab!.id!, { type: 'START_PICKER', data: { accept: 'selector' } }, { frameId: 0 });
   }, site.origin);
   const overlay = page.locator('[data-picker-overlay]');
   await expect(overlay).toHaveCount(1);
