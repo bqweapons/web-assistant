@@ -117,9 +117,10 @@ When changing runtime messages:
 ### Release checklist (minimum)
 1. `npm run i18n:check`
 2. `npm run compile`
-3. `npm run build`
-4. `npm run zip`
-5. Manual sanity checks:
+3. `npm test`
+4. `npm run test:e2e` (builds the extension, then runs the Playwright suite)
+5. `npm run zip`
+6. Manual sanity checks:
    - sidepanel opens and tabs localize correctly
    - upgrade path from old local data works (legacy storage auto-migration)
    - import/export works (including optional vault export/import)

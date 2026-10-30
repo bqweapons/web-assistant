@@ -42,6 +42,9 @@ npm run dev
 npm run i18n:check
 npm run compile
 npm run build
+# ユニットテスト、続いて E2E テスト（先にビルドします。初回のみ `npx playwright install chromium` が必要）
+npm test
+npm run test:e2e
 ```
 
 ### 配布用 zip の作成
