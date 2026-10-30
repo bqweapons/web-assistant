@@ -12,7 +12,8 @@
 
 - [ ] Bind a password field to Password Vault in a flow input step
 - [ ] Close sidepanel and run the flow
-- [ ] Confirm in-page vault unlock prompt appears
+- [ ] Confirm the extension's vault unlock window opens (the password is not typed into the page)
+- [ ] Start a flow from an on-page button and confirm the page shows a started / finished / failed notice
 - [ ] Enter wrong vault password and confirm retry prompt appears
 - [ ] Enter correct password and confirm flow resumes from current step
 - [ ] Cancel unlock prompt and confirm run stops with user-facing error

@@ -96,7 +96,7 @@ When changing runtime messages:
 - Do not log plain-text input values or vault passwords.
 - Flow execution logs must remain non-sensitive.
 - Password fields should use Password Vault bindings, not literal flow values.
-- If a vault operation fails due to lock state, prefer user-facing recovery UX (page unlock prompt or clear sidepanel error).
+- If a vault operation fails due to lock state, prefer user-facing recovery UX (the extension-owned vault unlock window or a clear sidepanel error).
 
 ### Legacy policy
 - `legacy/v1` is for comparison, debugging, and emergency maintenance only.
@@ -212,7 +212,7 @@ Use the current implementation in `entrypoints/background/runner/stepExecution.t
 ## 9. Debugging Tips
 
 - Check sidepanel flow run status and logs first.
-- If a flow silently fails while the sidepanel is closed, verify whether a page-side prompt (popup/vault unlock) is waiting.
+- If a flow silently fails while the sidepanel is closed, verify whether a popup step on the page or the vault unlock window is waiting. Flows started from an on-page button also show a result notice on the page.
 - For `secret-not-found`, rebind the password in the flow step (vault may have been reset).
 - For i18n issues, run `npm run i18n:check` before assuming runtime bugs.
 

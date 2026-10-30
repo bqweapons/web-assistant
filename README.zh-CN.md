@@ -12,9 +12,10 @@ Ladybird 是一个 Manifest V3 浏览器扩展，用于在网页中添加无代�
 
 核心能力：
 - 侧边栏管理（`Elements` / `Flows` / `Hidden` / `Overview` / `Settings`）
-- 动作流编辑器（`click`, `wait`, `input`, `navigate`, `log`, `if`, `while`, `popup`）
+- 动作流编辑器（点击、输入、等待、断言、跳转、弹窗、条件分支、循环、CSV/TSV 数据源、变量）
 - 用于流程复用输入的密码保管库（Password Vault）
 - 导入 / 导出（可选包含保管库数据）
+- 按站点的隐藏规则，以及全局的自动广告屏蔽开关
 - 多语言界面（`en`, `ja`, `zh_CN`）
 
 ## Chrome Web Store
@@ -69,16 +70,12 @@ npm run zip
 
 ## 动作流（概览）
 
-当注入按钮被点击时，流程会执行，并在链接跳转或选择器回退动作之前自动操作页面。
+当注入按钮被点击时（或从侧边栏运行），流程会执行，并在链接跳转或选择器回退动作之前自动操作页面。从页面按钮启动流程时，页面上会显示一个小提示，告知已开始以及完成或失败。
 
 支持的步骤类型包括：
-- `click`
-- `wait`
-- `input`
-- `navigate`
-- `log`
-- `if` / `while`
-- `popup`
+- `click`, `input`, `wait`, `assert`, `navigate`, `popup`
+- `if-else`, `loop`
+- `data-source` （按 CSV/TSV 行运行）, `set-variable`
 
 详细的步骤字段、条件、运行限制、frame 行为、保管库使用说明请参见 `AGENTS.md` 的 Action Flow Reference。
 
@@ -118,7 +115,8 @@ Ladybird 内置了兼容迁移逻辑，可在升级后将旧格式保存数据�
 
 ### 辅助材料
 - `docs/` 文档与策略内容
-- `release/` 历史产物、评审记录与商店素材
+- `store-listing/` Chrome Web Store 商店文案（en / ja / zh-CN）
+- `CHANGELOG.md` 版本更新记录
 
 ## 开发与贡献说明
 
@@ -132,5 +130,5 @@ Ladybird 内置了兼容迁移逻辑，可在升级后将旧格式保存数据�
 
 - 除非你主动导出，数据默认存储在 `chrome.storage.local`。
 - Password Vault 的秘密值仅在本地加密存储，使用时需要保管库密码解锁。
-- 不支持跨域 iframe 自动化。
+- 跨域 iframe 自动化存在限制，并非所有场景都可用。
 - 对 CSP 严格或 DOM 高频变化的网站，注入稳定性可能受影响。
