@@ -42,6 +42,9 @@ npm run dev
 npm run i18n:check
 npm run compile
 npm run build
+# Unit tests, then end-to-end tests (builds first; needs `npx playwright install chromium` once)
+npm test
+npm run test:e2e
 ```
 
 ### Package a zip for distribution

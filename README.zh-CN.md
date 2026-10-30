@@ -42,6 +42,9 @@ npm run dev
 npm run i18n:check
 npm run compile
 npm run build
+# 单元测试，然后端到端测试（会先构建；首次需运行 `npx playwright install chromium`）
+npm test
+npm run test:e2e
 ```
 
 ### 打包 zip（分发用）
